@@ -115,23 +115,29 @@
 
   /* ---------- tela de entrada ---------- */
   let pronto, prontoOk; pronto = new Promise(r => prontoOk = r);
-  const css = `#lg{position:fixed;inset:0;z-index:2000;background:#F5F1E8;display:flex;align-items:center;justify-content:center;padding:16px;font:15px/1.45 "Segoe UI",system-ui,sans-serif;color:#1A1A1A}
-  #lg .bx{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:28px 26px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px}
-  #lg h1{font-size:22px;margin:0;color:#143F54}#lg p{margin:0;color:#6B6558;font-size:13.5px}
-  #lg input{height:46px;border:1.5px solid #E5DFD0;border-radius:10px;padding:0 12px;font:inherit;width:100%;box-sizing:border-box}#lg input:focus{outline:none;border-color:#1B5C7A}
-  #lg button{height:46px;border:0;border-radius:10px;background:#1B5C7A;color:#fff;font:inherit;font-weight:700;cursor:pointer}#lg button:disabled{opacity:.6}
-  #lg .lk{background:none;color:#1B5C7A;height:auto;padding:2px 0;font-weight:600;font-size:13.5px}#lg .er{color:#A2453D;font-size:13px;min-height:18px}#lg .ok{color:#3F7D5C}
-  #lg .rw{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}`;
+  const css = `#lg{position:fixed;inset:0;z-index:2000;background:#fff;display:flex;align-items:center;justify-content:center;padding:16px;font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;color:#1A1A1A;overflow:auto}
+  #lg .bx{background:#F6F4EF;border:1px solid #E3DED4;border-radius:12px;box-shadow:0 10px 40px rgba(26,26,26,.06);padding:30px 32px 26px;width:100%;max-width:426px;display:flex;flex-direction:column;gap:0}
+  #lg .lg-logo{display:block;height:46px;width:auto;margin:0 auto 14px}
+  #lg h1{font-size:19px;font-weight:700;margin:0;text-align:center;color:#1A1A1A}#lg .lg-sub{margin:4px 0 22px;text-align:center;color:#9A948A;font-size:13px}
+  #lg label{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;color:#4A463D;margin:0 0 6px}
+  #lg input{height:38px;border:1px solid #CFCAC0;border-radius:6px;padding:0 12px;font:inherit;font-size:14px;width:100%;box-sizing:border-box;background:#fff;margin:0 0 16px}
+  #lg input:focus{outline:none;border-color:#1B5C7A;box-shadow:0 0 0 3px rgba(27,92,122,.14)}#lg input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #E8F0FE inset}
+  #lg .lg-go{height:50px;border:0;border-radius:6px;background:#1B5C7A;color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer;margin-top:6px}#lg .lg-go:hover{background:#143F54}#lg .lg-go:disabled{opacity:.6}
+  #lg .lk{border:0;background:none;color:#6B6558;padding:2px 0;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}#lg .lk:hover{color:#1B5C7A;text-decoration:underline}
+  #lg .er{color:#A2453D;font-size:13px;min-height:0;margin:-6px 0 4px}#lg .er:empty{display:none}#lg .ok{color:#3F7D5C}
+  #lg .rw{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:14px}`;
   function msgErro(e) { const c = (e && e.code) || ''; return ({ 'auth/invalid-credential': 'E-mail ou senha incorretos.', 'auth/wrong-password': 'E-mail ou senha incorretos.', 'auth/user-not-found': 'E-mail ou senha incorretos.',
     'auth/invalid-email': 'E-mail inválido.', 'auth/email-already-in-use': 'Já existe uma conta com esse e-mail. Use "Entrar".', 'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
     'auth/too-many-requests': 'Muitas tentativas. Espere alguns minutos.', 'auth/network-request-failed': 'Sem internet.' })[c] || 'Não deu certo (' + c + ').'; }
   function telaEntrar(modo) {
     let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
     const cria = modo === 'criar';
-    el.innerHTML = `<form class="bx" autocomplete="on"><h1>Painel de Operação</h1><p>${cria ? 'Crie sua conta. Depois o PCP libera o seu acesso.' : 'Entre com seu e-mail e senha.'}</p>
-      ${cria ? '<input id="lg-n" placeholder="Seu nome" autocomplete="name" required>' : ''}
-      <input id="lg-e" type="email" placeholder="E-mail" autocomplete="username" required><input id="lg-s" type="password" placeholder="Senha" autocomplete="${cria ? 'new-password' : 'current-password'}" required minlength="6">
-      <div class="er" id="lg-er"></div><button type="submit">${cria ? 'Criar conta' : 'Entrar'}</button>
+    const logo = (document.querySelector('.brand img') || {}).src || '';
+    el.innerHTML = `<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>Painel de Operação</h1><div class="lg-sub">${cria ? 'Criar conta · o PCP libera o acesso' : 'Produção · PCP · Almoxarifado'}</div>
+      ${cria ? '<label for="lg-n">NOME</label><input id="lg-n" autocomplete="name" required>' : ''}
+      <label for="lg-e">E-MAIL</label><input id="lg-e" type="email" autocomplete="username" required>
+      <label for="lg-s">SENHA</label><input id="lg-s" type="password" autocomplete="${cria ? 'new-password' : 'current-password'}" required minlength="6">
+      <div class="er" id="lg-er"></div><button type="submit" class="lg-go">${cria ? 'Criar conta →' : 'Entrar →'}</button>
       <div class="rw"><button type="button" class="lk" id="lg-t">${cria ? 'Já tenho conta' : 'Criar conta'}</button>${cria ? '' : '<button type="button" class="lk" id="lg-r">Esqueci a senha</button>'}</div></form>`;
     const f = el.querySelector('form'), er = el.querySelector('#lg-er');
     el.querySelector('#lg-t').onclick = () => telaEntrar(cria ? 'entrar' : 'criar');
