@@ -10,6 +10,26 @@
   const emailDe = s => { s = String(s || '').trim().toLowerCase(); return s.includes('@') ? s : usuarioLimpo(s) + '@' + DOM; };
   const usuarioDe = em => { em = String(em || '').toLowerCase(); return em.endsWith('@' + DOM) ? em.slice(0, -DOM.length - 1) : em; };
   const DONOS = (CFG.donos || []).map(emailDe);
+  /* texto de erro para a tela (antes esta função não existia e o botão ficava preso em "Entrando…") */
+  const msgErro = e => { const c = (e && e.code) || '';
+    const M = {
+      'auth/network-request-failed': 'Sem conexão com o Firebase. Confira a internet (ou VPN/bloqueador de anúncios) e tente de novo.',
+      'auth/operation-not-allowed': 'O login por e-mail e senha está desligado no Firebase (Authentication → Sign-in method → E-mail/senha → Ativar).',
+      'auth/unauthorized-domain': 'Este endereço do site não está autorizado no Firebase (Authentication → Settings → Authorized domains).',
+      'auth/too-many-requests': 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.',
+      'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
+      'auth/invalid-email': 'Usuário inválido. Use só letras, números, ponto, traço ou sublinhado.',
+      'auth/user-disabled': 'Esta conta foi desativada. Fale com o PCP.',
+      'auth/invalid-api-key': 'A chave do Firebase (apiKey) no config.js está inválida.',
+      'auth/api-key-not-valid': 'A chave do Firebase (apiKey) no config.js está inválida.',
+      'auth/requests-from-referer-blocked': 'A chave do Firebase está restrita e não aceita este endereço do site (Google Cloud → Credenciais).',
+      'auth/requires-recent-login': 'Por segurança, saia e entre de novo antes de trocar a senha.',
+      'usuario-vazio': 'Digite um usuário válido.',
+      'sem-permissao': 'Você não tem permissão para isso.',
+      'tempo-esgotado': 'O Firebase demorou demais para responder. Tente de novo.' };
+    if (M[c]) return M[c];
+    if (/referer.*blocked/i.test(c + ' ' + ((e && e.message) || ''))) return M['auth/requests-from-referer-blocked'];
+    return 'Não deu certo (' + (c || (e && e.message) || 'erro') + '). Tente de novo ou avise o PCP.'; };
   firebase.initializeApp(CFG.firebase);
   const auth = firebase.auth();
   /* banco com nome (ex.: "default" sem parênteses) ou o padrão "(default)" */
