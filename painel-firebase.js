@@ -230,8 +230,13 @@
   #lg .qr-imp{display:grid;gap:8px;margin:0 0 16px}#lg .qr-imp button{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;border:1.5px solid #E0D9C9;border-radius:12px;background:#fff;font:inherit;font-size:16px;font-weight:700;color:#1A1A1A;cursor:pointer;text-align:left}
   #lg .qr-imp i{width:14px;height:14px;border-radius:999px;flex-shrink:0}#lg .qr-imp [data-v=parou] i{background:#C0665D}#lg .qr-imp [data-v=reduziu] i{background:#D2A857}#lg .qr-imp [data-v=nao] i{background:#6A9C7E}
   #lg .qr-imp button[aria-pressed=true]{border-width:2.5px;border-color:#143F54;background:#EEF4F6}#lg .qr-imp [data-v=parou][aria-pressed=true]{border-color:#A2453D;background:#F8E6E3}
+  #lg .qr-eqs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}#lg .qr-eqs:empty{display:none}#lg .qr-eqs button{height:40px;padding:0 14px;border-radius:999px;border:1.5px solid #E0D9C9;background:#fff;font:inherit;font-size:14px;font-weight:600;cursor:pointer}#lg .qr-eqs button[aria-pressed=true]{background:#143F54;border-color:#143F54;color:#fff}
   #lg .qr-ok{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}#lg .qr-ok .qr-big{width:84px;height:84px;border-radius:999px;background:#E2EEE6;color:#3F7D5C;display:flex;align-items:center;justify-content:center;animation:qrpop .4s ease-out}
   @keyframes qrpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}#lg .qr-ok h1{font-size:24px}#lg .qr-ok p{margin:0;color:#4A463D;font-size:15px;max-width:34ch}`;
+  async function comprimir(file) { const url = await new Promise((ok, er) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = er; r.readAsDataURL(file); });
+    const img = await new Promise((ok, er) => { const i = new Image(); i.onload = () => ok(i); i.onerror = er; i.src = url; });
+    let w = img.width, h = img.height; const mx = 1280; if (Math.max(w, h) > mx) { const k = mx / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(img, 0, 0, w, h); let q = .72, d = cv.toDataURL('image/jpeg', q); while (d.length > 700000 && q > .3) { q -= .12; d = cv.toDataURL('image/jpeg', q); } return d; }
   function telaChamado(fase, info) { MODO_QR = true;
     let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
     if (!document.getElementById('lg-css3')) { const st3 = document.createElement('style'); st3.id = 'lg-css3'; st3.textContent = cssQr; document.head.appendChild(st3); }
@@ -242,11 +247,25 @@
     el.innerHTML = `<form class="bx qr-bx" autocomplete="off"><div class="qr-top"><span class="qr-ic">${svg('manutencao', 30, 2)}</span><div><small>CHAMAR MANUTENÇÃO</small><b>${esc(QR_LINHA)}</b></div></div>
       <label for="qr-d">O QUE ESTÁ ACONTECENDO?</label><textarea id="qr-d" required maxlength="900" placeholder="Ex.: correia do elevador rompeu"></textarea>
       <label>A LINHA…</label><div class="qr-imp">${[['parou', 'Parou'], ['reduziu', 'Está produzindo menos'], ['nao', 'Continua normal']].map(([k, t]) => `<button type="button" data-v="${k}" aria-pressed="false"><i></i>${t}</button>`).join('')}</div>
-      <label for="qr-e">EQUIPAMENTO (SE SOUBER)</label><div class="lg-in"><input id="qr-e" maxlength="80" placeholder="Ex.: misturador, ensacadeira"></div>
+      <label for="qr-e">EQUIPAMENTO (SE SOUBER)</label><div class="qr-eqs" id="qr-eqs"></div><div class="lg-in"><input id="qr-e" maxlength="80" placeholder="Ex.: misturador, ensacadeira"></div>
+      <div class="qr-foto" id="qr-foto"><label class="lg-inst" style="margin:0 0 16px;cursor:pointer">📷 Tirar foto do defeito (opcional)<input type="file" accept="image/*" capture="environment" id="qr-fi" hidden></label></div>
       <label for="qr-n">SEU NOME</label><div class="lg-in"><input id="qr-n" required maxlength="60" autocomplete="name" value="${esc(nome)}"></div>
       <div class="er" id="qr-er" role="alert"></div><button type="submit" class="lg-go">Enviar chamado</button>
       <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">Não precisa de usuário nem senha.</span><button type="button" class="lk" id="qr-login">Entrar com usuário</button></div><div class="lg-pe">Colafix · Manutenção</div></form>`;
-    const f = el.querySelector('form'), er = el.querySelector('#qr-er'); let imp = '';
+    const f = el.querySelector('form'), er = el.querySelector('#qr-er'); let imp = '', eqId = '', foto = '';
+    /* equipamentos da linha (lista da manutenção) e foto */
+    (async () => { try { if (!auth.currentUser) await auth.signInAnonymously(); const g = await fs.doc('config/manut').get(); const es = ((g.exists && g.data().equips) || []).filter(e => e.ativo !== false && e.linha === QR_LINHA);
+      const box = el.querySelector('#qr-eqs'); if (!box || !es.length) return;
+      box.innerHTML = es.map(e => `<button type="button" data-id="${esc(e.id)}" data-n="${esc(e.nome)}">${esc(e.nome)}</button>`).join('');
+      box.querySelectorAll('button').forEach(b => b.onclick = () => { const on = eqId !== b.dataset.id; eqId = on ? b.dataset.id : ''; el.querySelector('#qr-e').value = on ? b.dataset.n : ''; box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b && on)); });
+    } catch (e) { console.warn('equipamentos', e); } })();
+    el.querySelector('#qr-e').oninput = () => { eqId = ''; el.querySelectorAll('#qr-eqs button').forEach(x => x.setAttribute('aria-pressed', 'false')); };
+    const ligaFoto = () => { const bx = el.querySelector('#qr-foto'); if (!bx) return;
+      bx.innerHTML = foto ? `<div style="display:flex;align-items:center;gap:12px;margin:0 0 16px"><img src="${foto}" alt="Foto" style="height:90px;border-radius:10px"><button type="button" class="lk" id="qr-fx">Tirar a foto</button></div>`
+        : '<label class="lg-inst" style="margin:0 0 16px;cursor:pointer">📷 Tirar foto do defeito (opcional)<input type="file" accept="image/*" capture="environment" id="qr-fi" hidden></label>';
+      const x = bx.querySelector('#qr-fx'); if (x) x.onclick = () => { foto = ''; ligaFoto(); };
+      const fi = bx.querySelector('#qr-fi'); if (fi) fi.onchange = async ev => { const fl = ev.target.files && ev.target.files[0]; if (!fl) return; try { foto = await comprimir(fl); } catch (e) { er.textContent = 'Não consegui ler a foto.'; } ligaFoto(); }; };
+    ligaFoto();
     f.querySelectorAll('.qr-imp button').forEach(b => b.onclick = () => { imp = b.dataset.v; f.querySelectorAll('.qr-imp button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
     el.querySelector('#qr-login').onclick = () => { MODO_QR = false; telaEntrar('entrar'); };
     setTimeout(() => { const t = el.querySelector('#qr-d'); t && t.focus(); }, 60);
@@ -256,7 +275,10 @@
       b.disabled = true; b.textContent = 'Enviando…'; try { localStorage.setItem('painel.qrnome', n); } catch (e) {}
       try { if (!auth.currentUser) await auth.signInAnonymously();
         const id = 'q-' + novoId(), agora = new Date(), loc = new Date(agora.getTime() - agora.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
-        await fs.doc('chamados/' + id).set({ linha: QR_LINHA.slice(0, 59), quando: loc, defeito: d.slice(0, 900), impacto: imp, nome: n.slice(0, 60), equip: eq ? eq.slice(0, 80) : null, status: 'Aberta', criado: agora.toISOString(), por: null, numero: 999999, qr: true, qid: id, origem: 'qr' });
+        let fid = null; if (foto) { fid = 'f-' + novoId(); try { await fs.doc('chamfotos/' + fid).set({ d: foto, em: agora.toISOString(), origem: 'qr' }); } catch (e) { console.warn('foto', e); fid = null; } }
+        const doc = { linha: QR_LINHA.slice(0, 59), quando: loc, defeito: d.slice(0, 900), impacto: imp, nome: n.slice(0, 60), equip: eq ? eq.slice(0, 80) : null, status: 'Aberta', criado: agora.toISOString(), por: null, numero: 999999, qr: true, qid: id, origem: 'qr' };
+        if (fid) doc.foto = fid; if (eqId) doc.equipId = eqId;
+        await fs.doc('chamados/' + id).set(doc);
         telaChamado('ok', { parou: imp === 'parou' });
       } catch (e) { console.warn('qr', e); b.disabled = false; b.textContent = 'Enviar chamado';
         er.textContent = e && e.code === 'auth/operation-not-allowed' ? 'O chamado sem login ainda não foi ativado. Avise o PCP (Firebase → Authentication → Anônimo).' : e && (e.code === 'permission-denied' || e.code === 'sem-permissao') ? 'O banco recusou o chamado. Avise o PCP para publicar as regras novas.' : e && e.code === 'auth/network-request-failed' ? 'Sem internet. Tente de novo.' : 'Não deu certo (' + ((e && e.code) || 'erro') + '). Tente de novo.'; } };

@@ -9527,6 +9527,11 @@ function tabLinkInicial(){
 
 
 
+
+
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -9959,7 +9964,7 @@ function mpAvisoPinta(){ let el=document.getElementById('mp-aviso'); const N=S.m
   el.className='mp-aviso '+(par?'crit':'');
   el.innerHTML=`<div class="mp-av-ic">🔔</div><div class="mp-av-tx"><small>${par?'MÁQUINA PARADA · CHAMADO NOVO':'CHAMADO NOVO'}${c.origem==='qr'?' · PELO QR':''}</small><b>${esc(c.linha||'')}</b><span>${esc(String(c.defeito||'').slice(0,110))}${c.nome?' · '+esc(c.nome):''}</span></div>
    <div class="mp-av-bt">${pronta?`<button class="btn" data-act="mm-assumir" data-n="${c.numero}">Assumir</button>`:'<span class="sub" style="color:inherit;opacity:.8;margin:0">gerando a OS…</span>'}<button class="btn sec" data-act="mp-av-ver">Ver</button><button class="mp-av-x" data-act="mp-av-x" aria-label="Fechar">✕</button></div>`; }
-function mpVigia(){ if(!mpPodeAvisar()||!S.acs.pronto) return; const ab=(S.chamados||[]).filter(c=>!c.excluido&&c.status==='Aberta');
+function mpVigia(){ if(!mpPodeAvisar()||!S.acs.pronto) return; const ab=(S.chamados||[]).filter(c=>!c.excluido&&c.status==='Aberta'&&!c.prevId);
   const ids=new Set(ab.map(mpChave)); if(S.mp.vistos===null){ S.mp.vistos=ids; return; }
   const novos=ab.filter(c=>!S.mp.vistos.has(mpChave(c))&&Date.now()-new Date(c.criado||0).getTime()<30*6e4); S.mp.vistos=new Set([...S.mp.vistos,...ids]);
   if(novos.length) mpAvisa(novos.sort((a,b)=>(b.impacto==='parou')-(a.impacto==='parou'))[0]);
@@ -9987,6 +9992,266 @@ document.head.insertAdjacentHTML('beforeend',`<style id="mp-css2">
 @media (prefers-reduced-motion:reduce){ .mp-aviso,.mp-av-ic{animation:none!important} }
 </style>`);
 /* ===FIM MANP=== */
+/* ===================== MANUTENÇÃO 2 (06/10): equipamentos, preventivas, peças, fotos, confiabilidade e TV da oficina ===================== */
+/* config/manut = {equips:[{id,linha,nome,tag,ativo}], prev:[{id,equip,tarefa,freq,prox,ultima,ativo,osDe,os}], pecas:[{cod,desc,un,min}]}
+   pecasmov/{id} = {cod,desc,un,qtd(+ entrada / − saída),tipo:'entrada'|'saida'|'ajuste',os?,em,por,obs?}   chamfotos/{id} = {d:dataURL,em,origem} */
+P.foto='<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>';
+P.engr='<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>';
+P.cal2='<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/>';
+P.peca='<path d="M10 3h4v3l3 2v4h3v4h-3v4H7v-4H4v-4h3V8l3-2z"/>';
+P.tela='<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>';
+S.mx={cfg:{equips:[],prev:[],pecas:[]},lido:false,sub:false,movs:[],fotos:{},eq:{linha:'',nome:'',tag:'',ed:null},pv:{equip:'',tarefa:'',freq:'30',prox:'',ed:null,fil:'todas'},pc:{cod:'',desc:'',un:'un',min:'',ent:{cod:'',qtd:'',obs:''},busca:''},add:{cod:'',qtd:'1'},ger:false};
+Object.assign(VIEWS,{manprev:{nome:'Preventivas',ic:'cal2',mob:'Prevent.'},manequip:{nome:'Equipamentos',ic:'engr',mob:'Equip.'},manpecas:{nome:'Peças',ic:'peca',mob:'Peças'}});
+Object.assign(CRUMB,{manprev:'Manutenção preventiva',manequip:'Equipamentos',manpecas:'Peças da manutenção'});
+{ const M=MODS.find(m=>m.id==='manut'); if(M){ const qr=M.views.indexOf('manqr'); ['manprev','manequip','manpecas'].forEach(v=>{ if(!M.views.includes(v)) M.views.splice(qr<0?M.views.length:M.views.indexOf('manqr'),0,v); }); } }
+{ const _vo=viewOk; viewOk=function(v){ if(['manprev','manequip','manpecas'].includes(v)){ if(S.acs&&S.acs.dono) return true; const p=acsP(); return !!p&&!p.tudo&&(p.mods||[]).includes('manut'); } return _vo.apply(this,arguments); }; }
+{ const _mv=manView; manView=function(v){ return v==='manprev'?vManPrev():v==='manequip'?vManEquip():v==='manpecas'?vManPecas():_mv(v); }; }
+/* assinaturas */
+setInterval(()=>{ try{ const X=S.mx; if(X.sub||!S.db||!S.acs||!S.acs.pronto||!viewOk('manch')) return; X.sub=true;
+  S.db.doc('config/manut').onSnapshot(s=>{ const d=s.exists?(s.data()||{}):{}; X.cfg={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[]}; X.lido=true; rerenderSeguro(); },()=>{ X.lido=true; });
+  inscrever('pecasmov',()=>S.db.collection('pecasmov').orderBy('em','desc').limit(1000),snap=>{ X.movs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); });
+}catch(e){} },700);
+function mxId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+async function mxGrava(muda){ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const n={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[]}; muda(n); n.em=new Date().toISOString(); n.por=S.uid||null; await S.db.doc('config/manut').set(n); S.mx.cfg={equips:n.equips,prev:n.prev,pecas:n.pecas}; }
+function mxEquips(linha){ return (S.mx.cfg.equips||[]).filter(e=>e.ativo!==false&&(!linha||e.linha===linha)).sort((a,b)=>String(a.nome).localeCompare(String(b.nome))); }
+function mxEquip(id){ return (S.mx.cfg.equips||[]).find(e=>e.id===id); }
+function mxNorm(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
+function mxHoras(m){ return m==null?'—':m<60?m+' min':(m/60).toFixed(m<600?1:0).replace('.',',')+' h'; }
+function mxDias(d){ return d==null?'—':d<1?Math.round(d*24)+' h':(d<10?d.toFixed(1).replace('.',','):Math.round(d))+' d'; }
+/* número da OS (mesmo jeito do chamado normal) */
+async function mxNovaOS(base){ let n=(S.chamados||[]).reduce((m,c)=>Math.max(m,(+c.numero||0)<900000?(+c.numero||0):0),0)+1, doc=null;
+  for(let i=0;i<60&&!doc;i++,n++){ const ref=S.db.doc('chamados/os-'+manNum(n)); const r=await ref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:5000}); if(!r.acquired) continue; const x=await ref.get(); if(x.exists&&x.data()&&x.data().numero) continue; doc=Object.assign({},base,{numero:n}); await ref.set(doc); }
+  if(!doc) throw new Error('Não consegui reservar o número da OS.');
+  if(!(S.chamados||[]).some(c=>c.numero===doc.numero)) S.chamados=[Object.assign({_id:'os-'+manNum(doc.numero)},doc)].concat(S.chamados||[]);
+  return doc; }
+
+/* ---------- confiabilidade por equipamento ---------- */
+function mxChamEquip(e){ const k=mxNorm(e.nome); return (S.chamados||[]).filter(c=>!c.excluido&&(+c.numero||0)<900000&&(c.equipId===e.id||(!c.equipId&&mxNorm(c.equip)===k&&(!c.linha||!e.linha||c.linha===e.linha)))); }
+function mxConf(xs,dias){ const ini=Date.now()-dias*864e5; const cor=xs.filter(c=>!c.prevId&&c.criado&&new Date(c.criado).getTime()>=ini).sort((a,b)=>String(a.criado).localeCompare(String(b.criado)));
+  const reps=cor.map(c=>{ const e=manEtapas(c); return e.as&&e.co?manMin(e.as.em,e.co.em):null; }).filter(x=>x!=null);
+  const par=cor.reduce((a,c)=>{ const p=c.paradaId&&S.paradas.find(x=>x._id===c.paradaId); return a+(p?manMin(p.inicio,p.fim||new Date().toISOString())||0:0); },0);
+  let mtbf=null; if(cor.length>=2){ const t0=new Date(cor[0].criado).getTime(), t1=new Date(cor[cor.length-1].criado).getTime(); mtbf=(t1-t0)/864e5/(cor.length-1); } else if(cor.length===1) mtbf=null;
+  return {n:cor.length,mttr:reps.length?Math.round(reps.reduce((a,b)=>a+b,0)/reps.length):null,mtbf,par,ult:cor.length?cor[cor.length-1].criado:null}; }
+function mxConfTabela(){ const eqs=mxEquips(); const livres={}; (S.chamados||[]).filter(c=>!c.excluido&&!c.equipId&&c.equip&&(+c.numero||0)<900000&&!eqs.some(e=>mxNorm(e.nome)===mxNorm(c.equip))).forEach(c=>{ const k=mxNorm(c.equip)+'|'+(c.linha||''); livres[k]=livres[k]||{id:'',nome:c.equip,linha:c.linha||''}; });
+  const rows=[...eqs,...Object.values(livres)].map(e=>({e,z:mxConf(mxChamEquip(e),90)})).filter(r=>r.z.n).sort((a,b)=>b.z.n-a.z.n||(b.z.par-a.z.par));
+  if(!rows.length) return '<div class="empty">Quando os chamados tiverem o equipamento, aparece aqui quanto cada máquina quebra e quanto demora o reparo.</div>';
+  return `<div class="mx-tw"><table class="mx-t"><thead><tr><th>Equipamento</th><th>Linha</th><th class="r">Falhas</th><th class="r" title="Tempo médio de reparo">MTTR</th><th class="r" title="Tempo médio entre falhas">MTBF</th><th class="r">Linha parada</th><th>Última falha</th></tr></thead><tbody>
+   ${rows.slice(0,10).map(({e,z})=>`<tr class="${z.mtbf!=null&&z.mtbf<7?'crit':z.mtbf!=null&&z.mtbf<15?'warn':''}"><td><b>${esc(e.nome)}</b>${e.tag?`<small>${esc(e.tag)}</small>`:''}</td><td>${esc(e.linha||'—')}</td><td class="r num">${z.n}</td><td class="r num">${mxHoras(z.mttr)}</td><td class="r num">${z.mtbf==null?'<span class="t-mut">1 falha</span>':mxDias(z.mtbf)}</td><td class="r num">${z.par?mxHoras(z.par):'—'}</td><td>${z.ult?dia(z.ult).toLowerCase()+' '+hora(z.ult):'—'}</td></tr>`).join('')}</tbody></table></div>
+   <div class="sub" style="font-size:12px;margin-top:8px">Últimos 90 dias, só corretivas. MTTR = tempo médio de reparo (assumiu → concluiu). MTBF = tempo médio entre uma falha e a próxima. MTBF baixo (vermelho, menos de 7 dias) pede preventiva.</div>`; }
+function mxMeses(){ const out=[]; const h=new Date(); for(let i=5;i>=0;i--){ const d=new Date(h.getFullYear(),h.getMonth()-i,1); const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const xs=(S.chamados||[]).filter(c=>!c.excluido&&(+c.numero||0)<900000&&String(c.criado||'').length&&hojeStr(new Date(c.criado)).slice(0,7)===k);
+    const cor=xs.filter(c=>!c.prevId), prev=xs.filter(c=>c.prevId);
+    const reps=cor.map(c=>{ const e=manEtapas(c); return e.as&&e.co?manMin(e.as.em,e.co.em):null; }).filter(x=>x!=null);
+    const par=cor.reduce((a,c)=>{ const p=c.paradaId&&S.paradas.find(x=>x._id===c.paradaId); return a+(p?manMin(p.inicio,p.fim||new Date().toISOString())||0:0); },0);
+    out.push({k,lab:d.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''),cor:cor.length,prev:prev.length,prevOk:prev.filter(c=>c.status==='Concluída').length,mttr:reps.length?Math.round(reps.reduce((a,b)=>a+b,0)/reps.length):null,par}); }
+  return out; }
+function mxMesesCard(){ const ms=mxMeses(); const mx=Math.max(1,...ms.map(m=>m.cor+m.prev)), mxp=Math.max(1,...ms.map(m=>m.par));
+  return `<section class="card"><div class="head" style="align-items:baseline"><h2>Mês a mês</h2><span class="sub" style="margin:0">últimos 6 meses</span></div>
+   <div class="mx-mm">${ms.map(m=>`<div class="mx-m"><div class="mx-mb" title="${m.cor} corretivas · ${m.prev} preventivas"><i class="p" style="height:${m.prev/mx*100}%"></i><i style="height:${m.cor/mx*100}%"></i></div><b class="num">${m.cor+m.prev}</b><span>${esc(m.lab)}</span></div>`).join('')}</div>
+   <div class="legend" style="margin:6px 0 12px"><span><i style="background:var(--teal)"></i>corretivas</span><span><i style="background:var(--ok)"></i>preventivas</span></div>
+   <div class="mx-tw"><table class="mx-t"><thead><tr><th></th>${ms.map(m=>`<th class="r">${esc(m.lab)}</th>`).join('')}</tr></thead><tbody>
+    <tr><td>Tempo de reparo (MTTR)</td>${ms.map(m=>`<td class="r num">${mxHoras(m.mttr)}</td>`).join('')}</tr>
+    <tr><td>Linha parada</td>${ms.map(m=>`<td class="r num"><span class="mx-pb" style="--w:${m.par/mxp*100}%"></span>${m.par?mxHoras(m.par):'—'}</td>`).join('')}</tr>
+    <tr><td>Preventivas feitas</td>${ms.map(m=>`<td class="r num">${m.prev?m.prevOk+'/'+m.prev:'—'}</td>`).join('')}</tr></tbody></table></div></section>`; }
+/* painel: confiabilidade, mês a mês, preventivas do dia e modo TV */
+{ const _vp=vManPainel; vManPainel=function(){ let h=_vp(); const hj=!S.man.dia||S.man.dia===hojeStr();
+  const atr=mxPrevStatus().filter(x=>x.st==='atrasada'||x.st==='hoje');
+  const prevCard=hj&&atr.length?`<section class="card mx-prevhj"><div class="head" style="align-items:baseline"><h2>${ic('cal2',20,2)} Preventivas para hoje</h2><button class="lnk" data-go="manprev">Ver todas</button></div>${atr.slice(0,6).map(x=>`<div class="mx-pr ${x.st}"><div><b>${esc(x.p.tarefa)}</b><small>${esc((x.e&&x.e.nome)||'—')} · ${esc((x.e&&x.e.linha)||'')} · ${x.st==='atrasada'?'atrasada desde '+dm(x.p.prox):'hoje'}</small></div>${x.os?`<button class="btn sec" data-act="man-abrir" data-n="${x.os.numero}" data-ir="1">OS ${manNum(x.os.numero)}</button>`:`<span class="pill warn">OS sai em instantes</span>`}</div>`).join('')}</section>`:'';
+  const relogio=`<div class="mx-tvclk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div>`;
+  h=h.replace('<div class="mp-k">',prevCard+'<div class="mp-k">');
+  h=h.replace('<button class="btn" data-act="mp-novo">','<button class="btn sec" data-act="mx-tv" title="Tela cheia para a TV da oficina, com som">'+ic('tela',18,2)+(document.body.classList.contains('ltv-k')?'Sair do modo TV':'Modo TV')+'</button><button class="btn" data-act="mp-novo">');
+  h=h.replace('<div class="head"><div><div class="eyebrow">MANUTENÇÃO','<div class="head mx-hd">'+relogio+'<div><div class="eyebrow">MANUTENÇÃO');
+  return h+`<div class="two mp-two">${mxMesesCard()}<section class="card"><div class="head" style="align-items:baseline"><h2>Confiabilidade por equipamento</h2><span class="sub" style="margin:0">90 dias</span></div>${mxConfTabela()}</section></div>`; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mx-tv"]'); if(!b) return; const on=!document.body.classList.contains('ltv-k'); document.body.classList.toggle('ltv-k',on);
+  try{ if(on&&document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); if(!on&&document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  if(on&&!S.man.som){ S.man.som=true; try{ localStorage.setItem('painel.mansom','1'); }catch(e){} manBip(); } try{ localStorage.setItem('painel.mantv',on?'1':'0'); }catch(e){} render(); });
+/* TV da oficina: cargo próprio que abre direto no painel em modo TV */
+if(!ACS_PERFIS.tvman){ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.tvman={nome:'TV da oficina (manutenção)',mods:['manut'],locais:[]}; ACS_PERFIS.outro=_o; }
+if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('tvman')) EQ_PRONTO_ORD.splice(4,0,'tvman');
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.tvman='TV ligada na oficina: painel da manutenção em tela cheia, com som e as OS dos QR';
+if(typeof EQ_AREA!=='undefined') EQ_AREA.tvman='manutencao';
+setInterval(()=>{ try{ const A=S.acs; if(!A||!A.pronto||A.dono||!A.doc) return; let tv=false; try{ tv=localStorage.getItem('painel.mantv')==='1'; }catch(e){}
+  if((A.doc.perfil==='tvman'||tv)&&S.view==='manmon'&&!document.body.classList.contains('ltv-k')&&!S.mx._tvIni){ S.mx._tvIni=true; document.body.classList.add('ltv-k'); if(A.doc.perfil==='tvman'&&!S.man.som){ S.man.som=true; try{ localStorage.setItem('painel.mansom','1'); }catch(e){} } render(); } }catch(e){} },1500);
+APR_TELAS.push({k:'manut',v:'manmon',nome:'Manutenção',d:'Chamados ao vivo, máquinas paradas, preventivas do dia e a confiabilidade de cada equipamento.',cor:'#A2453D',on:true});
+
+/* ---------- equipamentos ---------- */
+function vManEquip(){ const X=S.mx, F=X.eq, LT=manLinhas(); if(!X.lido) return `${banner()}<section class="card"><div class="empty">Carregando…</div></section>`;
+  const porL={}; mxEquips().forEach(e=>{ (porL[e.linha||'Sem linha']=porL[e.linha||'Sem linha']||[]).push(e); });
+  const ls=Object.keys(porL).sort((a,b)=>{ const ia=LT.indexOf(a), ib=LT.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b); });
+  const sug=[...new Set((S.chamados||[]).filter(c=>c.equip&&!c.equipId&&!mxEquips().some(e=>mxNorm(e.nome)===mxNorm(c.equip)&&e.linha===c.linha)).map(c=>(c.linha||'')+'|'+c.equip))].slice(0,12);
+  const row=e=>{ const z=mxConf(mxChamEquip(e),90), pv=(X.cfg.prev||[]).filter(p=>p.equip===e.id&&p.ativo!==false).length, ed=F.ed===e.id;
+    if(ed) return `<div class="mx-er ed"><input class="txt" id="mx-eq-n" value="${esc(F.nome)}" placeholder="Nome"><input class="txt" id="mx-eq-t" value="${esc(F.tag)}" placeholder="TAG / patrimônio"><select class="txt" id="mx-eq-l">${LT.map(l=>`<option ${F.linha===l?'selected':''}>${esc(l)}</option>`).join('')}</select><button class="btn" data-act="mx-eq-salvar">Salvar</button><button class="btn sec" data-act="mx-eq-x">Cancelar</button></div>`;
+    return `<div class="mx-er"><span class="mx-eic">${ic('engr',18,2)}</span><div class="mx-en"><b>${esc(e.nome)}</b><small>${e.tag?esc(e.tag)+' · ':''}${z.n?`${z.n} falha${z.n>1?'s':''} em 90 dias · reparo ${mxHoras(z.mttr)}${z.mtbf!=null?' · MTBF '+mxDias(z.mtbf):''}`:'sem falha em 90 dias'}${pv?` · ${pv} preventiva${pv>1?'s':''}`:''}</small></div>
+     <div class="mx-ea"><button class="eq-lk" data-act="mx-eq-prev" data-id="${esc(e.id)}">${ic('cal2',15,2)}Preventiva</button><button class="eq-lk" data-act="mx-eq-ed" data-id="${esc(e.id)}">${ic('editar',15,2)}Editar</button>${F.conf===e.id?`<button class="eq-lk del" data-act="mx-eq-del" data-id="${esc(e.id)}">Confirmar: tirar</button>`:`<button class="eq-lk del" data-act="mx-eq-conf" data-id="${esc(e.id)}">${ic('lixo',15,2)}Tirar</button>`}</div></div>`; };
+  return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Equipamentos</h1><div class="sub">Cadastre as máquinas de cada linha. Quem abre o chamado escolhe na lista, e o painel mostra quanto cada uma quebra.</div></div></div>
+   <section class="card mx-new"><div class="label" style="margin-bottom:8px">NOVO EQUIPAMENTO</div><div class="mx-nf"><select class="txt" id="mx-eqn-l"><option value="">Linha…</option>${LT.map(l=>`<option ${F.linha===l&&!F.ed?'selected':''}>${esc(l)}</option>`).join('')}</select><input class="txt" id="mx-eqn-n" placeholder="Nome (ex.: Misturador, Ensacadeira, Elevador de canecas)" value="${F.ed?'':esc(F.nome)}"><input class="txt" id="mx-eqn-t" placeholder="TAG (opcional)" value="${F.ed?'':esc(F.tag)}"><button class="btn" data-act="mx-eq-novo">${ic('mais',18,2.4)}Cadastrar</button></div>
+    ${sug.length?`<div class="sub" style="font-size:12.5px;margin:10px 0 6px">Já apareceram nos chamados (toque para cadastrar):</div><div class="chips">${sug.map(s=>{ const [l,n]=s.split('|'); return `<button class="chip" data-act="mx-eq-sug" data-l="${esc(l)}" data-n="${esc(n)}">${esc(n)}${l?' · '+esc(l):''}</button>`; }).join('')}</div>`:''}</section>
+   ${ls.length?ls.map(l=>`<section class="card"><div class="head" style="align-items:baseline"><h2>${esc(l)}</h2><span class="sub" style="margin:0">${porL[l].length} equipamento${porL[l].length>1?'s':''}</span></div>${porL[l].map(row).join('')}</section>`).join(''):'<section class="card"><div class="empty">Nenhum equipamento cadastrado ainda.</div></section>'}`; }
+
+/* ---------- preventivas ---------- */
+function mxOsPrev(p){ return (S.chamados||[]).filter(c=>!c.excluido&&c.prevId===p.id&&c.status!=='Concluída').sort((a,b)=>b.numero-a.numero)[0]||null; }
+function mxPrevStatus(){ const h=hojeStr(), em7=addDias(h,7); return (S.mx.cfg.prev||[]).filter(p=>p.ativo!==false).map(p=>{ const os=mxOsPrev(p), e=mxEquip(p.equip);
+    const st=os?'aberta':!p.prox?'sem':p.prox<h?'atrasada':p.prox===h?'hoje':p.prox<=em7?'semana':'ok'; return {p,e,os,st}; }).sort((a,b)=>String(a.p.prox||'9').localeCompare(String(b.p.prox||'9'))); }
+function vManPrev(){ const X=S.mx, F=X.pv; if(!X.lido) return `${banner()}<section class="card"><div class="empty">Carregando…</div></section>`;
+  const eqs=mxEquips(), xs=mxPrevStatus(), h=hojeStr(); const cnt=k=>xs.filter(x=>x.st===k).length;
+  const lab={atrasada:['Atrasada','crit'],hoje:['Hoje','warn'],aberta:['OS aberta','prod'],semana:['Esta semana','neu'],ok:['Em dia','ok'],sem:['Sem data','neu']};
+  const fil=F.fil==='todas'?xs:xs.filter(x=>F.fil==='pend'?['atrasada','hoje','aberta'].includes(x.st):x.st===F.fil);
+  const row=x=>{ const {p,e,os,st}=x; const [l,c]=lab[st]; const ed=F.ed===p.id;
+    return `<div class="mx-pv ${st}"><div class="mx-pvd"><b class="num">${p.prox?dm(p.prox):'—'}</b><small>a cada ${p.freq} dia${+p.freq>1?'s':''}</small></div><div class="mx-pvt"><b>${esc(p.tarefa)}</b><small>${esc((e&&e.nome)||'equipamento removido')} · ${esc((e&&e.linha)||'')}${p.ultima?' · última '+dm(p.ultima):''}</small></div><span class="pill ${c}">${l}</span>
+     <div class="mx-ea">${os?`<button class="btn sec" data-act="man-abrir" data-n="${os.numero}" data-ir="1" style="height:38px">OS ${manNum(os.numero)}</button>`:`<button class="eq-lk" data-act="mx-pv-gerar" data-id="${esc(p.id)}">${ic('play',15,2)}Gerar OS agora</button>`}<button class="eq-lk" data-act="mx-pv-ed" data-id="${esc(p.id)}">${ic('editar',15,2)}Editar</button>${F.conf===p.id?`<button class="eq-lk del" data-act="mx-pv-del" data-id="${esc(p.id)}">Confirmar: tirar</button>`:`<button class="eq-lk del" data-act="mx-pv-conf" data-id="${esc(p.id)}">${ic('lixo',15,2)}Tirar</button>`}</div>
+     ${ed?mxPrevForm(true):''}</div>`; };
+  return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Preventivas</h1><div class="sub">Cadastre o que precisa ser feito em cada máquina e de quanto em quanto tempo. No dia, a OS abre sozinha na fila da manutenção; ao concluir, a próxima data é marcada.</div></div></div>
+   ${eqs.length?`<section class="card mx-new"><div class="label" style="margin-bottom:8px">NOVA PREVENTIVA</div>${F.ed?'<div class="sub" style="margin:0">Termine a edição abaixo.</div>':mxPrevForm(false)}</section>`:`<section class="card"><div class="empty">Cadastre os equipamentos primeiro. <button class="lnk" data-go="manequip">Ir para Equipamentos</button></div></section>`}
+   <div class="mp-k mx-k"><div class="${cnt('atrasada')?'crit':''}"><span>Atrasadas</span><b class="num">${cnt('atrasada')}</b><small>passou da data sem OS</small></div><div class="${cnt('hoje')?'warn':''}"><span>Hoje</span><b class="num">${cnt('hoje')}</b><small>a OS abre sozinha</small></div><div><span>OS abertas</span><b class="num">${cnt('aberta')}</b><small>esperando execução</small></div><div><span>Esta semana</span><b class="num">${cnt('semana')}</b><small>próximos 7 dias</small></div><div class="ok"><span>Em dia</span><b class="num">${cnt('ok')}</b><small>mais de 7 dias</small></div><div><span>Total</span><b class="num">${xs.length}</b><small>planos ativos</small></div></div>
+   <section class="card"><div class="chips" style="margin-bottom:10px">${[['todas','Todas'],['pend','Pendentes'],['semana','Esta semana'],['ok','Em dia']].map(([k,l])=>`<button class="chip" data-act="mx-pv-fil" data-v="${k}" aria-pressed="${F.fil===k}">${l}</button>`).join('')}</div>
+    ${fil.length?fil.map(row).join(''):'<div class="empty">Nenhuma preventiva aqui.</div>'}</section>`; }
+function mxPrevForm(ed){ const F=S.mx.pv, eqs=mxEquips(); return `<div class="mx-nf ${ed?'mx-pvf':''}"><select class="txt" id="mx-pv-e"><option value="">Equipamento…</option>${manLinhas().map(l=>{ const es=eqs.filter(e=>e.linha===l); return es.length?`<optgroup label="${esc(l)}">${es.map(e=>`<option value="${esc(e.id)}" ${F.equip===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}</optgroup>`:''; }).join('')}</select>
+   <input class="txt" id="mx-pv-t" placeholder="O que fazer (ex.: lubrificar rolamentos, trocar correia)" value="${esc(F.tarefa)}"><label class="mx-in"><span>a cada</span><input class="txt num" id="mx-pv-f" type="number" min="1" value="${esc(F.freq)}"><span>dias</span></label><label class="mx-in"><span>${ed?'próxima':'primeira'}</span><input class="txt" id="mx-pv-p" type="date" value="${esc(F.prox||hojeStr())}"></label>
+   <button class="btn" data-act="mx-pv-salvar">${ic('check',18,2.4)}${ed?'Salvar':'Cadastrar'}</button>${ed?'<button class="btn sec" data-act="mx-pv-x">Cancelar</button>':''}</div>`; }
+/* abre a OS da preventiva no dia */
+S.mx.gerando=false;
+async function mxGeraPrev(p,forcar){ const lk=S.db.doc('config/manut-prev-'+p.id); const r=await lk.acquire({holder:S.uid||('t'+Math.random()),ttlMs:9000}); if(!r.acquired) return false;
+  try{ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const pp=(d.prev||[]).find(x=>x.id===p.id); if(!pp||pp.ativo===false) return false;
+    if(!forcar&&(pp.osDe===pp.prox||mxOsPrev(pp))) return false; const e=(d.equips||[]).find(x=>x.id===pp.equip)||{};
+    const agora=new Date(), loc=new Date(agora.getTime()-agora.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+    const doc=await mxNovaOS({linha:e.linha||'Outra',quando:loc,defeito:'PREVENTIVA: '+pp.tarefa,impacto:'nao',nome:'Preventiva programada',equip:e.nome||null,equipId:e.id||null,status:'Aberta',criado:agora.toISOString(),por:S.uid||null,prevId:pp.id,origem:'preventiva',exec:{tipo:'Preventiva'}});
+    await mxGrava(c=>{ const x=c.prev.find(y=>y.id===pp.id); if(x){ x.osDe=pp.prox||hojeStr(); x.os=doc.numero; } }); return doc; }
+  finally{ try{ await lk.release(); }catch(e){} } }
+setInterval(async()=>{ const X=S.mx; if(X.gerando||!X.lido||!S.db||!viewOk('manch')||soVer&&typeof soVer==='function'&&soVer()) return; const h=hojeStr();
+  const dev=(X.cfg.prev||[]).filter(p=>p.ativo!==false&&p.prox&&p.prox<=h&&p.osDe!==p.prox&&!mxOsPrev(p)); if(!dev.length) return; X.gerando=true;
+  try{ for(const p of dev){ await mxGeraPrev(p,false); } }catch(e){ console.warn('preventiva',e); } X.gerando=false; },8000);
+/* concluir a OS: próxima data da preventiva e baixa das peças */
+{ const _ms=manStatus; manStatus=async function(c,st){ const antes=c.status; const r=await _ms.apply(this,arguments);
+  try{ if(st==='Concluída'&&antes!=='Concluída'&&c.status==='Concluída'){
+      if(c.prevId) await mxGrava(cf=>{ const x=cf.prev.find(y=>y.id===c.prevId); if(x){ const hj=hojeStr(); x.ultima=hj; x.prox=addDias(hj,Math.max(1,+x.freq||30)); } });
+      const E=c.exec||{}; if((E.pecas||[]).length&&!E.pecasBaixa){ for(const p of E.pecas){ if(!(+p.qtd>0)) continue; await S.db.collection('pecasmov').add({cod:p.cod||'',desc:p.desc||'',un:p.un||'un',qtd:-Math.abs(+p.qtd),tipo:'saida',os:c.numero,linha:c.linha||'',em:new Date().toISOString(),por:S.uid||null}); }
+        const E2=Object.assign({},E,{pecasBaixa:true}); await S.db.doc('chamados/'+c._id).update({exec:E2}); c.exec=E2; toast('OS '+manNum(c.numero)+' concluída · '+E.pecas.length+' peça'+(E.pecas.length>1?'s':'')+' baixada'+(E.pecas.length>1?'s':'')+' do estoque.'); } } }
+  catch(e){ console.warn('pós-conclusão',e); } return r; }; }
+
+/* ---------- peças ---------- */
+function mxSaldos(){ const s={}; (S.mx.movs||[]).forEach(m=>{ const k=m.cod||mxNorm(m.desc); const o=s[k]||(s[k]={cod:m.cod||'',desc:m.desc||'',un:m.un||'un',saldo:0,cons30:0}); o.saldo+=(+m.qtd||0); if(m.tipo==='saida'&&m.em&&Date.now()-new Date(m.em).getTime()<30*864e5) o.cons30+=Math.abs(+m.qtd||0); }); return s; }
+function mxPecasCat(){ const s=mxSaldos(); const cad=(S.mx.cfg.pecas||[]).map(p=>Object.assign({},p,{saldo:(s[p.cod]||{}).saldo||0,cons30:(s[p.cod]||{}).cons30||0}));
+  Object.values(s).forEach(o=>{ if(!cad.some(p=>p.cod===o.cod)) cad.push({cod:o.cod,desc:o.desc,un:o.un,min:0,saldo:o.saldo,cons30:o.cons30,solta:true}); }); return cad.sort((a,b)=>String(a.desc).localeCompare(String(b.desc))); }
+function mxBuscaPeca(q){ q=mxNorm(q); if(!q) return null; const cad=mxPecasCat(); const it=(S.itens||[]).filter(i=>i.ativo!==false).map(i=>({cod:i.codigo||i._id,desc:i.descricao||i.desc||i.nome||'',un:i.unidade||'un'}));
+  return [...cad,...it.filter(i=>!cad.some(c=>c.cod===i.cod))].find(p=>mxNorm(p.cod)===q||mxNorm(p.desc)===q||mxNorm(p.cod+' · '+p.desc)===q)||null; }
+function mxDatalist(){ const cad=mxPecasCat(); const it=(S.itens||[]).filter(i=>i.ativo!==false&&!cad.some(c=>c.cod===(i.codigo||i._id))).slice(0,600);
+  return `<datalist id="mx-pdl">${cad.map(p=>`<option value="${esc(p.cod?p.cod+' · '+p.desc:p.desc)}">${p.saldo!=null?'saldo '+p.saldo+' '+esc(p.un||''):''}</option>`).join('')}${it.map(i=>`<option value="${esc((i.codigo||i._id)+' · '+(i.descricao||''))}"></option>`).join('')}</datalist>`; }
+function vManPecas(){ const X=S.mx, F=X.pc; if(!X.lido) return `${banner()}<section class="card"><div class="empty">Carregando…</div></section>`;
+  const cat=mxPecasCat(), q=mxNorm(F.busca), lst=q?cat.filter(p=>mxNorm(p.cod+' '+p.desc).includes(q)):cat, baixo=cat.filter(p=>+p.min>0&&p.saldo<=+p.min);
+  const movs=(X.movs||[]).slice(0,40);
+  return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Peças</h1><div class="sub">O técnico escolhe as peças na OS e, ao concluir, elas saem do estoque sozinhas. Aqui você lança as entradas e vê o que está acabando.</div></div></div>
+   ${mxDatalist()}
+   ${baixo.length?`<section class="mp-alert" style="background:var(--warn-ink);animation:none">${ic('peca',22,2.2)}<div><b>${baixo.length} peça${baixo.length>1?'s':''} no mínimo ou abaixo</b><span>${baixo.slice(0,6).map(p=>esc(p.desc)+' ('+p.saldo+' '+esc(p.un||'')+')').join(' · ')}</span></div></section>`:''}
+   <div class="two mp-two"><section class="card mx-new"><div class="label" style="margin-bottom:8px">ENTRADA DE PEÇAS (COMPRA, DEVOLUÇÃO)</div><div class="mx-nf"><input class="txt" id="mx-ent-p" list="mx-pdl" placeholder="Peça (código ou nome)" value="${esc(F.ent.cod)}" autocomplete="off"><label class="mx-in"><span>qtd</span><input class="txt num" id="mx-ent-q" type="number" min="0" step="any" value="${esc(F.ent.qtd)}"></label><input class="txt" id="mx-ent-o" placeholder="Obs. (nota, fornecedor)" value="${esc(F.ent.obs)}"><button class="btn" data-act="mx-ent">${ic('mais',18,2.4)}Lançar entrada</button></div>
+     <div class="sub" style="font-size:12px;margin-top:8px">Para corrigir o saldo depois de contar, lance a diferença (ex.: −2). Nada é apagado: cada lançamento fica no histórico.</div></section>
+    <section class="card mx-new"><div class="label" style="margin-bottom:8px">CADASTRAR PEÇA</div><div class="mx-nf"><input class="txt" id="mx-pc-c" placeholder="Código" value="${esc(F.cod)}"><input class="txt" id="mx-pc-d" placeholder="Descrição (ex.: Rolamento 6205)" value="${esc(F.desc)}"><input class="txt" id="mx-pc-u" placeholder="Un." value="${esc(F.un)}" style="max-width:80px"><label class="mx-in"><span>mín.</span><input class="txt num" id="mx-pc-m" type="number" min="0" value="${esc(F.min)}"></label><button class="btn" data-act="mx-pc-novo">${ic('check',18,2.4)}Cadastrar</button></div>
+     <div class="sub" style="font-size:12px;margin-top:8px">Os itens do cadastro do painel (Ajustes → Itens) também aparecem na busca da OS.</div></section></div>
+   <section class="card"><div class="head" style="align-items:center"><h2>Estoque de peças</h2><label class="eq-q" style="max-width:320px;flex:1">${ic('lupa',18,2)}<input class="txt" id="mx-pc-q" placeholder="Procurar peça…" value="${esc(F.busca)}"></label></div>
+    ${lst.length?`<div class="mx-tw"><table class="mx-t"><thead><tr><th>Código</th><th>Peça</th><th class="r">Saldo</th><th class="r">Mínimo</th><th class="r">Usado em 30 dias</th><th></th></tr></thead><tbody>${lst.map(p=>`<tr class="${+p.min>0&&p.saldo<=+p.min?'crit':''}"><td class="num">${esc(p.cod||'—')}</td><td><b>${esc(p.desc)}</b>${p.solta?'<small>sem cadastro</small>':''}</td><td class="r num"><b>${p.saldo}</b> ${esc(p.un||'')}</td><td class="r num">${+p.min||'—'}</td><td class="r num">${p.cons30||'—'}</td><td class="r">${p.solta?`<button class="eq-lk" data-act="mx-pc-cad" data-c="${esc(p.cod)}" data-d="${esc(p.desc)}" data-u="${esc(p.un||'un')}">Cadastrar</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma peça ainda. Cadastre ao lado ou lance uma entrada.</div>'}</section>
+   <section class="card"><h2>Últimos lançamentos</h2>${movs.length?movs.map(m=>`<div class="mx-mv ${+m.qtd<0?'s':'e'}"><span class="num">${m.em?dm(hojeStr(new Date(m.em)))+' '+hora(m.em):''}</span><b class="num">${+m.qtd>0?'+':''}${m.qtd} ${esc(m.un||'')}</b><span><b>${esc(m.desc||m.cod)}</b>${m.os?` · <button class="lnk" data-act="man-abrir" data-n="${m.os}" data-ir="1" style="padding:0">OS ${manNum(m.os)}</button>`:''}${m.obs?' · '+esc(m.obs):''}</span><small>${esc(nomeDe(m.por)||'')}</small></div>`).join(''):'<div class="empty">Nenhum lançamento ainda.</div>'}</section>`; }
+
+/* ---------- equipamento e foto no chamado (formulário do painel e Tela da linha) ---------- */
+function mxEqChips(linha,sel){ const es=mxEquips(linha); if(!es.length) return ''; return `<div class="mx-eqc"><span class="label">EQUIPAMENTO</span><div class="chips">${es.map(e=>`<button type="button" class="chip" data-act="mx-f-eq" data-id="${esc(e.id)}" aria-pressed="${sel===e.id}">${esc(e.nome)}</button>`).join('')}<button type="button" class="chip" data-act="mx-f-eq" data-id="" aria-pressed="${!sel}">Outro / não sei</button></div></div>`; }
+function mxFotoCampo(){ const F=S.man.f||{}; return `<div class="mx-foto">${F.foto?`<img src="${F.foto}" alt="Foto do defeito"><button type="button" class="eq-lk del" data-act="mx-foto-x">${ic('lixo',15,2)}Tirar foto</button>`:`<label class="btn sec mx-fbt">${ic('foto',18,2)}Tirar foto do defeito (opcional)<input type="file" accept="image/*" capture="environment" id="mx-foto-in" hidden></label>`}</div>`; }
+{ const _mf=manForm; manForm=function(){ const F=S.man.f||{}; let h=_mf(); const ch=mxEqChips(F.linha,F.equipId);
+  if(ch) h=h.replace(/<label><span class="label">EQUIPAMENTO \(OPCIONAL\)<\/span>/,'<label style="display:none"><span class="label">EQUIPAMENTO (OPCIONAL)</span>');
+  return h.replace('<label style="display:block;margin-top:12px"><span class="label">DEFEITO / PROBLEMA</span>',ch+(ch?'':'')+'<label style="display:block;margin-top:12px"><span class="label">DEFEITO / PROBLEMA</span>').replace('<div class="label" style="margin:12px 0 6px">IMPACTO NA PRODUÇÃO</div>',mxFotoCampo()+'<div class="label" style="margin:12px 0 6px">IMPACTO NA PRODUÇÃO</div>'); }; }
+{ const _lf=manLtvForm; manLtvForm=function(l){ const F=S.man.f||{}; return _lf(l).replace('<div class="label" style="margin-top:12px">A LINHA…</div>',mxEqChips(l,F.equipId)+mxFotoCampo()+'<div class="label" style="margin-top:12px">A LINHA…</div>'); }; }
+async function mxComprime(file){ const url=await new Promise((ok,er)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=er; r.readAsDataURL(file); });
+  const img=await new Promise((ok,er)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=er; i.src=url; });
+  let w=img.width, h=img.height, max=1280; if(Math.max(w,h)>max){ const k=max/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); let q=.72, d=cv.toDataURL('image/jpeg',q); while(d.length>700000&&q>.3){ q-=.12; d=cv.toDataURL('image/jpeg',q); } return d; }
+document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id!=='mx-foto-in'&&t.id!=='mx-foto-os') return; const f=t.files&&t.files[0]; if(!f) return;
+  try{ const d=await mxComprime(f); if(t.id==='mx-foto-in'){ S.man.f=S.man.f||{}; S.man.f.foto=d; render(); } else { const c=manDoc(S.man.cur); if(c) await mxSalvaFoto(c,d); } }catch(e){ toast('Não consegui ler a foto.'); } });
+async function mxSalvaFoto(c,d){ const id='f-'+mxId(); await S.db.doc('chamfotos/'+id).set({d,em:new Date().toISOString(),por:S.uid||null,os:c.numero}); const fs=(c.fotos||[]).concat(c.foto?[]:[]); await S.db.doc('chamados/'+c._id).update(c.foto?{fotos:(c.fotos||[]).concat([id])}:{foto:id}); if(c.foto) c.fotos=(c.fotos||[]).concat([id]); else c.foto=id; S.mx.fotos[id]=d; toast('Foto anexada à OS '+manNum(c.numero)+'.'); render(); }
+/* depois que o chamado é salvo pelo formulário do painel, grava a foto e o equipamento escolhido */
+{ const _sv=manSalvar; manSalvar=async function(){ const F=S.man.f||{}, foto=F.foto, eqId=F.equipId; const antes=S.man.cur; await _sv.apply(this,arguments);
+  const c=S.man.cur!=null&&S.man.cur!==antes&&manDoc(S.man.cur); if(!c||!S.db) return; try{ const u={}; if(eqId){ u.equipId=eqId; } if(Object.keys(u).length){ await S.db.doc('chamados/'+c._id).update(u); Object.assign(c,u); } if(foto) await mxSalvaFoto(c,foto); }catch(e){ console.warn(e); } }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mx-f-eq"],[data-act="mx-foto-x"]'); if(!b) return; ev.stopPropagation(); const F=S.man.f=S.man.f||{};
+  if(b.dataset.act==='mx-foto-x'){ F.foto=null; render(); return; }
+  const e=b.dataset.id?mxEquip(b.dataset.id):null; F.equipId=e?e.id:''; F.equip=e?e.nome:''; render(); },true);
+/* na OS: fotos e peças usadas */
+async function mxFoto(id){ if(id in S.mx.fotos) return S.mx.fotos[id]; S.mx.fotos[id]=null; try{ const g=await S.db.doc('chamfotos/'+id).get(); S.mx.fotos[id]=g.exists?(g.data().d||''):''; }catch(e){ S.mx.fotos[id]=''; } rerenderSeguro(); return S.mx.fotos[id]; }
+{ const _md=manDetalhe; manDetalhe=function(c){ let h=_md(c); const ids=[c.foto,...(c.fotos||[])].filter(Boolean); ids.forEach(id=>{ if(!(id in S.mx.fotos)) mxFoto(id); });
+  const fotos=`<section class="card mx-fts"><div class="head" style="align-items:center"><div class="label">FOTOS</div><label class="btn sec" style="height:38px">${ic('foto',16,2)}Adicionar foto<input type="file" accept="image/*" capture="environment" id="mx-foto-os" hidden></label></div>
+    ${ids.length?`<div class="mx-ftg">${ids.map(id=>{ const d=S.mx.fotos[id]; return d?`<a href="${d}" target="_blank" rel="noopener"><img src="${d}" alt="Foto da OS"></a>`:`<div class="mx-ftl">${d===''?'foto indisponível':'carregando…'}</div>`; }).join('')}</div>`:'<div class="sub" style="font-size:13px;margin:0">Nenhuma foto. O operador pode mandar pelo QR ou a manutenção adiciona aqui.</div>'}</section>`;
+  const E=c.exec||{}, ps=E.pecas||[], A=S.mx.add;
+  const pecas=`<div class="mx-pecas"><span class="label">PEÇAS USADAS ${E.pecasBaixa?'<span class="pill ok" style="margin-left:6px">baixadas do estoque</span>':'<small style="font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)">· saem do estoque ao concluir</small>'}</span>
+    ${ps.length?`<div class="mx-pl">${ps.map((p,i)=>`<div class="mx-pi"><b>${esc(p.desc||p.cod)}</b><span class="num">${esc(p.cod||'')}</span><span class="num"><b>${p.qtd}</b> ${esc(p.un||'')}</span>${E.pecasBaixa?'':`<button type="button" class="eq-lk del" data-act="mx-p-x" data-i="${i}" aria-label="Tirar">${ic('lixo',15,2)}</button>`}</div>`).join('')}</div>`:''}
+    ${E.pecasBaixa?'':`<div class="mx-nf" style="margin-top:6px"><input class="txt" id="mx-p-c" list="mx-pdl" placeholder="Procurar peça (código ou nome)" value="${esc(A.cod)}" autocomplete="off"><label class="mx-in"><span>qtd</span><input class="txt num" id="mx-p-q" type="number" min="0" step="any" value="${esc(A.qtd)}"></label><button type="button" class="btn sec" data-act="mx-p-add">${ic('mais',16,2.4)}Adicionar peça</button></div>${mxDatalist()}`}</div>`;
+  h=h.replace(/<label style="display:block;margin-top:10px"><span class="label">MATERIAIS \/ PEÇAS UTILIZADOS<\/span><textarea[^>]*data-man-e="materiais"[^>]*>[\s\S]*?<\/textarea><\/label>/,pecas);
+  if(c.equipId||c.equip){ const e=c.equipId&&mxEquip(c.equipId); const z=e?mxConf(mxChamEquip(e),90):null; if(z&&z.n>1) h=h.replace('<section class="card man-at">',`<div class="banner" style="background:var(--teal-wash);color:var(--teal-strong)">${ic('engr',16,2)} <b>${esc(e.nome)}</b>: ${z.n} falhas em 90 dias · reparo médio ${mxHoras(z.mttr)}${z.mtbf!=null?' · uma falha a cada '+mxDias(z.mtbf):''}.</div><section class="card man-at">`); }
+  return h.replace('<section class="card man-at">',fotos+'<section class="card man-at">'); }; }
+async function mxPecasGrava(c,ps){ const E=Object.assign({},c.exec||{},{pecas:ps,materiais:ps.map(p=>(p.desc||p.cod)+' — '+p.qtd+' '+(p.un||'')).join('\n')}); await S.db.doc('chamados/'+c._id).update({exec:E}); c.exec=E; render(); }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mx-"]'); if(!b||b.disabled) return; const a=b.dataset.act, X=S.mx;
+  const v=id=>{ const e=document.getElementById(id); return e?String(e.value||'').trim():''; };
+  try{
+  if(a==='mx-p-add'){ const c=manDoc(S.man.cur); if(!c) return; const q=+String(v('mx-p-q')).replace(',','.'), t=v('mx-p-c'); if(!t||!(q>0)){ toast('Escolha a peça e a quantidade.'); return; }
+    const p=mxBuscaPeca(t)||{cod:'',desc:t.replace(/^[^·]*·\s*/,'')||t,un:'un'}; X.add={cod:'',qtd:'1'}; await mxPecasGrava(c,[...((c.exec||{}).pecas||[]),{cod:p.cod||'',desc:p.desc||t,un:p.un||'un',qtd:q}]); return; }
+  if(a==='mx-p-x'){ const c=manDoc(S.man.cur); if(!c) return; const ps=[...((c.exec||{}).pecas||[])]; ps.splice(+b.dataset.i,1); await mxPecasGrava(c,ps); return; }
+  if(a==='mx-eq-novo'||a==='mx-eq-sug'){ const l=a==='mx-eq-sug'?b.dataset.l:v('mx-eqn-l'), n=a==='mx-eq-sug'?b.dataset.n:v('mx-eqn-n'), t=a==='mx-eq-sug'?'':v('mx-eqn-t');
+    if(!l||!n){ toast('Escolha a linha e escreva o nome.'); return; } if(mxEquips(l).some(e=>mxNorm(e.nome)===mxNorm(n))){ toast('Já existe '+n+' na '+l+'.'); return; }
+    const id=mxId(); await mxGrava(cf=>{ cf.equips.push({id,linha:l,nome:n,tag:t||'',ativo:true,em:new Date().toISOString()}); });
+    /* liga os chamados antigos com esse nome ao equipamento */
+    for(const c of (S.chamados||[]).filter(c=>!c.equipId&&c.linha===l&&mxNorm(c.equip)===mxNorm(n)&&(+c.numero||0)<900000)){ try{ await S.db.doc('chamados/'+c._id).update({equipId:id}); c.equipId=id; }catch(e){} }
+    X.eq={linha:l,nome:'',tag:'',ed:null}; toast(n+' cadastrado na '+l+'.'); render(); return; }
+  if(a==='mx-eq-ed'){ const e=mxEquip(b.dataset.id); if(!e) return; X.eq={linha:e.linha,nome:e.nome,tag:e.tag||'',ed:e.id}; render(); return; }
+  if(a==='mx-eq-x'){ X.eq={linha:'',nome:'',tag:'',ed:null}; render(); return; }
+  if(a==='mx-eq-salvar'){ const id=X.eq.ed, n=v('mx-eq-n'), t=v('mx-eq-t'), l=v('mx-eq-l'); if(!n){ toast('Escreva o nome.'); return; } await mxGrava(cf=>{ const e=cf.equips.find(x=>x.id===id); if(e){ e.nome=n; e.tag=t; e.linha=l; } }); X.eq={linha:'',nome:'',tag:'',ed:null}; toast('Equipamento salvo.'); render(); return; }
+  if(a==='mx-eq-conf'){ X.eq.conf=b.dataset.id; render(); return; }
+  if(a==='mx-eq-del'){ const id=b.dataset.id; await mxGrava(cf=>{ const e=cf.equips.find(x=>x.id===id); if(e){ e.ativo=false; e.tiradoEm=new Date().toISOString(); } cf.prev.forEach(p=>{ if(p.equip===id) p.ativo=false; }); }); X.eq.conf=null; toast('Equipamento tirado da lista (o histórico fica).'); render(); return; }
+  if(a==='mx-eq-prev'){ X.pv=Object.assign({},X.pv,{equip:b.dataset.id,tarefa:'',freq:'30',prox:hojeStr(),ed:null}); go('manprev'); setTimeout(()=>{ const i=$('#mx-pv-t'); i&&i.focus(); },60); return; }
+  if(a==='mx-pv-fil'){ X.pv.fil=b.dataset.v; render(); return; }
+  if(a==='mx-pv-ed'){ const p=(X.cfg.prev||[]).find(x=>x.id===b.dataset.id); if(!p) return; X.pv=Object.assign({},X.pv,{equip:p.equip,tarefa:p.tarefa,freq:String(p.freq),prox:p.prox||'',ed:p.id}); render(); return; }
+  if(a==='mx-pv-x'){ X.pv=Object.assign({},X.pv,{equip:'',tarefa:'',freq:'30',prox:'',ed:null}); render(); return; }
+  if(a==='mx-pv-salvar'){ const e=v('mx-pv-e'), t=v('mx-pv-t'), f=Math.round(+v('mx-pv-f')), p=v('mx-pv-p'); if(!e||!t||!(f>0)||!p){ toast('Preencha o equipamento, o que fazer, a frequência e a data.'); return; }
+    const ed=X.pv.ed; await mxGrava(cf=>{ if(ed){ const x=cf.prev.find(y=>y.id===ed); if(x){ x.equip=e; x.tarefa=t; x.freq=f; if(x.prox!==p){ x.prox=p; x.osDe=null; } } } else cf.prev.push({id:mxId(),equip:e,tarefa:t,freq:f,prox:p,ativo:true,em:new Date().toISOString(),por:S.uid||null}); });
+    X.pv=Object.assign({},X.pv,{equip:'',tarefa:'',freq:'30',prox:'',ed:null}); toast(ed?'Preventiva salva.':'Preventiva cadastrada'+(p<=hojeStr()?': a OS abre em instantes.':' para '+dm(p)+'.')); render(); return; }
+  if(a==='mx-pv-gerar'){ const p=(X.cfg.prev||[]).find(x=>x.id===b.dataset.id); if(!p) return; b.disabled=true; const d=await mxGeraPrev(p,true); toast(d?'OS '+manNum(d.numero)+' aberta para a preventiva.':'Não foi possível abrir agora. Tente de novo.'); render(); return; }
+  if(a==='mx-pv-conf'){ X.pv.conf=b.dataset.id; render(); return; }
+  if(a==='mx-pv-del'){ const id=b.dataset.id; await mxGrava(cf=>{ const x=cf.prev.find(y=>y.id===id); if(x){ x.ativo=false; x.tiradoEm=new Date().toISOString(); } }); X.pv.conf=null; toast('Preventiva tirada.'); render(); return; }
+  if(a==='mx-pc-novo'||a==='mx-pc-cad'){ const c=a==='mx-pc-cad'?b.dataset.c:v('mx-pc-c'), d=a==='mx-pc-cad'?b.dataset.d:v('mx-pc-d'), u=(a==='mx-pc-cad'?b.dataset.u:v('mx-pc-u'))||'un', m=a==='mx-pc-cad'?0:+v('mx-pc-m')||0;
+    if(!d){ toast('Escreva a descrição da peça.'); return; } const cod=c||('P'+Date.now().toString(36).toUpperCase().slice(-5)); if((X.cfg.pecas||[]).some(p=>p.cod===cod)){ toast('Já existe a peça '+cod+'.'); return; }
+    await mxGrava(cf=>{ cf.pecas.push({cod,desc:d,un:u,min:m}); }); X.pc=Object.assign({},X.pc,{cod:'',desc:'',un:'un',min:''}); toast('Peça '+d+' cadastrada.'); render(); return; }
+  if(a==='mx-ent'){ const t=v('mx-ent-p'), q=+String(v('mx-ent-q')).replace(',','.'), o=v('mx-ent-o'); if(!t||!q){ toast('Escolha a peça e a quantidade.'); return; }
+    const p=mxBuscaPeca(t)||{cod:'',desc:t,un:'un'}; await S.db.collection('pecasmov').add({cod:p.cod||'',desc:p.desc||t,un:p.un||'un',qtd:q,tipo:q>0?'entrada':'ajuste',obs:o||null,em:new Date().toISOString(),por:S.uid||null});
+    X.pc.ent={cod:'',qtd:'',obs:''}; toast((q>0?'Entrada':'Ajuste')+' lançado: '+q+' '+(p.un||'')+' de '+(p.desc||t)+'.'); render(); return; }
+  }catch(e){ erro(e); } });
+document.addEventListener('input',ev=>{ const t=ev.target, X=S.mx; if(!t.id||!t.id.startsWith('mx-')) return; const m={'mx-eqn-n':['eq','nome'],'mx-eqn-t':['eq','tag'],'mx-eq-n':['eq','nome'],'mx-eq-t':['eq','tag'],'mx-pv-t':['pv','tarefa'],'mx-pv-f':['pv','freq'],'mx-pc-c':['pc','cod'],'mx-pc-d':['pc','desc'],'mx-pc-u':['pc','un'],'mx-pc-m':['pc','min'],'mx-p-c':['add','cod'],'mx-p-q':['add','qtd']}[t.id];
+  if(m){ X[m[0]][m[1]]=t.value; return; } if(t.id==='mx-ent-p') X.pc.ent.cod=t.value; if(t.id==='mx-ent-q') X.pc.ent.qtd=t.value; if(t.id==='mx-ent-o') X.pc.ent.obs=t.value;
+  if(t.id==='mx-pc-q'){ X.pc.busca=t.value; const p=t.selectionStart; render(); const n=$('#mx-pc-q'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(e){} } } });
+document.addEventListener('change',ev=>{ const t=ev.target, X=S.mx; if(t.id==='mx-eqn-l') X.eq.linha=t.value; if(t.id==='mx-pv-e') X.pv.equip=t.value; if(t.id==='mx-pv-p') X.pv.prox=t.value; if(t.id==='mx-eq-l') X.eq.linha=t.value; });
+{ const _rs=rerenderSeguro; rerenderSeguro=function(){ const a=document.activeElement; if(a&&a.id&&a.id.startsWith('mx-')) return; return _rs.apply(this,arguments); }; }
+/* cartões do quadro: câmera quando o chamado tem foto */
+{ const _it=mpItem; mpItem=function(r,hj){ let h=_it(r,hj); if(r.c.foto) h=h.replace('<span class="mp-st">',`<span class="mx-cam" title="Tem foto">${ic('foto',14,2)}</span><span class="mp-st">`); if(r.c.prevId) h=h.replace('<span class="mp-st">','<span class="pill ok" style="font-size:10.5px;padding:1px 7px">preventiva</span><span class="mp-st">'); return h; }; }
+
+document.head.insertAdjacentHTML('beforeend',`<style id="mx-css">
+.mx-hd .mx-tvclk{display:none}body.ltv-k .mx-hd .mx-tvclk{display:block;order:2;margin-left:auto;font-size:54px;font-weight:800;color:var(--teal-strong);line-height:1}
+body.ltv-k .mx-hd{align-items:center}body.ltv-k .mx-hd .mp-acts .seg,body.ltv-k .mx-hd .mp-data,body.ltv-k .mx-hd [data-go="manqr"]{display:none}
+.mx-nf{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.mx-nf>.txt{flex:1 1 200px;height:44px;width:auto;min-width:0}.mx-nf>select.txt{flex:0 1 220px}.mx-nf .btn{height:44px}
+.mx-in{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600}.mx-in .txt{width:96px;height:44px}.mx-in input[type=date]{width:auto}
+.mx-er{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line-2);flex-wrap:wrap}.mx-er:first-of-type{border-top:0}.mx-er.ed .txt{flex:1 1 160px;height:42px;width:auto}.mx-er.ed .btn{height:42px}
+.mx-eic{width:38px;height:38px;border-radius:10px;background:var(--teal-wash);color:var(--teal-strong);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mx-en{flex:1 1 240px;min-width:0}.mx-en b{display:block;font-size:15px}.mx-en small{color:var(--muted);font-size:12.5px}
+.mx-ea{display:flex;gap:4px 14px;flex-wrap:wrap;align-items:center}.mx-ea .eq-lk.del{margin-left:0}
+.mx-pv{display:grid;grid-template-columns:86px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line-2)}.mx-pv:first-of-type{border-top:0}
+.mx-pvd b{display:block;font-size:17px}.mx-pvd small{font-size:11.5px;color:var(--muted)}.mx-pv.atrasada .mx-pvd b{color:var(--crit-ink)}.mx-pv.hoje .mx-pvd b{color:var(--warn-ink)}
+.mx-pvt b{display:block;font-size:15px}.mx-pvt small{color:var(--muted);font-size:12.5px}.mx-pvf{grid-column:1/-1;padding:10px;border-radius:12px;background:var(--teal-wash)}
+.mx-k{grid-template-columns:repeat(6,minmax(0,1fr))}
+.mx-prevhj .mx-pr{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line-2)}.mx-prevhj .mx-pr:first-of-type{border-top:0}.mx-pr b{display:block}.mx-pr small{color:var(--muted);font-size:12.5px}.mx-pr.atrasada b{color:var(--crit-ink)}.mx-prevhj h2{display:flex;gap:8px;align-items:center}
+.mx-tw{overflow-x:auto}.mx-t{width:100%;border-collapse:collapse;font-size:13.5px}.mx-t th{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.mx-t td{padding:9px 8px;border-bottom:1px solid var(--line-2);vertical-align:top}.mx-t td small{display:block;color:var(--muted);font-size:11.5px}.mx-t .r{text-align:right;white-space:nowrap}.mx-t tr.crit td:first-child{box-shadow:inset 4px 0 0 var(--crit)}.mx-t tr.warn td:first-child{box-shadow:inset 4px 0 0 var(--warn)}.t-mut{color:var(--muted)}
+.mx-mm{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end;height:150px;margin-top:12px}.mx-m{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}.mx-m span{font-size:12px;color:var(--muted);text-transform:capitalize}.mx-m b{font-size:13px}
+.mx-mb{width:60%;max-width:46px;flex:1;display:flex;flex-direction:column-reverse;border-radius:8px 8px 0 0;overflow:hidden;background:var(--sunken)}.mx-mb i{display:block;background:var(--teal)}.mx-mb i.p{background:var(--ok)}
+.mx-pb{display:inline-block;width:var(--w);max-width:40px;height:6px;border-radius:3px;background:var(--crit);opacity:.6;margin-right:6px;vertical-align:1px}
+.mx-mv{display:grid;grid-template-columns:110px 90px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line-2);font-size:13.5px}.mx-mv:first-of-type{border-top:0}.mx-mv>span:first-child{color:var(--muted)}.mx-mv.e>b{color:var(--ok-ink)}.mx-mv.s>b{color:var(--crit-ink)}.mx-mv small{color:var(--muted)}
+.mx-eqc{margin-top:12px}.mx-eqc .chips{margin-top:6px}.mx-foto{margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}.mx-foto img{max-height:120px;border-radius:10px;box-shadow:var(--shadow)}.mx-fbt{cursor:pointer;height:46px}
+.mx-fts .head{margin-bottom:10px}.mx-ftg{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.mx-ftg img{width:100%;height:180px;object-fit:cover;border-radius:10px;display:block}.mx-ftl{height:180px;border-radius:10px;background:var(--sunken);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+.mx-pecas{margin-top:10px;display:flex;flex-direction:column;gap:6px}.mx-pl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}.mx-pi{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:8px 12px;border-top:1px solid var(--line-2);font-size:14px}.mx-pi:first-child{border-top:0}.mx-pi>span{color:var(--muted)}
+.mx-cam{color:var(--teal-strong);display:inline-flex;margin-left:auto;margin-right:6px}
+@media (max-width:860px){ .mx-pv{grid-template-columns:70px minmax(0,1fr)} .mx-pv .pill,.mx-pv .mx-ea{grid-column:2} .mx-k{grid-template-columns:repeat(2,minmax(0,1fr))} .mx-mv{grid-template-columns:80px 70px minmax(0,1fr)} .mx-mv small{display:none} .mx-nf>select.txt{flex:1 1 100%} }
+</style>`);
+/* ===FIM MANX=== */
 iniciar();
 })();
 </script>

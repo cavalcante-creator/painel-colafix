@@ -36,13 +36,25 @@ service cloud.firestore {
     // Chamado pelo QR da linha (sem login): só cria, com os campos do chamado.
     match /chamados/{id} {
       allow create: if logado() && provedor() == 'anonymous' && id.matches('q-[a-z0-9]+')
-        && request.resource.data.keys().hasOnly(['linha', 'quando', 'defeito', 'impacto', 'nome', 'equip', 'status', 'criado', 'por', 'numero', 'qr', 'qid', 'origem'])
+        && request.resource.data.keys().hasOnly(['linha', 'quando', 'defeito', 'impacto', 'nome', 'equip', 'equipId', 'foto', 'status', 'criado', 'por', 'numero', 'qr', 'qid', 'origem'])
         && request.resource.data.status == 'Aberta' && request.resource.data.numero == 999999 && request.resource.data.qr == true
         && request.resource.data.qid == id && request.resource.data.origem == 'qr'
         && request.resource.data.impacto in ['parou', 'reduziu', 'nao']
         && request.resource.data.defeito is string && request.resource.data.defeito.size() > 0 && request.resource.data.defeito.size() <= 900
         && request.resource.data.linha is string && request.resource.data.linha.size() > 0 && request.resource.data.linha.size() < 60
         && request.resource.data.nome is string && request.resource.data.nome.size() <= 60;
+    }
+
+    // Foto do chamado mandada pelo QR (sem login): só cria, até ~750 KB.
+    match /chamfotos/{id} {
+      allow create: if logado() && provedor() == 'anonymous' && id.matches('f-[a-z0-9]+')
+        && request.resource.data.keys().hasOnly(['d', 'em', 'origem']) && request.resource.data.d is string
+        && request.resource.data.d.size() < 760000;
+    }
+
+    // Lista de equipamentos da manutenção: o formulário do QR mostra os da linha.
+    match /config/manut {
+      allow get: if logado();
     }
 
     // Acessos: só a dona libera ou muda; cada pessoa lê o próprio.
