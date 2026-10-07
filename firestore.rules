@@ -1,24 +1,48 @@
 rules_version = '2';
 // Regras do banco do Painel de Operação Colafix (versão online, login por usuário e senha).
 // - Dona do painel (usuário iasmyn): tudo, inclusive criar contas e liberar acessos.
-// - Pessoas liberadas em Ajustes → Acessos: leem e gravam o operacional
-//   (o que cada uma vê é decidido pelo cargo escolhido em Acessos).
+// - Pessoas liberadas em Ajustes → Equipe e cargos: leem e gravam o operacional
+//   (o que cada uma vê é decidido pelo cargo).
+// - Cargos só de ver (Telas de TV, TV da fábrica, Calendário): leem e não gravam nada.
+// - QR da linha, sem login: o celular entra como anônimo e só consegue CRIAR um chamado novo
+//   (não lê nada do painel). O painel da manutenção transforma o chamado em OS numerada.
 // - Conta criada e ainda não liberada: só registra o próprio pedido e o próprio nome.
 // Para publicar: Firebase → Firestore Database → Regras → apagar tudo, colar este texto → Publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
     function logado() { return request.auth != null; }
+    function provedor() { return request.auth.token.firebase.sign_in_provider; }
     function dono() { return logado() && request.auth.token.email == 'iasmyn@painel-colafix.app'; }
     function caminhoAcs() { return /databases/$(database)/documents/acessos/$(request.auth.uid); }
-    function liberado() { return logado() && exists(caminhoAcs()) && get(caminhoAcs()).data.get('ativo', true) != false; }
-    function equipe() { return dono() || liberado(); }
+    function acs() { return get(caminhoAcs()).data; }
+    function liberado() {
+      return logado() && provedor() != 'anonymous' && exists(caminhoAcs())
+        && acs().get('ativo', true) != false && acs().get('apagado', false) != true;
+    }
+    function soVer() { return acs().get('perfil', '') in ['ver', 'tv', 'cal']; }
+    function le() { return dono() || liberado(); }
+    function grava() { return dono() || (liberado() && !soVer()); }
 
     // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
     match /{col}/{id} {
-      allow read, write: if equipe() && !(col in ['acessos', 'pedidos', 'perfis']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis']);
+      allow write: if grava() && !(col in ['acessos', 'pedidos', 'perfis']);
     }
     match /{col}/{id}/{resto=**} {
-      allow read, write: if equipe() && !(col in ['acessos', 'pedidos', 'perfis']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis']);
+      allow write: if grava() && !(col in ['acessos', 'pedidos', 'perfis']);
+    }
+
+    // Chamado pelo QR da linha (sem login): só cria, com os campos do chamado.
+    match /chamados/{id} {
+      allow create: if logado() && provedor() == 'anonymous' && id.matches('q-[a-z0-9]+')
+        && request.resource.data.keys().hasOnly(['linha', 'quando', 'defeito', 'impacto', 'nome', 'equip', 'status', 'criado', 'por', 'numero', 'qr', 'qid', 'origem'])
+        && request.resource.data.status == 'Aberta' && request.resource.data.numero == 999999 && request.resource.data.qr == true
+        && request.resource.data.qid == id && request.resource.data.origem == 'qr'
+        && request.resource.data.impacto in ['parou', 'reduziu', 'nao']
+        && request.resource.data.defeito is string && request.resource.data.defeito.size() > 0 && request.resource.data.defeito.size() <= 900
+        && request.resource.data.linha is string && request.resource.data.linha.size() > 0 && request.resource.data.linha.size() < 60
+        && request.resource.data.nome is string && request.resource.data.nome.size() <= 60;
     }
 
     // Acessos: só a dona libera ou muda; cada pessoa lê o próprio.
@@ -27,17 +51,17 @@ service cloud.firestore {
       allow write: if dono();
     }
 
-    // Pedido de acesso (criado pela própria pessoa ou pela dona ao criar a conta).
+    // Pedido de acesso (criado pela própria pessoa).
     match /pedidos/{uid} {
       allow read: if dono() || (logado() && request.auth.uid == uid);
-      allow create, update: if dono() || (logado() && request.auth.uid == uid);
+      allow create, update: if dono() || (logado() && provedor() != 'anonymous' && request.auth.uid == uid);
       allow delete: if dono();
     }
 
     // Nome de cada pessoa (aparece nos históricos).
     match /perfis/{uid} {
-      allow read: if logado();
-      allow write: if dono() || (logado() && request.auth.uid == uid);
+      allow read: if logado() && provedor() != 'anonymous';
+      allow write: if dono() || (logado() && provedor() != 'anonymous' && request.auth.uid == uid);
     }
   }
 }

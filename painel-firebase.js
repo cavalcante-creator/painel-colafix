@@ -141,6 +141,37 @@
       r.addEventListener('updatefound', () => { const w = r.installing; w && w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) aviso('Tem versão nova do painel.', [['Atualizar agora', () => location.reload()]]); }); }); }).catch(e => console.warn('sw', e)); });
   })();
 
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  /* ---------- entradas por área (?area=manutencao | telas | almox | producao) ---------- */
+  const SVG = {
+    manutencao: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.6 17.4a1.5 1.5 0 0 0 0 2.1l.9.9a1.5 1.5 0 0 0 2.1 0l5.7-5.7a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.3-.6-.6-2.3z"/>',
+    telas: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    almox: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+    producao: '<path d="M3 21V10l6 4V10l6 4V6l6 4v11z"/><path d="M7 17h2M12 17h2M17 17h2"/>',
+    check: '<path d="M5 12l5 5 9-10"/>' };
+  const AREAS = {
+    manutencao: { ey: 'MANUTENÇÃO', t: 'Central de Manutenção', s: 'Chamados das linhas chegando ao vivo, com aviso sonoro, e a OS pronta para imprimir.', it: ['Chamado aberto pelo QR da linha toca aqui na hora', 'Assumir e concluir com um toque', 'Tempo de resposta e de reparo de cada máquina'], c1: '#0F2A38', c2: '#1B5C7A' },
+    telas: { ey: 'TELAS DA FÁBRICA', t: 'Telas de TV', s: 'Acesso só para olhar: TV das linhas, apresentação e calendário da semana.', it: ['Atualiza sozinho, sem tocar em nada', 'Ideal para a TV, a portaria e a sala de reunião', 'Não muda nenhum dado do painel'], c1: '#1D2B36', c2: '#33566B' },
+    almox: { ey: 'ALMOXARIFADO', t: 'Almoxarifado', s: 'Diário de bordo dos ranchos, fichas de premix e contagem do estoque.', it: ['Próximo rancho a separar e entregar', 'Ficha do premix na hora', 'Contagem do dia no celular'], c1: '#2B2A1E', c2: '#6B5A2A' },
+    producao: { ey: 'PRODUÇÃO', t: 'Produção', s: 'Parar e voltar a linha em dois toques e chamar a manutenção.', it: ['Parada registrada com o horário certo', 'Chamado da manutenção pelo QR', 'Programação do dia da linha'], c1: '#123D33', c2: '#2F6F5E' } };
+  const AREA = AREAS[(new URLSearchParams(location.search).get('area') || '').toLowerCase()] ? (new URLSearchParams(location.search).get('area') || '').toLowerCase() : '';
+  const svg = (k, n, w) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w || 1.8}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SVG[k]}</svg>`;
+  function ladoArea(k) { const A = AREAS[k]; if (!A) return ''; const agora = new Date();
+    return `<aside class="lg-lado" style="--c1:${A.c1};--c2:${A.c2}"><div class="lg-ey">${A.ey} · COLAFIX</div><div class="lg-ic">${svg(k, 40, 1.7)}</div><h2>${A.t}</h2><p>${A.s}</p><ul>${A.it.map(x => `<li>${svg('check', 16, 2.6)}${x}</li>`).join('')}</ul>
+      <div class="lg-rel"><b data-lg-hora>${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}</b><span>${agora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span></div></aside>`; }
+  setInterval(() => { const d = new Date(); document.querySelectorAll('[data-lg-hora]').forEach(e => { e.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }); }, 15000);
+  const cssArea = `#lg .lg-wrap{display:flex;width:100%;max-width:420px;border-radius:22px;overflow:hidden;box-shadow:0 30px 80px rgba(15,42,56,.25),0 2px 6px rgba(20,63,84,.06)}
+  #lg .lg-wrap.tem{max-width:900px}#lg .lg-wrap .bx{box-shadow:none;border-radius:0;flex:1 1 420px;max-width:none}
+  #lg .lg-lado{flex:1 1 440px;color:#fff;padding:38px 38px 30px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden;background:linear-gradient(150deg,var(--c1) 0%,var(--c2) 100%)}
+  #lg .lg-lado::before{content:'';position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:999px;border:46px solid rgba(255,255,255,.06)}
+  #lg .lg-lado::after{content:'';position:absolute;left:-60px;bottom:-110px;width:260px;height:260px;border-radius:999px;background:rgba(255,255,255,.05)}
+  #lg .lg-ey{font-size:11px;font-weight:800;letter-spacing:.2em;opacity:.8}#lg .lg-ic{width:76px;height:76px;border-radius:22px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;margin-top:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  #lg .lg-lado h2{margin:6px 0 0;font-size:30px;line-height:1.15;letter-spacing:-.01em}#lg .lg-lado p{margin:0;font-size:15px;line-height:1.5;opacity:.88;max-width:34ch}
+  #lg .lg-lado ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:14px}#lg .lg-lado li{display:flex;gap:10px;align-items:flex-start}#lg .lg-lado li svg{flex-shrink:0;margin-top:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.16);width:22px;height:22px;box-sizing:border-box}
+  #lg .lg-rel{margin-top:auto;padding-top:22px;display:flex;flex-direction:column;position:relative;z-index:1}#lg .lg-rel b{font-size:44px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}#lg .lg-rel span{font-size:13px;opacity:.8;text-transform:capitalize}
+  @media (max-width:760px){ #lg .lg-wrap.tem{flex-direction:column;max-width:440px} #lg .lg-lado{padding:26px 24px 22px;flex:0 0 auto} #lg .lg-lado ul,#lg .lg-rel{display:none} #lg .lg-lado h2{font-size:24px} #lg .lg-ic{width:56px;height:56px;border-radius:16px;position:absolute;right:22px;top:22px;margin:0} }
+  @media (max-width:480px){ #lg .lg-wrap{border-radius:0;max-width:none;min-height:100%;box-shadow:none} #lg .lg-wrap .bx{min-height:0;justify-content:flex-start} }`;
+
   /* ---------- tela de entrada ---------- */
   let pronto, prontoOk; pronto = new Promise(r => prontoOk = r);
   const css = `#lg{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;color:#1A1A1A;overflow:auto;
@@ -165,14 +196,15 @@
     let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
     const pri = modo === 'primeiro';
     const logo = (document.querySelector('.brand img') || {}).src || '';
-    el.innerHTML = `<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>Painel de Operação</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : 'Entre com o usuário e a senha que o PCP passou para você'}</div>
+    if (!document.getElementById('lg-css2')) { const st2 = document.createElement('style'); st2.id = 'lg-css2'; st2.textContent = cssArea; document.head.appendChild(st2); }
+    el.innerHTML = `<div class="lg-wrap ${AREA && !pri ? 'tem' : ''}">${AREA && !pri ? ladoArea(AREA) : ''}<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>${AREA && !pri ? 'Entrar' : 'Painel de Operação'}</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : 'Entre com o usuário e a senha que o PCP passou para você'}</div>
       ${pri ? '<label for="lg-n">SEU NOME</label><div class="lg-in"><input id="lg-n" autocomplete="name" required></div>' : ''}
       <label for="lg-e">USUÁRIO</label><div class="lg-in"><input id="lg-e" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="ex.: joao.silva"></div>
       <label for="lg-s">SENHA</label><div class="lg-in"><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="6" style="padding-right:76px"><button type="button" class="lg-olho" id="lg-o" aria-label="Mostrar senha">Mostrar</button></div>
       <div class="er" id="lg-er" role="alert"></div><button type="submit" class="lg-go">${pri ? 'Criar e entrar' : 'Entrar'}</button>
       ${instalarPossivel() ? '<button type="button" class="lg-inst" id="lg-inst">⤓ Instalar o app neste aparelho</button>' : ''}
       <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">${pri ? '' : 'Esqueceu a senha? Fale com o PCP.'}</span><button type="button" class="lk" id="lg-t">${pri ? 'Voltar' : 'Primeiro acesso'}</button></div>
-      <div class="lg-pe">Colafix · Produção · PCP · Almoxarifado · Manutenção</div></form>`;
+      <div class="lg-pe">Colafix · Produção · PCP · Almoxarifado · Manutenção</div></form></div>`;
     const f = el.querySelector('form'), er = el.querySelector('#lg-er');
     el.querySelector('#lg-t').onclick = () => telaEntrar(pri ? 'entrar' : 'primeiro');
     el.querySelector('#lg-o').onclick = () => { const i = el.querySelector('#lg-s'), o = el.querySelector('#lg-o'); const v = i.type === 'password'; i.type = v ? 'text' : 'password'; o.textContent = v ? 'Ocultar' : 'Mostrar'; i.focus(); };
@@ -189,10 +221,53 @@
     setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
     if (!logo) document.addEventListener('DOMContentLoaded', () => { const src = (document.querySelector('.brand img') || {}).src, bx = el.querySelector('.bx'); if (src && bx && !bx.querySelector('.lg-logo')) { const im = document.createElement('img'); im.className = 'lg-logo'; im.src = src; im.alt = 'Colafix'; bx.prepend(im); } }, { once: true });
   }
+  /* ---------- chamado pelo QR da linha, sem login (entra como anônimo e só consegue criar o chamado) ---------- */
+  const QR_LINHA = (() => { const m = (location.search + '&' + location.hash).match(/[?&#]chamado=([^&#]+)/); if (!m) return ''; try { return decodeURIComponent(m[1].replace(/\+/g, ' ')); } catch (e) { return m[1]; } })();
+  let MODO_QR = false;
+  const cssQr = `#lg .qr-bx{max-width:480px}#lg .qr-top{display:flex;align-items:center;gap:14px;margin:0 0 18px}#lg .qr-ic{width:56px;height:56px;border-radius:16px;background:linear-gradient(150deg,#0F2A38,#1B5C7A);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  #lg .qr-top small{display:block;font-size:11px;font-weight:800;letter-spacing:.16em;color:#1B5C7A}#lg .qr-top b{display:block;font-size:26px;line-height:1.1;color:#143F54}
+  #lg textarea{border:1.5px solid #E0D9C9;border-radius:12px;padding:12px 14px;font:inherit;font-size:17px;width:100%;box-sizing:border-box;background:#FBFAF6;min-height:96px;resize:vertical;margin:0 0 16px}#lg textarea:focus{outline:none;border-color:#1B5C7A;background:#fff;box-shadow:0 0 0 4px rgba(27,92,122,.14)}
+  #lg .qr-imp{display:grid;gap:8px;margin:0 0 16px}#lg .qr-imp button{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;border:1.5px solid #E0D9C9;border-radius:12px;background:#fff;font:inherit;font-size:16px;font-weight:700;color:#1A1A1A;cursor:pointer;text-align:left}
+  #lg .qr-imp i{width:14px;height:14px;border-radius:999px;flex-shrink:0}#lg .qr-imp [data-v=parou] i{background:#C0665D}#lg .qr-imp [data-v=reduziu] i{background:#D2A857}#lg .qr-imp [data-v=nao] i{background:#6A9C7E}
+  #lg .qr-imp button[aria-pressed=true]{border-width:2.5px;border-color:#143F54;background:#EEF4F6}#lg .qr-imp [data-v=parou][aria-pressed=true]{border-color:#A2453D;background:#F8E6E3}
+  #lg .qr-ok{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}#lg .qr-ok .qr-big{width:84px;height:84px;border-radius:999px;background:#E2EEE6;color:#3F7D5C;display:flex;align-items:center;justify-content:center;animation:qrpop .4s ease-out}
+  @keyframes qrpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}#lg .qr-ok h1{font-size:24px}#lg .qr-ok p{margin:0;color:#4A463D;font-size:15px;max-width:34ch}`;
+  function telaChamado(fase, info) { MODO_QR = true;
+    let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
+    if (!document.getElementById('lg-css3')) { const st3 = document.createElement('style'); st3.id = 'lg-css3'; st3.textContent = cssQr; document.head.appendChild(st3); }
+    const nome = (() => { try { return localStorage.getItem('painel.qrnome') || ''; } catch (e) { return ''; } })();
+    if (fase === 'ok') { el.innerHTML = `<div class="bx qr-bx qr-ok"><div class="qr-big">${svg('check', 44, 2.6)}</div><h1>Chamado enviado</h1><p>A manutenção já foi avisada no painel dela${info && info.parou ? ' e a parada da ' + esc(QR_LINHA) + ' fica registrada' : ''}. Acompanhe pela TV ou fale com o PCP.</p>
+        <button type="button" class="lg-go" id="qr-mais" style="width:100%;margin-top:12px">Abrir outro chamado</button><div class="lg-pe">Colafix · Manutenção</div></div>`;
+      el.querySelector('#qr-mais').onclick = () => telaChamado(); return; }
+    el.innerHTML = `<form class="bx qr-bx" autocomplete="off"><div class="qr-top"><span class="qr-ic">${svg('manutencao', 30, 2)}</span><div><small>CHAMAR MANUTENÇÃO</small><b>${esc(QR_LINHA)}</b></div></div>
+      <label for="qr-d">O QUE ESTÁ ACONTECENDO?</label><textarea id="qr-d" required maxlength="900" placeholder="Ex.: correia do elevador rompeu"></textarea>
+      <label>A LINHA…</label><div class="qr-imp">${[['parou', 'Parou'], ['reduziu', 'Está produzindo menos'], ['nao', 'Continua normal']].map(([k, t]) => `<button type="button" data-v="${k}" aria-pressed="false"><i></i>${t}</button>`).join('')}</div>
+      <label for="qr-e">EQUIPAMENTO (SE SOUBER)</label><div class="lg-in"><input id="qr-e" maxlength="80" placeholder="Ex.: misturador, ensacadeira"></div>
+      <label for="qr-n">SEU NOME</label><div class="lg-in"><input id="qr-n" required maxlength="60" autocomplete="name" value="${esc(nome)}"></div>
+      <div class="er" id="qr-er" role="alert"></div><button type="submit" class="lg-go">Enviar chamado</button>
+      <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">Não precisa de usuário nem senha.</span><button type="button" class="lk" id="qr-login">Entrar com usuário</button></div><div class="lg-pe">Colafix · Manutenção</div></form>`;
+    const f = el.querySelector('form'), er = el.querySelector('#qr-er'); let imp = '';
+    f.querySelectorAll('.qr-imp button').forEach(b => b.onclick = () => { imp = b.dataset.v; f.querySelectorAll('.qr-imp button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+    el.querySelector('#qr-login').onclick = () => { MODO_QR = false; telaEntrar('entrar'); };
+    setTimeout(() => { const t = el.querySelector('#qr-d'); t && t.focus(); }, 60);
+    f.onsubmit = async ev => { ev.preventDefault(); const b = f.querySelector('.lg-go'); er.textContent = '';
+      const d = f.querySelector('#qr-d').value.trim(), n = f.querySelector('#qr-n').value.trim().replace(/\s+/g, ' '), eq = f.querySelector('#qr-e').value.trim();
+      if (!d) { er.textContent = 'Escreva o que está acontecendo.'; return; } if (!imp) { er.textContent = 'Toque em como está a linha.'; return; } if (n.length < 2) { er.textContent = 'Escreva o seu nome.'; return; }
+      b.disabled = true; b.textContent = 'Enviando…'; try { localStorage.setItem('painel.qrnome', n); } catch (e) {}
+      try { if (!auth.currentUser) await auth.signInAnonymously();
+        const id = 'q-' + novoId(), agora = new Date(), loc = new Date(agora.getTime() - agora.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+        await fs.doc('chamados/' + id).set({ linha: QR_LINHA.slice(0, 59), quando: loc, defeito: d.slice(0, 900), impacto: imp, nome: n.slice(0, 60), equip: eq ? eq.slice(0, 80) : null, status: 'Aberta', criado: agora.toISOString(), por: null, numero: 999999, qr: true, qid: id, origem: 'qr' });
+        telaChamado('ok', { parou: imp === 'parou' });
+      } catch (e) { console.warn('qr', e); b.disabled = false; b.textContent = 'Enviar chamado';
+        er.textContent = e && e.code === 'auth/operation-not-allowed' ? 'O chamado sem login ainda não foi ativado. Avise o PCP (Firebase → Authentication → Anônimo).' : e && (e.code === 'permission-denied' || e.code === 'sem-permissao') ? 'O banco recusou o chamado. Avise o PCP para publicar as regras novas.' : e && e.code === 'auth/network-request-failed' ? 'Sem internet. Tente de novo.' : 'Não deu certo (' + ((e && e.code) || 'erro') + '). Tente de novo.'; } };
+  }
+
   let jaLogou = false; try { jaLogou = localStorage.getItem('painel.logado') === '1'; } catch (e) {}
-  if (!jaLogou) { if (document.body) telaEntrar('entrar'); else document.addEventListener('DOMContentLoaded', () => { if (!EU) telaEntrar('entrar'); }); }
+  const primeiraTela = () => (QR_LINHA && !jaLogou ? telaChamado() : telaEntrar('entrar'));
+  if (!jaLogou) { if (document.body) primeiraTela(); else document.addEventListener('DOMContentLoaded', () => { if (!EU) primeiraTela(); }); }
   auth.onAuthStateChanged(async u => {
-    if (!u) { try { localStorage.removeItem('painel.logado'); } catch (e) {} if (EU) { location.reload(); return; } if (!document.getElementById('lg')) telaEntrar('entrar'); return; }
+    if (u && u.isAnonymous) { if (!MODO_QR) auth.signOut(); return; } /* anônimo só serve para o chamado do QR */
+    if (!u) { jaLogou = false; try { localStorage.removeItem('painel.logado'); } catch (e) {} if (EU) { location.reload(); return; } if (!document.getElementById('lg')) primeiraTela(); return; }
     try { localStorage.setItem('painel.logado', '1'); } catch (e) {}
     if (EU && EU.uid !== u.uid) { location.reload(); return; }
     EU = u; const el = document.getElementById('lg'); if (el) el.remove(); setTimeout(() => { const q = document.querySelector('.quem'); if (q) { q.title = 'Usuário ' + usuarioDe(u.email) + ' · trocar senha ou sair'; q.style.cursor = 'pointer'; } }, 500);
