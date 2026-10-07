@@ -8,7 +8,7 @@ window.PAINEL_CONFIG = {
     messagingSenderId: "157670738508",
     appId: "1:157670738508:web:af36f476070c5d273182e9"
   },
-  banco: "default",
-  donos: ["cavalcante@colafix.com"],
-  link: "https://cavalcante-creator.github.io/painel-colafix/"
+  banco: "default",                                           // nome do banco no Firestore
+  donos: ["iasmyn"],                                          // usuário com acesso total (PCP)
+  link: "https://cavalcante-creator.github.io/painel-colafix/" // endereço do site (QR codes)
 };
