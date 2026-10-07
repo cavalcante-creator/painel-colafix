@@ -121,42 +121,71 @@
   const DOWNLOADS = { save: async ({ filename, data }) => { const b = data instanceof Blob ? data : new Blob([data]);
     const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = filename || 'arquivo'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); return { ok: true }; } };
 
+  /* ---------- app instalável (PWA) ---------- */
+  let pedidoInstalar = null;
+  const instalado = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } };
+  const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function instalarPossivel() { return !instalado() && (!!pedidoInstalar || ehIOS()); }
+  async function instalar() {
+    if (pedidoInstalar) { const p = pedidoInstalar; pedidoInstalar = null; p.prompt(); try { await p.userChoice; } catch (e) {} document.querySelectorAll('#lg-inst').forEach(b => b.remove()); return; }
+    if (ehIOS()) aviso('No iPhone/iPad: toque em Compartilhar (quadrado com seta) e depois em “Adicionar à Tela de Início”.');
+  }
+  window.addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); pedidoInstalar = ev;
+    const bx = document.querySelector('#lg .bx'); if (bx && !bx.querySelector('#lg-inst')) { const b = document.createElement('button'); b.type = 'button'; b.className = 'lg-inst'; b.id = 'lg-inst'; b.textContent = '⤓ Instalar o app neste aparelho'; b.onclick = instalar; const go = bx.querySelector('.lg-go'); go && go.after(b); } });
+  window.addEventListener('appinstalled', () => { pedidoInstalar = null; document.querySelectorAll('#lg-inst').forEach(b => b.remove()); aviso('App instalado. Ele aparece junto dos outros aplicativos.'); });
+  (function () { const h = document.head; const tem = sel => h.querySelector(sel);
+    if (!tem('link[rel="manifest"]')) { const l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.webmanifest'; h.appendChild(l); }
+    if (!tem('link[rel="apple-touch-icon"]')) { const l = document.createElement('link'); l.rel = 'apple-touch-icon'; l.href = 'icons/apple-touch-icon.png'; h.appendChild(l); }
+    [['theme-color', '#143F54'], ['apple-mobile-web-app-capable', 'yes'], ['mobile-web-app-capable', 'yes'], ['apple-mobile-web-app-title', 'Painel Colafix'], ['apple-mobile-web-app-status-bar-style', 'default']].forEach(([n, c]) => { if (!tem(`meta[name="${n}"]`)) { const m = document.createElement('meta'); m.name = n; m.content = c; h.appendChild(m); } });
+    if ('serviceWorker' in navigator && location.protocol === 'https:') window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(r => {
+      r.addEventListener('updatefound', () => { const w = r.installing; w && w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) aviso('Tem versão nova do painel.', [['Atualizar agora', () => location.reload()]]); }); }); }).catch(e => console.warn('sw', e)); });
+  })();
+
   /* ---------- tela de entrada ---------- */
   let pronto, prontoOk; pronto = new Promise(r => prontoOk = r);
-  const css = `#lg{position:fixed;inset:0;z-index:2000;background:#fff;display:flex;align-items:center;justify-content:center;padding:16px;font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;color:#1A1A1A;overflow:auto}
-  #lg .bx{background:#F6F4EF;border:1px solid #E3DED4;border-radius:12px;box-shadow:0 10px 40px rgba(26,26,26,.06);padding:30px 32px 26px;width:100%;max-width:426px;display:flex;flex-direction:column;gap:0}
-  #lg .lg-logo{display:block;height:46px;width:auto;margin:0 auto 14px}
-  #lg h1{font-size:19px;font-weight:700;margin:0;text-align:center;color:#1A1A1A}#lg .lg-sub{margin:4px 0 22px;text-align:center;color:#9A948A;font-size:13px}
-  #lg label{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;color:#4A463D;margin:0 0 6px}
-  #lg input{height:38px;border:1px solid #CFCAC0;border-radius:6px;padding:0 12px;font:inherit;font-size:14px;width:100%;box-sizing:border-box;background:#fff;margin:0 0 16px}
-  #lg input:focus{outline:none;border-color:#1B5C7A;box-shadow:0 0 0 3px rgba(27,92,122,.14)}#lg input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #E8F0FE inset}
-  #lg .lg-go{height:50px;border:0;border-radius:6px;background:#1B5C7A;color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer;margin-top:6px}#lg .lg-go:hover{background:#143F54}#lg .lg-go:disabled{opacity:.6}
+  const css = `#lg{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;color:#1A1A1A;overflow:auto;
+    background:radial-gradient(1200px 600px at 10% -10%,#DCE9EF 0,transparent 60%),radial-gradient(900px 500px at 110% 110%,#EFE6D2 0,transparent 55%),#F5F1E8}
+  #lg .bx{background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(20,63,84,.16),0 2px 6px rgba(20,63,84,.06);padding:34px 34px 26px;width:100%;max-width:420px;display:flex;flex-direction:column}
+  #lg .lg-logo{display:block;height:44px;width:auto;margin:0 auto 18px}
+  #lg h1{font-size:22px;font-weight:800;margin:0;text-align:center;color:#143F54;letter-spacing:-.01em}#lg .lg-sub{margin:4px 0 24px;text-align:center;color:#6B6558;font-size:13.5px}
+  #lg label{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;color:#4A463D;margin:0 0 6px}
+  #lg .lg-in{position:relative;margin:0 0 16px}
+  #lg input{height:50px;border:1.5px solid #E0D9C9;border-radius:12px;padding:0 14px;font:inherit;font-size:16px;width:100%;box-sizing:border-box;background:#FBFAF6;transition:border-color .15s,box-shadow .15s}
+  #lg input:focus{outline:none;border-color:#1B5C7A;background:#fff;box-shadow:0 0 0 4px rgba(27,92,122,.14)}#lg input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #EEF4F6 inset}
+  #lg .lg-olho{position:absolute;right:6px;top:6px;height:38px;padding:0 10px;border:0;border-radius:9px;background:transparent;color:#6B6558;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}#lg .lg-olho:hover{background:#F2EEE4}
+  #lg .lg-go{height:54px;border:0;border-radius:12px;background:#1B5C7A;color:#fff;font:inherit;font-size:16.5px;font-weight:700;cursor:pointer;margin-top:4px;box-shadow:0 6px 18px rgba(27,92,122,.28);transition:background .15s,transform .1s}#lg .lg-go:hover{background:#143F54}#lg .lg-go:active{transform:scale(.985)}#lg .lg-go:disabled{opacity:.65;cursor:wait}
   #lg .lk{border:0;background:none;color:#6B6558;padding:2px 0;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}#lg .lk:hover{color:#1B5C7A;text-decoration:underline}
-  #lg .er{color:#A2453D;font-size:13px;min-height:0;margin:-6px 0 4px}#lg .er:empty{display:none}#lg .ok{color:#3F7D5C}
-  #lg .rw{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:14px}`;
-  function msgErro(e) { const c = (e && e.code) || ''; return ({ 'auth/invalid-credential': 'E-mail ou senha incorretos.', 'auth/wrong-password': 'E-mail ou senha incorretos.', 'auth/user-not-found': 'E-mail ou senha incorretos.',
-    'auth/invalid-email': 'E-mail inválido.', 'auth/email-already-in-use': 'Já existe uma conta com esse e-mail. Use "Entrar".', 'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
-    'auth/too-many-requests': 'Muitas tentativas. Espere alguns minutos.', 'auth/network-request-failed': 'Sem internet.' })[c] || 'Não deu certo (' + c + ').'; }
+  #lg .er{color:#A2453D;background:#F8E6E3;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;margin:-4px 0 12px}#lg .er:empty{display:none}
+  #lg .rw{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:16px}
+  #lg .lg-inst{margin-top:14px;height:44px;border:1.5px solid #E0D9C9;border-radius:12px;background:#fff;color:#143F54;font:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}#lg .lg-inst:hover{border-color:#1B5C7A;background:#EEF4F6}
+  #lg .lg-pe{margin-top:18px;text-align:center;font-size:11.5px;color:#9A948A}
+  @media (max-width:480px){ #lg{padding:0;align-items:stretch} #lg .bx{border-radius:0;max-width:none;min-height:100%;justify-content:center;padding:28px 22px;box-shadow:none} }
+  @media (prefers-color-scheme:dark){ #lg{background:#15191B;color:#EEF1F2} #lg .bx{background:#1E2427;box-shadow:0 24px 70px rgba(0,0,0,.4)} #lg h1{color:#8CC2DA} #lg label{color:#CBD3D6} #lg input{background:#232A2E;border-color:#333C41;color:#EEF1F2} #lg input:focus{background:#1E2427} #lg .lg-logo{background:#fff;border-radius:8px;padding:4px 8px} #lg .lg-inst{background:#1E2427;color:#8CC2DA;border-color:#333C41} }`;
   function telaEntrar(modo) {
     let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
     const pri = modo === 'primeiro';
     const logo = (document.querySelector('.brand img') || {}).src || '';
-    el.innerHTML = `<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>Painel de Operação</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : 'Produção · PCP · Almoxarifado'}</div>
-      ${pri ? '<label for="lg-n">SEU NOME</label><input id="lg-n" autocomplete="name" required>' : ''}
-      <label for="lg-e">USUÁRIO</label><input id="lg-e" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-      <label for="lg-s">SENHA</label><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="6">
-      <div class="er" id="lg-er"></div><button type="submit" class="lg-go">${pri ? 'Criar e entrar →' : 'Entrar →'}</button>
-      <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">${pri ? '' : 'Esqueceu a senha? Fale com o PCP.'}</span><button type="button" class="lk" id="lg-t">${pri ? 'Voltar' : 'Primeiro acesso'}</button></div></form>`;
+    el.innerHTML = `<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>Painel de Operação</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : 'Entre com o usuário e a senha que o PCP passou para você'}</div>
+      ${pri ? '<label for="lg-n">SEU NOME</label><div class="lg-in"><input id="lg-n" autocomplete="name" required></div>' : ''}
+      <label for="lg-e">USUÁRIO</label><div class="lg-in"><input id="lg-e" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="ex.: joao.silva"></div>
+      <label for="lg-s">SENHA</label><div class="lg-in"><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="6" style="padding-right:76px"><button type="button" class="lg-olho" id="lg-o" aria-label="Mostrar senha">Mostrar</button></div>
+      <div class="er" id="lg-er" role="alert"></div><button type="submit" class="lg-go">${pri ? 'Criar e entrar' : 'Entrar'}</button>
+      ${instalarPossivel() ? '<button type="button" class="lg-inst" id="lg-inst">⤓ Instalar o app neste aparelho</button>' : ''}
+      <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">${pri ? '' : 'Esqueceu a senha? Fale com o PCP.'}</span><button type="button" class="lk" id="lg-t">${pri ? 'Voltar' : 'Primeiro acesso'}</button></div>
+      <div class="lg-pe">Colafix · Produção · PCP · Almoxarifado · Manutenção</div></form>`;
     const f = el.querySelector('form'), er = el.querySelector('#lg-er');
     el.querySelector('#lg-t').onclick = () => telaEntrar(pri ? 'entrar' : 'primeiro');
-    f.onsubmit = async ev => { ev.preventDefault(); const b = f.querySelector('button[type=submit]'); b.disabled = true; er.className = 'er'; er.textContent = '';
+    el.querySelector('#lg-o').onclick = () => { const i = el.querySelector('#lg-s'), o = el.querySelector('#lg-o'); const v = i.type === 'password'; i.type = v ? 'text' : 'password'; o.textContent = v ? 'Ocultar' : 'Mostrar'; i.focus(); };
+    const bi = el.querySelector('#lg-inst'); if (bi) bi.onclick = instalar;
+    f.onsubmit = async ev => { ev.preventDefault(); const b = f.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Entrando…'; er.textContent = '';
       const us = el.querySelector('#lg-e').value, em = emailDe(us), se = el.querySelector('#lg-s').value;
+      const volta = () => { b.disabled = false; b.textContent = pri ? 'Criar e entrar' : 'Entrar'; };
       try {
-        if (pri) { if (!DONOS.includes(em)) { er.textContent = 'O primeiro acesso é só da responsável pelo PCP. As outras contas o PCP cria em Acessos.'; b.disabled = false; return; }
+        if (pri) { if (!DONOS.includes(em)) { er.textContent = 'O primeiro acesso é só da responsável pelo PCP. As outras contas o PCP cria em Equipe e cargos.'; volta(); return; }
           const nome = el.querySelector('#lg-n').value.trim(); const c = await auth.createUserWithEmailAndPassword(em, se);
           await c.user.updateProfile({ displayName: nome }); await fs.doc('perfis/' + c.user.uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString() }); }
         else await auth.signInWithEmailAndPassword(em, se);
-      } catch (e) { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : (e && (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password')) ? 'Usuário ou senha incorretos.' : msgErro(e); b.disabled = false; } };
+      } catch (e) { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : (e && (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password')) ? 'Usuário ou senha incorretos.' : msgErro(e); volta(); } };
     setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
     if (!logo) document.addEventListener('DOMContentLoaded', () => { const src = (document.querySelector('.brand img') || {}).src, bx = el.querySelector('.bx'); if (src && bx && !bx.querySelector('.lg-logo')) { const im = document.createElement('img'); im.className = 'lg-logo'; im.src = src; im.alt = 'Colafix'; bx.prepend(im); } }, { once: true });
   }
@@ -213,38 +242,15 @@
     try { await c.user.updateProfile({ displayName: nome }); } catch (e) {}
     await sec.auth().signOut();
     await fs.doc('perfis/' + uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString(), criadoPor: EU.uid });
-    await fs.doc('pedidos/' + uid).set({ em: new Date().toISOString(), criadoPeloPcp: true });
     return uid; }
-  function telaCriar() { modal(`<h2>Criar usuário</h2><p>A pessoa entra com este usuário e senha. Depois de criar, escolha o cargo dela na lista de Acessos.</p>
-      <label>NOME</label><input id="cu-n" required autocomplete="off"><label>USUÁRIO</label><input id="cu-u" required autocapitalize="none" spellcheck="false" autocomplete="off" placeholder="ex.: joao.linha1">
-      <label>SENHA INICIAL</label><input id="cu-s" required minlength="6" autocomplete="off" placeholder="mínimo 6 caracteres"><div class="er" id="cu-er"></div>
-      <div class="rw"><button type="button" id="cu-x">Fechar</button><button class="p">Criar</button></div>`, f => {
-      const n = f.querySelector('#cu-n'), u = f.querySelector('#cu-u');
-      n.oninput = () => { if (!u.dataset.mexeu) u.value = usuarioLimpo(n.value.split(' ').slice(0, 2).join('.')); }; u.oninput = () => { u.dataset.mexeu = '1'; };
-      f.querySelector('#cu-x').onclick = fecharModal;
-      f.onsubmit = async ev => { ev.preventDefault(); const er = f.querySelector('#cu-er'), b = f.querySelector('.p'); b.disabled = true; er.className = 'er'; er.textContent = '';
-        const us = usuarioLimpo(u.value), se = f.querySelector('#cu-s').value;
-        try { await criarUsuario(us, n.value.trim(), se); er.className = 'er ok'; er.textContent = 'Criado: usuário ' + us + ' · senha ' + se + '. Passe para a pessoa e escolha o cargo na lista.'; f.reset(); delete u.dataset.mexeu; b.disabled = false; }
-        catch (e) { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Já existe o usuário ' + us + '.' : e && e.code === 'usuario-vazio' ? 'Escreva o usuário.' : msgErro(e); b.disabled = false; } }; }); }
-
-  /* botão "Criar usuário" na tela de Acessos (só a dona) + texto da tela */
-  let acsAgendado = false;
-  new MutationObserver(() => { if (acsAgendado || !EU || !ehDono(EU)) return; acsAgendado = true; requestAnimationFrame(() => { acsAgendado = false; acsBotao(); }); }).observe(document.documentElement, { childList: true, subtree: true });
-  function acsBotao() { const h = document.querySelector('#view .head h1');
-    if (!h || h.textContent.trim() !== 'Acessos') return; document.querySelectorAll('#view section.card').forEach(c => { if (c.style.display !== 'none') { const tx = (c.innerText || '').trim(); if (/^COMO FUNCIONA/i.test(tx) || /^Criar acesso/.test(tx)) c.style.display = 'none'; } }); const head = h.closest('.head'); if (!head || head.querySelector('.pf-novo')) return;
-    const sub = head.querySelector('.sub'); if (sub) sub.textContent = 'Você é a master: crie o usuário e a senha de cada pessoa e escolha o que ela pode ver.';
-    document.querySelectorAll('#view section.card').forEach(c => { const tx = (c.innerText || '').trim(); if (/^COMO FUNCIONA/i.test(tx) || /^Criar acesso/.test(tx)) c.style.display = 'none'; });
-    const b = document.createElement('button'); b.className = 'pf-novo'; b.type = 'button'; b.textContent = '+ Criar usuário'; b.onclick = telaCriar; head.appendChild(b);
-    if (!mcssOk) { const st = document.createElement('style'); st.textContent = mcss; document.head.appendChild(st); mcssOk = true; } }
-
   /* menu do usuário: tocar no nome/avatar no topo */
   document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('[data-act="sair-conta"]')) { auth.signOut().then(() => location.reload()); return; }
     const mn = document.getElementById('pf-menu'); if (mn && !mn.contains(ev.target)) mn.remove();
     const q = ev.target.closest && ev.target.closest('.quem'); if (!q || !EU || mn) return;
     if (!mcssOk) { const st = document.createElement('style'); st.textContent = mcss; document.head.appendChild(st); mcssOk = true; }
     const r = q.getBoundingClientRect(), m = document.createElement('div'); m.id = 'pf-menu'; m.style.top = (r.bottom + 6) + 'px'; m.style.right = Math.max(8, innerWidth - r.right) + 'px';
-    m.innerHTML = `<div>Usuário <b>${usuarioDe(EU.email)}</b></div><button data-m="senha">Trocar minha senha</button><button data-m="sair">Sair</button>`;
-    m.onclick = e => { const k = e.target.dataset.m; if (!k) return; m.remove(); if (k === 'senha') trocarSenha(); else auth.signOut().then(() => location.reload()); };
+    m.innerHTML = `<div>Usuário <b>${usuarioDe(EU.email)}</b></div><button data-m="senha">Trocar minha senha</button>${instalarPossivel() ? '<button data-m="instalar">Instalar o app neste aparelho</button>' : ''}<button data-m="sair">Sair</button>`;
+    m.onclick = e => { const k = e.target.dataset.m; if (!k) return; m.remove(); if (k === 'senha') trocarSenha(); else if (k === 'instalar') instalar(); else auth.signOut().then(() => location.reload()); };
     document.body.appendChild(m); });
 
   window.claude = {
@@ -252,6 +258,9 @@
     use: async nome => { await pronto;
       if (nome === 'db') return DB; if (nome === 'user') return USER; if (nome === 'assets') return ASSETS; if (nome === 'downloads') return DOWNLOADS; return null; },
     assetBytes: async id => { await pronto; return ASSETS.bytes(id); },
+    /* só a dona: cria a conta de outra pessoa (o painel grava o acesso com o cargo) */
+    criarUsuario: async (usuario, nome, senha) => { await pronto; if (!ehDono(EU)) throw { code: 'sem-permissao' }; return criarUsuario(usuario, nome, senha); },
+    instalar, instalarPossivel,
     _fs: () => fs, _assets: ASSETS, _enc: enc
   };
 })();

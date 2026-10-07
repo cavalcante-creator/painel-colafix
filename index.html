@@ -1,4 +1,4 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#143F54"><meta name="robots" content="noindex"><style>body{margin:0}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#143F54"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Painel Colafix"><meta name="robots" content="noindex"><style>body{margin:0}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Painel de Operação Colafix</title>
 <style>
 :root{
@@ -7252,7 +7252,7 @@ function pnlAcessoEd(f){ const temAlx=(f.mods||[]).includes('almox');
    <div class="sub" style="font-size:12.5px;margin-top:14px">Desmarque uma aba para esconder só ela dentro do módulo. Quem tem este cargo passa a ver assim assim que você salvar.</div></div>`; }
 function vPaineis(){ if(!S.acs.dono) return acsCaixa('Somente a responsável','Esta tela é só da dona do painel.');
   const N=S.pnl, C=pnlCargos(), ks=Object.keys(C).sort((a,b)=>String(C[a].nome).localeCompare(String(C[b].nome))); const E=N.ed;
-  const semCargo=(S.acs.lista||[]).filter(d=>d._id!=='_geral'&&!pnlCargo(d.perfil)&&d.ativo!==false);
+  const semCargo=(S.acs.lista||[]).filter(d=>d._id!=='_geral'&&!d.apagado&&!pnlCargo(d.perfil)&&d.ativo!==false);
   return `${banner()}<div class="head"><div><div class="eyebrow">AJUSTES</div><h1>Painéis por cargo</h1><div class="sub">Monte o que cada cargo acessa e a tela inicial que a pessoa vê ao entrar. Depois, se precisar, ajuste o painel de uma pessoa só.</div></div><button class="btn" data-pv="abrir" style="height:42px">${ic('lupa',16,2.2)}Pré-visualizar como cargo</button></div>
    ${ajAbas('paineis')}
    <div class="pnl-wrap"><aside class="pnl-side">
@@ -7260,7 +7260,7 @@ function vPaineis(){ if(!S.acs.dono) return acsCaixa('Somente a responsável','E
       ${ks.length?ks.map(k=>{ const c=C[k], n=pnlPessoasDe(k).length; return `<button class="pnl-it ${E&&E.tipo==='cargo'&&E.id===k?'on':''}" data-act="pnl-cargo" data-id="${k}"><b>${esc(c.nome)}</b><small>${(c.blocos||[]).length} blocos · ${(c.mods||[]).length} módulos · ${n} ${n===1?'pessoa':'pessoas'}</small></button>`; }).join(''):'<div class="sub" style="font-size:13px;margin:0 0 6px">Nenhum cargo ainda. Comece por um modelo:</div>'}
       <div class="label" style="margin:14px 0 8px">NOVO A PARTIR DE</div><div class="pnl-mods">${Object.entries(PNL_MODELOS).map(([k,m])=>`<button class="chip" data-act="pnl-novo" data-v="${k}">${k==='vazio'?'Em branco':esc(m.nome)}</button>`).join('')}</div></section>
      <section class="card pnl-lst"><div class="label" style="margin-bottom:8px">PESSOAS</div>
-      ${(S.acs.lista||[]).filter(d=>d._id!=='_geral').sort((a,b)=>acsNome(a._id).localeCompare(acsNome(b._id))).map(d=>`<button class="pnl-it ${E&&E.tipo==='pessoa'&&E.id===d._id?'on':''}" data-act="pnl-pessoa" data-id="${esc(d._id)}"><b>${esc(acsNome(d._id))}</b><small>${esc(pnlPerfilNome(d.perfil))}${d.blocos&&d.blocos.length?' · painel próprio':''} · ${pnlVisto(d._id)}${d.ativo===false?' · bloqueada':''}</small></button>`).join('')||'<div class="sub" style="font-size:13px;margin:0">Ninguém com acesso ainda.</div>'}
+      ${(S.acs.lista||[]).filter(d=>d._id!=='_geral'&&!d.apagado).sort((a,b)=>acsNome(a._id).localeCompare(acsNome(b._id))).map(d=>`<button class="pnl-it ${E&&E.tipo==='pessoa'&&E.id===d._id?'on':''}" data-act="pnl-pessoa" data-id="${esc(d._id)}"><b>${esc(acsNome(d._id))}</b><small>${esc(pnlPerfilNome(d.perfil))}${d.blocos&&d.blocos.length?' · painel próprio':''} · ${pnlVisto(d._id)}${d.ativo===false?' · bloqueada':''}</small></button>`).join('')||'<div class="sub" style="font-size:13px;margin:0">Ninguém com acesso ainda.</div>'}
       <button class="pnl-it ${E&&E.tipo==='dono'?'on':''}" data-act="pnl-dono"><b>Você</b><small>seu próprio painel inicial</small></button>
       ${semCargo.length?`<div class="sub" style="font-size:12px;margin:8px 2px 0">${semCargo.length} ${semCargo.length===1?'pessoa ainda está':'pessoas ainda estão'} num perfil antigo. Em <button class="lnk" data-go="acessos" style="font-size:12px">Acessos</button>, escolha o cargo novo para ela seguir o painel.</div>`:''}</section>
    </aside><div class="pnl-main">${pnlEditor()}</div></div>`; }
@@ -9519,6 +9519,282 @@ function tabLinkInicial(){
     const tenta=()=>{ if(S.acs&&S.acs.pronto){ const l=tabLinhaDoQr(l0); if(l&&viewOk('linhatv')){ tabSet(l); go('linhatv'); } try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60) setTimeout(tenta,500); };
     setTimeout(tenta,300); }
 
+
+/* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
+P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
+P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
+P.equipe='<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.8"/><path d="M16.5 14.2c3 .3 5 2.5 5 5.3"/>';
+P.editar='<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>';
+P.chaveacesso='<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>';
+P.whats='<path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1c-1-.4-2-1.4-2.5-2.5l1-1-1-2z"/>';
+P.imprimir='<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>';
+P.olho='<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+P.bloq='<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>';
+if(!P.tv) P.tv='<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>';
+if(!P.analise) P.analise='<path d="M4 19V5M4 19h16"/><path d="M7 15l4-4 3 3 5-6"/>';
+const EQ_MOD={inicio:['sol','Meu dia','Resumo do dia do PCP'],silos:['silo','Silos','Medição dos silos e cargas de cimento'],producao:['fabrica','Produção','Programação, calendário, ranchos e diário de bordo'],
+  tv:['tv','TV da fábrica','Só a tela da TV das linhas'],telas:['tv','Telas de TV','Apresentação em rodízio'],cal:['calendario','Calendário','Só consulta da semana'],
+  paradas:['pausa','Paradas','Parar e voltar a linha (Tela da linha) e abrir chamado'],analise:['analise','Análise PCP','Necessidades, estoques e previsto × realizado'],
+  almox:['caixa','Inventário','Contagem, recebimento, auditoria e diário de bordo dos ranchos'],premix:['premix','Almoxarifado','Fichas e receitas de premix'],
+  manut:['chave','Manutenção','Atender chamados e QR das linhas'],ajustes:['ajuste','Ajustes e itens','Configurações e cadastro de itens']};
+const EQ_COR=['#1B5C7A','#3F7D5C','#8A6326','#A2453D','#5B4E8C','#2F6F73','#7A4E2D','#45607A'];
+const EQ_PRONTO_ORD=['almoxpmx','linha','manut','producao','sup','supsis','tv','cal','auditor','conf','conf2','conf3','confa1','confa2','pcp'];
+const EQ_PRONTO_DESC={almoxpmx:'Premix, diário de bordo dos ranchos e contagem',linha:'Computador fixo da linha: parar e voltar a linha e abrir chamado',manut:'Atende os chamados de manutenção',producao:'Vê o Meu dia e a programação, sem mudar nada',
+  sup:'Inventário: contagem e recebimento de todos os almox',supsis:'Inventário completo, com auditoria',tv:'Só a TV das linhas',cal:'Só consulta do calendário',auditor:'Consulta a auditoria do inventário',
+  conf:'Contagem e recebimento do Almox 3',conf2:'Contagem do Almox 30',conf3:'Contagem do Rejunte e da Separação',confa1:'Contagem do Almox 1',confa2:'Contagem do Almox 2',pcp:'Tudo, igual a você'};
+const EQ_PRINCIPAIS=6;
+if(ACS_PERFIS.almoxpmx) ACS_PERFIS.almoxpmx.nome='Almoxarifado'; if(ACS_PERFIS.manut) ACS_PERFIS.manut.nome='Manutenção'; if(ACS_PERFIS.linha) ACS_PERFIS.linha.nome='Produção · Tela da linha';
+S.eq={maisCg:false,aba:'pessoas',q:'',fil:'',nv:null,cartao:null,conf:null,cg:null,cgConf:null,cgMove:'',salv:false,usu:{}};
+function eqOnline(){ return !!(window.claude&&window.claude.online&&typeof window.claude.criarUsuario==='function'); }
+function eqLimpo(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'.').replace(/[^a-z0-9._-]/g,'').replace(/\.{2,}/g,'.').replace(/^\.|\.$/g,''); }
+function eqUsuSug(nome){ const p=eqLimpo(nome).split('.').filter(Boolean); return p.length>1?p[0]+'.'+p[p.length-1]:(p[0]||''); }
+function eqSenha(){ const L='abcdefghjkmnpqrstuvwxyz', a=new Uint32Array(7); crypto.getRandomValues(a); return [0,1,2].map(i=>L[a[i]%L.length]).join('')+[3,4,5,6].map(i=>a[i]%10).join(''); }
+function eqIni(n){ return String(n||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
+function eqCorDe(id){ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return EQ_COR[h%EQ_COR.length]; }
+function eqVis(d){ return d&&d._id!=='_geral'&&!d.apagado; }
+/* cargos: os prontos (do painel) + os criados por você */
+function eqCargos(){ const ps=(S.acs.lista||[]).filter(eqVis); const n=k=>ps.filter(d=>(d.perfil||'outro')===k).length;
+  const ord=k=>{ const i=EQ_PRONTO_ORD.indexOf(k); return i<0?99:i; };
+  const prontos=Object.entries(ACS_PERFIS).filter(([k])=>k!=='outro').map(([k,v])=>({k,nome:v.nome,desc:EQ_PRONTO_DESC[k]||'',mods:v.mods||[],pronto:true,n:n(k)})).sort((a,b)=>ord(a.k)-ord(b.k));
+  const meus=Object.entries(pnlCargos()).map(([k,v])=>({k,nome:v.nome||'Cargo sem nome',desc:v.desc||'',mods:v.mods||[],pronto:false,n:n(k)})).sort((a,b)=>a.nome.localeCompare(b.nome));
+  return {meus,prontos,todos:[...meus,...prontos]}; }
+function eqModsDe(d){ const c=pnlCargo(d.perfil); return c?(c.mods||[]):(d.mods||[]); }
+function eqIcones(mods,max){ max=max||6; const ms=(mods||[]).filter(m=>EQ_MOD[m]); return `<span class="eq-ics">${ms.slice(0,max).map(m=>`<span class="eq-mi" title="${esc(EQ_MOD[m][1])}">${ic(EQ_MOD[m][0],15,2)}</span>`).join('')}${ms.length>max?`<span class="eq-mi more">+${ms.length-max}</span>`:''}</span>`; }
+function eqUsuario(id){ return S.eq.usu[id]||''; }
+async function eqCarregaUsu(){ const E=S.eq; if(!S.user) return; const ids=[...(S.acs.lista||[]),...(S.acs.pedidos||[])].map(x=>x._id).filter(i=>i&&i!=='_geral'&&!(i in E.usu)); if(!ids.length) return;
+  ids.forEach(i=>E.usu[i]=''); try{ const ps=await S.user.profiles(ids); let mud=false; ids.forEach(i=>{ const p=ps&&ps[i]; if(p){ if(p.email&&!String(p.email).includes('@')){ E.usu[i]=p.email; mud=true; } if(p.name&&!S.nomes[i]){ S.nomes[i]=p.name; mud=true; } } }); if(mud) rerenderSeguro(); }catch(e){} }
+function eqSelCargo(sel,attrs){ const C=eqCargos(); return `<select class="txt eq-sel" ${attrs||''}>${C.meus.length?`<optgroup label="Seus cargos">${C.meus.map(c=>`<option value="${c.k}" ${c.k===sel?'selected':''}>${esc(c.nome)}</option>`).join('')}</optgroup>`:''}<optgroup label="Cargos prontos">${C.prontos.map(c=>`<option value="${c.k}" ${c.k===sel?'selected':''}>${esc(c.nome)}</option>`).join('')}</optgroup>${sel&&!C.todos.some(c=>c.k===sel)?`<option value="${esc(sel)}" selected>Personalizado</option>`:''}</select>`; }
+
+vAcessos=function(){ const A=S.acs, E=S.eq; if(!A.dono) return acsCaixa('Somente a responsável','Esta tela é só da dona do painel.');
+  eqCarregaUsu();
+  const abas=`<div class="eq-tabs" role="tablist">${[['pessoas','Pessoas',(A.lista||[]).filter(eqVis).length],['cargos','Cargos',eqCargos().todos.length]].map(([k,l,n])=>`<button role="tab" data-act="eq-aba" data-v="${k}" aria-selected="${E.aba===k}">${ic(k==='pessoas'?'equipe':'chaveacesso',18,2)}${l}<small>${n}</small></button>`).join('')}</div>`;
+  const novo=E.aba==='pessoas'?(eqOnline()?`<button class="btn" data-act="eq-novo">${ic('mais',18,2.4)}Nova pessoa</button>`:''):`<button class="btn" data-act="eq-cg-novo">${ic('mais',18,2.4)}Novo cargo</button>`;
+  return `${banner()}
+  <div class="head eq-head"><div><div class="eyebrow">AJUSTES</div><h1>Equipe e cargos</h1><div class="sub">${E.aba==='pessoas'?'Crie o acesso de cada pessoa e escolha o cargo dela. O cargo decide o que ela vê.':'Cada cargo é um pacote de telas. Mude um cargo e todos que o usam mudam juntos.'}</div></div>${novo}</div>
+  ${ajAbas('acessos')}${abas}
+  ${E.aba==='pessoas'?eqPessoas():eqCargosTela()}
+  ${E.nv?eqNovoModal():''}${E.cartao?eqCartaoModal():''}${E.cg?eqCargoModal():''}`; };
+
+function eqPessoas(){ const A=S.acs, E=S.eq, C=eqCargos();
+  const pend=(A.pedidos||[]).filter(p=>!(A.lista||[]).some(l=>l._id===p._id)&&!p.criadoPeloPcp);
+  const q=eqLimpo(E.q).replace(/\./g,' ');
+  let ps=(A.lista||[]).filter(eqVis).map(d=>Object.assign({},d,{nome:acsNome(d._id)})).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const cnt={}; ps.forEach(d=>{ const k=d.perfil||'outro'; cnt[k]=(cnt[k]||0)+1; });
+  if(E.fil) ps=ps.filter(d=>(d.perfil||'outro')===E.fil);
+  if(q) ps=ps.filter(d=>eqLimpo(d.nome+' '+eqUsuario(d._id)+' '+pnlPerfilNome(d.perfil)).replace(/\./g,' ').includes(q));
+  const chips=Object.keys(cnt).length>1?`<div class="eq-fil"><button class="chip" data-act="eq-fil" data-v="" aria-pressed="${!E.fil}">Todos · ${(A.lista||[]).filter(eqVis).length}</button>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<button class="chip" data-act="eq-fil" data-v="${esc(k)}" aria-pressed="${E.fil===k}">${esc(pnlPerfilNome(k))} · ${n}</button>`).join('')}</div>`:'';
+  const card=d=>{ const id=d._id, bl=d.ativo===false, u=eqUsuario(id), conf=E.conf===id;
+    return `<article class="eq-p ${bl?'off':''}">
+     <div class="eq-pt"><span class="eq-av" style="background:${eqCorDe(id)}">${esc(eqIni(d.nome))}</span><div class="eq-pn"><b>${esc(d.nome)}</b><small>${u?'@'+esc(u):'&nbsp;'}</small></div>${bl?'<span class="pill crit">bloqueado</span>':''}</div>
+     <label class="eq-pc"><span>Cargo</span>${eqSelCargo(d.perfil||'outro',`data-eq-cargo="${esc(id)}"`)}</label>
+     <div class="eq-pm">${eqIcones(eqModsDe(d),7)}</div>
+     ${conf?`<div class="eq-conf"><b>Apagar ${esc(d.nome)}?</b><span>A pessoa perde o acesso na hora. O que ela já registrou continua no histórico.${u?' O usuário @'+esc(u)+' não pode ser usado de novo.':''}</span><div><button class="btn warn" data-act="eq-apagar" data-id="${esc(id)}">${ic('lixo',16,2)}Sim, apagar</button><button class="btn sec" data-act="eq-conf-x">Não</button></div></div>`
+      :`<div class="eq-pa"><button class="eq-lk" data-act="eq-bloq" data-id="${esc(id)}">${ic(bl?'check':'bloq',15,2)}${bl?'Desbloquear':'Bloquear'}</button><button class="eq-lk" data-act="acs-editar" data-id="${esc(id)}">${ic('editar',15,2)}Ajustar telas</button><button class="eq-lk del" data-act="eq-conf" data-id="${esc(id)}">${ic('lixo',15,2)}Apagar</button></div>`}
+    </article>`; };
+  const ed=A.ed?acsEditor(A.ed):'';
+  return `${pend.length?`<section class="card eq-pend"><h2>${ic('sino',18,2)} Pedindo acesso · ${pend.length}</h2><div class="sub" style="margin:2px 0 8px">Pessoas que entraram e ainda não têm cargo. Escolha o cargo e libere.</div>
+    ${pend.map(p=>`<div class="eq-pr"><span class="eq-av sm" style="background:${eqCorDe(p._id)}">${esc(eqIni(acsNome(p._id)))}</span><div class="eq-pn"><b>${esc(acsNome(p._id))}</b><small>${eqUsuario(p._id)?'@'+esc(eqUsuario(p._id))+' · ':''}${p.em?'pediu '+dia(p.em).toLowerCase()+' às '+hora(p.em):''}</small></div>
+     ${eqSelCargo('',`id="eq-pp-${esc(p._id)}"`).replace('<optgroup','<option value="" selected>Escolha o cargo…</option><optgroup')}<button class="btn" data-act="eq-liberar" data-id="${esc(p._id)}">Liberar</button><button class="btn sec" data-act="eq-recusar" data-id="${esc(p._id)}">Recusar</button></div>`).join('')}</section>`:''}
+   ${ed}
+   <div class="eq-bar"><label class="eq-q">${ic('lupa',18,2)}<input class="txt" id="eq-q" placeholder="Procurar pessoa, usuário ou cargo…" value="${esc(E.q)}" autocomplete="off"></label>${chips}</div>
+   <div class="eq-grid">
+    <article class="eq-p eu"><div class="eq-pt"><span class="eq-av" style="background:var(--teal-strong)">${esc(eqIni(S.nomes[S.uid]||'PCP'))}</span><div class="eq-pn"><b>${esc(S.nomes[S.uid]||'Você')}</b><small>dona do painel</small></div><span class="pill ok">master · tudo</span></div><div class="eq-pm sub" style="font-size:12.5px">Você vê e muda tudo, cria pessoas e cargos.</div></article>
+    ${ps.map(card).join('')}
+    ${eqOnline()&&!E.q&&!E.fil?`<button class="eq-p eq-add" data-act="eq-novo">${ic('mais',26,2)}<b>Nova pessoa</b><small>usuário, senha e cargo em um passo</small></button>`:''}
+   </div>
+   ${!ps.length&&(E.q||E.fil)?'<div class="empty">Ninguém encontrado com esse filtro.</div>':''}
+   ${!eqOnline()?'<div class="sub" style="font-size:12.5px">Nesta versão do painel as pessoas entram com a conta do claude.ai e aparecem em “Pedindo acesso”. Na versão online você cria o usuário e a senha aqui.</div>':''}`; }
+
+function eqNovoModal(){ const N=S.eq.nv, C=eqCargos(), sel=N.cargo;
+  const cartao=c=>`<button class="eq-cgo ${sel===c.k?'on':''}" data-act="eq-nv-cargo" data-v="${esc(c.k)}" aria-pressed="${sel===c.k}"><b>${esc(c.nome)}</b>${eqIcones(c.mods,5)}${c.desc?`<small>${esc(c.desc)}</small>`:''}</button>`;
+  return `<div class="dbmodal eq-modal" data-eq-fundo="nv"><div class="dbmbox eq-box" role="dialog" aria-modal="true" aria-labelledby="eq-nv-t">
+   <div class="eq-mh"><div><div class="eyebrow">NOVA PESSOA</div><h2 id="eq-nv-t">Criar acesso</h2></div><button class="eq-x" data-act="eq-nv-x" aria-label="Fechar">✕</button></div>
+   <div class="eq-mb">
+    <div class="eq-steps"><span class="on">1 Quem é</span><span class="${N.nome?'on':''}">2 Cargo</span><span class="${N.nome&&sel?'on':''}">3 Pronto</span></div>
+    <div class="eq-f2"><label class="eq-f"><span>Nome</span><input class="txt" id="eq-nv-nome" value="${esc(N.nome)}" placeholder="Ex.: João da Silva" autocomplete="off"></label>
+     <label class="eq-f"><span>Usuário para entrar</span><div class="eq-in"><span class="eq-pre">@</span><input class="txt" id="eq-nv-usu" value="${esc(N.usu)}" placeholder="joao.silva" autocapitalize="none" spellcheck="false" autocomplete="off"></div></label>
+     <label class="eq-f"><span>Senha inicial</span><div class="eq-in"><input class="txt num" id="eq-nv-sen" value="${esc(N.sen)}" autocomplete="off" spellcheck="false"><button type="button" class="eq-lk" data-act="eq-nv-gera" title="Gerar outra senha">${ic('relogio',15,2)}Outra</button></div><small>A pessoa pode trocar depois, tocando no nome dela no topo.</small></label></div>
+    <div class="label" style="margin:18px 0 8px">CARGO</div>
+    ${C.meus.length?`<div class="label" style="margin:0 0 8px">SEUS CARGOS</div><div class="eq-cgs">${C.meus.map(cartao).join('')}</div><div class="label" style="margin:14px 0 8px">CARGOS PRONTOS</div>`:''}
+    <div class="eq-cgs">${(S.eq.maisCg||C.prontos.slice(EQ_PRINCIPAIS).some(c=>c.k===sel)?C.prontos:C.prontos.slice(0,EQ_PRINCIPAIS)).map(cartao).join('')}</div>
+    ${C.prontos.length>EQ_PRINCIPAIS&&!S.eq.maisCg&&!C.prontos.slice(EQ_PRINCIPAIS).some(c=>c.k===sel)?`<button class="eq-lk" data-act="eq-mais" style="margin-top:8px">${ic('mais',15,2.2)}Mostrar todos os cargos prontos (${C.prontos.length})</button>`:''}
+    <div class="eq-err" id="eq-nv-err">${esc(N.err||'')}</div>
+   </div>
+   <div class="eq-mf"><button class="btn sec" data-act="eq-nv-x">Cancelar</button><button class="btn" data-act="eq-nv-criar" ${S.eq.salv?'disabled':''}>${S.eq.salv?'Criando…':ic('check',18,2.4)+'Criar acesso'}</button></div>
+  </div></div>`; }
+
+function eqLinkPainel(){ return (window.claude&&window.claude.link)||(S.cfg&&S.cfg.linkPainel)||location.href.split(/[?#]/)[0]; }
+function eqTextoCartao(c){ return `Seu acesso ao Painel de Operação Colafix\n\nEndereço: ${eqLinkPainel()}\nUsuário: ${c.usu}\nSenha: ${c.sen}\n\nNo primeiro acesso, toque no seu nome no topo e troque a senha.`; }
+function eqCartaoModal(){ const c=S.eq.cartao;
+  return `<div class="dbmodal eq-modal" data-eq-fundo="cartao"><div class="dbmbox eq-box sm" role="dialog" aria-modal="true">
+   <div class="eq-ok">${ic('check',30,2.6)}</div><h2 style="text-align:center;margin-top:10px">Acesso criado</h2><div class="sub" style="text-align:center">Passe estes dados para ${esc(c.nome.split(' ')[0])}. A senha não aparece de novo depois de fechar.</div>
+   <div class="eq-card" id="eq-cartao"><div class="eq-card-h"><b>Painel de Operação</b><span>COLAFIX</span></div>
+    <div class="eq-card-r"><span>Nome</span><b>${esc(c.nome)}</b></div><div class="eq-card-r"><span>Cargo</span><b>${esc(c.cargo)}</b></div>
+    <div class="eq-card-r big"><span>Usuário</span><b class="num">${esc(c.usu)}</b></div><div class="eq-card-r big"><span>Senha</span><b class="num">${esc(c.sen)}</b></div>
+    <div class="eq-card-r"><span>Endereço</span><b class="num" style="font-size:12px;word-break:break-all">${esc(eqLinkPainel())}</b></div></div>
+   <div class="eq-cbts"><button class="btn sec" data-act="eq-c-copiar">${ic('copiar',16,2)}Copiar</button><button class="btn sec" data-act="eq-c-zap">${ic('whats',16,2)}WhatsApp</button><button class="btn sec" data-act="eq-c-print">${ic('imprimir',16,2)}Imprimir</button></div>
+   <div class="eq-mf" style="border:0;padding:6px 0 0"><button class="btn sec" data-act="eq-c-outra">${ic('mais',16,2.2)}Criar outra pessoa</button><button class="btn" data-act="eq-c-x">Concluir</button></div>
+  </div></div>`; }
+
+function eqCargosTela(){ const C=eqCargos(), E=S.eq;
+  const card=c=>{ const conf=E.cgConf===c.k, outros=C.todos.filter(x=>x.k!==c.k);
+    return `<article class="eq-c ${c.pronto?'pronto':''}"><div class="eq-ct"><b>${esc(c.nome)}</b><span class="pill ${c.pronto?'neu':'prod'}">${c.pronto?'pronto':'seu'}</span></div>
+     ${c.desc?`<div class="sub" style="font-size:12.5px;margin:0">${esc(c.desc)}</div>`:''}
+     <div class="eq-cm">${(c.mods||[]).filter(m=>EQ_MOD[m]).map(m=>`<span class="eq-tg">${ic(EQ_MOD[m][0],14,2)}${esc(EQ_MOD[m][1])}</span>`).join('')||'<span class="sub" style="font-size:12px">nenhuma tela</span>'}</div>
+     <div class="eq-cn">${ic('equipe',15,2)}${c.n} ${c.n===1?'pessoa':'pessoas'}</div>
+     ${conf?`<div class="eq-conf"><b>Apagar o cargo ${esc(c.nome)}?</b>${c.n?`<span>${c.n} ${c.n===1?'pessoa usa':'pessoas usam'} este cargo. Passar para:</span>${eqSelCargo(E.cgMove||outros[0].k,'id="eq-cg-move"')}`:'<span>Ninguém usa este cargo.</span>'}<div><button class="btn warn" data-act="eq-cg-apagar" data-id="${esc(c.k)}">${ic('lixo',16,2)}Sim, apagar</button><button class="btn sec" data-act="eq-cg-conf-x">Não</button></div></div>`
+      :`<div class="eq-pa">${c.pronto?`<button class="eq-lk" data-act="eq-cg-dup" data-id="${esc(c.k)}">${ic('copiar',15,2)}Copiar para ajustar</button>`:`<button class="eq-lk" data-act="eq-cg-ed" data-id="${esc(c.k)}">${ic('editar',15,2)}Editar</button><button class="eq-lk" data-act="eq-cg-tela" data-id="${esc(c.k)}">${ic('grid',15,2)}Tela inicial</button><button class="eq-lk del" data-act="eq-cg-conf" data-id="${esc(c.k)}">${ic('lixo',15,2)}Apagar</button>`}</div>`}
+    </article>`; };
+  return `${C.meus.length?`<div class="label" style="margin:0">SEUS CARGOS · ${C.meus.length}</div><div class="eq-grid">${C.meus.map(card).join('')}</div>`:''}
+   <div class="eq-grid">${C.meus.length?'':`<button class="eq-c eq-add" data-act="eq-cg-novo">${ic('mais',26,2)}<b>Novo cargo</b><small>escolha as telas que ele vê</small></button>`}</div>
+   <div class="label" style="margin:6px 0 0">CARGOS PRONTOS · ${C.prontos.length}</div><div class="sub" style="font-size:12.5px;margin:0">Não dá para mudar nem apagar estes. Use “Copiar para ajustar” para criar um seu a partir deles.</div>
+   <div class="eq-grid">${(S.eq.maisCg?C.prontos:C.prontos.slice(0,EQ_PRINCIPAIS)).map(card).join('')}</div>
+   ${C.prontos.length>EQ_PRINCIPAIS?`<button class="eq-lk" data-act="eq-mais">${ic(S.eq.maisCg?'seta':'mais',15,2.2)}${S.eq.maisCg?'Mostrar só os principais':'Mostrar todos os cargos prontos ('+C.prontos.length+')'}</button>`:''}`; }
+
+function eqCargoModal(){ const G=S.eq.cg, f=G.f, temAlx=f.mods.includes('almox');
+  return `<div class="dbmodal eq-modal" data-eq-fundo="cg"><div class="dbmbox eq-box" role="dialog" aria-modal="true" aria-labelledby="eq-cg-t">
+   <div class="eq-mh"><div><div class="eyebrow">${G.novo?'NOVO CARGO':'EDITAR CARGO'}</div><h2 id="eq-cg-t">${esc(f.nome||'Cargo sem nome')}</h2></div><button class="eq-x" data-act="eq-cg-x" aria-label="Fechar">✕</button></div>
+   <div class="eq-mb">
+    <div class="eq-f2"><label class="eq-f"><span>Nome do cargo</span><input class="txt" id="eq-cg-nome" value="${esc(f.nome)}" placeholder="Ex.: Líder da Linha 2" autocomplete="off"></label>
+     <label class="eq-f" style="grid-column:span 2"><span>Para que serve (opcional)</span><input class="txt" id="eq-cg-desc" value="${esc(f.desc||'')}" placeholder="Ex.: registra paradas e vê a programação da linha" autocomplete="off"></label></div>
+    <div class="label" style="margin:18px 0 8px">O QUE ESTE CARGO VÊ</div>
+    <div class="eq-mods">${ACS_MODS.map(([k])=>{ const M=EQ_MOD[k]; if(!M) return ''; const on=f.mods.includes(k); return `<button class="eq-mod ${on?'on':''}" data-act="eq-cg-mod" data-v="${k}" aria-pressed="${on}"><span class="eq-mic">${ic(M[0],20,2)}</span><span><b>${esc(M[1])}</b><small>${esc(M[2])}</small></span><span class="eq-ck">${on?ic('check',14,3):''}</span></button>`; }).join('')}</div>
+    ${temAlx?`<div class="label" style="margin:16px 0 8px">INVENTÁRIO · ALMOXARIFADOS</div><div class="eq-fil">${ALX_LOCS.map(l=>`<button class="chip" data-act="eq-cg-loc" data-v="${l}" aria-pressed="${f.locais.includes(l)}">${esc(ALX_LOC[l])}</button>`).join('')}</div>
+     <div class="label" style="margin:14px 0 8px">NO INVENTÁRIO PODE</div><div class="eq-fil">${ACS_ACOES.map(([k,n])=>`<button class="chip" data-act="eq-cg-acao" data-v="${k}" aria-pressed="${!!f[k]}">${esc(n)}</button>`).join('')}</div>`:''}
+    <div class="eq-err">${esc(G.err||'')}</div>
+   </div>
+   <div class="eq-mf">${G.novo?'<span class="sub" style="font-size:12.5px;margin:0">A tela inicial começa com os blocos sugeridos para essas telas.</span>':'<span></span>'}<div style="display:flex;gap:8px"><button class="btn sec" data-act="eq-cg-x">Cancelar</button><button class="btn" data-act="eq-cg-salvar" ${S.eq.salv?'disabled':''}>${S.eq.salv?'Salvando…':ic('check',18,2.4)+'Salvar cargo'}</button></div></div>
+  </div></div>`; }
+
+async function eqGravaCargos(muda){ const D=pnlClone(S.pnl.dados)||{}; D.cargos=D.cargos||{}; muda(D.cargos); D.em=new Date().toISOString(); await S.db.doc('config/paineis').set(D); S.pnl.dados=D; }
+function eqBlocosSug(mods){ const out=[]; (mods||[]).forEach(m=>(PNL_SUG[m]||[]).forEach(k=>{ const B=PNL_BLOCOS[k]; if(!B||out.some(b=>b.t===k)) return; const nb={t:k,s:B.s}; if(B.par==='linha') nb.p={linha:linhasOrd()[0]}; if(B.par==='ritmo') nb.p={ritmo:'total'}; out.push(nb); })); return out.slice(0,6); }
+
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="eq-"]'); if(!b||b.disabled) return; const E=S.eq, a=b.dataset.act, A=S.acs; if(!A.dono) return;
+  if(a==='eq-aba'){ E.aba=b.dataset.v; E.conf=null; E.cgConf=null; render(); return; }
+  if(a==='eq-fil'){ E.fil=b.dataset.v; render(); return; }
+  if(a==='eq-mais'){ E.maisCg=!E.maisCg; render(); return; }
+  if(a==='eq-novo'||a==='eq-c-outra'){ E.cartao=null; E.nv={nome:'',usu:'',sen:eqSenha(),cargo:'',mexeu:false,err:''}; render(); setTimeout(()=>{ const i=$('#eq-nv-nome'); i&&i.focus(); },40); return; }
+  if(a==='eq-nv-x'){ E.nv=null; render(); return; }
+  if(a==='eq-nv-gera'){ E.nv.sen=eqSenha(); render(); return; }
+  if(a==='eq-nv-cargo'){ E.nv.cargo=b.dataset.v; E.nv.err=''; render(); return; }
+  if(a==='eq-nv-criar'){ const N=E.nv; N.nome=String(N.nome||'').trim(); N.usu=eqLimpo(N.usu); N.sen=String(N.sen||'').trim();
+    N.err=!N.nome?'Escreva o nome da pessoa.':!N.usu?'Escreva o usuário.':N.sen.length<6?'A senha precisa ter pelo menos 6 caracteres.':!N.cargo?'Escolha o cargo.':''; if(N.err){ render(); return; }
+    E.salv=true; render();
+    try{ const uid=await window.claude.criarUsuario(N.usu,N.nome,N.sen); S.nomes[uid]=N.nome; E.usu[uid]=N.usu;
+      const ok=await acsGravar(uid,acsPreset(N.cargo),true); E.salv=false;
+      if(ok){ E.cartao={nome:N.nome,usu:N.usu,sen:N.sen,cargo:pnlPerfilNome(N.cargo)}; E.nv=null; } render(); }
+    catch(e){ E.salv=false; N.err=e&&e.code==='auth/email-already-in-use'?'Já existe o usuário @'+N.usu+'. Escolha outro (ex.: '+N.usu+'2).':e&&e.code==='auth/weak-password'?'Senha fraca: use pelo menos 6 caracteres.':e&&e.code==='auth/network-request-failed'?'Sem internet. Tente de novo.':'Não deu certo ('+((e&&e.code)||'erro')+').'; render(); }
+    return; }
+  if(a==='eq-c-x'){ E.cartao=null; render(); return; }
+  if(a==='eq-c-copiar'){ const t=eqTextoCartao(E.cartao); try{ await navigator.clipboard.writeText(t); toast('Copiado.'); }catch(e){ toast('Não consegui copiar. Selecione e copie à mão.'); } return; }
+  if(a==='eq-c-zap'){ window.open('https://wa.me/?text='+encodeURIComponent(eqTextoCartao(E.cartao)),'_blank','noopener'); return; }
+  if(a==='eq-c-print'){ const el=$('#eq-cartao'); const w=window.open('','_blank','width=480,height=640'); if(!w){ toast('O navegador bloqueou a janela de impressão.'); return; }
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>Acesso ${esc(E.cartao.nome)}</title><style>body{font:15px "Segoe UI",system-ui,sans-serif;margin:24px;color:#1A1A1A}.eq-card{border:2px solid #143F54;border-radius:14px;padding:18px 20px;max-width:360px}.eq-card-h{display:flex;justify-content:space-between;border-bottom:1px solid #E5DFD0;padding-bottom:10px;margin-bottom:6px}.eq-card-h b{color:#143F54;font-size:17px}.eq-card-h span{font-weight:800;letter-spacing:.14em;color:#A2453D}.eq-card-r{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px dashed #E5DFD0}.eq-card-r span{color:#6B6558}.eq-card-r.big b{font-size:20px}</style>${el.outerHTML}<p style="font-size:12px;color:#6B6558;max-width:360px">No primeiro acesso, toque no seu nome no topo do painel e troque a senha.</p><script>print()<\/script>`); w.document.close(); return; }
+  if(a==='eq-conf'){ E.conf=b.dataset.id; render(); return; }
+  if(a==='eq-conf-x'){ E.conf=null; render(); return; }
+  if(a==='eq-apagar'){ const id=b.dataset.id, d=(A.lista||[]).find(x=>x._id===id); if(!d) return; const nd=Object.assign({},d); delete nd._id;
+    Object.assign(nd,{ativo:false,apagado:true,apagadoEm:new Date().toISOString(),apagadoPor:S.uid||null,alteradoEm:new Date().toISOString()});
+    try{ await S.db.doc('acessos/'+id).set(nd); try{ await S.db.doc('pedidos/'+id).delete(); }catch(e){} E.conf=null; toast(acsNome(id)+' foi apagado(a) da equipe.'); render(); }catch(e){ erro(e); } return; }
+  if(a==='eq-bloq'){ const id=b.dataset.id, d=(A.lista||[]).find(x=>x._id===id); if(!d) return; const f=acsPreset(d.perfil||'outro'); if(!pnlCargo(d.perfil)&&!ACS_PERFIS[d.perfil]) Object.assign(f,{mods:d.mods||[],locais:d.locais||[],contar:d.contar,receber:d.receber,auditar:d.auditar,verAud:d.verAud}); f.perfil=d.perfil||'outro'; f.ativo=d.ativo===false;
+    if(await acsGravar(id,f,false)){ toast(f.ativo?acsNome(id)+' desbloqueado(a).':acsNome(id)+' bloqueado(a): não entra mais até você desbloquear.'); render(); } return; }
+  if(a==='eq-liberar'){ const id=b.dataset.id, sel=$('#eq-pp-'+CSS.escape(id)); if(!sel||!sel.value){ toast('Escolha o cargo antes de liberar.'); sel&&sel.focus(); return; } if(await acsGravar(id,acsPreset(sel.value),true)){ toast('Acesso liberado para '+acsNome(id)+'.'); render(); } return; }
+  if(a==='eq-recusar'){ const id=b.dataset.id; if(b.dataset.c!=='1'){ b.dataset.c='1'; b.textContent='Confirmar recusa'; return; } const f=acsPreset('outro'); f.mods=[]; f.ativo=false; f.apagado=true; if(await acsGravar(id,f,true)){ try{ await S.db.doc('acessos/'+id).update({apagado:true}); }catch(e){} toast('Pedido recusado.'); render(); } return; }
+  /* cargos */
+  if(a==='eq-cg-novo'){ E.cg={novo:true,id:pnlNum(),f:{nome:'',desc:'',mods:[],locais:[],contar:false,receber:false,auditar:false,verAud:false},err:''}; render(); setTimeout(()=>{ const i=$('#eq-cg-nome'); i&&i.focus(); },40); return; }
+  if(a==='eq-cg-ed'){ const c=pnlCargos()[b.dataset.id]; if(!c) return; E.cg={novo:false,id:b.dataset.id,f:{nome:c.nome||'',desc:c.desc||'',mods:[...(c.mods||[])],locais:[...(c.locais||[])],contar:!!c.contar,receber:!!c.receber,auditar:!!c.auditar,verAud:!!c.verAud},err:''}; render(); return; }
+  if(a==='eq-cg-dup'){ const p=ACS_PERFIS[b.dataset.id]; if(!p) return; E.cg={novo:true,id:pnlNum(),f:{nome:p.nome+' (meu)',desc:'',mods:[...(p.mods||[])],locais:[...(p.locais||[])],contar:!!p.contar,receber:!!p.receber,auditar:!!p.auditar,verAud:!!p.verAud},err:''}; render(); setTimeout(()=>{ const i=$('#eq-cg-nome'); if(i){ i.focus(); i.select(); } },40); return; }
+  if(a==='eq-cg-x'){ E.cg=null; render(); return; }
+  if(a==='eq-cg-mod'){ const f=E.cg.f, k=b.dataset.v; f.mods=f.mods.includes(k)?f.mods.filter(x=>x!==k):[...f.mods,k]; if(k==='almox'&&f.mods.includes('almox')&&!f.locais.length){ f.locais=[...ALX_LOCS]; f.contar=true; } render(); return; }
+  if(a==='eq-cg-loc'){ const f=E.cg.f, k=b.dataset.v; f.locais=f.locais.includes(k)?f.locais.filter(x=>x!==k):[...f.locais,k]; render(); return; }
+  if(a==='eq-cg-acao'){ const f=E.cg.f; f[b.dataset.v]=!f[b.dataset.v]; render(); return; }
+  if(a==='eq-cg-salvar'){ const G=E.cg, f=G.f; f.nome=String(f.nome||'').trim();
+    G.err=!f.nome?'Dê um nome para o cargo.':!f.mods.length?'Marque pelo menos uma tela.':f.mods.includes('almox')&&!f.locais.length?'Marque pelo menos um almoxarifado.':(eqCargos().todos.some(c=>c.k!==G.id&&c.nome.toLowerCase()===f.nome.toLowerCase())?'Já existe um cargo com esse nome.':''); if(G.err){ render(); return; }
+    E.salv=true; render();
+    try{ await eqGravaCargos(cs=>{ const old=cs[G.id]; const c=Object.assign({},old||{},{nome:f.nome,desc:String(f.desc||'').trim(),mods:f.mods,locais:f.mods.includes('almox')?f.locais:[],contar:!!f.contar,receber:!!f.receber,auditar:!!f.auditar,verAud:!!f.verAud,alteradoEm:new Date().toISOString(),alteradoPor:S.uid||null});
+        c.ocultas=(old&&old.ocultas)||[]; c.blocos=(old&&old.blocos)||eqBlocosSug(f.mods);
+        if(old){ const snap=pnlClone(old); delete snap.hist; c.hist=[...(old.hist||[]).slice(-9),{em:old.alteradoEm||null,por:old.alteradoPor||null,snap}]; } cs[G.id]=c; });
+      toast(G.novo?'Cargo '+f.nome+' criado.':'Cargo salvo. Quem usa '+f.nome+' já vê assim.'); E.cg=null; }
+    catch(e){ erro(e); } E.salv=false; render(); return; }
+  if(a==='eq-cg-tela'){ pnlAbrirCargo(b.dataset.id); go('paineis'); return; }
+  if(a==='eq-cg-conf'){ E.cgConf=b.dataset.id; E.cgMove=''; render(); return; }
+  if(a==='eq-cg-conf-x'){ E.cgConf=null; render(); return; }
+  if(a==='eq-cg-apagar'){ const k=b.dataset.id, para=($('#eq-cg-move')||{}).value||'', ps=(A.lista||[]).filter(d=>eqVis(d)&&d.perfil===k);
+    if(ps.length&&!para){ toast('Escolha para qual cargo as pessoas vão.'); return; }
+    try{ for(const d of ps){ const f=acsPreset(para); f.ativo=d.ativo!==false; await acsGravar(d._id,f,false); }
+      await eqGravaCargos(cs=>{ delete cs[k]; }); E.cgConf=null; toast('Cargo apagado'+(ps.length?'; '+ps.length+(ps.length===1?' pessoa passou':' pessoas passaram')+' para '+pnlPerfilNome(para):'')+'.'); render(); }
+    catch(e){ erro(e); } return; }
+});
+document.addEventListener('input',ev=>{ const t=ev.target, E=S.eq; if(!t.id||!t.id.startsWith('eq-')) return;
+  if(t.id==='eq-q'){ E.q=t.value; const p=t.selectionStart; render(); const n=$('#eq-q'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(e){} } return; }
+  if(E.nv){ if(t.id==='eq-nv-nome'){ E.nv.nome=t.value; if(!E.nv.mexeu){ E.nv.usu=eqUsuSug(t.value); const u=$('#eq-nv-usu'); if(u) u.value=E.nv.usu; } }
+    if(t.id==='eq-nv-usu'){ E.nv.usu=t.value; E.nv.mexeu=true; } if(t.id==='eq-nv-sen') E.nv.sen=t.value; }
+  if(E.cg){ if(t.id==='eq-cg-nome'){ E.cg.f.nome=t.value; const h=$('#eq-cg-t'); if(h) h.textContent=t.value||'Cargo sem nome'; } if(t.id==='eq-cg-desc') E.cg.f.desc=t.value; } });
+document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id==='eq-cg-move'){ S.eq.cgMove=t.value; return; }
+  const id=t.dataset&&t.dataset.eqCargo; if(!id||!S.acs.dono) return; const d=(S.acs.lista||[]).find(x=>x._id===id); if(!d) return;
+  const f=acsPreset(t.value); f.ativo=d.ativo!==false; if(await acsGravar(id,f,false)){ toast(acsNome(id)+' agora é '+pnlPerfilNome(t.value)+'.'); render(); } });
+document.addEventListener('click',ev=>{ const f=ev.target.closest&&ev.target.closest('[data-eq-fundo]'); if(!f||ev.target!==f) return; const k=f.dataset.eqFundo; if(k==='nv') S.eq.nv=null; else if(k==='cg') S.eq.cg=null; else return; render(); });
+document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape') return; const E=S.eq; if(E.nv||E.cg){ E.nv=null; E.cg=null; render(); } });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&S.eq.nv&&ev.target&&ev.target.closest&&ev.target.closest('.eq-box')&&ev.target.tagName==='INPUT'){ ev.preventDefault(); const b=document.querySelector('[data-act="eq-nv-criar"]'); b&&b.click(); } });
+/* pessoas apagadas não contam como "com acesso" e não aparecem nos cargos */
+{ const _aj=ajAbas; ajAbas=function(v){ return _aj(v).replace('>Acessos<','>Equipe e cargos<').replace('>Painéis por cargo<','>Telas iniciais<'); }; }
+CRUMB.acessos='Equipe e cargos';
+{ const _pp=pnlPessoasDe; pnlPessoasDe=function(k){ return _pp(k).filter(d=>!d.apagado); }; }
+{ const _g=acsGate; acsGate=function(){ const d=S.acs&&S.acs.doc; if(d&&d.apagado&&!S.acs.dono) return acsCaixa('Sem acesso','Este usuário não faz mais parte da equipe do painel. Se for engano, fale com a responsável pelo PCP.')+(window.claude&&window.claude.online?'<p style="text-align:center"><button class="lnk" data-act="sair-conta">Entrar com outro usuário</button></p>':''); return _g(); }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="eq-css">
+.eq-head .btn{height:46px}
+.eq-tabs{display:flex;gap:4px;padding:4px;background:var(--sunken);border-radius:12px;width:max-content;max-width:100%}
+.eq-tabs button{display:flex;align-items:center;gap:8px;height:42px;padding:0 18px;border:0;border-radius:9px;background:transparent;color:var(--ink-2);font-weight:700;font-size:14px;cursor:pointer}
+.eq-tabs button small{font-size:11px;font-weight:700;background:var(--surface);color:var(--muted);border-radius:999px;padding:1px 8px}
+.eq-tabs button[aria-selected="true"]{background:var(--surface);color:var(--teal-strong);box-shadow:var(--shadow)}
+.eq-tabs button[aria-selected="true"] small{background:var(--teal-tint);color:var(--teal-strong)}
+.eq-bar{display:flex;flex-direction:column;gap:10px}
+.eq-q{position:relative;display:block;max-width:520px}.eq-q svg{position:absolute;left:14px;top:13px;color:var(--muted)}.eq-q input{height:44px;padding-left:42px}
+.eq-fil{display:flex;flex-wrap:wrap;gap:6px}
+.eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
+.eq-p,.eq-c{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column;gap:12px;border:1.5px solid transparent;min-width:0}
+.eq-p.off{opacity:.72;background:var(--surface-2)}.eq-p.eu{border-color:var(--teal-tint)}
+.eq-pt{display:flex;align-items:center;gap:12px}.eq-pn{min-width:0;flex:1}.eq-pn b{display:block;font-size:16px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.eq-pn small{display:block;color:var(--muted);font-size:12.5px}
+.eq-av{width:44px;height:44px;border-radius:999px;color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:.02em}.eq-av.sm{width:36px;height:36px;font-size:13px}
+.eq-pc{display:flex;flex-direction:column;gap:4px}.eq-pc>span{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.eq-sel{height:42px;font-weight:600}
+.eq-ics{display:flex;flex-wrap:wrap;gap:5px}.eq-mi{width:28px;height:28px;border-radius:8px;background:var(--teal-wash);color:var(--teal-strong);display:inline-flex;align-items:center;justify-content:center}.eq-mi.more{font-size:11px;font-weight:800;width:auto;padding:0 7px}
+.eq-pa{display:flex;flex-wrap:wrap;gap:4px 14px;padding-top:10px;border-top:1px solid var(--line-2);margin-top:auto}
+.eq-lk{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:4px 0;color:var(--teal-strong);font-weight:600;font-size:13px;cursor:pointer}.eq-lk:hover{text-decoration:underline}.eq-lk.del{color:var(--crit-ink);margin-left:auto}
+.eq-conf{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:var(--crit-tint);color:var(--crit-ink);margin-top:auto}.eq-conf span{font-size:12.5px;color:var(--ink-2)}.eq-conf>div{display:flex;gap:8px;flex-wrap:wrap}.eq-conf .btn{height:40px}.eq-conf .eq-sel{background:var(--surface)}
+.eq-add{align-items:center;justify-content:center;text-align:center;border:2px dashed var(--line)!important;background:transparent!important;box-shadow:none!important;color:var(--teal-strong);cursor:pointer;min-height:180px;font:inherit}.eq-add:hover{border-color:var(--teal)!important;background:var(--teal-wash)!important}.eq-add b{font-size:16px}.eq-add small{color:var(--muted);font-size:12.5px}
+.eq-pend{border:1.5px solid var(--warn)}.eq-pend h2{display:flex;align-items:center;gap:8px}
+.eq-pr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line-2)}.eq-pr .eq-pn{flex:1 1 180px}.eq-pr .eq-sel{width:auto;flex:0 1 240px}.eq-pr .btn{height:42px}
+.eq-ct{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.eq-ct b{font-size:16px}
+.eq-cm{display:flex;flex-wrap:wrap;gap:6px}.eq-tg{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--teal-wash);color:var(--teal-strong)}
+.eq-c.pronto .eq-tg{background:var(--sunken);color:var(--ink-2)}
+.eq-cn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+.eq-modal{z-index:950}.eq-box{max-width:760px;display:flex;flex-direction:column;padding:0}.eq-box.sm{max-width:440px;padding:24px 24px 18px}
+.eq-mh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:20px 24px 14px;border-bottom:1px solid var(--line-2);position:sticky;top:0;background:var(--surface);z-index:1}
+.eq-x{width:38px;height:38px;border-radius:10px;border:0;background:var(--sunken);color:var(--ink-2);font-size:16px;cursor:pointer;flex-shrink:0}
+.eq-mb{padding:18px 24px;overflow:auto}
+.eq-mf{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--line-2);position:sticky;bottom:0;background:var(--surface)}.eq-mf .btn{height:46px}
+.eq-steps{display:flex;gap:6px;margin-bottom:16px}.eq-steps span{flex:1;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--faint);padding-top:8px;border-top:3px solid var(--line)}.eq-steps span.on{color:var(--teal-strong);border-top-color:var(--teal)}
+.eq-f2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.eq-f{display:flex;flex-direction:column;gap:5px;min-width:0}.eq-f>span{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}.eq-f small{font-size:11.5px;color:var(--muted)}
+.eq-in{display:flex;align-items:center;gap:6px;position:relative}.eq-in .txt{flex:1;min-width:0}.eq-pre{position:absolute;left:12px;color:var(--muted);font-weight:700}.eq-pre+.txt{padding-left:28px}
+.eq-cgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.eq-cgo{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font:inherit;color:var(--ink)}.eq-cgo:hover{border-color:var(--teal)}
+.eq-cgo b{font-size:14px;line-height:1.3}.eq-cgo small{font-size:12px;color:var(--muted)}.eq-cgo.on{border:2px solid var(--teal);background:var(--teal-wash);padding:11.5px 13.5px}
+.eq-err{color:var(--crit-ink);font-weight:600;font-size:13.5px;margin-top:12px}.eq-err:empty{display:none}
+.eq-mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.eq-mod{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font:inherit;color:var(--ink)}.eq-mod:hover{border-color:var(--teal)}
+.eq-mod b{display:block;font-size:14px}.eq-mod small{display:block;font-size:12px;color:var(--muted);line-height:1.35}.eq-mod>span:nth-child(2){flex:1;min-width:0}
+.eq-mic{width:38px;height:38px;border-radius:10px;background:var(--sunken);color:var(--ink-2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.eq-ck{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff}
+.eq-mod.on{border:2px solid var(--teal);background:var(--teal-wash);padding:11.5px 13.5px}.eq-mod.on .eq-mic{background:var(--teal);color:#fff}.eq-mod.on .eq-ck{background:var(--teal);border-color:var(--teal)}
+.eq-ok{width:60px;height:60px;border-radius:999px;background:var(--ok-tint);color:var(--ok-ink);display:flex;align-items:center;justify-content:center;margin:0 auto}
+.eq-card{margin:16px 0 12px;border:2px solid var(--teal-strong);border-radius:14px;padding:14px 18px;background:var(--surface)}
+.eq-card-h{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px}.eq-card-h b{color:var(--teal-strong);font-size:16px}.eq-card-h span{font-weight:800;letter-spacing:.16em;font-size:12px;color:var(--crit-ink)}
+.eq-card-r{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:7px 0;border-bottom:1px dashed var(--line)}.eq-card-r:last-child{border-bottom:0}.eq-card-r span{color:var(--muted);font-size:13px}.eq-card-r b{text-align:right}.eq-card-r.big b{font-size:20px;letter-spacing:.02em}
+.eq-cbts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.eq-cbts .btn{height:44px;padding:0 8px;font-size:14px}
+@media (max-width:700px){ .eq-f2{grid-template-columns:1fr} .eq-f[style]{grid-column:auto!important} .eq-tabs{width:100%} .eq-tabs button{flex:1;justify-content:center;padding:0 8px} .eq-mh,.eq-mb,.eq-mf{padding-left:16px;padding-right:16px} .eq-box.sm{padding:20px 16px} .eq-head .btn{width:100%} }
+</style>`);
+/* ===FIM EQUIPE=== */
 iniciar();
 })();
 </script>
