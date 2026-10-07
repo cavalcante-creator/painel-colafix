@@ -9571,6 +9571,12 @@ function tabLinkInicial(){
 
 
 
+
+
+
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -10453,6 +10459,42 @@ document.head.insertAdjacentHTML('beforeend',`<style id="cb-css">
 .cb-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important}.cb-card b{font-size:22px}.cb-svg{max-width:100%;height:auto}
 </style>`);
 /* ===FIM CB=== */
+/* ===================== APAGAR OS (07/10): a responsável apaga chamados de teste ===================== */
+/* Só a dona (ou cargo com tudo). Apaga a OS, a parada que ela abriu, as fotos e devolve ao estoque as peças baixadas. */
+S.ax={conf:null,ap:false};
+function axPode(){ try{ return dbMaster(); }catch(e){ return !!(S.acs&&S.acs.dono); } }
+{ const _md=manDetalhe; manDetalhe=function(c){ let h=_md.apply(this,arguments); if(!axPode()||!c) return h;
+  const conf=S.ax.conf===c.numero, par=c.paradaId&&S.paradas.find(p=>p._id===c.paradaId), E=c.exec||{}, nf=(c.foto?1:0)+(c.fotos||[]).length, pcs=E.pecasBaixa?(E.pecas||[]).filter(p=>+p.qtd>0).length:0;
+  const bt=`<button class="btn sec ax-del" data-act="ax-conf" data-n="${c.numero}">${ic('lixo',18,2)}Apagar OS</button>`;
+  h=h.replace('<button class="btn sec" data-act="man-imprimir">',bt+'<button class="btn sec" data-act="man-imprimir">');
+  if(!conf) return h;
+  const itens=['a OS some de todas as telas, indicadores e do histórico'];
+  if(par) itens.push('a parada da '+esc(par.linha)+' que ela abriu também é apagada');
+  if(nf) itens.push(nf===1?'a foto é apagada':nf+' fotos são apagadas');
+  if(pcs) itens.push('as peças que saíram do estoque voltam para o saldo');
+  const box=`<section class="card ax-box" role="alertdialog" aria-labelledby="ax-t"><h2 id="ax-t" style="margin:0 0 6px">Apagar a OS ${manNum(c.numero)} de vez?</h2><div class="sub" style="margin:0 0 10px">Use para chamados de teste ou abertos por engano. Não dá para desfazer.</div><ul class="ax-ul">${itens.map(x=>'<li>'+x+'</li>').join('')}</ul>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button class="btn sec" data-act="ax-x">Voltar</button><button class="btn ax-sim" data-act="ax-sim" data-n="${c.numero}" ${S.ax.ap?'disabled':''}>${ic('lixo',18,2)}${S.ax.ap?'Apagando…':'Sim, apagar a OS '+manNum(c.numero)}</button></div></section>`;
+  const i=h.indexOf('<section class="card">'); return i<0?box+h:h.slice(0,i)+box+h.slice(i); }; }
+async function axApagar(n){ const c=manDoc(n); if(!c||!S.db) return; S.ax.ap=true; render();
+  try{ const E=c.exec||{};
+    if(c.paradaId){ try{ await S.db.doc('paradas/'+c.paradaId).delete(); S.paradas=S.paradas.filter(p=>p._id!==c.paradaId); }catch(e){} }
+    for(const f of [c.foto,...(c.fotos||[])].filter(Boolean)){ try{ await S.db.doc('chamfotos/'+f).delete(); }catch(e){} }
+    if(E.pecasBaixa){ for(const p of (E.pecas||[])){ if(!(+p.qtd>0)) continue; await S.db.collection('pecasmov').add({cod:p.cod||'',desc:p.desc||'',un:p.un||'un',qtd:Math.abs(+p.qtd),tipo:'ajuste',obs:'OS '+manNum(c.numero)+' apagada',os:c.numero,em:new Date().toISOString(),por:S.uid||null}); } }
+    await S.db.doc('chamados/'+c._id).delete();
+    S.chamados=(S.chamados||[]).filter(x=>x._id!==c._id); S.ax.conf=null; S.man.cur=null; S.man.ed=null; toast('OS '+manNum(n)+' apagada.');
+  }catch(e){ erro(e); }
+  S.ax.ap=false; render(); window.scrollTo(0,0); }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="ax-"]'); if(!b||!axPode()) return; const a=b.dataset.act;
+  if(a==='ax-conf'){ S.ax.conf=+b.dataset.n; render(); window.scrollTo(0,0); return; }
+  if(a==='ax-x'){ S.ax.conf=null; render(); return; }
+  if(a==='ax-sim'){ axApagar(+b.dataset.n); } });
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="man-voltar"],[data-act="man-abrir"]'); if(b) S.ax.conf=null; },true);
+document.head.insertAdjacentHTML('beforeend',`<style id="ax-css">
+.ax-del{color:var(--crit-ink)}.ax-del:hover{border-color:var(--crit)}
+.ax-box{border:2px solid var(--crit);background:var(--crit-tint)}.ax-ul{margin:0;padding-left:20px;color:var(--ink-2);line-height:1.6}
+.ax-sim{background:var(--crit-ink)!important;border-color:var(--crit-ink)!important;color:#fff!important}
+</style>`);
+/* ===FIM APAGAR=== */
 /* ===================== LAYOUT DO CELULAR (06/10): barra de baixo com "Mais", topo limpo, botões e filtros no tamanho do dedo ===================== */
 P.mais3='<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
 S.mob={sheet:false};
