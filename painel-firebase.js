@@ -84,7 +84,7 @@
   async function perfis(ids) { const out = {};
     await Promise.all([...new Set(ids)].map(async id => {
       if (id in cacheNomes) { out[id] = cacheNomes[id]; return; }
-      try { const g = await fs.doc('perfis/' + id).get(); const d = g.exists ? g.data() : null; cacheNomes[id] = d ? { name: d.nome || d.usuario || '', email: d.usuario || d.email || '' } : null; }
+      try { const g = await Promise.race([fs.doc('perfis/' + id).get(), new Promise((_, er) => setTimeout(() => er({ code: 'tempo-esgotado' }), 8000))]); const d = g.exists ? g.data() : null; cacheNomes[id] = d ? { name: d.nome || d.usuario || '', email: d.usuario || d.email || '' } : null; }
       catch (e) { cacheNomes[id] = null; }
       out[id] = cacheNomes[id]; }));
     return out; }
@@ -298,6 +298,7 @@
     if (EU && EU.uid !== u.uid) { location.reload(); return; }
     EU = u; const el = document.getElementById('lg'); if (el) el.remove(); setTimeout(() => { const q = document.querySelector('.quem'); if (q) { q.title = 'Usuário ' + usuarioDe(u.email) + ' · trocar senha ou sair'; q.style.cursor = 'pointer'; } }, 500);
     prontoOk(); /* o painel abre na hora; o perfil é conferido em segundo plano */
+    diagnostico(u);
     const ate = ms => new Promise((_, er) => setTimeout(() => er({ code: 'tempo-esgotado' }), ms));
     (async () => { try { const g = await Promise.race([fs.doc('perfis/' + u.uid).get(), ate(20000)]);
       if (!g.exists) await fs.doc('perfis/' + u.uid).set({ nome: u.displayName || usuarioDe(u.email), usuario: usuarioDe(u.email), criadoEm: new Date().toISOString() }); }
@@ -305,6 +306,24 @@
       aviso(c === 'permission-denied' || c === 'sem-permissao' ? 'O banco recusou o acesso: as regras do Firestore não estão publicadas. No Firebase: Firestore Database → Regras → cole o firestore.rules → Publicar.'
         : 'O banco de dados está demorando para responder (' + c + '). Confira a internet e, no Firebase, se o Firestore Database foi criado.', [['Tentar de novo', () => location.reload()]]); } })();
   });
+  /* confere, no servidor, se o banco responde para este usuário (aparece na tela se o painel ficar preso em "Verificando") */
+  window.PAINEL_DIAG = { passos: [] };
+  async function diagnostico(u) { const D = window.PAINEL_DIAG; D.usuario = usuarioDe(u.email); D.uid = u.uid;
+    const t = (nome, pr) => Promise.race([pr, new Promise((_, er) => setTimeout(() => er({ code: 'sem-resposta' }), 10000))])
+      .then(r => { const x = { nome, ok: true, info: r && r.exists !== undefined ? (r.exists ? 'existe' : 'não existe') : (r && r.size !== undefined ? r.size + ' registros' : '') }; D.passos.push(x); return x; })
+      .catch(e => { const x = { nome, ok: false, info: (e && e.code) || 'erro' }; D.passos.push(x); return x; });
+    await t('acesso (acessos/' + u.uid.slice(0, 6) + '…)', fs.doc('acessos/' + u.uid).get({ source: 'server' }));
+    await t('nome (perfis)', fs.doc('perfis/' + u.uid).get({ source: 'server' }));
+    await t('ordens', fs.collection('ordens').limit(1).get({ source: 'server' }));
+    console.info('[painel] diagnóstico', JSON.stringify(D)); }
+  setInterval(() => { const g = document.querySelector('.acs-gate'); if (!g || !EU || g.querySelector('.pf-diag')) return; const h = (g.querySelector('h1') || {}).textContent || ''; if (!/Verificando|Não consegui/.test(h)) return;
+    if (!g.dataset.t0) { g.dataset.t0 = Date.now(); return; } if (Date.now() - g.dataset.t0 < 8000) return;
+    const D = window.PAINEL_DIAG; const d = document.createElement('div'); d.className = 'pf-diag'; d.style.cssText = 'margin-top:16px;text-align:left;font-size:13px;background:#F7F4EC;border-radius:10px;padding:12px 14px;max-width:520px;width:100%';
+    const neg = D.passos.find(x => !x.ok);
+    d.innerHTML = '<b>Demorou mais que o normal. O que o banco respondeu para @' + esc(D.usuario || '') + ':</b><br>' + (D.passos.length ? D.passos.map(x => (x.ok ? '✅ ' : '❌ ') + esc(x.nome) + ' — ' + esc(x.info)).join('<br>') : 'ainda sem resposta…')
+      + (neg && /permission|sem-permissao/.test(neg.info) ? '<br><br><b>As regras do Firestore estão desatualizadas.</b> Peça para o PCP publicar o firestore.rules (Firestore Database → Regras → Publicar).' : neg && neg.info === 'sem-resposta' ? '<br><br>O banco não respondeu. Confira a internet e tente de novo.' : D.passos.length && D.passos[0].info === 'não existe' ? '<br><br>Este usuário ainda não tem cargo. Peça para o PCP escolher o cargo em Equipe e cargos.' : '')
+      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button type="button" onclick="location.reload()" style="height:40px;padding:0 14px;border-radius:8px;border:0;background:#1B5C7A;color:#fff;font-weight:700;cursor:pointer">Tentar de novo</button><button type="button" data-act="sair-conta" style="height:40px;padding:0 14px;border-radius:8px;border:1px solid #CFCAC0;background:#fff;font-weight:700;cursor:pointer">Entrar com outro usuário</button></div>';
+    g.appendChild(d); }, 2000);
   function aviso(txt, bts) { let b = document.getElementById('lg-aviso');
     if (!b) { b = document.createElement('div'); b.id = 'lg-aviso'; b.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2100;max-width:min(640px,calc(100% - 24px));background:#FFF7E6;border:1px solid #E8CB8A;color:#5C4210;border-radius:12px;padding:12px 14px;font:14px/1.4 "Segoe UI",system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);display:flex;gap:10px;align-items:center;flex-wrap:wrap'; document.body.appendChild(b); }
     b.innerHTML = ''; const s = document.createElement('span'); s.style.flex = '1 1 260px'; s.textContent = txt; b.appendChild(s);
