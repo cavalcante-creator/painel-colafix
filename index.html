@@ -9532,6 +9532,9 @@ function tabLinkInicial(){
 
 
 
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -9809,7 +9812,10 @@ document.head.insertAdjacentHTML('beforeend',`<style id="eq-css">
 </style>`);
 /* ===FIM EQUIPE=== */
 /* ===================== MANUTENÇÃO · PAINEL NO LAYOUT DO PAINEL (06/10) + LOGIN SÓ PARA VER AS TELAS ===================== */
-VIEWS.manmon={nome:'Painel',ic:'grid',mob:'Painel'}; CRUMB.manmon='Painel da manutenção';
+/* o Painel da manutenção (quadro por linha) continua como estava; esta tela nova fica na aba Resumo */
+VIEWS.manres={nome:'Resumo',ic:'grafico',mob:'Resumo'}; CRUMB.manres='Resumo da manutenção';
+{ const M=MODS.find(m=>m.id==='manut'); if(M&&!M.views.includes('manres')){ const i=M.views.indexOf('manmon'); M.views.splice(i<0?0:i+1,0,'manres'); } }
+{ const _vr=viewOk; viewOk=function(v){ if(v==='manres') return _vr.call(this,'manmon'); return _vr.apply(this,arguments); }; }
 S.mp={col:''};
 function mpRows(dia){ const h=hojeStr(), agora=new Date().toISOString(), doDia=iso=>iso&&hojeStr(new Date(iso))===dia;
   const xs=(S.chamados||[]).filter(c=>!c.excluido&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(dia===h&&c.status!=='Concluída')));
@@ -9860,7 +9866,7 @@ function vManPainel(){ const M=S.man, h=hojeStr(), dia=M.dia||h, ont=addDias(h,-
     ${lsL.length?`<div class="mp-bars">${lsL.map(l=>{ const o=z.porL[l]; return `<div class="mp-br"><span>${esc(l)}</span><div class="mp-bt"><i style="width:${o.n/maxL*100}%"></i><i class="p" style="width:${o.par/maxL*100}%"></i></div><b class="num">${o.n}</b></div>`; }).join('')}</div><div class="legend" style="margin-top:10px"><span><i style="background:var(--teal)"></i>chamados</span><span><i style="background:var(--crit)"></i>com máquina parada</span></div>`:'<div class="empty">Nenhum chamado nos últimos 30 dias.</div>'}</section>
    <section class="card"><div class="head" style="align-items:baseline"><h2>Equipamentos que mais pedem manutenção</h2><span class="sub" style="margin:0">últimos 30 dias</span></div>
     ${z.porE.length?z.porE.map((o,i)=>`<div class="mp-eqr"><span class="mp-rk">${i+1}</span><div><b>${esc(o.nome)}</b><small>${esc([...o.l].filter(Boolean).join(', '))}</small></div><span class="pill ${o.n>=3?'crit':o.n>=2?'warn':'neu'}">${o.n} chamado${o.n>1?'s':''}</span></div>`).join('')+'<div class="sub" style="font-size:12px;margin-top:10px">Equipamento que volta sempre é candidato a manutenção preventiva.</div>':'<div class="empty">Quando os chamados tiverem o equipamento preenchido, o ranking aparece aqui.</div>'}</section></div>`; }
-{ const _mv2=manView; manView=function(v){ return v==='manmon'?vManPainel():_mv2(v); }; }
+{ const _mv2=manView; manView=function(v){ return v==='manres'?vManPainel():_mv2(v); }; }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mp-novo"]'); if(!b) return; manNovo(); S.man.cur=null; go('manch'); setTimeout(()=>{ const f=$('#man-form'); if(f) f.scrollIntoView({block:'start',behavior:'smooth'}); },60); });
 /* "Concluir" no painel: um toque abre a confirmação (já existia) — o botão fica verde */
 /* detalhe da OS: botão Assumir no topo e a linha do tempo */
