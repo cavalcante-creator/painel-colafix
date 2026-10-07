@@ -9577,6 +9577,21 @@ function tabLinkInicial(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -10495,6 +10510,139 @@ document.head.insertAdjacentHTML('beforeend',`<style id="ax-css">
 .ax-sim{background:var(--crit-ink)!important;border-color:var(--crit-ink)!important;color:#fff!important}
 </style>`);
 /* ===FIM APAGAR=== */
+/* ===================== MATERIAIS PARA COMPRAS (07/10): cadastro com marca, referência e fotos; lista para o Compras ===================== */
+/* Sem entrada de nota por enquanto: a aba Peças vira "Materiais". Cada material em config/manut.pecas ganha
+   {marca,ref,espec,forn,onde,obs,fotos:[ids],ativo}. Fotos em pecafotos/{id} = {d:dataURL,em,por,cod}.
+   O saldo e as entradas continuam lá embaixo (fechados), para quando tiver nota. */
+VIEWS.manpecas.nome='Materiais'; VIEWS.manpecas.mob='Materiais'; CRUMB.manpecas='Materiais da manutenção';
+S.mt={busca:'',ed:null,f:null,fotos:{},lista:[],verLista:false,salv:false,conf:null};
+try{ S.mt.lista=JSON.parse(localStorage.getItem('painel.mtlista')||'[]')||[]; }catch(e){}
+function mtSalvaLista(){ try{ localStorage.setItem('painel.mtlista',JSON.stringify(S.mt.lista)); }catch(e){} }
+function mtCat(){ return mxPecasCat().filter(p=>!p.solta&&p.ativo!==false); }
+function mtDe(cod){ return (S.mx.cfg.pecas||[]).find(p=>p.cod===cod); }
+async function mtFoto(id){ if(S.mt.fotos[id]) return S.mt.fotos[id]; if(S.mt.fotos[id]===''&&id in S.mt.fotos) return ''; S.mt.fotos[id]=null; try{ const g=await S.db.doc('pecafotos/'+id).get(); S.mt.fotos[id]=g.exists?(g.data().d||''):''; }catch(e){ S.mt.fotos[id]=''; } rerenderSeguro(); return S.mt.fotos[id]; }
+function mtImg(id,cls){ if(!id) return `<div class="${cls} mt-sem">${ic('foto',26,1.8)}</div>`; const d=S.mt.fotos[id]; if(d===undefined) mtFoto(id); return d?`<img class="${cls}" src="${d}" alt="">`:`<div class="${cls} mt-sem">${d===null?'…':ic('foto',26,1.8)}</div>`; }
+function mtNaLista(cod){ return S.mt.lista.find(x=>x.cod===cod); }
+
+/* ---------- tela ---------- */
+{ const _vp=vManPecas; vManPecas=function(){ const X=S.mx, T=S.mt; if(!X.lido) return _vp();
+  const cat=mtCat(), q=mxNorm(T.busca), lst=q?cat.filter(p=>mxNorm([p.cod,p.desc,p.marca,p.ref,p.espec,p.forn,p.onde].join(' ')).includes(q)):cat, nL=T.lista.length;
+  const card=p=>{ const na=mtNaLista(p.cod), fs=p.fotos||[];
+    return `<article class="mt-card"><button class="mt-ft" data-act="mt-ed" data-c="${esc(p.cod)}" aria-label="Abrir ${esc(p.desc)}">${mtImg(fs[0],'mt-img')}${fs.length>1?`<span class="mt-nf">${fs.length} fotos</span>`:''}</button>
+      <div class="mt-bd"><b class="mt-d">${esc(p.desc)}</b>${p.marca||p.ref?`<div class="mt-mr">${p.marca?'<span class="pill">'+esc(p.marca)+'</span>':''}${p.ref?'<span class="num">Ref. '+esc(p.ref)+'</span>':''}</div>`:'<div class="mt-mr"><span class="mt-falta">sem marca/referência</span></div>'}
+        ${p.espec?`<div class="mt-l">${esc(p.espec)}</div>`:''}${p.onde?`<div class="mt-l mt-mu">Usa em: ${esc(p.onde)}</div>`:''}${p.forn?`<div class="mt-l mt-mu">Fornecedor: ${esc(p.forn)}</div>`:''}
+        <div class="mt-rd"><span class="num mt-mu">${esc(p.cod)}${p.cons30?' · usou '+p.cons30+' '+esc(p.un||'')+' em 30 dias':''}</span>
+          <button class="btn ${na?'':'sec'} mt-add" data-act="mt-lista" data-c="${esc(p.cod)}" aria-pressed="${!!na}">${na?ic('check',16,2.6)+'Na lista':ic('mais',16,2.6)+'Pedir'}</button></div></div></article>`; };
+  const lista=T.verLista?mtListaCard():'';
+  return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Materiais</h1><div class="sub">Cadastro com marca, referência e foto, para o Compras pedir exatamente o que a manutenção usa.</div></div>
+   <div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="mt-ver-lista" aria-pressed="${T.verLista}">${ic('lote',18,2)}Lista para compras${nL?` <span class="mt-bdg">${nL}</span>`:''}</button><button class="btn" data-act="mt-novo">${ic('mais',18,2.4)}Novo material</button></div></div>
+   ${lista}
+   <section class="card mt-sec"><div class="head" style="align-items:center"><h2>${cat.length} materia${cat.length===1?'l':'is'}</h2><label class="eq-q" style="max-width:340px;flex:1">${ic('lupa',18,2)}<input class="txt" id="mt-q" placeholder="Procurar por nome, marca, referência…" value="${esc(T.busca)}"></label></div>
+    ${lst.length?`<div class="mt-grid">${lst.map(card).join('')}</div>`:cat.length?'<div class="empty">Nada encontrado.</div>':`<div class="empty">Nenhum material ainda. Clique em <b>Novo material</b> e tire a foto da peça, da etiqueta ou da caixa.</div>`}</section>
+   <details class="card mt-est" ${T.estAb?'open':''}><summary><b>Estoque e lançamentos</b><span class="sub" style="margin:0"> · para quando tiver entrada de nota</span></summary>${mtEst(_vp()).replace(/<section class="card mx-new"><div class="label" style="margin-bottom:8px">CADASTRAR PEÇA[\s\S]*?<\/section><\/div>/,'</div>')}</details>`; }; }
+
+function mtEst(h){ const i=h.indexOf('<datalist id="mx-pdl">'); return i<0?'':h.slice(i); }
+document.addEventListener('toggle',ev=>{ if(ev.target.classList&&ev.target.classList.contains('mt-est')) S.mt.estAb=ev.target.open; },true);
+function mtListaCard(){ const L=S.mt.lista; if(!L.length) return `<section class="card mt-lc"><div class="head"><h2>Lista para compras</h2></div><div class="empty">Clique em <b>Pedir</b> nos materiais para montar a lista.</div></section>`;
+  return `<section class="card mt-lc"><div class="head" style="align-items:center"><h2>Lista para compras</h2><button class="eq-lk del" data-act="mt-limpar">${ic('lixo',15,2)}Limpar lista</button></div>
+   <div class="mt-ll">${L.map((x,i)=>{ const p=mtDe(x.cod)||{desc:x.cod}; return `<div class="mt-li">${mtImg((p.fotos||[])[0],'mt-th')}<div class="mt-lt"><b>${esc(p.desc)}</b><span>${[p.marca,p.ref?'Ref. '+p.ref:''].filter(Boolean).map(esc).join(' · ')||'<i>sem marca</i>'}</span></div>
+     <label class="mx-in"><span>qtd</span><input class="txt num" type="number" min="0" step="any" data-mt-q="${i}" value="${esc(x.qtd)}"></label><span class="mt-mu">${esc(p.un||'un')}</span><input class="txt mt-lo" data-mt-o="${i}" placeholder="Obs. (urgente, para a OS…)" value="${esc(x.obs||'')}"><button class="eq-lk del" data-act="mt-tira" data-i="${i}" aria-label="Tirar da lista">${ic('lixo',15,2)}</button></div>`; }).join('')}</div>
+   <div class="mt-la"><button class="btn" data-act="mt-pdf">${ic('baixar',18,2)}Baixar PDF com fotos</button><button class="btn sec" data-act="mt-zap">${ic('whats',18,2)}WhatsApp</button><button class="btn sec" data-act="mt-copiar">Copiar texto</button></div></section>`; }
+
+/* ---------- formulário (novo / editar) ---------- */
+function mtModal(){ const F=S.mt.f; if(!F) return ''; const eqs=mxEquips().map(e=>e.nome).filter((v,i,a)=>a.indexOf(v)===i);
+  const inp=(k,lb,ph,st)=>`<label class="mt-fl" ${st?`style="${st}"`:''}><span class="label">${lb}</span><input class="txt" data-mt-f="${k}" value="${esc(F[k]||'')}" placeholder="${esc(ph||'')}" ${k==='onde'?'list="mt-eqdl"':''}></label>`;
+  return `<div class="dbmodal eq-modal" data-mt-fundo="1"><div class="dbmbox eq-box mt-box" role="dialog" aria-modal="true" aria-labelledby="mt-t">
+   <div class="mt-bx"><div class="eyebrow">MATERIAIS</div><h2 id="mt-t" style="margin:4px 0 14px">${S.mt.ed?esc(F.desc||'Material'):'Novo material'}</h2>
+   <div class="mt-fts">${(F.fotos||[]).map((id,i)=>`<div class="mt-fi">${mtImg(id,'mt-fimg')}<button type="button" class="mt-fx" data-act="mt-foto-x" data-i="${i}" aria-label="Tirar foto">✕</button></div>`).join('')}${(F.fotos||[]).length<4?`<label class="mt-fadd">${ic('foto',24,2)}<span>${S.mt.salv==='foto'?'Enviando…':'Foto'}</span><input type="file" accept="image/*" capture="environment" id="mt-foto-in" hidden></label>`:''}</div>
+   <div class="sub" style="font-size:12px;margin:6px 0 14px">Até 4 fotos: a peça, a etiqueta/plaqueta com a referência, a caixa.</div>
+   <datalist id="mt-eqdl">${eqs.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+   <div class="mt-g">${inp('desc','DESCRIÇÃO *','Ex.: Rolamento rígido de esferas','grid-column:1/-1')}${inp('marca','MARCA','Ex.: SKF')}${inp('ref','REFERÊNCIA / MODELO','Ex.: 6205-2RS')}${inp('espec','MEDIDAS / ESPECIFICAÇÃO','Ex.: 25×52×15 mm, vedado','grid-column:1/-1')}${inp('onde','ONDE USA','Equipamento ou linha')}${inp('forn','FORNECEDOR','Onde costuma comprar')}${inp('cod','CÓDIGO','Deixe vazio para gerar')}<div class="mt-g2">${inp('un','UN.','un')}${inp('min','MÍNIMO','0')}</div>${inp('obs','OBSERVAÇÃO PARA O COMPRAS','Ex.: só original; similar não serve','grid-column:1/-1')}</div>
+   <div class="eq-err" id="mt-err"></div></div>
+   <div class="eq-mf">${S.mt.ed?(S.mt.conf?`<span class="mt-cf">Tirar do cadastro? <button class="btn warn" data-act="mt-tirar-ok">Tirar</button><button class="eq-lk" data-act="mt-tirar-x">Não</button></span>`:`<button class="eq-lk del" style="margin:0" data-act="mt-tirar">${ic('lixo',15,2)}Tirar do cadastro</button>`):'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="mt-x">Cancelar</button><button class="btn" data-act="mt-salvar" ${S.mt.salv?'disabled':''}>${ic('check',18,2.4)}Salvar</button></div></div></div></div>`; }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ let el=document.getElementById('mt-ov'); const h=S.mt.f&&S.view==='manpecas'?mtModal():'';
+    if(!h){ if(el) el.remove(); return x; } if(!el){ el=document.createElement('div'); el.id='mt-ov'; document.body.appendChild(el); }
+    const a=document.activeElement, k=a&&a.dataset&&a.dataset.mtF, pos=k&&a.selectionStart; el.innerHTML=h; if(k){ const n=el.querySelector(`[data-mt-f="${k}"]`); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } } }catch(e){ console.warn(e); } return x; }; }
+{ const _rs=rerenderSeguro; rerenderSeguro=function(){ const a=document.activeElement; if(a&&a.dataset&&(a.dataset.mtF!=null||a.dataset.mtQ!=null||a.dataset.mtO!=null||a.id==='mt-q')) return; return _rs.apply(this,arguments); }; }
+
+document.addEventListener('input',ev=>{ const t=ev.target, T=S.mt; if(!t.dataset) return;
+  if(t.dataset.mtF!=null&&T.f){ T.f[t.dataset.mtF]=t.value; return; }
+  if(t.dataset.mtQ!=null){ const x=T.lista[+t.dataset.mtQ]; if(x){ x.qtd=t.value; mtSalvaLista(); } return; }
+  if(t.dataset.mtO!=null){ const x=T.lista[+t.dataset.mtO]; if(x){ x.obs=t.value; mtSalvaLista(); } return; }
+  if(t.id==='mt-q'){ T.busca=t.value; const p=t.selectionStart; render(); const n=$('#mt-q'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(e){} } } });
+document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id!=='mt-foto-in') return; const f=t.files&&t.files[0]; if(!f||!S.mt.f) return; S.mt.salv='foto'; render();
+  try{ const d=await mxComprime(f), id='pf-'+mxId(); await S.db.doc('pecafotos/'+id).set({d,em:new Date().toISOString(),por:S.uid||null,cod:S.mt.f.cod||null}); S.mt.fotos[id]=d; S.mt.f.fotos=[...(S.mt.f.fotos||[]),id]; }catch(e){ toast('Não consegui salvar a foto.'); }
+  S.mt.salv=false; render(); });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mt-"]'), T=S.mt;
+  if(!b){ if(ev.target&&ev.target.dataset&&ev.target.dataset.mtFundo){ T.f=null; T.ed=null; T.conf=null; render(); } return; } const a=b.dataset.act;
+  try{
+  if(a==='mt-novo'){ T.ed=null; T.conf=null; T.f={desc:'',marca:'',ref:'',espec:'',onde:'',forn:'',cod:'',un:'un',min:'',obs:'',fotos:[]}; render(); setTimeout(()=>{ const n=document.querySelector('[data-mt-f="desc"]'); n&&n.focus(); },50); return; }
+  if(a==='mt-ed'){ const p=mtDe(b.dataset.c); if(!p) return; T.ed=p.cod; T.conf=null; T.f=Object.assign({desc:'',marca:'',ref:'',espec:'',onde:'',forn:'',un:'un',obs:'',fotos:[]},JSON.parse(JSON.stringify(p)),{min:p.min?String(p.min):''}); render(); return; }
+  if(a==='mt-x'){ T.f=null; T.ed=null; T.conf=null; render(); return; }
+  if(a==='mt-foto-x'){ const id=(T.f.fotos||[])[+b.dataset.i]; T.f.fotos=T.f.fotos.filter((_,i)=>i!==+b.dataset.i); render(); if(id&&!(T.ed&&((mtDe(T.ed)||{}).fotos||[]).includes(id))){ try{ await S.db.doc('pecafotos/'+id).delete(); }catch(e){} } return; }
+  if(a==='mt-tirar'){ T.conf=true; render(); return; } if(a==='mt-tirar-x'){ T.conf=false; render(); return; }
+  if(a==='mt-tirar-ok'){ const cod=T.ed; await mxGrava(cf=>{ const x=cf.pecas.find(p=>p.cod===cod); if(x){ x.ativo=false; x.tiradoEm=new Date().toISOString(); } }); T.lista=T.lista.filter(x=>x.cod!==cod); mtSalvaLista(); T.f=null; T.ed=null; T.conf=false; toast('Material tirado do cadastro.'); render(); return; }
+  if(a==='mt-salvar'){ const F=T.f, err=document.getElementById('mt-err'), d=String(F.desc||'').trim(); if(!d){ if(err) err.textContent='Escreva a descrição.'; return; }
+    const ed=T.ed, cod=ed||String(F.cod||'').trim()||('P'+Date.now().toString(36).toUpperCase().slice(-5));
+    if(!ed&&(S.mx.cfg.pecas||[]).some(p=>p.cod===cod&&p.ativo!==false)){ if(err) err.textContent='Já existe um material com o código '+cod+'.'; return; }
+    const dados={cod,desc:d,marca:String(F.marca||'').trim(),ref:String(F.ref||'').trim(),espec:String(F.espec||'').trim(),onde:String(F.onde||'').trim(),forn:String(F.forn||'').trim(),un:String(F.un||'').trim()||'un',min:+String(F.min||'').replace(',','.')||0,obs:String(F.obs||'').trim(),fotos:F.fotos||[],ativo:true};
+    T.salv=true; render();
+    await mxGrava(cf=>{ const i=cf.pecas.findIndex(p=>p.cod===cod); if(i>=0) cf.pecas[i]=Object.assign({},cf.pecas[i],dados,{editEm:new Date().toISOString()}); else cf.pecas.push(Object.assign(dados,{em:new Date().toISOString(),por:S.uid||null})); });
+    T.salv=false; T.f=null; T.ed=null; toast((ed?'Material salvo: ':'Material cadastrado: ')+d+'.'); render(); return; }
+  if(a==='mt-lista'){ const c=b.dataset.c; if(mtNaLista(c)) T.lista=T.lista.filter(x=>x.cod!==c); else { T.lista.push({cod:c,qtd:'1',obs:''}); toast('Na lista para compras ('+T.lista.length+').'); } mtSalvaLista(); render(); return; }
+  if(a==='mt-ver-lista'){ T.verLista=!T.verLista; render(); return; }
+  if(a==='mt-tira'){ T.lista.splice(+b.dataset.i,1); mtSalvaLista(); render(); return; }
+  if(a==='mt-limpar'){ T.lista=[]; mtSalvaLista(); render(); return; }
+  if(a==='mt-copiar'){ const t=mtTexto(); try{ await navigator.clipboard.writeText(t); toast('Lista copiada.'); }catch(e){ copiarAntigo(t,()=>toast('Lista copiada.')); } return; }
+  if(a==='mt-zap'){ window.open('https://wa.me/?text='+encodeURIComponent(mtTexto()),'_blank','noopener'); return; }
+  if(a==='mt-pdf'){ b.disabled=true; await mtPdf(); b.disabled=false; return; }
+  }catch(e){ T.salv=false; erro(e); render(); } });
+
+/* ---------- saída para o Compras ---------- */
+function mtTexto(){ const L=S.mt.lista; return '*Pedido de materiais · Manutenção Colafix* ('+dm(hojeStr())+')\n\n'+L.map((x,i)=>{ const p=mtDe(x.cod)||{desc:x.cod}; return (i+1)+'. *'+p.desc+'* — '+(x.qtd||'?')+' '+(p.un||'un')+
+  (p.marca?'\n   Marca: '+p.marca:'')+(p.ref?'\n   Ref.: '+p.ref:'')+(p.espec?'\n   '+p.espec:'')+(p.forn?'\n   Fornecedor: '+p.forn:'')+(p.obs?'\n   Obs.: '+p.obs:'')+(x.obs?'\n   ⚠ '+x.obs:''); }).join('\n\n')+'\n\nCódigos: '+L.map(x=>x.cod).join(', '); }
+async function mtPdf(){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } const L=S.mt.lista; if(!L.length) return;
+  const rz={}; for(const x of L){ const p=mtDe(x.cod); const id=p&&(p.fotos||[])[0]; if(!id) continue; const d=await mtFoto(id); if(d){ try{ const im=new Image(); im.src=d; await im.decode(); rz[id]=im.naturalWidth/im.naturalHeight; }catch(e){} } }
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'), W=210, M=14; let y=16;
+  const cab=()=>{ pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(31,56,100); pdf.text('Pedido de materiais · Manutenção',M,y); pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(90,90,90); pdf.text('COLAFIX · '+dm(hojeStr())+' · '+L.length+' ite'+(L.length>1?'ns':'m'),W-M,y,{align:'right'}); y+=4; pdf.setDrawColor(31,56,100); pdf.setLineWidth(.6); pdf.line(M,y,W-M,y); y+=6; };
+  cab();
+  L.forEach((x,i)=>{ const p=mtDe(x.cod)||{desc:x.cod,cod:x.cod}, H=42; if(y+H>285){ pdf.addPage(); y=16; cab(); }
+    pdf.setDrawColor(210); pdf.setLineWidth(.2); pdf.roundedRect(M,y,W-2*M,H-4,2,2);
+    const f=(p.fotos||[])[0]&&S.mt.fotos[p.fotos[0]]; if(f){ try{ const r=rz[p.fotos[0]]||4/3; let iw=34, ih=iw/r; if(ih>34){ ih=34; iw=ih*r; } pdf.addImage(f,'JPEG',M+2+(34-iw)/2,y+2+(34-ih)/2,iw,ih); }catch(e){} } else { pdf.setFillColor(242,242,242); pdf.rect(M+2,y+2,34,34,'F'); pdf.setFontSize(8); pdf.setTextColor(150); pdf.text('sem foto',M+19,y+20,{align:'center'}); }
+    const tx=M+41, tw=W-M-tx-34; pdf.setTextColor(0); pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.text(pdf.splitTextToSize((i+1)+'. '+p.desc,tw).slice(0,2),tx,y+7);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); let ly=y+(pdf.splitTextToSize(p.desc,tw).length>1?17:13);
+    [['Marca',p.marca],['Ref.',p.ref],['Espec.',p.espec],['Fornecedor',p.forn],['Obs.',[p.obs,x.obs].filter(Boolean).join(' · ')]].filter(r=>r[1]).forEach(([k,v])=>{ if(ly>y+H-6) return; pdf.setTextColor(110); pdf.text(k+':',tx,ly); pdf.setTextColor(0); pdf.text(pdf.splitTextToSize(String(v),tw-20)[0],tx+20,ly); ly+=4.6; });
+    pdf.setTextColor(110); pdf.setFontSize(8); pdf.text('Código '+p.cod,tx,y+H-7);
+    pdf.setFillColor(234,240,249); pdf.roundedRect(W-M-30,y+4,27,20,2,2,'F'); pdf.setTextColor(31,56,100); pdf.setFont('helvetica','bold'); pdf.setFontSize(18); pdf.text(String(x.qtd||'?'),W-M-16.5,y+15,{align:'center'}); pdf.setFontSize(8.5); pdf.setFont('helvetica','normal'); pdf.text(p.un||'un',W-M-16.5,y+21,{align:'center'});
+    y+=H; });
+  pdf.setTextColor(0); await manBaixar(pdf,'Pedido_materiais_'+hojeStr()+'.pdf','PDF do pedido gerado com '+L.length+' ite'+(L.length>1?'ns':'m')+'.'); }
+
+document.head.insertAdjacentHTML('beforeend',`<style id="mt-css">
+.mt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.mt-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.mt-ft{position:relative;display:block;padding:0;border:0;background:var(--sunken);cursor:pointer;aspect-ratio:4/3}.mt-img{width:100%;height:100%;object-fit:cover;display:block}
+.mt-sem{display:flex;align-items:center;justify-content:center;color:var(--faint);width:100%;height:100%}
+.mt-nf{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:999px}
+.mt-bd{padding:12px 14px 12px;display:flex;flex-direction:column;gap:5px;flex:1}.mt-d{font-size:15.5px;line-height:1.3}
+.mt-mr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}.mt-falta{font-size:12px;color:var(--warn-ink);font-style:italic}
+.mt-l{font-size:13px;color:var(--ink-2)}.mt-mu{color:var(--muted);font-size:12.5px}
+.mt-rd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px}.mt-add{height:38px!important;min-height:38px!important;padding:0 14px}
+.mt-bdg{display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;border-radius:999px;background:var(--crit);color:#fff;font-size:12px;font-weight:800;margin-left:4px}
+.mt-lc{border:2px solid var(--teal)}.mt-ll{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mt-li{display:grid;grid-template-columns:52px minmax(0,1fr) auto auto minmax(0,220px) auto;gap:12px;align-items:center;padding:8px 12px;border-top:1px solid var(--line-2)}.mt-li:first-child{border-top:0}
+.mt-th{width:52px;height:52px;border-radius:8px;object-fit:cover;background:var(--sunken)}div.mt-th{display:flex}.mt-lt{display:flex;flex-direction:column;min-width:0}.mt-lt span{font-size:12.5px;color:var(--muted)}
+.mt-li .mx-in input{width:76px}.mt-lo{height:40px}.mt-la{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.mt-est>summary{cursor:pointer;list-style:revert;padding:2px 0}.mt-est[open]>summary{margin-bottom:12px}
+#mt-ov .dbmodal{z-index:960}.mt-box{max-width:640px}.mt-bx{padding:22px 24px 6px;overflow:auto}
+.mt-fts{display:flex;gap:10px;flex-wrap:wrap}.mt-fi{position:relative}.mt-fimg{width:96px;height:96px;border-radius:12px;object-fit:cover;background:var(--sunken)}div.mt-fimg{display:flex}
+.mt-fx{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:0;background:var(--crit-ink);color:#fff;font-size:12px;cursor:pointer}
+.mt-fadd{width:96px;height:96px;border:2px dashed var(--line);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--teal-strong);font-weight:700;font-size:13px;cursor:pointer}.mt-fadd:hover{border-color:var(--teal)}
+.mt-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.mt-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.mt-fl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mt-cf{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--crit-ink)}
+@media (max-width:700px){ .mt-sec>.head{flex-wrap:wrap}.mt-sec>.head .eq-q{max-width:none!important;flex:1 1 100%!important} .mt-li{grid-template-columns:52px minmax(0,1fr) auto;row-gap:8px}.mt-li .mx-in{grid-column:2}.mt-li>.mt-mu{display:none}.mt-lo{grid-column:1/-1}.mt-li>.eq-lk{grid-row:1;grid-column:3}
+  .mt-g{grid-template-columns:minmax(0,1fr)}.mt-g>*{grid-column:auto!important}.mt-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mt-bd{padding:10px}.mt-d{font-size:14px}.mt-rd{flex-direction:column;align-items:stretch}.mt-bx{padding:18px 16px 6px} }
+</style>`);
+/* ===FIM MATERIAIS=== */
 /* ===================== LAYOUT DO CELULAR (06/10): barra de baixo com "Mais", topo limpo, botões e filtros no tamanho do dedo ===================== */
 P.mais3='<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
 S.mob={sheet:false};
