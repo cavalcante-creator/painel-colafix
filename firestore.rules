@@ -1,0 +1,43 @@
+rules_version = '2';
+// Regras do banco do Painel de Operação Colafix (versão online, login por usuário e senha).
+// - Dona do painel (usuário iasmyn): tudo, inclusive criar contas e liberar acessos.
+// - Pessoas liberadas em Ajustes → Acessos: leem e gravam o operacional
+//   (o que cada uma vê é decidido pelo cargo escolhido em Acessos).
+// - Conta criada e ainda não liberada: só registra o próprio pedido e o próprio nome.
+// Para publicar: Firebase → Firestore Database → Regras → apagar tudo, colar este texto → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logado() { return request.auth != null; }
+    function dono() { return logado() && request.auth.token.email == 'iasmyn@painel-colafix.app'; }
+    function caminhoAcs() { return /databases/$(database)/documents/acessos/$(request.auth.uid); }
+    function liberado() { return logado() && exists(caminhoAcs()) && get(caminhoAcs()).data.get('ativo', true) != false; }
+    function equipe() { return dono() || liberado(); }
+
+    // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
+    match /{col}/{id} {
+      allow read, write: if equipe() && !(col in ['acessos', 'pedidos', 'perfis']);
+    }
+    match /{col}/{id}/{resto=**} {
+      allow read, write: if equipe() && !(col in ['acessos', 'pedidos', 'perfis']);
+    }
+
+    // Acessos: só a dona libera ou muda; cada pessoa lê o próprio.
+    match /acessos/{uid} {
+      allow read: if dono() || (logado() && request.auth.uid == uid);
+      allow write: if dono();
+    }
+
+    // Pedido de acesso (criado pela própria pessoa ou pela dona ao criar a conta).
+    match /pedidos/{uid} {
+      allow read: if dono() || (logado() && request.auth.uid == uid);
+      allow create, update: if dono() || (logado() && request.auth.uid == uid);
+      allow delete: if dono();
+    }
+
+    // Nome de cada pessoa (aparece nos históricos).
+    match /perfis/{uid} {
+      allow read: if logado();
+      allow write: if dono() || (logado() && request.auth.uid == uid);
+    }
+  }
+}

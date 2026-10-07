@@ -9106,6 +9106,10 @@ Object.assign(VIEWS,{manch:{nome:'Chamados',ic:'chave',mob:'Chamados'},manqr:{no
 Object.assign(CRUMB,{manch:'Chamados de manutenção',manqr:'QR das linhas'});
 MODS.push({id:'manut',nome:'Manutenção',ic:'chave',views:['manch','manqr']});
 ACS_MODS.splice(ACS_MODS.findIndex(m=>m[0]==='ajustes'),0,['manut','Manutenção (atender chamados)']);
+/* cargos prontos para criar os usuários do almox e da manutenção (06/10) */
+{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro;
+  Object.assign(ACS_PERFIS,{almoxpmx:{nome:'Almoxarifado (premix, diário de bordo e contagem)',mods:['premix','almox'],locais:ALX_LOCS,contar:1,receber:1},manut:{nome:'Manutenção (atender chamados)',mods:['manut'],locais:[]}});
+  ACS_PERFIS.outro=_o; }
 /* quem é da produção (ou só registra paradas) pode abrir chamado; o QR das linhas é de quem cuida da manutenção */
 { const _vo=viewOk; viewOk=function(v){ if(v==='manch'&&!(S.acs&&S.acs.dono)){ const p=acsP(); if(p&&!p.tudo&&p.mods&&(p.mods.includes('producao')||p.mods.includes('paradas'))) return true; } return _vo.apply(this,arguments); }; }
 const MAN_IMP={parou:['Parou a máquina','crit'],reduziu:['Diminuiu a produção','warn'],nao:['Não afeta a produção','ok']};

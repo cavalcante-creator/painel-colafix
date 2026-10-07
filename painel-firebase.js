@@ -158,18 +158,22 @@
         else await auth.signInWithEmailAndPassword(em, se);
       } catch (e) { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : (e && (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password')) ? 'Usuário ou senha incorretos.' : msgErro(e); b.disabled = false; } };
     setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
+    if (!logo) document.addEventListener('DOMContentLoaded', () => { const src = (document.querySelector('.brand img') || {}).src, bx = el.querySelector('.bx'); if (src && bx && !bx.querySelector('.lg-logo')) { const im = document.createElement('img'); im.className = 'lg-logo'; im.src = src; im.alt = 'Colafix'; bx.prepend(im); } }, { once: true });
   }
+  let jaLogou = false; try { jaLogou = localStorage.getItem('painel.logado') === '1'; } catch (e) {}
+  if (!jaLogou) { if (document.body) telaEntrar('entrar'); else document.addEventListener('DOMContentLoaded', () => { if (!EU) telaEntrar('entrar'); }); }
   auth.onAuthStateChanged(async u => {
-    if (!u) { if (EU) { location.reload(); return; } telaEntrar('entrar'); return; }
+    if (!u) { try { localStorage.removeItem('painel.logado'); } catch (e) {} if (EU) { location.reload(); return; } if (!document.getElementById('lg')) telaEntrar('entrar'); return; }
+    try { localStorage.setItem('painel.logado', '1'); } catch (e) {}
     if (EU && EU.uid !== u.uid) { location.reload(); return; }
     EU = u; const el = document.getElementById('lg'); if (el) el.remove(); setTimeout(() => { const q = document.querySelector('.quem'); if (q) { q.title = 'Usuário ' + usuarioDe(u.email) + ' · trocar senha ou sair'; q.style.cursor = 'pointer'; } }, 500);
+    prontoOk(); /* o painel abre na hora; o perfil é conferido em segundo plano */
     const ate = ms => new Promise((_, er) => setTimeout(() => er({ code: 'tempo-esgotado' }), ms));
-    try { const g = await Promise.race([fs.doc('perfis/' + u.uid).get({ source: 'server' }), ate(15000)]);
+    (async () => { try { const g = await Promise.race([fs.doc('perfis/' + u.uid).get(), ate(20000)]);
       if (!g.exists) await fs.doc('perfis/' + u.uid).set({ nome: u.displayName || usuarioDe(u.email), usuario: usuarioDe(u.email), criadoEm: new Date().toISOString() }); }
     catch (e) { const c = (e && e.code) || 'erro'; console.warn('firestore', c, e && e.message);
-      aviso(c === 'permission-denied' ? 'O banco recusou o acesso: as regras do Firestore não estão publicadas. No Firebase: Firestore Database → Regras → cole o firestore.rules → Publicar.'
-        : 'O banco de dados não respondeu (' + c + '). No Firebase, confira se o Firestore Database foi criado (botão "Criar banco de dados").', [['Tentar de novo', () => location.reload()]]); }
-    prontoOk();
+      aviso(c === 'permission-denied' || c === 'sem-permissao' ? 'O banco recusou o acesso: as regras do Firestore não estão publicadas. No Firebase: Firestore Database → Regras → cole o firestore.rules → Publicar.'
+        : 'O banco de dados está demorando para responder (' + c + '). Confira a internet e, no Firebase, se o Firestore Database foi criado.', [['Tentar de novo', () => location.reload()]]); } })();
   });
   function aviso(txt, bts) { let b = document.getElementById('lg-aviso');
     if (!b) { b = document.createElement('div'); b.id = 'lg-aviso'; b.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2100;max-width:min(640px,calc(100% - 24px));background:#FFF7E6;border:1px solid #E8CB8A;color:#5C4210;border-radius:12px;padding:12px 14px;font:14px/1.4 "Segoe UI",system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);display:flex;gap:10px;align-items:center;flex-wrap:wrap'; document.body.appendChild(b); }
@@ -224,12 +228,14 @@
         catch (e) { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Já existe o usuário ' + us + '.' : e && e.code === 'usuario-vazio' ? 'Escreva o usuário.' : msgErro(e); b.disabled = false; } }; }); }
 
   /* botão "Criar usuário" na tela de Acessos (só a dona) + texto da tela */
-  new MutationObserver(() => { if (!EU || !ehDono(EU)) return; const h = document.querySelector('#view .head h1');
+  let acsAgendado = false;
+  new MutationObserver(() => { if (acsAgendado || !EU || !ehDono(EU)) return; acsAgendado = true; requestAnimationFrame(() => { acsAgendado = false; acsBotao(); }); }).observe(document.documentElement, { childList: true, subtree: true });
+  function acsBotao() { const h = document.querySelector('#view .head h1');
     if (!h || h.textContent.trim() !== 'Acessos') return; document.querySelectorAll('#view section.card').forEach(c => { if (c.style.display !== 'none') { const tx = (c.innerText || '').trim(); if (/^COMO FUNCIONA/i.test(tx) || /^Criar acesso/.test(tx)) c.style.display = 'none'; } }); const head = h.closest('.head'); if (!head || head.querySelector('.pf-novo')) return;
     const sub = head.querySelector('.sub'); if (sub) sub.textContent = 'Você é a master: crie o usuário e a senha de cada pessoa e escolha o que ela pode ver.';
     document.querySelectorAll('#view section.card').forEach(c => { const tx = (c.innerText || '').trim(); if (/^COMO FUNCIONA/i.test(tx) || /^Criar acesso/.test(tx)) c.style.display = 'none'; });
     const b = document.createElement('button'); b.className = 'pf-novo'; b.type = 'button'; b.textContent = '+ Criar usuário'; b.onclick = telaCriar; head.appendChild(b);
-    if (!mcssOk) { const st = document.createElement('style'); st.textContent = mcss; document.head.appendChild(st); mcssOk = true; } }).observe(document.documentElement, { childList: true, subtree: true });
+    if (!mcssOk) { const st = document.createElement('style'); st.textContent = mcss; document.head.appendChild(st); mcssOk = true; } }
 
   /* menu do usuário: tocar no nome/avatar no topo */
   document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('[data-act="sair-conta"]')) { auth.signOut().then(() => location.reload()); return; }
