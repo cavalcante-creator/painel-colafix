@@ -9556,6 +9556,21 @@ function tabLinkInicial(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -10082,11 +10097,11 @@ Object.assign(CRUMB,{manprev:'Manutenção preventiva',manequip:'Equipamentos',m
 { const _mv=manView; manView=function(v){ return v==='manprev'?vManPrev():v==='manequip'?vManEquip():v==='manpecas'?vManPecas():_mv(v); }; }
 /* assinaturas */
 setInterval(()=>{ try{ const X=S.mx; if(X.sub||!S.db||!S.acs||!S.acs.pronto||!viewOk('manch')) return; X.sub=true;
-  S.db.doc('config/manut').onSnapshot(s=>{ const d=s.exists?(s.data()||{}):{}; X.cfg={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[]}; X.lido=true; rerenderSeguro(); },()=>{ X.lido=true; });
+  S.db.doc('config/manut').onSnapshot(s=>{ const d=s.exists?(s.data()||{}):{}; X.cfg={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}; X.lido=true; rerenderSeguro(); },()=>{ X.lido=true; });
   inscrever('pecasmov',()=>S.db.collection('pecasmov').orderBy('em','desc').limit(1000),snap=>{ X.movs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); });
 }catch(e){} },700);
 function mxId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-async function mxGrava(muda){ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const n={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[]}; muda(n); n.em=new Date().toISOString(); n.por=S.uid||null; await S.db.doc('config/manut').set(n); S.mx.cfg={equips:n.equips,prev:n.prev,pecas:n.pecas}; }
+async function mxGrava(muda){ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const n={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}; muda(n); n.em=new Date().toISOString(); n.por=S.uid||null; await S.db.doc('config/manut').set(n); S.mx.cfg={equips:n.equips,prev:n.prev,pecas:n.pecas,limites:n.limites}; }
 function mxEquips(linha){ return (S.mx.cfg.equips||[]).filter(e=>e.ativo!==false&&(!linha||e.linha===linha)).sort((a,b)=>String(a.nome).localeCompare(String(b.nome))); }
 function mxEquip(id){ return (S.mx.cfg.equips||[]).find(e=>e.id===id); }
 function mxNorm(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
@@ -10326,6 +10341,118 @@ body.ltv-k .mx-hd{align-items:center}body.ltv-k .mx-hd .mp-acts .seg,body.ltv-k 
 @media (max-width:860px){ .mx-pv{grid-template-columns:70px minmax(0,1fr)} .mx-pv .pill,.mx-pv .mx-ea{grid-column:2} .mx-k{grid-template-columns:repeat(2,minmax(0,1fr))} .mx-mv{grid-template-columns:80px 70px minmax(0,1fr)} .mx-mv small{display:none} .mx-nf>select.txt{flex:1 1 100%} }
 </style>`);
 /* ===FIM MANX=== */
+/* ===================== MANUTENÇÃO 3 (06/10): causa ao concluir e aviso de chamado sem atendimento ===================== */
+const MZ_CAUSAS=['Mecânica','Elétrica','Pneumática / hidráulica','Ajuste / regulagem','Operacional','Desgaste de peça','Outra'];
+const MZ_LIM_PADRAO={parou:15,outro:30};
+S.mz={conc:null,avisados:{},ultBip:0};
+function mzLim(){ const l=(S.mx&&S.mx.cfg&&S.mx.cfg.limites)||{}; return {parou:+l.parou||MZ_LIM_PADRAO.parou,outro:+l.outro||MZ_LIM_PADRAO.outro}; }
+/* ---------- concluir: pede a causa e o que foi feito (uma vez por OS) ---------- */
+{ const _ms=manStatus; manStatus=async function(c,st){ if(st==='Concluída'&&c&&c.status!=='Concluída'&&!(c.exec&&c.exec.causa)&&!c._mzOk){ const E=c.exec||{}; S.mz.conc={n:c.numero,causa:'',txt:E.servicos||'',prev:!!c.prevId}; render(); setTimeout(()=>{ const t=document.getElementById('mz-txt'); t&&t.focus(); },60); return; }
+  return _ms.apply(this,arguments); }; }
+function mzModal(){ const Z=S.mz.conc, c=Z&&manDoc(Z.n); if(!c) return '';
+  return `<div class="dbmodal eq-modal" data-mz-fundo="1"><div class="dbmbox eq-box sm mz-box" role="dialog" aria-modal="true" aria-labelledby="mz-t">
+   <div class="eyebrow">CONCLUIR OS ${manNum(c.numero)} · ${esc(c.linha||'')}</div><h2 id="mz-t" style="margin:4px 0 2px">${esc(String(c.defeito||'').slice(0,80))}</h2><div class="sub" style="margin:0 0 14px">${esc(c.equip||'')}${c.paradaId?' · a parada da linha também é encerrada':''}</div>
+   <div class="label" style="margin-bottom:8px">${Z.prev?'TIPO DO SERVIÇO':'O QUE CAUSOU?'}</div>
+   <div class="mz-cs">${(Z.prev?['Preventiva feita','Preventiva com troca de peça','Preventiva com problema encontrado']:MZ_CAUSAS).map(k=>`<button type="button" class="mz-c" data-act="mz-causa" data-v="${esc(k)}" aria-pressed="${Z.causa===k}">${esc(k)}</button>`).join('')}</div>
+   <label style="display:block;margin-top:14px"><span class="label">O QUE FOI FEITO</span><textarea class="txt" id="mz-txt" rows="3" placeholder="Ex.: troquei a correia e regulei a tensão" style="margin-top:6px">${esc(Z.txt)}</textarea></label>
+   <div class="eq-err" id="mz-err"></div>
+   <div class="eq-mf" style="border:0;padding:14px 0 0"><button class="btn sec" data-act="mz-x">Voltar</button><button class="btn" data-act="mz-ok" style="background:var(--ok-ink)">${ic('check',18,2.6)}Concluir OS</button></div></div></div>`; }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ let el=document.getElementById('mz-ov'); const h=S.mz.conc?mzModal():'';
+    if(!h){ if(el) el.remove(); return x; } if(!el){ el=document.createElement('div'); el.id='mz-ov'; document.body.appendChild(el); }
+    const t=document.getElementById('mz-txt'), foco=t&&document.activeElement===t, pos=t&&t.selectionStart; el.innerHTML=h; if(foco){ const n=document.getElementById('mz-txt'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }catch(e){} return x; }; }
+document.addEventListener('input',ev=>{ if(ev.target.id==='mz-txt'&&S.mz.conc) S.mz.conc.txt=ev.target.value; });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mz-"]'), f=ev.target.closest&&ev.target.closest('[data-mz-fundo]');
+  if(!b){ if(f&&ev.target===f){ S.mz.conc=null; render(); } return; } const Z=S.mz.conc; if(!Z) return; const a=b.dataset.act;
+  if(a==='mz-x'){ S.mz.conc=null; render(); return; }
+  if(a==='mz-causa'){ Z.causa=b.dataset.v; render(); return; }
+  if(a==='mz-ok'){ const c=manDoc(Z.n); if(!c) return; if(!Z.causa){ const e=document.getElementById('mz-err'); if(e) e.textContent=Z.prev?'Escolha o tipo do serviço.':'Escolha o que causou o problema.'; return; }
+    b.disabled=true; try{ const E=Object.assign({},c.exec||{},{causa:Z.causa}); if(String(Z.txt||'').trim()) E.servicos=String(Z.txt).trim(); await S.db.doc('chamados/'+c._id).update({exec:E}); c.exec=E; S.mz.conc=null; c._mzOk=true; await manStatus(c,'Concluída'); delete c._mzOk; }
+    catch(e){ b.disabled=false; erro(e); } render(); } });
+/* a causa aparece no Resumo (30 dias) e no cartão concluído */
+function mzCausas(){ const ini=Date.now()-30*864e5, cnt={}; (S.chamados||[]).filter(c=>!c.excluido&&!c.prevId&&c.status==='Concluída'&&c.concluidoEm&&new Date(c.concluidoEm).getTime()>=ini).forEach(c=>{ const k=(c.exec&&c.exec.causa)||'Sem causa'; cnt[k]=(cnt[k]||0)+1; }); return Object.entries(cnt).sort((a,b)=>b[1]-a[1]); }
+{ const _vp=vManPainel; vManPainel=function(){ const h=_vp(); const cs=mzCausas(); const mx=Math.max(1,...cs.map(x=>x[1]));
+  const card=`<section class="card"><div class="head" style="align-items:baseline"><h2>Causas das falhas</h2><span class="sub" style="margin:0">corretivas concluídas · 30 dias</span></div>${cs.length?`<div class="mp-bars">${cs.map(([k,n])=>`<div class="mp-br"><span>${esc(k)}</span><div class="mp-bt"><i style="width:${n/mx*100}%;${k==='Sem causa'?'background:var(--faint)':''}"></i></div><b class="num">${n}</b></div>`).join('')}</div>`:'<div class="empty">A causa é escolhida ao concluir cada OS. Os números aparecem aqui.</div>'}</section>`;
+  return h+`<div class="two mp-two">${card}<section class="card"><div class="head" style="align-items:baseline"><h2>Aviso de chamado sem atendimento</h2></div><div class="sub" style="margin:0 0 10px">Avisa no sino, com som e notificação, quando ninguém assumiu o chamado depois de:</div>
+    <div class="mx-nf"><label class="mx-in"><span>máquina parada</span><input class="txt num" id="mz-lp" type="number" min="1" value="${mzLim().parou}"><span>min</span></label><label class="mx-in"><span>outros</span><input class="txt num" id="mz-lo" type="number" min="1" value="${mzLim().outro}"><span>min</span></label><button class="btn sec" data-act="mzl-salvar">Salvar</button></div></section></div>`; }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mzl-salvar"]'); if(!b) return; const p=Math.max(1,+document.getElementById('mz-lp').value||15), o=Math.max(1,+document.getElementById('mz-lo').value||30);
+  try{ await mxGrava(cf=>{ cf.limites={parou:p,outro:o}; }); S.mx.cfg.limites={parou:p,outro:o}; toast('Aviso: '+p+' min com máquina parada, '+o+' min nos outros.'); render(); }catch(e){ erro(e); } });
+/* ---------- aviso de chamado esquecido ---------- */
+function mzAtrasados(){ const L=mzLim(), ag=Date.now(); return (S.chamados||[]).filter(c=>!c.excluido&&!c.prevId&&c.status==='Aberta'&&c.criado&&(+c.numero||0)<900000).map(c=>({c,min:Math.round((ag-new Date(c.criado).getTime())/6e4)})).filter(x=>x.min>=(x.c.impacto==='parou'?L.parou:L.outro)); }
+NAV_EXTRA.push(()=>{ try{ if(!viewOk('manch')) return []; const xs=mzAtrasados(); if(!xs.length) return []; const pior=xs.sort((a,b)=>b.min-a.min)[0];
+  return [{n:xs.length,t:'Chamado'+(xs.length>1?'s':'')+' sem atendimento',s:'OS '+manNum(pior.c.numero)+' · '+pior.c.linha+' · há '+manDur(pior.min),acao:'manch',c:'crit'}]; }catch(e){ return []; } });
+setInterval(()=>{ try{ if(!S.acs||!S.acs.pronto||!viewOk('manch')) return; for(const {c,min} of mzAtrasados()){ const k=c._id+'|'+(min>=2*(c.impacto==='parou'?mzLim().parou:mzLim().outro)?2:1); if(S.mz.avisados[k]) continue; S.mz.avisados[k]=1;
+      toast('⚠ OS '+manNum(c.numero)+' · '+c.linha+': ninguém assumiu há '+manDur(min)+'.'); if(S.man.som&&typeof manBip==='function'){ manBip(); setTimeout(manBip,900); }
+      try{ if('Notification' in window&&Notification.permission==='granted'&&document.hidden){ const n=new Notification('Chamado sem atendimento · '+c.linha,{body:'OS '+manNum(c.numero)+' · há '+manDur(min)+' · '+String(c.defeito||'').slice(0,80),tag:'atraso-'+c._id,icon:'icons/icon-192.png'}); n.onclick=()=>{ window.focus(); S.man.cur=c.numero; go('manch'); n.close(); }; } }catch(e){}
+      try{ rerenderSeguro(); }catch(e){} break; } }catch(e){} },20000);
+/* o cartão do quadro mostra a causa quando concluído */
+{ const _it=mpItem; mpItem=function(r,hj){ let h=_it(r,hj); const k=r.c.exec&&r.c.exec.causa; if(k&&r.fase==='co') h=h.replace('<div class="mp-ft">',`<div class="mp-meta"><span class="mp-imp">causa: ${esc(k)}</span></div><div class="mp-ft">`); return h; }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="mz-css">
+#mz-ov .dbmodal{z-index:970}.mz-box{max-width:520px}.mz-cs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mz-c{min-height:50px;padding:8px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);font:inherit;font-size:14.5px;font-weight:700;color:var(--ink);cursor:pointer;text-align:left}
+.mz-c:hover{border-color:var(--teal)}.mz-c[aria-pressed="true"]{border:2px solid var(--ok-ink);background:var(--ok-tint);color:var(--ok-ink)}
+@media (max-width:480px){ .mz-cs{grid-template-columns:minmax(0,1fr)} }
+</style>`);
+/* ===FIM MANZ=== */
+/* ===================== LEITOR DE CÓDIGO DE BARRAS (06/10): códigos das linhas para o coletor (laser, lê só barras) ===================== */
+/* O leitor funciona como teclado: digita o código e dá Enter. CH-<LINHA> abre o chamado daquela linha (no modo tablet, troca a linha);
+   RA-<nº> abre o rancho no diário de bordo. */
+const CB_LIB='https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js';
+S.cb={modo:'qr',ultimo:null};
+try{ S.cb.modo=localStorage.getItem('painel.qrmodo')==='barras'?'barras':'qr'; }catch(e){}
+function cbSlug(l){ return String(l||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function cbCodLinha(l){ return 'CH-'+cbSlug(l); }
+function cbLinhaDe(cod){ const s=String(cod||'').toUpperCase().replace(/^CH-?/,''); return manLinhas().find(l=>cbSlug(l)===s)||''; }
+async function cbLib(){ if(window.JsBarcode) return; await carregarScript(CB_LIB); }
+function cbSvg(cod,alt){ return `<svg class="cb-svg" data-cb="${esc(cod)}" data-cb-h="${alt||70}" role="img" aria-label="Código de barras ${esc(cod)}"></svg>`; }
+async function cbPinta(){ const els=[...document.querySelectorAll('svg.cb-svg[data-cb]:not([data-ok])')]; if(!els.length) return; try{ await cbLib(); }catch(e){ els.forEach(x=>x.outerHTML='<div class="sub">Não consegui carregar o gerador de código de barras. Recarregue a página.</div>'); return; }
+  els.forEach(el=>{ try{ window.JsBarcode(el,el.dataset.cb,{format:'CODE128',height:+el.dataset.cbH||70,width:2,displayValue:true,fontSize:14,margin:8,background:'#ffffff'}); el.dataset.ok='1'; }catch(e){} }); }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); setTimeout(cbPinta,0); return x; }; }
+
+/* ---------- tela QR das linhas: opção "Código de barras (leitor)" ---------- */
+{ const _vq=vManQr; vManQr=function(){ const h=_vq(); const L=linhasOrd(), U=S.cb.ultimo;
+  const seg=`<div class="cb-top"><div class="seg" role="group" aria-label="Tipo de código"><button data-act="cb-modo" data-v="qr" aria-pressed="${S.cb.modo==='qr'}">QR · celular</button><button data-act="cb-modo" data-v="barras" aria-pressed="${S.cb.modo==='barras'}">Código de barras · leitor</button></div>
+    ${S.cb.modo==='barras'?`<div class="cb-teste ${U?(U.ok?'ok':'err'):''}">${ic('grid',18,2)}<span>${U?(U.ok?'Leu <b>'+esc(U.cod)+'</b> → '+esc(U.txt):'Leu <b>'+esc(U.cod)+'</b>, mas não é um código do painel'):'Teste o leitor: bipe qualquer código desta página.'}</span></div>`:''}</div>`;
+  if(S.cb.modo!=='barras') return h.replace('<div class="man-qrs" id="man-qrs">',seg+'<div class="man-qrs" id="man-qrs">');
+  const cards=L.map(l=>`<div class="man-qr cb-card"><div class="man-qr-t">CHAMADO DE MANUTENÇÃO</div><b>${esc(l)}</b>${cbSvg(cbCodLinha(l),80)}<small>Bipe com o leitor no computador do painel</small></div>`).join('');
+  return h.replace(/<button class="btn" data-act="man-qr-imp">[\s\S]*?<\/button>/,`<button class="btn" data-act="cb-pdf">${ic('baixar',18,2)}Baixar PDF dos códigos</button>`)
+    .replace(/<div class="man-qrs" id="man-qrs">[\s\S]*$/,seg+`<div class="banner" style="background:var(--teal-wash);color:var(--teal-strong);margin-bottom:12px">O leitor laser lê só código de barras (não lê QR). Ele funciona no computador que está com o painel aberto: bipou o código da linha, abre o chamado dela. No modo tablet, troca a linha.</div><div class="man-qrs cb-grid">${cards}</div>`); }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cb-modo"],[data-act="cb-pdf"]'); if(!b) return;
+  if(b.dataset.act==='cb-modo'){ S.cb.modo=b.dataset.v; try{ localStorage.setItem('painel.qrmodo',S.cb.modo); }catch(e){} render(); return; }
+  cbPdf(); });
+async function cbPdf(){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } try{ await cbLib(); }catch(e){ toast('Não consegui carregar o gerador de código de barras.'); return; }
+  const L=linhasOrd(), pdf=new window.jspdf.jsPDF('p','mm','a4'), W=210, cw=95, ch=66, mx=(W-2*cw)/2, my=10;
+  L.forEach((l,i)=>{ const k=i%8; if(i&&k===0) pdf.addPage(); const x=mx+(k%2)*cw, y=my+Math.floor(k/2)*ch;
+    pdf.setDrawColor(150); pdf.setLineDashPattern([1.5,1.5],0); pdf.rect(x+3,y+3,cw-6,ch-6); pdf.setLineDashPattern([],0);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(31,56,100); pdf.text('CHAMADO DE MANUTENÇÃO',x+cw/2,y+11,{align:'center'});
+    pdf.setFontSize(18); pdf.setTextColor(0,0,0); pdf.text(l,x+cw/2,y+20,{align:'center'});
+    const cv=document.createElement('canvas'); window.JsBarcode(cv,cbCodLinha(l),{format:'CODE128',height:90,width:3,displayValue:true,fontSize:22,margin:10,background:'#ffffff'});
+    const iw=78, ih=iw*cv.height/cv.width; pdf.addImage(cv.toDataURL('image/png'),'PNG',x+(cw-iw)/2,y+24,iw,Math.min(ih,34));
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(90,90,90); pdf.text('Bipe com o leitor no computador do painel',x+cw/2,y+ch-7,{align:'center'}); pdf.setTextColor(0,0,0); });
+  await manBaixar(pdf,'Codigos_barras_linhas.pdf','PDF com '+L.length+' códigos de barras gerado. Abra e imprima.'); }
+
+/* ---------- o que o leitor digitar ---------- */
+S.cb.buf=''; S.cb.t=0; S.cb.inicio=null;
+document.addEventListener('keydown',ev=>{ if(ev.ctrlKey||ev.altKey||ev.metaKey) return; const agora=performance.now(), gap=agora-S.cb.t; S.cb.t=agora;
+  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(cod.length>=4&&/^(CH|RA)-/i.test(cod)&&gap<120){ const a=document.activeElement;
+      if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&typeof a.value==='string'&&a.value.toUpperCase().endsWith(cod.toUpperCase())){ a.value=a.value.slice(0,a.value.length-cod.length); a.dispatchEvent(new Event('input',{bubbles:true})); }
+      ev.preventDefault(); ev.stopPropagation(); cbLeu(cod); } return; }
+  if(ev.key&&ev.key.length===1){ if(gap>80) S.cb.buf=''; else if(S.cb.buf&&gap<50) ev.stopImmediatePropagation(); /* rajada do leitor: não dispara os atalhos do teclado (N, A, P, F) */ S.cb.buf+=ev.key; if(S.cb.buf.length>40) S.cb.buf=S.cb.buf.slice(-40); } },true);
+function cbLeu(cod){ cod=String(cod).toUpperCase(); const naTela=S.view==='manqr'&&S.cb.modo==='barras';
+  if(cod.startsWith('CH-')){ const l=cbLinhaDe(cod); if(!l){ S.cb.ultimo={cod,ok:false}; toast('Código '+cod+' não é de nenhuma linha.'); if(naTela) render(); return; }
+    if(naTela){ S.cb.ultimo={cod,ok:true,txt:'abre o chamado da '+l}; render(); toast('Leitor funcionando: '+l+'.'); return; }
+    if(typeof tabOn==='function'&&tabOn()&&linhasOrd().includes(l)){ tabSet(l); go('linhatv'); toast('Tablet: '+l); return; }
+    if(!viewOk('manch')){ toast('Seu acesso não inclui abrir chamados.'); return; }
+    if(S.view==='linhatv'&&typeof manLtvForm==='function'){ manNovo(l); S.man.novo=false; if(S.paradas.some(p=>p.linha===l&&!p.fim)) S.man.f.impacto='parou'; S.man.ltv=l; render(); return; }
+    manNovo(l); S.man.cur=null; go('manch'); setTimeout(()=>{ const x=$('#man-form'); x&&x.scrollIntoView({block:'start'}); const ta=document.querySelector('[data-man="defeito"]'); ta&&ta.focus(); },80); toast('Chamado da '+l); return; }
+  if(cod.startsWith('RA-')){ const n=cod.slice(3).replace(/\D/g,''); if(naTela){ S.cb.ultimo={cod,ok:true,txt:'abre o rancho '+n}; render(); return; }
+    if(!viewOk('diario')){ toast('Seu acesso não inclui o diário de bordo.'); return; } go('diario'); setTimeout(()=>{ if(!dbAbrirRancho(n)) toast('Rancho '+n+' não encontrado.'); },120); return; } }
+document.head.insertAdjacentHTML('beforeend',`<style id="cb-css">
+.cb-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px}.cb-top .seg button{height:40px}
+.cb-teste{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:var(--sunken);color:var(--ink-2);font-size:14px;border:1.5px dashed var(--line)}
+.cb-teste.ok{background:var(--ok-tint);color:var(--ok-ink);border-style:solid;border-color:var(--ok)}.cb-teste.err{background:var(--crit-tint);color:var(--crit-ink);border-style:solid;border-color:var(--crit)}
+.cb-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important}.cb-card b{font-size:22px}.cb-svg{max-width:100%;height:auto}
+</style>`);
+/* ===FIM CB=== */
 /* ===================== LAYOUT DO CELULAR (06/10): barra de baixo com "Mais", topo limpo, botões e filtros no tamanho do dedo ===================== */
 P.mais3='<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
 S.mob={sheet:false};
