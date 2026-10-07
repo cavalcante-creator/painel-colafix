@@ -8,7 +8,10 @@
   const DONOS = (CFG.donos || []).map(e => String(e).trim().toLowerCase());
   firebase.initializeApp(CFG.firebase);
   const auth = firebase.auth();
-  const fs = firebase.firestore();
+    const BANCO = CFG.banco || '(default)';
+  let fs;
+  if (BANCO === '(default)') fs = firebase.firestore();
+  else { const app = firebase.app(); const exp = app.container.getProvider('firestore').getImmediate({ identifier: BANCO }); fs = new firebase.firestore.Firestore(app, exp); }
   try { fs.settings({ ignoreUndefinedProperties: true, merge: true }); } catch (e) {}
   if (CFG.emulador) { auth.useEmulator('http://' + CFG.emulador + ':9099', { disableWarnings: true }); fs.useEmulator(CFG.emulador, 8080); }
   try { fs.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
