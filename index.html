@@ -9535,6 +9535,12 @@ function tabLinkInicial(){
 
 
 
+
+
+
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -9583,12 +9589,12 @@ function eqSelCargo(sel,attrs){ const C=eqCargos(); return `<select class="txt e
 vAcessos=function(){ const A=S.acs, E=S.eq; if(!A.dono) return acsCaixa('Somente a responsável','Esta tela é só da dona do painel.');
   eqCarregaUsu();
   const abas=`<div class="eq-tabs" role="tablist">${[['pessoas','Pessoas',(A.lista||[]).filter(eqVis).length],['cargos','Cargos',eqCargos().todos.length]].map(([k,l,n])=>`<button role="tab" data-act="eq-aba" data-v="${k}" aria-selected="${E.aba===k}">${ic(k==='pessoas'?'equipe':'chaveacesso',18,2)}${l}<small>${n}</small></button>`).join('')}</div>`;
-  const novo=E.aba==='pessoas'?(eqOnline()?`<button class="btn" data-act="eq-novo">${ic('mais',18,2.4)}Nova pessoa</button>`:''):`<button class="btn" data-act="eq-cg-novo">${ic('mais',18,2.4)}Novo cargo</button>`;
+  const novo=E.aba==='pessoas'?(eqOnline()?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="eq-lote">${ic('equipe',18,2)}Várias pessoas</button><button class="btn" data-act="eq-novo">${ic('mais',18,2.4)}Nova pessoa</button></div>`:''):`<button class="btn" data-act="eq-cg-novo">${ic('mais',18,2.4)}Novo cargo</button>`;
   return `${banner()}
   <div class="head eq-head"><div><div class="eyebrow">AJUSTES</div><h1>Equipe e cargos</h1><div class="sub">${E.aba==='pessoas'?'Crie o acesso de cada pessoa e escolha o cargo dela. O cargo decide o que ela vê.':'Cada cargo é um pacote de telas. Mude um cargo e todos que o usam mudam juntos.'}</div></div>${novo}</div>
   ${ajAbas('acessos')}${abas}
   ${E.aba==='pessoas'?eqPessoas():eqCargosTela()}
-  ${E.nv?eqNovoModal():''}${E.cartao?eqCartaoModal():''}${E.cg?eqCargoModal():''}`; };
+  ${E.lote?eqLoteModal():''}${E.nv?eqNovoModal():''}${E.cartao?eqCartaoModal():''}${E.cg?eqCargoModal():''}`; };
 
 function eqPessoas(){ const A=S.acs, E=S.eq, C=eqCargos();
   const pend=(A.pedidos||[]).filter(p=>!(A.lista||[]).some(l=>l._id===p._id)&&!p.criadoPeloPcp);
@@ -9809,6 +9815,53 @@ document.head.insertAdjacentHTML('beforeend',`<style id="eq-css">
 .eq-card-r{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:7px 0;border-bottom:1px dashed var(--line)}.eq-card-r:last-child{border-bottom:0}.eq-card-r span{color:var(--muted);font-size:13px}.eq-card-r b{text-align:right}.eq-card-r.big b{font-size:20px;letter-spacing:.02em}
 .eq-cbts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.eq-cbts .btn{height:44px;padding:0 8px;font-size:14px}
 @media (max-width:700px){ .eq-f2{grid-template-columns:1fr} .eq-f[style]{grid-column:auto!important} .eq-tabs{width:100%} .eq-tabs button{flex:1;justify-content:center;padding:0 8px} .eq-mh,.eq-mb,.eq-mf{padding-left:16px;padding-right:16px} .eq-box.sm{padding:20px 16px} .eq-head .btn{width:100%} }
+</style>`);
+
+/* ---------- várias pessoas de uma vez: nome + cargo; usuário e senha saem prontos; imprime todos os cartões ---------- */
+function eqLoteLinha(){ return {nome:'',usu:'',cargo:'',sen:eqSenha(),mexeu:false,st:'',err:''}; }
+function eqLoteModal(){ const L=S.eq.lote, C=eqCargos(), fim=L.rows.some(r=>r.st==='ok')&&!L.rodando;
+  const sel=(r,i)=>`<select class="txt" data-eq-lc="${i}" ${r.st==='ok'?'disabled':''}><option value="">Cargo…</option>${C.meus.length?`<optgroup label="Seus cargos">${C.meus.map(c=>`<option value="${c.k}" ${r.cargo===c.k?'selected':''}>${esc(c.nome)}</option>`).join('')}</optgroup>`:''}<optgroup label="Cargos prontos">${C.prontos.map(c=>`<option value="${c.k}" ${r.cargo===c.k?'selected':''}>${esc(c.nome)}</option>`).join('')}</optgroup></select>`;
+  return `<div class="dbmodal eq-modal" data-eq-fundo="lote"><div class="dbmbox eq-box eq-lote" role="dialog" aria-modal="true" aria-labelledby="eq-lt-t">
+   <div class="eq-mh"><div><div class="eyebrow">VÁRIAS PESSOAS</div><h2 id="eq-lt-t">Criar acessos de uma vez</h2></div><button class="eq-x" data-act="eq-lote-x" aria-label="Fechar">✕</button></div>
+   <div class="eq-mb"><div class="sub" style="margin:0 0 12px">Escreva o nome e escolha o cargo. O usuário e a senha saem prontos (dá para mudar). No fim, imprima ou copie todos os cartões.</div>
+    <div class="eq-lh"><span>Nome</span><span>Usuário</span><span>Senha</span><span>Cargo</span><span></span></div>
+    ${L.rows.map((r,i)=>`<div class="eq-lr ${r.st}"><input class="txt" data-eq-ln="${i}" value="${esc(r.nome)}" placeholder="Nome e sobrenome" ${r.st==='ok'?'disabled':''}><div class="eq-in"><span class="eq-pre">@</span><input class="txt" data-eq-lu="${i}" value="${esc(r.usu)}" autocapitalize="none" spellcheck="false" ${r.st==='ok'?'disabled':''}></div><input class="txt num" data-eq-ls="${i}" value="${esc(r.sen)}" ${r.st==='ok'?'disabled':''}>${sel(r,i)}
+      <span class="eq-lst">${r.st==='ok'?ic('check',18,2.6):r.st==='vai'?'…':r.st==='err'?'⚠':`<button class="eq-x" data-act="eq-lote-del" data-i="${i}" aria-label="Tirar linha" style="width:32px;height:32px">✕</button>`}</span>${r.err?`<div class="eq-lerr">${esc(r.err)}</div>`:''}</div>`).join('')}
+    ${L.rodando?'':`<button class="eq-lk" data-act="eq-lote-mais" style="margin-top:8px">${ic('mais',15,2.2)}Mais uma linha</button>`}
+   </div>
+   <div class="eq-mf">${fim?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" data-act="eq-lote-print">${ic('imprimir',16,2)}Imprimir os cartões</button><button class="btn sec" data-act="eq-lote-copiar">${ic('copiar',16,2)}Copiar todos</button></div>`:'<span></span>'}
+    <div style="display:flex;gap:8px"><button class="btn sec" data-act="eq-lote-x">${fim?'Concluir':'Cancelar'}</button>${L.rows.some(r=>r.st!=='ok')?`<button class="btn" data-act="eq-lote-criar" ${L.rodando?'disabled':''}>${L.rodando?'Criando…':ic('check',18,2.4)+'Criar todos'}</button>`:''}</div></div>
+  </div></div>`; }
+function eqLoteCartoes(){ return S.eq.lote.rows.filter(r=>r.st==='ok').map(r=>({nome:r.nome,usu:r.usu,sen:r.sen,cargo:pnlPerfilNome(r.cargo),perfil:r.cargo})); }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="eq-lote"]'); if(!b||b.disabled||!S.acs.dono) return; const E=S.eq, a=b.dataset.act;
+  if(a==='eq-lote'){ E.lote={rows:[1,2,3,4,5].map(eqLoteLinha),rodando:false}; render(); setTimeout(()=>{ const i=document.querySelector('[data-eq-ln="0"]'); i&&i.focus(); },40); return; }
+  const L=E.lote; if(!L) return;
+  if(a==='eq-lote-x'){ if(L.rodando) return; E.lote=null; render(); return; }
+  if(a==='eq-lote-mais'){ L.rows.push(eqLoteLinha()); render(); return; }
+  if(a==='eq-lote-del'){ L.rows.splice(+b.dataset.i,1); if(!L.rows.length) L.rows.push(eqLoteLinha()); render(); return; }
+  if(a==='eq-lote-criar'){ const fila=L.rows.filter(r=>r.st!=='ok'&&r.nome.trim()); let falta=false; if(!fila.length){ toast('Escreva pelo menos um nome.'); return; }
+    fila.forEach(r=>{ r.usu=eqLimpo(r.usu||eqUsuSug(r.nome)); r.err=!r.cargo?'Escolha o cargo.':!r.usu?'Escreva o usuário.':String(r.sen||'').length<6?'Senha com pelo menos 6 caracteres.':''; if(r.err){ r.st='err'; falta=true; } else r.st=''; });
+    const us=fila.map(r=>r.usu); fila.forEach(r=>{ if(us.filter(u=>u===r.usu).length>1){ r.err='Usuário repetido na lista.'; r.st='err'; falta=true; } });
+    if(falta){ render(); return; } L.rodando=true; render();
+    for(const r of fila){ r.st='vai'; render(); try{ const uid=await window.claude.criarUsuario(r.usu,r.nome.trim(),r.sen); S.nomes[uid]=r.nome.trim(); E.usu[uid]=r.usu; const ok=await acsGravar(uid,acsPreset(r.cargo),true); r.st=ok?'ok':'err'; if(!ok) r.err='Conta criada, mas o cargo não gravou: escolha o cargo na lista.'; }
+      catch(e){ r.st='err'; r.err=e&&e.code==='auth/email-already-in-use'?'Já existe @'+r.usu+'. Mude o usuário (ex.: '+r.usu+'2).':e&&e.code==='auth/network-request-failed'?'Sem internet.':'Não deu certo ('+((e&&e.code)||'erro')+').'; } }
+    L.rodando=false; const n=L.rows.filter(r=>r.st==='ok').length; toast(n+' acesso'+(n>1?'s':'')+' criado'+(n>1?'s':'')+'.'); render(); return; }
+  if(a==='eq-lote-copiar'){ const t=eqLoteCartoes().map(c=>`${c.nome} (${c.cargo})\nEndereço: ${eqLinkDe(c)}\nUsuário: ${c.usu}\nSenha: ${c.sen}`).join('\n\n'); try{ await navigator.clipboard.writeText(t); toast('Copiado.'); }catch(e){ toast('Não consegui copiar.'); } return; }
+  if(a==='eq-lote-print'){ const cs=eqLoteCartoes(); const w=window.open('','_blank','width=900,height=700'); if(!w){ toast('O navegador bloqueou a janela de impressão.'); return; }
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>Acessos do painel</title><style>body{font:14px "Segoe UI",system-ui,sans-serif;margin:16px;color:#1A1A1A}.g{display:grid;grid-template-columns:1fr 1fr;gap:12px}.c{border:2px solid #143F54;border-radius:12px;padding:12px 14px;break-inside:avoid}.h{display:flex;justify-content:space-between;border-bottom:1px solid #E5DFD0;padding-bottom:6px;margin-bottom:4px}.h b{color:#143F54}.h span{font-weight:800;letter-spacing:.14em;color:#A2453D;font-size:11px}.r{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #E5DFD0}.r span{color:#6B6558}.r.b b{font-size:17px}.u{font-size:11px;word-break:break-all}.p{font-size:11px;color:#6B6558;margin-top:6px}</style>
+     <div class="g">${cs.map(c=>`<div class="c"><div class="h"><b>Painel de Operação</b><span>COLAFIX</span></div><div class="r"><span>Nome</span><b>${esc(c.nome)}</b></div><div class="r"><span>Cargo</span><b>${esc(c.cargo)}</b></div><div class="r b"><span>Usuário</span><b>${esc(c.usu)}</b></div><div class="r b"><span>Senha</span><b>${esc(c.sen)}</b></div><div class="r"><span>Endereço</span><b class="u">${esc(eqLinkDe(c))}</b></div><div class="p">No primeiro acesso, toque no seu nome no topo e troque a senha.</div></div>`).join('')}</div><script>print()<\/script>`); w.document.close(); return; } });
+document.addEventListener('input',ev=>{ const t=ev.target, L=S.eq.lote; if(!L||!t.dataset) return; const g=k=>t.dataset[k]!=null?+t.dataset[k]:null; let i;
+  if((i=g('eqLn'))!=null){ const r=L.rows[i]; r.nome=t.value; if(!r.mexeu){ r.usu=eqUsuSug(t.value); const u=document.querySelector(`[data-eq-lu="${i}"]`); if(u) u.value=r.usu; } if(i===L.rows.length-1&&t.value.trim()){ L.rows.push(eqLoteLinha()); const p=t.selectionStart; render(); const n=document.querySelector(`[data-eq-ln="${i}"]`); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(e){} } } return; }
+  if((i=g('eqLu'))!=null){ L.rows[i].usu=t.value; L.rows[i].mexeu=true; return; }
+  if((i=g('eqLs'))!=null){ L.rows[i].sen=t.value; return; } });
+document.addEventListener('change',ev=>{ const t=ev.target, L=S.eq.lote; if(!L||!t.dataset||t.dataset.eqLc==null) return; L.rows[+t.dataset.eqLc].cargo=t.value; });
+document.addEventListener('click',ev=>{ const f=ev.target.closest&&ev.target.closest('[data-eq-fundo="lote"]'); if(!f||ev.target!==f||!S.eq.lote||S.eq.lote.rodando) return; S.eq.lote=null; render(); });
+document.head.insertAdjacentHTML('beforeend',`<style id="eq-lote-css">
+.eq-lote{max-width:1000px}.eq-lh,.eq-lr{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px minmax(0,1.2fr) 36px;gap:8px;align-items:center}
+.eq-lh{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0 0 6px}.eq-lr{padding:6px 0;border-top:1px solid var(--line-2)}.eq-lr .txt{height:42px;width:100%}
+.eq-lr.ok .txt{background:var(--ok-tint);border-color:var(--ok)}.eq-lr.err .txt{border-color:var(--crit)}.eq-lst{display:flex;justify-content:center;color:var(--ok-ink);font-weight:800}.eq-lr.err .eq-lst{color:var(--crit-ink)}
+.eq-lerr{grid-column:1/-1;color:var(--crit-ink);font-size:12.5px;font-weight:600}
+@media (max-width:760px){ .eq-lh{display:none} .eq-lr{grid-template-columns:1fr 1fr;padding:10px 0} .eq-lr>input:first-child{grid-column:1/-1} .eq-lr select{grid-column:1/2} }
 </style>`);
 /* ===FIM EQUIPE=== */
 /* ===================== MANUTENÇÃO · PAINEL NO LAYOUT DO PAINEL (06/10) + LOGIN SÓ PARA VER AS TELAS ===================== */
