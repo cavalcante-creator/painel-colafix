@@ -197,7 +197,7 @@
     const pri = modo === 'primeiro';
     const logo = (document.querySelector('.brand img') || {}).src || '';
     if (!document.getElementById('lg-css2')) { const st2 = document.createElement('style'); st2.id = 'lg-css2'; st2.textContent = cssArea; document.head.appendChild(st2); }
-    el.innerHTML = `<div class="lg-wrap ${AREA && !pri ? 'tem' : ''}">${AREA && !pri ? ladoArea(AREA) : ''}<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>${AREA && !pri ? 'Entrar' : 'Painel de Operação'}</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : 'Entre com o usuário e a senha que o PCP passou para você'}</div>
+    el.innerHTML = `<div class="lg-wrap ${AREA && !pri ? 'tem' : ''}">${AREA && !pri ? ladoArea(AREA) : ''}<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>${AREA && !pri ? 'Entrar' : 'Painel de Operação'}</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : RANCHO_QR ? 'Entre para abrir o rancho <b>' + esc(RANCHO_QR) + '</b> no diário de bordo' : QR_LINHA ? 'Entre para abrir o chamado da <b>' + esc(QR_LINHA) + '</b>' : 'Entre com o usuário e a senha que o PCP passou para você'}</div>
       ${pri ? '<label for="lg-n">SEU NOME</label><div class="lg-in"><input id="lg-n" autocomplete="name" required></div>' : ''}
       <label for="lg-e">USUÁRIO</label><div class="lg-in"><input id="lg-e" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="ex.: joao.silva"></div>
       <label for="lg-s">SENHA</label><div class="lg-in"><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="6" style="padding-right:76px"><button type="button" class="lg-olho" id="lg-o" aria-label="Mostrar senha">Mostrar</button></div>
@@ -224,6 +224,7 @@
   /* ---------- chamado pelo QR da linha, sem login (entra como anônimo e só consegue criar o chamado) ---------- */
   const QR_LINHA = (() => { const m = (location.search + '&' + location.hash).match(/[?&#]chamado=([^&#]+)/); if (!m) return ''; try { return decodeURIComponent(m[1].replace(/\+/g, ' ')); } catch (e) { return m[1]; } })();
   let MODO_QR = false;
+  const RANCHO_QR = ((location.search + '&' + location.hash).match(/[?&#]rancho=(\d{4,})/) || [])[1] || '';
   const cssQr = `#lg .qr-bx{max-width:480px}#lg .qr-top{display:flex;align-items:center;gap:14px;margin:0 0 18px}#lg .qr-ic{width:56px;height:56px;border-radius:16px;background:linear-gradient(150deg,#0F2A38,#1B5C7A);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   #lg .qr-top small{display:block;font-size:11px;font-weight:800;letter-spacing:.16em;color:#1B5C7A}#lg .qr-top b{display:block;font-size:26px;line-height:1.1;color:#143F54}
   #lg textarea{border:1.5px solid #E0D9C9;border-radius:12px;padding:12px 14px;font:inherit;font-size:17px;width:100%;box-sizing:border-box;background:#FBFAF6;min-height:96px;resize:vertical;margin:0 0 16px}#lg textarea:focus{outline:none;border-color:#1B5C7A;background:#fff;box-shadow:0 0 0 4px rgba(27,92,122,.14)}
@@ -237,6 +238,9 @@
     const img = await new Promise((ok, er) => { const i = new Image(); i.onload = () => ok(i); i.onerror = er; i.src = url; });
     let w = img.width, h = img.height; const mx = 1280; if (Math.max(w, h) > mx) { const k = mx / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(img, 0, 0, w, h); let q = .72, d = cv.toDataURL('image/jpeg', q); while (d.length > 700000 && q > .3) { q -= .12; d = cv.toDataURL('image/jpeg', q); } return d; }
+  /* entra como anônimo se o Firebase permitir; se não, segue sem conta (as regras aceitam o chamado do QR assim mesmo) */
+  let anonTentado = false;
+  async function entrarAnonimo() { if (auth.currentUser || anonTentado) return; anonTentado = true; try { await auth.signInAnonymously(); } catch (e) { console.info('QR sem conta (' + (e && e.code) + ')'); } }
   function telaChamado(fase, info) { MODO_QR = true;
     let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
     if (!document.getElementById('lg-css3')) { const st3 = document.createElement('style'); st3.id = 'lg-css3'; st3.textContent = cssQr; document.head.appendChild(st3); }
@@ -254,7 +258,7 @@
       <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">Não precisa de usuário nem senha.</span><button type="button" class="lk" id="qr-login">Entrar com usuário</button></div><div class="lg-pe">Colafix · Manutenção</div></form>`;
     const f = el.querySelector('form'), er = el.querySelector('#qr-er'); let imp = '', eqId = '', foto = '';
     /* equipamentos da linha (lista da manutenção) e foto */
-    (async () => { try { if (!auth.currentUser) await auth.signInAnonymously(); const g = await fs.doc('config/manut').get(); const es = ((g.exists && g.data().equips) || []).filter(e => e.ativo !== false && e.linha === QR_LINHA);
+    (async () => { try { await entrarAnonimo(); const g = await fs.doc('config/manut').get(); const es = ((g.exists && g.data().equips) || []).filter(e => e.ativo !== false && e.linha === QR_LINHA);
       const box = el.querySelector('#qr-eqs'); if (!box || !es.length) return;
       box.innerHTML = es.map(e => `<button type="button" data-id="${esc(e.id)}" data-n="${esc(e.nome)}">${esc(e.nome)}</button>`).join('');
       box.querySelectorAll('button').forEach(b => b.onclick = () => { const on = eqId !== b.dataset.id; eqId = on ? b.dataset.id : ''; el.querySelector('#qr-e').value = on ? b.dataset.n : ''; box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b && on)); });
@@ -273,7 +277,7 @@
       const d = f.querySelector('#qr-d').value.trim(), n = f.querySelector('#qr-n').value.trim().replace(/\s+/g, ' '), eq = f.querySelector('#qr-e').value.trim();
       if (!d) { er.textContent = 'Escreva o que está acontecendo.'; return; } if (!imp) { er.textContent = 'Toque em como está a linha.'; return; } if (n.length < 2) { er.textContent = 'Escreva o seu nome.'; return; }
       b.disabled = true; b.textContent = 'Enviando…'; try { localStorage.setItem('painel.qrnome', n); } catch (e) {}
-      try { if (!auth.currentUser) await auth.signInAnonymously();
+      try { await entrarAnonimo();
         const id = 'q-' + novoId(), agora = new Date(), loc = new Date(agora.getTime() - agora.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
         let fid = null; if (foto) { fid = 'f-' + novoId(); try { await fs.doc('chamfotos/' + fid).set({ d: foto, em: agora.toISOString(), origem: 'qr' }); } catch (e) { console.warn('foto', e); fid = null; } }
         const doc = { linha: QR_LINHA.slice(0, 59), quando: loc, defeito: d.slice(0, 900), impacto: imp, nome: n.slice(0, 60), equip: eq ? eq.slice(0, 80) : null, status: 'Aberta', criado: agora.toISOString(), por: null, numero: 999999, qr: true, qid: id, origem: 'qr' };
@@ -281,7 +285,7 @@
         await fs.doc('chamados/' + id).set(doc);
         telaChamado('ok', { parou: imp === 'parou' });
       } catch (e) { console.warn('qr', e); b.disabled = false; b.textContent = 'Enviar chamado';
-        er.textContent = e && e.code === 'auth/operation-not-allowed' ? 'O chamado sem login ainda não foi ativado. Avise o PCP (Firebase → Authentication → Anônimo).' : e && (e.code === 'permission-denied' || e.code === 'sem-permissao') ? 'O banco recusou o chamado. Avise o PCP para publicar as regras novas.' : e && e.code === 'auth/network-request-failed' ? 'Sem internet. Tente de novo.' : 'Não deu certo (' + ((e && e.code) || 'erro') + '). Tente de novo.'; } };
+        er.textContent = e && (e.code === 'permission-denied' || e.code === 'sem-permissao') ? 'O banco recusou o chamado: as regras do Firebase estão desatualizadas. Avise o PCP (Firestore → Regras → colar e Publicar).' : e && (e.code === 'auth/network-request-failed' || e.code === 'unavailable') ? 'Sem internet. Tente de novo.' : 'Não deu certo (' + ((e && e.code) || 'erro') + '). Tente de novo ou avise o PCP.'; } };
   }
 
   let jaLogou = false; try { jaLogou = localStorage.getItem('painel.logado') === '1'; } catch (e) {}

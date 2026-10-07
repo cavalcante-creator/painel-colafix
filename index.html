@@ -3972,7 +3972,7 @@ function dbAbrirRancho(num){ num=String(num||'').replace(/\D/g,''); if(!num){ re
   if(!e.ent&&PD.alm){ D.aberto=o._id; D.f=dbNovoF(o,'ent'); } else if(e.ent&&!e.conf&&PD.prod){ D.aberto=o._id; D.f=dbNovoF(o,'conf'); } else if(e.conf){ D.ver=o._id+'|conf'; } else if(e.ent){ D.ver=o._id+'|ent'; }
   if(S.view!=='diario') go('diario'); else render(); return true; }
 function dbLinkInicial(){ let m=null; try{ m=(location.hash+'&'+location.search+'&'+document.referrer+'&'+(window.name||'')).match(/rancho=(\d{6,})/); }catch(e){} if(!m) return; const num=m[1]; let t=0;
-  const tenta=()=>{ if(S.acs&&S.acs.pronto&&S.ordens.some(o=>String(o.rancho||'')===num)){ if(viewOk('diario')) dbAbrirRancho(num); try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]rancho=\d+/,'')); }catch(e){} return; } if(++t<60) setTimeout(tenta,500); else toast('Rancho '+num+' não encontrado no painel.'); };
+  const tenta=()=>{ if(S.acs&&S.acs.pronto&&!acsGate()&&S.ordens.some(o=>String(o.rancho||'')===num)){ if(viewOk('diario')) dbAbrirRancho(num); try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]rancho=\d+/,'')); }catch(e){} return; } if(++t<60) setTimeout(tenta,500); else if(!(S.acs&&S.acs.pronto&&!acsGate())){ t=0; setTimeout(tenta,800); } else toast('Rancho '+num+' não encontrado no painel.'); };
   setTimeout(tenta,300); }
 dbLinkInicial(); window.addEventListener('hashchange',dbLinkInicial);
 function dbMonStatus(r){ const o=r.o, e=r.e; let c,t,sub='',pisca=false;
@@ -9227,7 +9227,7 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(t.dataset&&t.data
 { const _rs=rerenderSeguro; rerenderSeguro=function(){ const a=document.activeElement; if(a&&a.closest&&a.closest('.man-form,.man-at')) return; return _rs.apply(this,arguments); }; }
 /* QR: ?chamado=Linha%201 abre o formulário já com a linha */
 function manLinkInicial(){ if(tabOn()) return tabLinkInicial(); let m=null; try{ m=(location.hash+'&'+location.search+'&'+document.referrer+'&'+(window.name||'')).match(/chamado=([^&#]+)/); }catch(e){} if(!m) return; let linha=''; try{ linha=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ linha=m[1]; } let t=0;
-  const tenta=()=>{ if(S.acs&&S.acs.pronto){ if(viewOk('manch')){ manNovo(manLinhas().includes(linha)?linha:''); S.man.cur=null; go('manch'); } else toast('Seu acesso não inclui abrir chamados. Peça para liberar a Produção ou a Manutenção.'); try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60) setTimeout(tenta,500); };
+  const tenta=()=>{ if(S.acs&&S.acs.pronto){ if(viewOk('manch')){ manNovo(manLinhas().includes(linha)?linha:''); S.man.cur=null; go('manch'); } else toast('Seu acesso não inclui abrir chamados. Peça para liberar a Produção ou a Manutenção.'); try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60||!(S.acs&&S.acs.pronto)) setTimeout(tenta,500); };
   setTimeout(tenta,300); }
 manLinkInicial(); window.addEventListener('hashchange',manLinkInicial);
 /* painel por cargo: bloco de chamados + modelo Manutenção */
@@ -9516,7 +9516,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 /* no tablet, o QR da linha aberto pela câmera do próprio tablet troca a linha em vez de abrir chamado */
 function tabLinkInicial(){
     let m=null; try{ m=(location.hash+'&'+location.search).match(/chamado=([^&#]+)/); }catch(e){} if(!m) return; const l0=m[0]; let t=0;
-    const tenta=()=>{ if(S.acs&&S.acs.pronto){ const l=tabLinhaDoQr(l0); if(l&&viewOk('linhatv')){ tabSet(l); go('linhatv'); } try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60) setTimeout(tenta,500); };
+    const tenta=()=>{ if(S.acs&&S.acs.pronto){ const l=tabLinhaDoQr(l0); if(l&&viewOk('linhatv')){ tabSet(l); go('linhatv'); } try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60||!(S.acs&&S.acs.pronto)) setTimeout(tenta,500); };
     setTimeout(tenta,300); }
 
 
