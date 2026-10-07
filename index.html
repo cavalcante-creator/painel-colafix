@@ -9541,6 +9541,21 @@ function tabLinkInicial(){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ===================== EQUIPE E CARGOS (06/10): criar pessoas, cargos e apagar, numa tela só ===================== */
 P.lixo='<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>';
 P.pessoa='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>';
@@ -10123,7 +10138,7 @@ function mxMesesCard(){ const ms=mxMeses(); const mx=Math.max(1,...ms.map(m=>m.c
   return h+`<div class="two mp-two">${mxMesesCard()}<section class="card"><div class="head" style="align-items:baseline"><h2>Confiabilidade por equipamento</h2><span class="sub" style="margin:0">90 dias</span></div>${mxConfTabela()}</section></div>`; }; }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mx-tv"]'); if(!b) return; const on=!document.body.classList.contains('ltv-k'); document.body.classList.toggle('ltv-k',on);
   try{ if(on&&document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); if(!on&&document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }catch(e){}
-  if(on&&!S.man.som){ S.man.som=true; try{ localStorage.setItem('painel.mansom','1'); }catch(e){} manBip(); } try{ localStorage.setItem('painel.mantv',on?'1':'0'); }catch(e){} render(); });
+  if(on&&!S.man.som){ S.man.som=true; try{ localStorage.setItem('painel.mansom','1'); }catch(e){} manBip(); } try{ localStorage.setItem('painel.mantv',on?'1':'0'); }catch(e){} if(on&&S.view!=='manmon'){ go('manmon'); document.body.classList.add('ltv-k'); } else render(); });
 /* TV da oficina: cargo próprio que abre direto no painel em modo TV */
 if(!ACS_PERFIS.tvman){ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.tvman={nome:'TV da oficina (manutenção)',mods:['manut'],locais:[]}; ACS_PERFIS.outro=_o; }
 if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('tvman')) EQ_PRONTO_ORD.splice(4,0,'tvman');
@@ -10311,6 +10326,78 @@ body.ltv-k .mx-hd{align-items:center}body.ltv-k .mx-hd .mp-acts .seg,body.ltv-k 
 @media (max-width:860px){ .mx-pv{grid-template-columns:70px minmax(0,1fr)} .mx-pv .pill,.mx-pv .mx-ea{grid-column:2} .mx-k{grid-template-columns:repeat(2,minmax(0,1fr))} .mx-mv{grid-template-columns:80px 70px minmax(0,1fr)} .mx-mv small{display:none} .mx-nf>select.txt{flex:1 1 100%} }
 </style>`);
 /* ===FIM MANX=== */
+/* ===================== LAYOUT DO CELULAR (06/10): barra de baixo com "Mais", topo limpo, botões e filtros no tamanho do dedo ===================== */
+P.mais3='<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
+S.mob={sheet:false};
+function mobCel(){ return matchMedia('(max-width:860px)').matches; }
+{ const _rn=renderNav; renderNav=function(){ _rn.apply(this,arguments); try{ const bn=$('#bottomnav'); if(!bn) return; const m=modAtual(); const tabs=mTabs(m)||[];
+    const aj=['ajustes','itens','acessos','paineis'].includes(S.view)||S.view==='modulos';
+    document.body.classList.toggle('mob-semnav',aj||tabs.length<=1);
+    if(tabs.length>5&&m.id!=='analise'){ /* a Análise PCP já tem a própria barra por grupos */ let vis=tabs.slice(0,4); if(!vis.includes(S.view)&&tabs.includes(S.view)) vis=[...tabs.slice(0,3),S.view];
+      const resto=tabs.filter(v=>!vis.includes(v));
+      bn.style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
+      bn.innerHTML=vis.map(v=>`<button data-go="${v}" ${S.view===v?'aria-current="page"':''}>${ic(VIEWS[v].ic,22)}${esc(VIEWS[v].mob||VIEWS[v].nome)}</button>`).join('')+`<button data-act="mob-mais" aria-expanded="${S.mob.sheet}" ${resto.includes(S.view)?'aria-current="page"':''}>${ic('mais3',22,2.6)}Mais</button>`;
+      let sh=document.getElementById('mob-sheet'); if(S.mob.sheet){ if(!sh){ sh=document.createElement('div'); sh.id='mob-sheet'; document.body.appendChild(sh); }
+        sh.innerHTML=`<div class="mob-sh-bx" role="dialog" aria-label="Mais telas"><div class="mob-sh-h"><b>${esc(m.nome)}</b><button data-act="mob-mais-x" aria-label="Fechar">✕</button></div>${resto.map(v=>`<button class="mob-sh-it" data-go="${v}" ${S.view===v?'aria-current="page"':''}>${ic(VIEWS[v].ic,22)}<span>${esc(VIEWS[v].nome)}</span></button>`).join('')}</div>`; }
+      else if(sh) sh.remove(); }
+    else { const sh=document.getElementById('mob-sheet'); if(sh) sh.remove(); S.mob.sheet=false; }
+  }catch(e){ console.warn('nav celular',e); } }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mob-mais"],[data-act="mob-mais-x"],#mob-sheet [data-go]'); const fundo=ev.target&&ev.target.id==='mob-sheet';
+  if(!b&&!fundo) return; if(b&&b.dataset.act==='mob-mais'){ S.mob.sheet=!S.mob.sheet; renderNav(); return; } S.mob.sheet=false; setTimeout(()=>renderNav(),0); });
+document.head.insertAdjacentHTML('beforeend',`<style id="mob-css">
+#mob-sheet{position:fixed;inset:0;z-index:40;background:rgba(10,25,35,.35);display:flex;align-items:flex-end}
+.mob-sh-bx{width:100%;background:var(--surface);border-radius:18px 18px 0 0;padding:10px 12px calc(76px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 30px rgba(0,0,0,.18);animation:mobsh .2s ease-out}
+@keyframes mobsh{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.mob-sh-h{display:flex;justify-content:space-between;align-items:center;padding:6px 6px 10px}.mob-sh-h b{font-size:16px}.mob-sh-h button{width:36px;height:36px;border-radius:10px;border:0;background:var(--sunken);font-size:15px;cursor:pointer}
+.mob-sh-it{display:flex;align-items:center;gap:14px;width:100%;height:54px;padding:0 12px;border:0;border-radius:12px;background:transparent;font:inherit;font-size:16px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.mob-sh-it[aria-current="page"]{background:var(--teal-wash);color:var(--teal-strong)}.mob-sh-it svg{color:var(--teal-strong)}
+@media (max-width:860px){
+  /* topo: só o essencial e o nome do módulo inteiro */
+  #tp-mais{display:none!important}
+  .top{gap:8px}.top-r{gap:6px!important}
+  .mob-brand{min-width:0;flex:1 1 auto}.mob-brand img{flex-shrink:0}
+  .mob-brand .mob-mod{font-size:13px!important;padding:7px 10px!important;border-radius:9px!important;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .avatar{width:36px;height:36px}
+  /* barra de baixo: no máximo 5, com rótulo legível; some onde não ajuda */
+  .bottomnav button{font-size:11.5px;gap:4px;height:62px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bottomnav button[aria-current="page"]{background:var(--teal-wash)}
+  body.mob-semnav .bottomnav{display:none!important} body.mob-semnav .content{padding-bottom:40px}
+  /* títulos e espaços */
+  h1{font-size:25px;line-height:31px}
+  .content{gap:16px}
+  .card{padding:18px 16px}
+  .head{gap:12px}.head>div:first-child{min-width:0}
+  /* filtros em uma linha que rola para o lado, no tamanho do dedo */
+  .seg{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .seg::-webkit-scrollbar{display:none}
+  .seg button{flex:0 0 auto;height:40px!important;padding:0 14px}
+  .chip{min-height:40px;height:auto;padding:0 14px}
+  .chips{gap:8px}
+  .btn{min-height:46px}
+  .lnk{padding:8px 0}
+  .txt{height:48px;font-size:16px}textarea.txt{height:auto}
+  /* nada passa da largura da tela */
+  .pill{white-space:normal;max-width:100%;text-align:center}
+  #view img,#view svg{max-width:100%}
+  /* Tela da linha */
+  .ltv-h{align-items:flex-start}.ltv-hr{flex-wrap:wrap;gap:8px;width:100%}.ltv-hr .btn{flex:1 1 auto;height:44px!important;white-space:nowrap;font-size:14px;padding:0 12px}.ltv-clk{display:none}
+  /* Programação: busca em cima, filtros embaixo */
+  .pf-r1 .srch{flex:1 1 100%!important;min-width:0!important;max-width:100%!important;width:100%}
+  .pfil{overflow:hidden}.pf-r1,.pf-r3{min-width:0;width:100%}.pf-r1>*,.pf-r3>*{min-width:0;max-width:100%}.pfil .seg{max-width:100%}
+  /* Paradas por cimento e Base de dados: nada fica para fora */
+  .row.num[style*="grid-template-columns:150px"]{grid-template-columns:110px minmax(0,1fr)!important}
+  .bq-fs{grid-template-columns:minmax(0,1fr)!important}.bq-fh{flex-wrap:wrap}
+  .mob-brand img{height:18px!important}.mob-brand .mob-mod{font-size:12.5px!important;padding:6px 9px!important}
+  /* TV da fábrica no celular */
+  .tv2-top img,.tv2-top .tv2-logo{display:none}.tv2-top h1{font-size:24px!important;line-height:30px!important}.tv2-ck{font-size:28px!important}.tv2-ey{letter-spacing:.12em;font-size:11px}
+  .tvf-top img{display:none}.tvf-top h1{font-size:24px!important;line-height:30px!important}.tvf-rel{font-size:28px!important}.tvf-acts{width:100%}.tvf-acts .btn{flex:1}
+  .tvf-o{font-size:15px;grid-template-columns:28px minmax(0,1fr) auto}
+  /* tabelas largas rolam dentro do cartão */
+  .dbw,.mx-tw,.chw,.calscroll{-webkit-overflow-scrolling:touch}
+}
+@media (max-width:420px){ .mob-brand img{height:18px!important} .tp-ib,.tp-busca{width:36px!important;height:36px!important} }
+</style>`);
+/* ===FIM MOB=== */
 iniciar();
 })();
 </script>
