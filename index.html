@@ -5061,7 +5061,7 @@ async function salvar(col,doc){
 }
 function erro(e){ const c=e&&e.code; console.warn('[painel] erro ao gravar',c,e&&e.message);
   if(c==='sem-permissao'||c==='permission-denied'){ toast('Você não possui permissão para salvar isso. Fale com o administrador.'); return; }
-  toast(c==='quota_exceeded'?'O armazenamento do teste está cheio. Avise o responsável.':c==='resource_exhausted'?'Muitas ações seguidas. Aguarde alguns segundos e tente de novo.':'Não foi possível salvar. Verifique a conexão e tente de novo.'); }
+  toast(c==='quota_exceeded'?'O armazenamento do teste está cheio. Avise o responsável.':c==='resource-exhausted'?'A cota grátis diária do Firebase acabou. O painel volta sozinho por volta das 4h da manhã.':c==='resource_exhausted'?'Muitas ações seguidas. Aguarde alguns segundos e tente de novo.':'Não foi possível salvar. Verifique a conexão e tente de novo.'); }
 
 async function exportar(kind){
   let linhas;
@@ -8614,6 +8614,40 @@ async function resolverNomes(){
   const falta=[...ids].filter(i=>!(i in S.nomes)); if(!falta.length) return;
   try{ const ps=await S.user.profiles(falta); falta.forEach(i=>{ S.nomes[i]=(ps&&ps[i]&&ps[i].name)||''; }); rerenderSeguro(); }catch(e){}
 }
+/* ---- LEITURAS POR PERFIL (08/10) ----
+   Antes, todo login abria ~20 listas de até 1.000 documentos (o banco quase inteiro), e a cota grátis do Firestore
+   (50 mil leituras/dia) acabava. Agora cada grupo de dados só é assinado por quem tem um módulo que usa esse grupo.
+   Administradora, "tudo" e módulos desconhecidos continuam carregando tudo. */
+const LEIT_CONHECIDOS=['inicio','silos','producao','tv','telas','cal','paradas','analise','almox','ajustes','manut','premix','silosver','tablet'];
+const LEIT_GRUPOS={
+  prod:['inicio','silos','producao','tv','telas','cal','paradas','analise','almox','ajustes','premix'], /* ordens, entregas, itens, previsões, análise */
+  silos:['inicio','silos','producao','tv','telas','cal','analise','silosver'],                                    /* medições, premix, cargas */
+  paradas:['inicio','silos','producao','tv','telas','paradas','analise'],                                 /* paradas (histórico) */
+  chamados:['inicio','producao','paradas','tv','telas','manut','tablet'],                                         /* chamados de manutenção */
+  diario:['inicio','producao','paradas','almox','premix','tv','telas'],                                           /* diário de bordo e ranchos */
+  alx:['inicio','producao','almox','premix','ajustes'],                                                           /* inventário */
+  pmx:['inicio','producao','almox','premix']                                                                       /* premix */
+};
+function leitPrecisa(g){ const A=S.acs; if(!A||!A.pronto) return false; if(A.dono) return true; let p=null; try{ p=acsP(); }catch(e){} if(!p) return false; if(p.tudo) return true;
+  const m=p.mods||[]; if(m.some(x=>!LEIT_CONHECIDOS.includes(x))) return true; return (LEIT_GRUPOS[g]||[]).some(x=>m.includes(x)); }
+const _leit={};
+function assinaPorPerfil(db){ if(!db||!S.acs||!S.acs.pronto) return; const vez=(k,f)=>{ if(_leit[k]) return; _leit[k]=true; try{ f(); }catch(e){ _leit[k]=false; console.warn('[leituras]',k,e); } };
+  const fil=key=>snap=>{ S[key]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&(x.em||x.criadaEm||x.inicio)); resolverNomes(); rerenderSeguro(); };
+  if(leitPrecisa('prod')){ vez('anl',()=>anlAssinar(db));
+    vez('ordens',()=>{ assinarQ(()=>db.collection('ordens').where('status','==','aberta').limit(1000),'_ordA'); assinarQ(()=>db.collection('ordens').orderBy('data','desc').limit(1000),'_ordB'); });
+    vez('itens',()=>assinarQ(()=>db.collection('itens').limit(1000),'itens')); vez('previsoes',()=>assinarQ(()=>db.collection('previsoes').limit(1000),'previsoes'));
+    vez('entregas',()=>{ assinarQ(()=>db.collection('entregas').orderBy('em','desc').limit(1000),'_entViva'); assinarQ(()=>db.collection('entregasarq').limit(500),'_entArq'); }); }
+  if(leitPrecisa('silos')){ /* mais recentes primeiro (antes vinham 1.000 quaisquer) */
+    vez('medicoes',()=>inscrever('medicoes',()=>db.collection('medicoes').orderBy('em','desc').limit(1000),fil('medicoes')));
+    vez('premix',()=>assinar('premix','premix',500));
+    vez('cargas',()=>inscrever('cargas',()=>S.db.collection('cargas').orderBy('criadaEm','desc').limit(1000),snap=>{ S.cargas=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&(x.em||x.criadaEm||x.inicio)); resolverNomes(); rerenderSeguro(); })); }
+  if(leitPrecisa('paradas')) vez('paradas',()=>inscrever('paradas',()=>db.collection('paradas').orderBy('inicio','desc').limit(1000),fil('paradas')));
+  else if(leitPrecisa('chamados')){ const n=S.acs&&acsP()&&(acsP().mods||[]).includes('manut')?200:60; /* manutenção e tablet: só as recentes (ligar/fechar a parada do chamado) */
+    vez('paradas',()=>inscrever('paradas',()=>db.collection('paradas').orderBy('inicio','desc').limit(n),fil('paradas'))); }
+  if(leitPrecisa('chamados')) vez('chamados',()=>inscrever('chamados',()=>db.collection('chamados').orderBy('numero','desc').limit(300),snap=>{ S.chamados=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&typeof x==='object'); S._chamLido=true; resolverNomes(); rerenderSeguro(); }));
+  if(leitPrecisa('diario')) vez('diario',()=>{ assinarQ(()=>db.collection('diario').limit(1000),'diario'); assinarQ(()=>db.collection('ranchos').orderBy('criadoEm','desc').limit(1000),'ranchos'); });
+  if(leitPrecisa('alx')) vez('alx',()=>alxAssinar(db));
+  if(leitPrecisa('pmx')) vez('pmx',()=>pmxAssinar(db)); }
 async function iniciar(){
   tick(); setInterval(()=>{ tick(); rerenderSeguro(); },30000);
   render();
@@ -8626,7 +8660,7 @@ async function iniciar(){
   S.db=db; S.dbOk=true;
   db.doc('sistema/importacao').onSnapshot(s=>{ S.sisImp=s.exists?s.data():null; rerenderSeguro(); },()=>{});
   db.doc('config/geral').onSnapshot(s=>{ if(s.exists){ const c=s.data(); S.cfg=Object.assign(JSON.parse(JSON.stringify(CFG_PADRAO)),c); rerenderSeguro(); } },()=>{});
-  anlAssinar(db); alxAssinar(db); pmxAssinar(db); assinarQ(()=>db.collection('chamados').orderBy('numero','desc').limit(300),'chamados'); assinar('medicoes','medicoes',1000); assinar('premix','premix',500); inscrever('cargas',()=>S.db.collection('cargas').orderBy('criadaEm','desc').limit(1000),snap=>{ S.cargas=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&(x.em||x.criadaEm||x.inicio)); resolverNomes(); rerenderSeguro(); }); assinar('paradas','paradas',1000); assinarQ(()=>db.collection('ordens').where('status','==','aberta').limit(1000),'_ordA'); assinarQ(()=>db.collection('ordens').orderBy('data','desc').limit(1000),'_ordB'); assinarQ(()=>db.collection('itens').limit(1000),'itens'); assinarQ(()=>db.collection('previsoes').limit(1000),'previsoes'); assinarQ(()=>db.collection('diario').limit(1000),'diario'); assinarQ(()=>db.collection('ranchos').orderBy('criadoEm','desc').limit(1000),'ranchos'); assinarQ(()=>db.collection('entregas').orderBy('em','desc').limit(1000),'_entViva'); assinarQ(()=>db.collection('entregasarq').limit(500),'_entArq');
+  assinaPorPerfil(db); setInterval(()=>assinaPorPerfil(db),400); /* cada login carrega só o que usa (cota grátis do Firebase) */
   render();
 }
 // ================= BARRA DO TOPO: busca geral, avisos, ações rápidas, conexão, atalhos =================
@@ -10957,7 +10991,7 @@ function vTotem(){ const T=S.tt, L=ttLinhas();
     <p class="sub" style="margin:0;font-size:15px">Fica registrado que <b>${esc(T.p.nome)}</b> consertou, pelo crachá.${c.paradaId?' A parada da linha também é encerrada.':''}</p>${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}
     <div class="tt-rod"><button class="btn sec" data-act="tt-fim-volta" ${T.enviando?'disabled':''}>Voltar</button><button class="btn" data-act="tt-fim-ok" ${T.enviando?'disabled':''} style="background:var(--ok-ink)">${T.enviando?'Concluindo…':'Concluir OS'}</button></div>`; }
   else if(T.fase==='tecnico'){ const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)&&(+c.numero||0)<900000&&L.includes(c.linha)).sort((a,b)=>(b.impacto==='parou')-(a.impacto==='parou')||String(a.criado).localeCompare(String(b.criado)));
-    corpo=`<div class="tt-ola">Olá, <b>${esc(T.p.nome)}</b> · ${esc(TT_PAPEL.tecnico)}</div><h1 class="tt-h">${xs.length?'Qual chamado você está atendendo?':'Nenhum chamado aberto nestas linhas'}</h1>
+    corpo=`<div class="tt-ola">Olá, <b>${esc(T.p.nome)}</b> · ${esc(TT_PAPEL.tecnico)}</div><h1 class="tt-h">${!S._chamLido?'Carregando os chamados…':xs.length?'Qual chamado você está atendendo?':'Nenhum chamado aberto nestas linhas'}</h1>
     <div class="tt-lst">${xs.map(c=>{ const meu=c.exec&&c.exec.tecnico&&mxNorm(c.exec.tecnico)===mxNorm(T.p.nome)&&c.status==='Em execução'; return `<div class="tt-ch ${c.impacto==='parou'?'crit':''}"><div><b>OS ${manNum(c.numero)} · ${esc(c.linha)}${c.equip?' · '+esc(c.equip):''}</b><span>${esc(String(c.defeito||'').slice(0,90))}</span><small>${esc(c.status)} · aberto há ${manIdade(c.criado)}${c.nome?' por '+esc(c.nome):''}</small></div><div class="tt-acs">${c.status==='Em execução'?(meu?'<span class="pill teal">você está nele</span>':''):`<button class="btn sec" data-act="tt-cheguei" data-n="${c.numero}" ${T.enviando?'disabled':''}>Cheguei na máquina</button>`}<button class="btn" data-act="tt-fim" data-n="${c.numero}" ${T.enviando?'disabled':''}>Terminei o conserto</button></div></div>`; }).join('')}</div>
     ${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}<div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Sair</button><button class="btn sec" data-act="tt-tec-abrir">Abrir um chamado</button></div>`; }
   return `<div class="tt">${topo}${corpo}</div>`; }
@@ -11055,7 +11089,7 @@ function vSilosVer(){ const ult=saldoPorSilo(), agora=Date.now(); const L=S.cfg.
   const datas=Object.values(ult).map(u=>new Date(u.em).getTime()).filter(Boolean), maisVelho=datas.length?Math.min(...datas):null;
   const aviso=maisVelho&&agora-maisVelho>24*36e5?`<div class="banner">Algum silo não é atualizado há mais de 24 horas. O número pode não refletir o nível real.</div>`:'';
   const aCaminho=(S.cargas||[]).filter(c=>etapaCarga(c)===0), naFab=(S.cargas||[]).filter(c=>etapaCarga(c)===1);
-  let cim=''; try{ cim=cimentoCard(previsaoCimento(),true); }catch(e){}
+  let cim=''; if(leitPrecisa('prod')){ try{ cim=cimentoCard(previsaoCimento(),true); }catch(e){} } /* sem as ordens carregadas, o quadro não aparece */
   return `${banner()}<div class="head"><div><div class="eyebrow">SILOS · SÓ CONSULTA</div><h1>Nível dos silos</h1><div class="sub">Atualiza sozinho a cada medição ou apontamento. Normal a partir de ${L.normal}% · crítico abaixo de ${L.atencao}%.</div></div>
     <div class="sv-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div></div>
    ${aviso}${grupos.map(grupo).join('')}
