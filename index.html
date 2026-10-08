@@ -11068,6 +11068,34 @@ document.head.insertAdjacentHTML('beforeend',`<style id="sv-css">
 @media (max-width:520px){ .sv-ts{grid-template-columns:repeat(2,minmax(0,1fr))} .sv-clk{font-size:28px} }
 </style>`);
 /* ===FIM SILOS CONSULTA=== */
+/* ===================== CONSULTA: SILOS + CALENDÁRIO DE UMA LINHA (07/10) ===================== */
+/* Cargo pronto "consulta" = nível dos silos + calendário, só leitura (também no banco).
+   acessos/{uid}.linhas = ['Linha 1'] → o calendário dessa pessoa só mostra essa(s) linha(s). Vazio = todas. */
+{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.consulta={nome:'Silos e calendário (só consulta)',mods:['silosver','cal'],locais:[]}; ACS_PERFIS.outro=_o; }
+if(!ACS_SO_VER.includes('consulta')) ACS_SO_VER.push('consulta');
+if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('consulta')) EQ_PRONTO_ORD.splice(EQ_PRONTO_ORD.indexOf('silosver')>=0?EQ_PRONTO_ORD.indexOf('silosver')+1:EQ_PRONTO_ORD.length,0,'consulta');
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.consulta='Só olha o nível dos silos e o calendário (dá para limitar a uma linha). Não muda nada.';
+/* linhas liberadas para a pessoa logada (null = todas) */
+function acsLinhas(){ const A=S.acs; if(!A||A.dono||!A.doc) return null; const ls=(A.doc.linhas||[]).filter(l=>linhasOrd().includes(l)); return ls.length?ls:null; }
+function comLinhas(fn){ const r=acsLinhas(); if(!r) return fn(); const _lo=linhasOrd; linhasOrd=function(){ return _lo().filter(l=>r.includes(l)); };
+  try{ if(S.cal&&S.cal.linha!=='todas'&&!r.includes(S.cal.linha)) S.cal.linha=r.length===1?r[0]:'todas'; if(S.cal&&r.length===1) S.cal.linha=r[0]; return fn(); } finally { linhasOrd=_lo; } }
+{ const _vc=vCalendario; vCalendario=function(){ const r=acsLinhas(); let h=comLinhas(()=>_vc.apply(this,arguments));
+  if(r) h=h.replace('<h1>Calendário</h1>','<h1>Calendário · '+esc(r.join(', '))+'</h1>'); return h; }; }
+{ const _ch=calHtml; calHtml=function(){ return comLinhas(()=>_ch.apply(this,arguments)); }; }  /* o arquivo baixado também só leva a(s) linha(s) dela */
+/* gravar o cargo não apaga as linhas escolhidas */
+{ const _ag=acsGravar; acsGravar=async function(id,f,novo){ const ant=(S.acs.lista||[]).find(x=>x._id===id); const ok=await _ag.apply(this,arguments);
+  if(ok&&ant&&ant.linhas&&ant.linhas.length&&f.linhas===undefined){ try{ await S.db.doc('acessos/'+id).update({linhas:ant.linhas}); }catch(e){ console.warn('[equipe] manter linhas',e); } } return ok; }; }
+/* Equipe: escolher a linha do calendário no cartão da pessoa */
+{ const _ep=eqPessoas; eqPessoas=function(){ const h=_ep.apply(this,arguments); const LT=linhasOrd();
+  return h.replace(/(<label class="eq-pc"><span>Cargo<\/span><select[^>]*data-eq-cargo="([^"]+)"[\s\S]*?<\/select><\/label>)/g,(m,lab,id)=>{ const d=(S.acs.lista||[]).find(x=>x._id===id); if(!d) return m;
+    const mods=eqModsDe(d); if(!mods.includes('cal')&&!mods.includes('producao')) return m; const sel=(d.linhas||[])[0]||'';
+    return lab+`<label class="eq-pc"><span>Calendário</span><select class="txt eq-sel" data-eq-linhas="${esc(id)}"><option value="" ${sel?'':'selected'}>Todas as linhas</option>${LT.map(l=>`<option ${sel===l?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`; }); }; }
+document.addEventListener('change',async ev=>{ const t=ev.target, id=t.dataset&&t.dataset.eqLinhas; if(!id) return; if(!S.acs.dono){ toast('Você não possui permissão para mudar isso.'); return; }
+  const d=(S.acs.lista||[]).find(x=>x._id===id); if(!d) return; const v=t.value?[t.value]:[]; t.disabled=true;
+  try{ await S.db.doc('acessos/'+id).update({linhas:v,alteradoEm:new Date().toISOString(),alteradoPor:S.uid||null}); d.linhas=v; toast(acsNome(id)+(v.length?' vê só a '+v[0]+' no calendário.':' vê todas as linhas no calendário.')); }
+  catch(e){ console.warn('[equipe] linhas',e); erro(e); } t.disabled=false; render(); });
+/* ===FIM CONSULTA=== */
+
 
 
 
