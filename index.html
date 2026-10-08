@@ -2209,7 +2209,8 @@ const MODS = [
 ];
 const CRUMB = {diario:'Diário de bordo',tvfab:'TV da fábrica',geral:'Visão geral',silos:'Silos',cargas:'Cargas de cimento',cimento:'Paradas por falta de cimento',paradas:'Paradas',meudia:'Meu dia',indicadores:'Indicadores',programacao:'Programação',calendario:'Calendário',itens:'Itens',ranchos:'Ranchos',aprogramar:'Previsão',historico:'Histórico',medicao:'Nova medição',ajustes:'Ajustes',modulos:'Módulos'};
 function modDe(v){ if(v==='medicao') return 'silos'; const m=MODS.find(m=>m.views.includes(v)); return m?m.id:null; }
-function go(v){ if(v==='aprogramar'){ v='programacao'; S.ord.filaAb=true; } if(v==='ranchos'&&rchGav()){ v='programacao'; S.rchGav=true; } if(S.acs&&S.acs.pronto&&!viewOk(v)) v=primeiraView(); S.view=v; const m=modDe(v); if(m) S.mod=m; render(); window.scrollTo(0,0); }
+function go(v){ if(v==='aprogramar'){ v='programacao'; S.ord.filaAb=true; } if(v==='ranchos'&&rchGav()){ v='programacao'; S.rchGav=true; } if(S.acs&&S.acs.pronto&&!viewOk(v)){ /* sem permissão para esta tela: continua no painel (nunca expulsa) e avisa se foi um toque da pessoa */
+    try{ if(acsP()&&window.event&&window.event.type==='click') setTimeout(()=>toast('Você não possui permissão para acessar este módulo.'),0); }catch(e){} v=primeiraView(); } S.view=v; const m=modDe(v); if(m) S.mod=m; render(); window.scrollTo(0,0); }
 function modAtual(){ return MODS.find(m=>m.id===S.mod)||MODS[0]; }
 function abas(){ const m=modAtual(); if(!modDe(S.view)||mTabs(m).length<2) return '';
   return `<nav class="tabs" aria-label="${esc(m.nome)}">${mTabs(m).map(v=>`<button class="tab" data-go="${v}" ${S.view===v?'aria-current="page"':''}>${ic(VIEWS[v].ic,18)}${VIEWS[v].nome}${v==='aprogramar'&&(prevAtivas().length+aProgramar().length)?` <span class="pill warn num" style="padding:1px 8px">${prevAtivas().length+aProgramar().length}</span>`:''}</button>`).join('')}</nav>`; }
@@ -2246,7 +2247,7 @@ function banner(){
 function legenda(){ const L=S.cfg.limites; return `<div class="legend"><span><i style="background:var(--ok)"></i>Normal ≥ ${L.normal}%</span><span><i style="background:var(--warn)"></i>Atenção ${L.atencao}–${L.normal}%</span><span><i style="background:var(--crit)"></i>Crítico &lt; ${L.atencao}%</span></div>`; }
 
 function vGeral(){
-  const ult=ultimoPorSilo(), um=ultimaMedicao();
+  const ult=saldoPorSilo(), um=ultimaMedicao(); /* saldo atual (consumo automático + medições) */
   const grupos=['Cimento','Areia'].map(g=>{
     const ss=S.cfg.silos.filter(s=>s.grupo===g);
     const tot=ss.reduce((a,s)=>a+(ult[s.id]?ult[s.id].q:0),0), cap=ss.reduce((a,s)=>a+s.cap,0);
@@ -2258,7 +2259,7 @@ function vGeral(){
       <div class="nm">${esc(s.nome)}</div><div class="q num">${f1(u.q)}<small>t</small></div>
       <div class="cap">de ${s.cap} t${u.q===0?' · vazio':''}</div>
       <div class="pct num" style="color:${nv.ink}">${f1(p*100)}%<small>${nv.n}</small></div>
-      <div class="hr num">${dia(u.em)==='Hoje'?'Medido '+hora(u.em):dia(u.em)+' '+hora(u.em)}</div></div>`;
+      <div class="hr num">${siloOrigemCurta(u)}${dia(u.em)==='Hoje'?hora(u.em):dia(u.em)+' '+hora(u.em)}</div></div>`;
     }).join('');
     return `<div class="grupo"><div class="gh"><span style="display:flex;align-items:center;gap:8px"><b style="color:var(--ink)">${g.toUpperCase()}</b>${g==='Cimento'?`<button class="zapbtn" data-act="abrir-zap" aria-label="Enviar medição no WhatsApp" title="Enviar no WhatsApp">${ic('zap',20,1.9)}</button>`:''}</span><span class="num"><b style="letter-spacing:0">${f1(tot)} t</b> de ${cap} t</span></div><div class="tanks">${tanks}</div></div>`;
   });
@@ -2284,7 +2285,7 @@ function vGeral(){
     return `<div class="sl-g"><div class="gh"><span style="display:flex;align-items:center;gap:8px"><b>${g.toUpperCase()}</b>${g==='Cimento'?`<button class="zapbtn" data-act="abrir-zap" aria-label="Enviar medição no WhatsApp" title="Enviar no WhatsApp">${ic('zap',20,1.9)}</button>`:''}</span><span class="num" style="color:var(--muted)"><b style="color:var(--ink-2);letter-spacing:0">${f1(tot)} t</b> de ${cap} t</span></div>
     ${ss.map(s=>{ const u=ult[s.id]; if(!u) return `<div class="sl-r"><div class="n">${esc(s.nome)}<small>de ${s.cap} t · sem medição</small></div><div class="t num" style="color:var(--faint)">—</div><div></div><div class="bar"></div></div>`;
       const p=u.q/s.cap, nv=nivel(p);
-      return `<div class="sl-r"><div class="n">${esc(s.nome)}<small>de ${s.cap} t · ${dia(u.em)==='Hoje'?'medido '+hora(u.em):dia(u.em)+' '+hora(u.em)}</small></div><div class="t num">${f1(u.q)} t</div><div class="pc num" style="color:${nv.ink}">${u.q===0?'vazio':f1(p*100).replace(',0','')+'%'}</div><div class="bar"><i style="width:${Math.min(100,p*100)}%;background:${nv.fill}"></i></div></div>`; }).join('')}</div>`; }).join('');
+      return `<div class="sl-r"><div class="n">${esc(s.nome)}<small>de ${s.cap} t · ${siloOrigemCurta(u).toLowerCase()}${dia(u.em)==='Hoje'?hora(u.em):dia(u.em)+' '+hora(u.em)}</small></div><div class="t num">${f1(u.q)} t</div><div class="pc num" style="color:${nv.ink}">${u.q===0?'vazio':f1(p*100).replace(',0','')+'%'}</div><div class="bar"><i style="width:${Math.min(100,p*100)}%;background:${nv.fill}"></i></div></div>`; }).join('')}</div>`; }).join('');
   // faixa de resumo
   const capCim=cimSilos.reduce((a,s)=>a+s.cap,0), nvCim=nivel(capCim?cim/capCim:0);
   const criticos=S.cfg.silos.filter(s=>ult[s.id]&&nivel(ult[s.id].q/s.cap).c==='crit').map(s=>s.nome+(ult[s.id].q===0?' vazio':''));
@@ -2514,14 +2515,14 @@ function pmxRes(p,v){ const n=parseInt(v,10); return isNaN(n)?'':'= '+f0(n*p.sac
 
 // ---------- nova medição ----------
 function vMedicao(){
-  const ult=ultimoPorSilo();
+  const ult=saldoPorSilo();
   const corr = S.med.corrige ? S.medicoes.find(m=>m._id===S.med.corrige) : null;
   const grupo=g=>{
     const ss=S.cfg.silos.filter(s=>s.grupo===g);
     return `<section class="card" aria-label="${g}" style="padding:18px 22px 8px"><div class="head" style="align-items:baseline;padding-bottom:6px"><b style="letter-spacing:.14em;font-size:13px">${g.toUpperCase()}</b><span class="sub" style="margin:0;font-size:12px">${ss.length} silos</span></div>
     ${ss.map(s=>{ const u=ult[s.id]; return `<div class="row mrow">
       <span id="mt-${s.id}">${medTank(s)}</span>
-      <div style="min-width:0"><div style="font-size:16px;font-weight:600">${esc(s.nome)}</div><div class="num" style="font-size:12px;color:var(--muted)">de ${s.cap} t${u?` · anterior ${f1(u.q)} t (${dia(u.em)} ${hora(u.em)})`:''}</div></div>
+      <div style="min-width:0"><div style="font-size:16px;font-weight:600">${esc(s.nome)}</div><div class="num" style="font-size:12px;color:var(--muted)">de ${s.cap} t${u?` · sistema ${f1(u.q)} t (${dia(u.em)} ${hora(u.em)})`:''}</div></div>
       <div class="field"><input class="mcampo" id="m-${s.id}" data-silo="${s.id}" inputmode="decimal" autocomplete="off" placeholder="—" value="${esc(S.med.v[s.id]||'')}" aria-label="${esc(s.nome)} em toneladas"><span class="u">t</span></div>
       <div class="res" id="mr-${s.id}">${medRes(s)}</div></div>`; }).join('')}</section>`;
   };
@@ -2562,7 +2563,7 @@ function medAtualizaResumo(){
 // ---------- silos detalhe ----------
 function vSilos(){
   const s=S.cfg.silos.find(x=>x.id===S.siloSel)||S.cfg.silos[0];
-  const ult=ultimoPorSilo();
+  const ult=saldoPorSilo();
   const serie=validas().filter(m=>m.itens&&m.itens[s.id]!=null).map(m=>({em:m.em,q:m.itens[s.id],por:m.por,obs:m.obs})).reverse();
   const recentes=serie.slice(-60);
   const chips=S.cfg.silos.map(x=>{ const u=ult[x.id]; const p=u?u.q/x.cap:0; const nv=nivel(p);
@@ -2588,11 +2589,12 @@ function vSilos(){
   const zeros=serie.filter(r=>r.q===0).length;
   return `${banner()}
   <div class="head"><div><div class="eyebrow">SILOS</div><h1>${esc(s.nome)}</h1><div class="sub">${s.grupo} · capacidade ${s.cap} t</div></div>
-  <button class="btn sec" data-act="export" data-kind="silo">${ic('baixar',18,2)}Exportar medições</button></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">${siloPodeMedir()?`<button class="btn" data-act="sm-abrir" data-silo="${s.id}">📏 Registrar medição</button>`:''}<button class="btn sec" data-act="export" data-kind="silo">${ic('baixar',18,2)}Exportar medições</button></div></div>
+  ${siloFormHtml(s)}
   <div style="display:flex;gap:8px;flex-wrap:wrap" role="group" aria-label="Escolher silo">${chips}</div>
   <section class="card">
     <div style="display:flex;gap:36px;flex-wrap:wrap;margin-bottom:16px">
-      <div><div class="label">AGORA</div><div class="num" style="margin-top:4px"><span style="font-size:28px;font-weight:700">${u?f1(u.q)+' t':'—'}</span>${u?` <span style="font-weight:700;color:${nv.ink}">${f1(u.q/s.cap*100)}% ${nv.n}</span>`:''}</div><div class="sub" style="margin:0;font-size:12px">${u?'Medido '+dia(u.em).toLowerCase()+' '+hora(u.em):'sem medição'}</div></div>
+      <div><div class="label">AGORA</div><div class="num" style="margin-top:4px"><span style="font-size:28px;font-weight:700">${u?f1(u.q)+' t':'—'}</span>${u?` <span style="font-weight:700;color:${nv.ink}">${f1(u.q/s.cap*100)}% ${nv.n}</span>`:''}</div><div class="sub" style="margin:0;font-size:12px">${siloAgoraSub(s,u)}</div></div>
       <div><div class="label">MEDIÇÕES</div><div class="num" style="font-size:28px;font-weight:700;margin-top:4px">${serie.length}</div></div>
       <div><div class="label">VEZES MEDIDO VAZIO</div><div class="num" style="font-size:28px;font-weight:700;margin-top:4px">${zeros}</div></div>
     </div>
@@ -2864,7 +2866,7 @@ function render(){
   S._div=divergencias();
   renderNav();
   const v=S.view, el=$('#view');
-  el.innerHTML = abas() + (v==='modulos'?vModulos():v==='cimento'?vCimento():v==='geral'?vGeral():v==='medicao'?vMedicao():v==='silos'?vSilos():v==='cargas'?vCargas():v==='paradas'?vParadas():v==='programacao'?vProgramacao():v==='aprogramar'?vAProgramar():v==='meudia'?vMeuDia()+anlResDiaModal():v==='indicadores'?anlInjeta(vIndicadores(),adeCard()+anlEficiencia()):v==='tvfab'?vTvFab():v==='calendario'?vCalendario():v==='ranchos'?vRanchos():v==='diario'?vDiario():v==='itens'?vItens():v==='historico'?vHistorico():String(v).startsWith('anl')?anlView(v):String(v).startsWith('alx')?alxView(v):String(v).startsWith('man')?manView(v):String(v).startsWith('pmx')?pmxView(v):v==='linhatv'?vLinhaTv():v==='tvapres'?vApres():v==='painel'?vPainel():v==='paineis'?vPaineis():v==='acessos'?vAcessos():anlInjeta(vAjustes(),anlBackupCard()+corAjustes())) + repModal();
+  el.innerHTML = abas() + (v==='silosver'?vSilosVer():v==='modulos'?vModulos():v==='cimento'?vCimento():v==='geral'?vGeral():v==='medicao'?vMedicao():v==='silos'?vSilos():v==='cargas'?vCargas():v==='paradas'?vParadas():v==='programacao'?vProgramacao():v==='aprogramar'?vAProgramar():v==='meudia'?vMeuDia()+anlResDiaModal():v==='indicadores'?anlInjeta(vIndicadores(),adeCard()+anlEficiencia()):v==='tvfab'?vTvFab():v==='calendario'?vCalendario():v==='ranchos'?vRanchos():v==='diario'?vDiario():v==='itens'?vItens():v==='historico'?vHistorico():String(v).startsWith('anl')?anlView(v):String(v).startsWith('alx')?alxView(v):String(v).startsWith('man')?manView(v):String(v).startsWith('pmx')?pmxView(v):v==='linhatv'?vLinhaTv():v==='tvapres'?vApres():v==='painel'?vPainel():v==='paineis'?vPaineis():v==='acessos'?vAcessos():anlInjeta(vAjustes(),anlBackupCard()+corAjustes())) + repModal();
   document.body.classList.toggle('dbmon',S.view==='diario'&&S.dbo&&S.dbo.modo==='monitor');
   if(v==='medicao') medAtualizaResumo();
   { const bx=S.rep&&S.rep.aberto&&document.querySelector('.rep.dbmbox'); if(bx&&S.rep.st) bx.scrollTop=S.rep.st; }
@@ -5057,7 +5059,8 @@ async function salvar(col,doc){
   if(!S.db){ toast('Sem conexão com o armazenamento. O registro não foi salvo.'); return false; }
   try{ await S.db.collection(col).add(doc); return true; }catch(e){ erro(e); return false; }
 }
-function erro(e){ const c=e&&e.code;
+function erro(e){ const c=e&&e.code; console.warn('[painel] erro ao gravar',c,e&&e.message);
+  if(c==='sem-permissao'||c==='permission-denied'){ toast('Você não possui permissão para salvar isso. Fale com o administrador.'); return; }
   toast(c==='quota_exceeded'?'O armazenamento do teste está cheio. Avise o responsável.':c==='resource_exhausted'?'Muitas ações seguidas. Aguarde alguns segundos e tente de novo.':'Não foi possível salvar. Verifique a conexão e tente de novo.'); }
 
 async function exportar(kind){
@@ -7101,7 +7104,7 @@ const PNL_R={
     return {st:at.length?{c:'crit',t:at.length+' parada'+(at.length>1?'s':'')+' agora'}:{c:'ok',t:'Nenhuma agora'},
       html:`${at.map(p=>`<div class="pb-pa"><b>${esc(p.linha)}</b><span>${esc(p.motivo||'sem motivo')} · há ${dur(Date.now()-new Date(p.inicio))}</span></div>`).join('')}
        <div class="pb-cap" style="margin-top:${at.length?12:0}px">Tempo parado hoje</div>${tot?Object.entries(min).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([l,ms])=>`<div class="pb-row"><span>${esc(l)}</span><b class="num">${dur(ms)}</b></div>`).join(''):'<div class="pb-row"><span>Nenhuma parada hoje</span><b></b></div>'}`}; },
-  silos(){ const ult=ultimoPorSilo(); const g=['Cimento','Areia'].map(n=>{ const ss=S.cfg.silos.filter(s=>s.grupo===n); const t=ss.reduce((a,s)=>a+(ult[s.id]?ult[s.id].q:0),0), cap=ss.reduce((a,s)=>a+s.cap,0); return {n,t,cap,p:cap?t/cap:0}; });
+  silos(){ const ult=saldoPorSilo(); const g=['Cimento','Areia'].map(n=>{ const ss=S.cfg.silos.filter(s=>s.grupo===n); const t=ss.reduce((a,s)=>a+(ult[s.id]?ult[s.id].q:0),0), cap=ss.reduce((a,s)=>a+s.cap,0); return {n,t,cap,p:cap?t/cap:0}; });
     let pc=null; try{ pc=previsaoCimento(); }catch(e){}
     return {st:pc?(pc.falta?{c:'crit',t:'Vai faltar cimento'}:{c:'ok',t:'Cimento cobre'}):{c:'neu',t:'Sem medição'},
       html:`${g.map(x=>{ const nv=nivel(x.p); return `<div class="pb-si"><div class="pb-row"><span>${x.n}</span><b class="num">${f1(x.t)} t <small>de ${x.cap} t</small></b></div><div class="pb-bar"><i style="width:${Math.min(100,x.p*100)}%;background:${nv.fill}"></i></div></div>`; }).join('')}
@@ -7456,12 +7459,18 @@ async function acsIniciar(db,user){ const A=S.acs;
       inscrever('pedidos',()=>db.collection('pedidos').limit(500),snap=>{ A.pedidos=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); acsNomes(); rerenderSeguro(); }); }
     render(); return; }
   if(!S.uid||!db){ A.pronto=true; A.semId=!S.uid; A.erro=db?null:'sem-db'; render(); return; }
-  db.doc('acessos/'+S.uid).onSnapshot(s=>{ const antes=!!acsP(), esperava=A.pronto&&!A.doc; A.doc=s.exists?s.data():null; A.pronto=true;
-      if(!A.doc) acsPedir();
+  db.doc('acessos/'+S.uid).onSnapshot(s=>{
+      /* LOGIN: "não existe" vindo só do cache local (sem resposta do servidor ainda, ou sem internet) NÃO é "sem perfil".
+         Antes isso mostrava "Aguardando liberação" para quem já tinha acesso. Continua em "Verificando seu acesso…" até o servidor confirmar. */
+      const soCache=!!(s.metadata&&s.metadata.fromCache);
+      if(!s.exists&&soCache){ A.cacheSemDoc=true; if(!A.doc) rerenderSeguro(); return; }
+      const antes=!!acsP(), esperava=A.pronto&&!A.doc; A.doc=s.exists?s.data():null; A.pronto=true; A.cacheSemDoc=false;
+      if(!A.doc){ console.warn('[login] autenticado, mas sem perfil de acesso (acessos/'+S.uid+'). Pedido de acesso enviado ao administrador.'); acsPedir(); }
       if(!viewOk(S.view)){ S.view=primeiraView(); const m=modDe(S.view); if(m) S.mod=m; }
       if(esperava&&!antes&&acsP()) toast('Acesso liberado.');
       render(); },
-    e=>{ A.pronto=true; A.erro=(e&&e.code)||'erro'; render(); });
+    e=>{ console.warn('[login] não consegui ler o perfil de acesso', e&&e.code); A.pronto=true; A.erro=(e&&e.code)||'erro'; render(); },
+    {includeMetadataChanges:true});
 }
 async function acsPedir(){ const A=S.acs; if(A.pedido||!S.db||!S.uid) return; A.pedido='enviando';
   try{ const ref=S.db.doc('pedidos/'+S.uid); let ja=null; try{ const g=await ref.get(); ja=g.exists?g.data():null; }catch(e){}
@@ -7478,13 +7487,13 @@ function acsGate(){ const A=S.acs;
   if(!A.pronto){ if(S.dbOk===false&&!S.user) return acsCaixa('Abra o painel pelo claude.ai','Este painel só funciona aberto pelo link do claude.ai, com a sua conta da Colafix.'); return acsCaixa('Verificando seu acesso…','Um instante.'); }
   if(A.dono) return '';
   if(A.semId) return acsCaixa('Não consegui identificar a sua conta','Abra o painel pelo link do claude.ai, entrando com a sua conta da Colafix. Se já está assim, recarregue a página.');
-  if(A.erro&&!A.doc) return acsCaixa('Não consegui verificar o seu acesso','Recarregue a página. Se continuar, avise a responsável pelo painel.'+(A.erro!=='sem-db'?' <small>(código: '+esc(A.erro)+')</small>':''));
+  if(A.erro&&!A.doc) return acsCaixa('Não consegui verificar o seu acesso',(/unavailable|network|tempo/.test(A.erro)?'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.':'Login realizado, mas não consegui ler o seu perfil de acesso. Recarregue a página. Se continuar, avise o administrador.')+(A.erro!=='sem-db'?' <small>(código: '+esc(A.erro)+')</small>':'')+(window.claude&&window.claude.online?'<p style="margin:14px 0 0"><button class="btn sec" onclick="location.reload()">Tentar de novo</button> <button class="lnk" data-act="sair-conta">Entrar com outro usuário</button></p>':''));
   const d=A.doc;
   if(d&&d.ativo===false) return acsCaixa('Acesso bloqueado','O seu acesso a este painel foi retirado. Se for engano, fale com a responsável pelo PCP.');
   if(d&&acsP()&&!modsVis().length&&!viewOk('ajustes')) return acsCaixa('Nenhum módulo liberado','O seu acesso existe, mas nenhum módulo foi marcado. Peça para a responsável escolher o que você pode ver.');
   if(d) return '';
   const nm=S.nomes[S.uid]||'';
-  return acsCaixa('Aguardando liberação',`${nm?'<b>'+esc(nm)+'</b>, o':'O'} seu acesso ao Painel de Operação ainda não foi liberado.`+
+  return acsCaixa('Perfil de acesso não encontrado',`${nm?'<b>'+esc(nm)+'</b> — ':''}Login realizado, mas seu perfil de acesso não foi encontrado. Entre em contato com o administrador.`+
     (A.pedido==='erro'?`<div class="banner" style="margin-top:14px">Não consegui registrar o seu pedido: a sua conta só tem permissão de <b>ver</b> este painel. Peça para a responsável mudar o seu acesso para <b>Colaborador</b> no compartilhamento do painel (ou liberar você direto na tela Acessos).<br><small>(código: ${esc(A.erroPedido||'')})</small></div>`
      :`<p style="margin:12px 0 0">O pedido já foi enviado para a responsável pelo PCP. Assim que ela liberar, esta tela muda sozinha.</p>${window.claude&&window.claude.online?'<p style="margin:14px 0 0"><button class="lnk" data-act="sair-conta">Entrar com outra conta</button></p>':''}`));
 }
@@ -9113,7 +9122,11 @@ ACS_MODS.splice(ACS_MODS.findIndex(m=>m[0]==='ajustes'),0,['manut','Manutenção
 /* quem é da produção (ou só registra paradas) pode abrir chamado; o QR das linhas é de quem cuida da manutenção */
 { const _vo=viewOk; viewOk=function(v){ if(v==='manch'&&!(S.acs&&S.acs.dono)){ const p=acsP(); if(p&&!p.tudo&&p.mods&&(p.mods.includes('producao')||p.mods.includes('paradas'))) return true; } return _vo.apply(this,arguments); }; }
 const MAN_IMP={parou:['Parou a máquina','crit'],reduziu:['Diminuiu a produção','warn'],nao:['Não afeta a produção','ok']};
-const MAN_ST=['Aberta','Em execução','Concluída'];
+const MAN_ST=['Aberta','Em execução','Aguardando peça','Aguardando terceiros','Concluída','Cancelada'];
+/* fechada = não precisa mais de atendimento; ignorada nas estatísticas = apagada ou cancelada */
+function manFechada(c){ return !!c&&(c.status==='Concluída'||c.status==='Cancelada'); }
+function manIgnorar(c){ return !c||!!c.excluido||c.status==='Cancelada'; }
+function manStCor(st){ return st==='Concluída'?'ok':st==='Cancelada'?'neu':st==='Em execução'?'teal':/Aguardando/.test(st||'')?'warn':'neu'; }
 const MAN_COND=['Funcionando normalmente','Funcionando com ressalvas','Equipamento indisponível','Necessita manutenção adicional','Necessita substituição de componente','Serviço não executado'];
 const MAN_TIPO=['Corretiva','Preventiva','Preditiva','Emergencial','Inspeção','Instalação'];
 function manNum(n){ return String(n||0).padStart(5,'0'); }
@@ -9131,14 +9144,14 @@ function manQrSvg(txt,px){ if(typeof qrcode!=='function') return ''; const q=qrc
 function manView(v){ return v==='manqr'?vManQr():vManCh(); }
 function vManCh(){ const M=S.man, h=hojeStr(); const xs=(S.chamados||[]).filter(c=>!c.excluido);
   if(M.cur!=null){ const c=manDoc(M.cur); if(c) return manDetalhe(c); M.cur=null; }
-  const ab=xs.filter(c=>c.status!=='Concluída'), par=ab.filter(c=>c.impacto==='parou');
-  const fil=M.fil==='abertos'?ab:M.fil==='todos'?xs:xs.filter(c=>c.status===M.fil);
-  const card=c=>{ const [it,ic]=MAN_IMP[c.impacto]||['—','neu']; return `<button class="man-it ${c.status==='Concluída'?'feito':''}" data-act="man-abrir" data-n="${c.numero}"><span class="man-n num">OS ${manNum(c.numero)}</span><span class="man-tx"><b>${esc(c.linha||'—')}</b>${c.equip?` · ${esc(c.equip)}`:''}<span class="man-df">${esc(String(c.defeito||'').slice(0,140))}</span><small>${esc(c.nome||'')} · ${c.quando?dm(String(c.quando).slice(0,10))+' '+String(c.quando).slice(11,16):''}${c.status!=='Concluída'?' · há '+manIdade(c.criado):''}</small></span><span class="man-tg"><span class="pill ${ic}">${it}</span><span class="pill ${c.status==='Concluída'?'ok':c.status==='Em execução'?'teal':'neu'}">${esc(c.status)}</span></span></button>`; };
+  const ab=xs.filter(c=>!manFechada(c)), par=ab.filter(c=>c.impacto==='parou');
+  const fil=M.fil==='meus'?xs.filter(c=>c.por&&c.por===S.uid):M.fil==='abertos'?ab:M.fil==='todos'?xs:M.fil==='aguardando'?xs.filter(c=>/^Aguardando/.test(c.status||'')):xs.filter(c=>c.status===M.fil);
+  const card=c=>{ const [it,ic]=MAN_IMP[c.impacto]||['—','neu']; return `<button class="man-it ${manFechada(c)?'feito':''}" data-act="man-abrir" data-n="${c.numero}"><span class="man-n num">OS ${manNum(c.numero)}</span><span class="man-tx"><b>${esc(c.linha||'—')}</b>${c.equip?` · ${esc(c.equip)}`:''}<span class="man-df">${esc(String(c.defeito||'').slice(0,140))}</span><small>${esc(c.nome||'')} · ${c.quando?dm(String(c.quando).slice(0,10))+' '+String(c.quando).slice(11,16):''}${!manFechada(c)?' · há '+manIdade(c.criado):''}</small></span><span class="man-tg"><span class="pill ${ic}">${it}</span><span class="pill ${manStCor(c.status)}">${esc(c.status)}</span></span></button>`; };
   return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Chamados</h1><div class="sub">Quem está na linha abre o chamado (pelo celular ou pelo QR da linha). A manutenção atende e a OS sai pronta para imprimir.</div></div>
    <div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap">${viewOk('manqr')?`<button class="btn sec" data-go="manqr">${ic('grid',18,2)}QR das linhas</button>`:''}<button class="btn" data-act="man-novo">${ic('mais',20,2.2)}Abrir chamado</button></div></div>
   ${M.novo?manForm():''}
   <div class="rsm num"><span class="${par.length?'crit':''}">Máquina parada <b>${par.length}</b></span><span>Abertos <b>${ab.filter(c=>c.status==='Aberta').length}</b></span><span>Em execução <b>${ab.filter(c=>c.status==='Em execução').length}</b></span><span>Concluídos hoje <b>${xs.filter(c=>c.status==='Concluída'&&String(c.concluidoEm||'').slice(0,10)===h).length}</b></span></div>
-  <section class="card ofil"><div class="seg" role="group" aria-label="Mostrar">${[['abertos','Em aberto'],['Aberta','Aberta'],['Em execução','Em execução'],['Concluída','Concluída'],['todos','Todos']].map(([k,l])=>`<button data-act="man-fil" data-v="${esc(k)}" aria-pressed="${M.fil===k}">${l}</button>`).join('')}</div></section>
+  <section class="card ofil"><div class="seg" role="group" aria-label="Mostrar">${[['meus','Meus chamados'],['abertos','Em aberto'],['Aberta','Aberta'],['Em execução','Em execução'],['aguardando','Aguardando'],['Concluída','Concluída'],['Cancelada','Cancelada'],['todos','Todos']].map(([k,l])=>`<button data-act="man-fil" data-v="${esc(k)}" aria-pressed="${M.fil===k}">${l}</button>`).join('')}</div></section>
   <section class="man-lst">${fil.length?fil.map(card).join(''):`<div class="card"><div class="empty">${M.fil==='abertos'?'Nenhum chamado em aberto.':'Nenhum chamado.'}</div></div>`}</section>`; }
 function manForm(){ const F=S.man.f; return `<section class="card man-form" id="man-form"><div class="head" style="align-items:baseline"><div><div class="eyebrow">NOVO CHAMADO</div><h2 style="margin-top:2px">Abrir chamado de manutenção</h2></div><button class="lnk" data-act="man-novo-x">Cancelar</button></div>
    <div class="label" style="margin:12px 0 6px">LINHA</div><div class="chips">${manLinhas().map(l=>`<button class="chip" data-act="man-f" data-k="linha" data-v="${esc(l)}" aria-pressed="${F.linha===l}">${esc(l)}</button>`).join('')}</div>
@@ -9183,10 +9196,11 @@ function vManQr(){ const L=linhasOrd();
   <div class="man-qrs" id="man-qrs">${L.map(l=>`<div class="man-qr"><div class="man-qr-t">CHAMADO DE MANUTENÇÃO</div>${manQrSvg(manLink(l),180)}<b>${esc(l)}</b><small>Escaneie para abrir um chamado desta linha</small></div>`).join('')}</div>`; }
 
 /* --- ações --- */
-async function manSalvar(){ const M=S.man, F=M.f; if(!S.db){ toast('Sem conexão: o chamado não foi salvo.'); return; }
+async function manSalvar(){ const M=S.man, F=M.f; if(M.salv||!F) return; if(!S.db){ toast('Sem conexão com o servidor: o chamado não foi salvo.'); return; }
   if(!F.linha||!F.quando||!F.defeito.trim()||!F.nome.trim()||!F.impacto){ toast('Preencha a linha, a data, o defeito, o impacto e quem está solicitando.'); return; }
   M.salv=true; render(); const agora=new Date().toISOString(), quandoIso=new Date(F.quando).toISOString();
-  const base={linha:F.linha,quando:F.quando,defeito:F.defeito.trim(),impacto:F.impacto,nome:F.nome.trim(),equip:(F.equip||'').trim()||null,status:'Aberta',criado:agora,por:S.uid||null};
+  const base={linha:F.linha,quando:F.quando,defeito:F.defeito.trim(),impacto:F.impacto,nome:F.nome.trim(),equip:(F.equip||'').trim()||null,equipId:F.equipId||null,cracha:F.cracha||null,status:'Aberta',criado:agora,por:S.uid||null,origem:F.origem||(M.ltv?'tela-linha':'painel'),hist:[{em:agora,por:S.uid||null,o:'Chamado aberto'+(F.equip?' · '+String(F.equip).trim():'')+(F.origem==='qr-equip'?' (QR do equipamento)':F.origem==='tablet'?' (tablet da parede'+(F.cracha?', crachá de '+F.nome:', sem crachá: '+F.nome)+')':'')}]};
+  toast('Salvando chamado…');
   try{ let n=(S.chamados||[]).reduce((m,c)=>Math.max(m,(+c.numero||0)<900000?(+c.numero||0):0),0)+1, doc=null;
     for(let i=0;i<60&&!doc;i++,n++){ const ref=S.db.doc('chamados/os-'+manNum(n)); const r=await ref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:5000}); if(!r.acquired) continue; const g=await ref.get(); if(g.exists&&g.data()&&g.data().numero) continue; doc=Object.assign({numero:n},base); await ref.set(doc); }
     if(!doc) throw new Error('Não consegui reservar o número da OS. Tente de novo.');
@@ -9194,19 +9208,27 @@ async function manSalvar(){ const M=S.man, F=M.f; if(!S.db){ toast('Sem conexão
       if(!pid){ const ref=await S.db.collection('paradas').add({linha:F.linha,motivo:'Manutenção',inicio:quandoIso<=agora?quandoIso:agora,fim:null,por:S.uid||null,obs:'OS '+manNum(doc.numero)+' · '+doc.defeito.slice(0,80),os:doc.numero}); pid=ref&&ref.id; }
       if(pid){ await S.db.doc('chamados/os-'+manNum(doc.numero)).update({paradaId:pid}); doc.paradaId=pid; } }
     if(!(S.chamados||[]).some(c=>c.numero===doc.numero)) S.chamados=[Object.assign({_id:'os-'+manNum(doc.numero)},doc)].concat(S.chamados||[]);
-    M.novo=false; M.f=null; M.cur=doc.numero; M.ed=null; toast('Chamado aberto · OS '+manNum(doc.numero)+(doc.paradaId?' · parada da '+doc.linha+' registrada':''));
-  }catch(e){ erro(e); }
+    M._criado=doc.numero; M.novo=false; M.f=null; M.cur=doc.numero; M.ed=null; toast('Chamado criado com sucesso · OS '+manNum(doc.numero)+(doc.paradaId?' · parada da '+doc.linha+' registrada':''));
+  }catch(e){ console.warn('[manutenção] abrir chamado',e); manErro(e,'Não foi possível criar o chamado.'); }
   M.salv=false; render(); window.scrollTo(0,0); }
-async function manStatus(c,st){ if(!S.db||c.status===st) return; const agora=new Date().toISOString(), u={status:st,hist:(c.hist||[]).concat([{em:agora,por:S.uid||null,o:c.status+' → '+st}]).slice(-40)};
+async function manStatus(c,st){ if(!S.db||c.status===st||c._stGrav) return; c._stGrav=true; const agora=new Date().toISOString(), u={status:st,hist:(c.hist||[]).concat([{em:agora,por:S.uid||null,o:c.status+' → '+st+(st==='Cancelada'&&c._motivoCancel?' · motivo: '+c._motivoCancel:'')}]).slice(-200)};
   const E=Object.assign({},c.exec||{}); const loc=()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); };
   if(st==='Em execução'&&!E.inicio){ E.inicio=loc(); u.exec=E; }
   if(st==='Concluída'){ if(!E.fim) E.fim=loc(); u.exec=E; u.concluidoEm=agora; u.concluidoPor=S.uid||null; } else { u.concluidoEm=null; }
+  if(st==='Cancelada'){ u.canceladoEm=agora; u.canceladoPor=S.uid||null; u.motivoCancel=c._motivoCancel||null; } else if(c.canceladoEm){ u.canceladoEm=null; }
   try{ await S.db.doc('chamados/'+c._id).update(u); Object.assign(c,u);
     if(st==='Concluída'&&c.paradaId){ const p=S.paradas.find(x=>x._id===c.paradaId); if(p&&!p.fim){ const fim=E.fim?new Date(E.fim).toISOString():agora; await S.db.doc('paradas/'+p._id).update({fim:fim>p.inicio?fim:agora,porFim:S.uid||null}); toast('OS concluída · '+p.linha+' voltou a rodar'); } else toast('OS '+manNum(c.numero)+' concluída'); }
+    else if(st==='Cancelada'&&c.paradaId){ const p=S.paradas.find(x=>x._id===c.paradaId); if(p&&!p.fim){ await S.db.doc('paradas/'+p._id).update({fim:agora>p.inicio?agora:p.inicio,porFim:S.uid||null}); toast('OS '+manNum(c.numero)+' cancelada · parada da '+p.linha+' encerrada'); } else toast('OS '+manNum(c.numero)+' cancelada'); }
     else toast('OS '+manNum(c.numero)+': '+st);
-    render(); }catch(e){ erro(e); } }
-async function manSalvarAt(c){ const ed=S.man.ed; if(!ed||!S.db) return; const E=Object.assign({},c.exec||{},ed);
-  try{ await S.db.doc('chamados/'+c._id).update({exec:E}); c.exec=E; S.man.ed=null; toast('Atendimento salvo na OS '+manNum(c.numero)); render(); }catch(e){ erro(e); } }
+    render(); }catch(e){ console.warn('[manutenção] status',e); manErro(e,'Não foi possível mudar o status da OS '+manNum(c.numero)+'.'); } finally { c._stGrav=false; } }
+const MAN_CAMPO={tecnico:'responsável',tipo:'tipo',inicio:'início',fim:'término',diagnostico:'diagnóstico',causa:'causa',servicos:'serviço realizado',condicao:'condição',pendencias:'observações/pendências'};
+async function manSalvarAt(c){ const ed=S.man.ed; if(!ed||!S.db||S.man.salvAt) return; const E=Object.assign({},c.exec||{},ed);
+  const mud=Object.keys(ed).filter(k=>String((c.exec||{})[k]||'')!==String(ed[k]||'')); if(!mud.length){ S.man.ed=null; render(); return; }
+  const agora=new Date().toISOString(); const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Atendimento atualizado: '+mud.map(k=>MAN_CAMPO[k]||k).join(', ')+(ed.tecnico&&ed.tecnico!==(c.exec||{}).tecnico?' · responsável '+ed.tecnico:'')}]).slice(-200);
+  S.man.salvAt=true; const b=document.querySelector('[data-act="man-salvar-at"]'); if(b){ b.disabled=true; b.textContent='Salvando…'; }
+  try{ await S.db.doc('chamados/'+c._id).update({exec:E,hist}); c.exec=E; c.hist=hist; S.man.ed=null; toast('Atendimento salvo na OS '+manNum(c.numero)+'.'); }
+  catch(e){ console.warn('[manutenção] atendimento',e); manErro(e,'Não foi possível salvar o atendimento. Nada foi perdido na tela: tente de novo.'); }
+  finally{ S.man.salvAt=false; render(); } }
 function manImprimir(sel){ const el=document.querySelector(sel); if(!el) return; document.body.classList.add('man-print'); el.classList.add('man-alvo'); const tira=()=>{ document.body.classList.remove('man-print'); el.classList.remove('man-alvo'); window.removeEventListener('afterprint',tira); }; window.addEventListener('afterprint',tira); setTimeout(()=>{ window.print(); setTimeout(tira,1500); },50); }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="man-"]'); if(!b) return; const a=b.dataset.act, M=S.man;
   if(a==='man-novo'){ manNovo(); render(); setTimeout(()=>{ const f=$('#man-form'); if(f) f.scrollIntoView({block:'start',behavior:'smooth'}); },30); return; }
@@ -9227,18 +9249,18 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(t.dataset&&t.data
 { const _rs=rerenderSeguro; rerenderSeguro=function(){ const a=document.activeElement; if(a&&a.closest&&a.closest('.man-form,.man-at')) return; return _rs.apply(this,arguments); }; }
 /* QR: ?chamado=Linha%201 abre o formulário já com a linha */
 function manLinkInicial(){ if(tabOn()) return tabLinkInicial(); let m=null; try{ m=(location.hash+'&'+location.search+'&'+document.referrer+'&'+(window.name||'')).match(/chamado=([^&#]+)/); }catch(e){} if(!m) return; let linha=''; try{ linha=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ linha=m[1]; } let t=0;
-  const tenta=()=>{ if(S.acs&&S.acs.pronto){ if(viewOk('manch')){ manNovo(manLinhas().includes(linha)?linha:''); S.man.cur=null; go('manch'); } else toast('Seu acesso não inclui abrir chamados. Peça para liberar a Produção ou a Manutenção.'); try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60||!(S.acs&&S.acs.pronto)) setTimeout(tenta,500); };
+  const tenta=()=>{ if(S.acs&&S.acs.pronto){ if(viewOk('manch')){ manNovo(manLinhas().includes(linha)?linha:''); S.man.cur=null; go('manch'); } else toast('Seu acesso não inclui abrir chamados. Peça para liberar a Produção ou a Manutenção.'); try{ { const u=new URL(location.href); u.searchParams.delete('chamado'); u.searchParams.delete('equip'); u.hash=''; history.replaceState(null,'',u.pathname+u.search); } }catch(e){} return; } if(++t<60||!(S.acs&&S.acs.pronto)) setTimeout(tenta,500); };
   setTimeout(tenta,300); }
 manLinkInicial(); window.addEventListener('hashchange',manLinkInicial);
 /* painel por cargo: bloco de chamados + modelo Manutenção */
 PNL_BLOCOS.chamados={nome:'Chamados de manutenção',d:'Chamados em aberto, com a máquina parada primeiro.',ic:'chave',s:'m',go:'manch'};
-PNL_R.chamados=function(){ const xs=(S.chamados||[]).filter(c=>!c.excluido&&c.status!=='Concluída').sort((a,b)=>(b.impacto==='parou')-(a.impacto==='parou')||String(a.criado).localeCompare(String(b.criado))); const par=xs.filter(c=>c.impacto==='parou').length;
+PNL_R.chamados=function(){ const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)).sort((a,b)=>(b.impacto==='parou')-(a.impacto==='parou')||String(a.criado).localeCompare(String(b.criado))); const par=xs.filter(c=>c.impacto==='parou').length;
   return {tit:'Chamados de manutenção',st:par?{c:'crit',t:par+' com máquina parada'}:xs.length?{c:'warn',t:xs.length+' em aberto'}:{c:'ok',t:'Nenhum em aberto'},
    html:xs.length?`<div class="pb-rl">${xs.slice(0,6).map(c=>`<div class="pb-ri ${c.impacto==='parou'?'crit':c.impacto==='reduziu'?'warn':''}"><i></i><div><b>OS ${manNum(c.numero)}</b> <span>${esc(c.linha)} · ${esc(String(c.defeito||'').slice(0,50))}</span></div><em class="num">${esc(c.status)} · ${manIdade(c.criado)}</em></div>`).join('')}</div>`:'<div class="pb-vz">Nenhum chamado em aberto</div>'}; };
 PNL_MODELOS.manut={nome:'Manutenção',desc:'Fila de chamados, máquinas paradas e OS para imprimir.',mods:['manut','paradas'],blocos:[{t:'chamados',s:'g'},{t:'paradas',s:'p'}]};
 PNL_SUG.manut=['chamados','paradas']; (PNL_SUG.producao||[]).push('chamados');
 /* sino do topo: chamado com máquina parada */
-NAV_EXTRA.push(()=>{ if(!viewOk('manch')) return []; const n=(S.chamados||[]).filter(c=>!c.excluido&&c.status!=='Concluída'&&c.impacto==='parou').length; return n?[{n,t:'Chamado'+(n>1?'s':'')+' com máquina parada',s:'Manutenção',acao:'manch',c:'crit'}]:[]; });
+NAV_EXTRA.push(()=>{ if(!viewOk('manch')) return []; const n=(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)&&c.impacto==='parou').length; return n?[{n,t:'Chamado'+(n>1?'s':'')+' com máquina parada',s:'Manutenção',acao:'manch',c:'crit'}]:[]; });
 { const _ti=tpIr; tpIr=function(acao){ if(acao==='manch'){ S.tp.pop=null; S.man.cur=null; go('manch'); return; } return _ti.apply(this,arguments); }; }
 
 /* impressão em PDF (o navegador do painel não deixa abrir a janela de impressão): gera o PDF e baixa */
@@ -9287,14 +9309,14 @@ async function manPdfOs(o){ if(!window.jspdf){ toast('Gerador de PDF indisponív
 VIEWS.manmon={nome:'Painel da manutenção',ic:'tv',mob:'Painel'}; CRUMB.manmon='Painel da manutenção';
 { const M=MODS.find(m=>m.id==='manut'); if(M&&!M.views.includes('manmon')) M.views.unshift('manmon'); }
 S.man.som=false; S.man._abertas=null;
-function manAbertos(){ return (S.chamados||[]).filter(c=>!c.excluido&&c.status!=='Concluída'); }
+function manAbertos(){ return (S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)); }
 function manPeso(c){ return (c.impacto==='parou'?30:c.impacto==='reduziu'?20:10)+(c.status==='Aberta'?5:0); }
 function manEventosHoje(){ const h=hojeStr(), ev=[]; (S.chamados||[]).forEach(c=>{ if(c.excluido) return; if(String(c.criado||'').length&&hojeStr(new Date(c.criado))===h) ev.push({em:c.criado,c,t:'Aberto'}); (c.hist||[]).forEach(x=>{ if(x.em&&hojeStr(new Date(x.em))===h) ev.push({em:x.em,c,t:String(x.o||'').split('→').pop().trim(),por:x.por}); }); });
   return ev.sort((a,b)=>String(b.em).localeCompare(String(a.em))); }
 function vManMon(){ const M=S.man, h=hojeStr(), dia=M.dia||h, ont=addDias(h,-1), LT=linhasOrd(), agora=new Date().toISOString(), kiosk=document.body.classList.contains('ltv-k'), hj=dia===h;
   if(!document.getElementById('mdfont')){ try{ const l=document.createElement('link'); l.id='mdfont'; l.rel='stylesheet'; l.href='https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap'; document.head.appendChild(l); }catch(e){} }
   const doDia=iso=>iso&&hojeStr(new Date(iso))===dia;
-  const xs=(S.chamados||[]).filter(c=>!c.excluido&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(hj&&c.status!=='Concluída')));
+  const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(hj&&!manFechada(c))));
   const cor={crit:'#D64545',warn:'#E0930F',neu:'#1B5C7A',ok:'#2E9E5B'}, peso={crit:0,warn:1,neu:2,ok:3};
   const rs=xs.map(c=>{ const e=manEtapas(c); const resp=manMin(e.ab.em,e.as?e.as.em:(c.status==='Aberta'?agora:null)), rep=e.as?manMin(e.as.em,e.co?e.co.em:agora):null;
     const par=c.paradaId&&S.paradas.find(p=>p._id===c.paradaId); const pm=par?manMin(par.inicio,par.fim||agora):null; let x;
@@ -9388,7 +9410,7 @@ function manDur(m){ return m==null?'—':m<60?m+' min':Math.floor(m/60)+'h'+Stri
 function manDiario(){ const M=S.man, h=hojeStr(), dia=M.dia||h, ont=addDias(h,-1), LT=linhasOrd(), agora=new Date().toISOString();
   if(!document.getElementById('mdfont')){ try{ const l=document.createElement('link'); l.id='mdfont'; l.rel='stylesheet'; l.href='https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap'; document.head.appendChild(l); }catch(e){} }
   const doDia=iso=>iso&&hojeStr(new Date(iso))===dia;
-  const xs=(S.chamados||[]).filter(c=>!c.excluido&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(dia===h&&c.status!=='Concluída')));
+  const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(dia===h&&!manFechada(c))));
   const cor={crit:'#D64545',warn:'#E0930F',neu:'#1B5C7A',ok:'#2E9E5B'}, peso={crit:0,warn:1,neu:2,ok:3};
   const rs=xs.map(c=>{ const e=manEtapas(c); const resp=manMin(e.ab.em,e.as?e.as.em:(c.status==='Aberta'?agora:null)), rep=e.as?manMin(e.as.em,e.co?e.co.em:agora):null;
     const par=c.paradaId&&S.paradas.find(p=>p._id===c.paradaId); const pm=par?manMin(par.inicio,par.fim||agora):null; let x;
@@ -9516,7 +9538,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 /* no tablet, o QR da linha aberto pela câmera do próprio tablet troca a linha em vez de abrir chamado */
 function tabLinkInicial(){
     let m=null; try{ m=(location.hash+'&'+location.search).match(/chamado=([^&#]+)/); }catch(e){} if(!m) return; const l0=m[0]; let t=0;
-    const tenta=()=>{ if(S.acs&&S.acs.pronto){ const l=tabLinhaDoQr(l0); if(l&&viewOk('linhatv')){ tabSet(l); go('linhatv'); } try{ history.replaceState(null,'',location.pathname+location.search.replace(/[?&]chamado=[^&]*/,'')); }catch(e){} return; } if(++t<60||!(S.acs&&S.acs.pronto)) setTimeout(tenta,500); };
+    const tenta=()=>{ if(S.acs&&S.acs.pronto){ const l=tabLinhaDoQr(l0); if(l&&viewOk('linhatv')){ tabSet(l); go('linhatv'); } try{ { const u=new URL(location.href); u.searchParams.delete('chamado'); u.searchParams.delete('equip'); u.hash=''; history.replaceState(null,'',u.pathname+u.search); } }catch(e){} return; } if(++t<60||!(S.acs&&S.acs.pronto)) setTimeout(tenta,500); };
     setTimeout(tenta,300); }
 
 
@@ -9922,13 +9944,13 @@ VIEWS.manres={nome:'Resumo',ic:'grafico',mob:'Resumo'}; CRUMB.manres='Resumo da 
 { const _vr=viewOk; viewOk=function(v){ if(v==='manres') return _vr.call(this,'manmon'); return _vr.apply(this,arguments); }; }
 S.mp={col:''};
 function mpRows(dia){ const h=hojeStr(), agora=new Date().toISOString(), doDia=iso=>iso&&hojeStr(new Date(iso))===dia;
-  const xs=(S.chamados||[]).filter(c=>!c.excluido&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(dia===h&&c.status!=='Concluída')));
+  const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&(doDia(c.criado)||doDia(c.concluidoEm)||(c.hist||[]).some(x=>doDia(x.em))||(dia===h&&!manFechada(c))));
   return xs.map(c=>{ const e=manEtapas(c); const resp=manMin(e.ab.em,e.as?e.as.em:(c.status==='Aberta'?agora:null)), rep=e.as?manMin(e.as.em,e.co?e.co.em:agora):null;
     const par=c.paradaId&&S.paradas.find(p=>p._id===c.paradaId); const pm=par?manMin(par.inicio,par.fim||agora):null;
     const fase=e.co?'co':e.as||c.status==='Em execução'?'ex':'ag';
     const cor=fase==='co'?'ok':c.impacto==='parou'?'crit':fase==='ag'&&resp>15?'crit':fase==='ag'?'warn':'neu';
     return {c,e,resp,rep,pm,par,fase,cor}; }); }
-function mpStats30(){ const ini=Date.now()-30*864e5; const rs=(S.chamados||[]).filter(c=>!c.excluido&&c.criado&&new Date(c.criado).getTime()>=ini).map(c=>({c,e:manEtapas(c)}));
+function mpStats30(){ const ini=Date.now()-30*864e5; const rs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&c.criado&&new Date(c.criado).getTime()>=ini).map(c=>({c,e:manEtapas(c)}));
   const resp=rs.filter(r=>r.e.as).map(r=>manMin(r.e.ab.em,r.e.as.em)), rep=rs.filter(r=>r.e.as&&r.e.co).map(r=>manMin(r.e.as.em,r.e.co.em));
   const med=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
   const porL={}; rs.forEach(r=>{ const l=r.c.linha||'Sem linha'; const o=porL[l]||(porL[l]={n:0,par:0}); o.n++; if(r.c.impacto==='parou') o.par++; });
@@ -9976,7 +9998,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 /* detalhe da OS: botão Assumir no topo e a linha do tempo */
 { const _md=manDetalhe; manDetalhe=function(c){ let h=_md(c); const e=manEtapas(c);
   if(c.status==='Aberta') h=h.replace('<button class="btn sec" data-act="man-voltar">','<button class="btn" data-act="mm-assumir" data-n="'+c.numero+'">'+ic('play',16,2.4)+'Assumir</button><button class="btn sec" data-act="man-voltar">');
-  const ev=[{em:c.criado,t:'Chamado aberto',s:(c.nome?'por '+c.nome:'')+(c.impacto?' · '+(MAN_IMP[c.impacto]||[''])[0]:''),k:'ab'}].concat((c.hist||[]).map(x=>({em:x.em,t:String(x.o||'').split('→').pop().trim(),s:x.por?'por '+nomeDe(x.por):'',k:/Conclu/.test(x.o||'')?'co':'ex'}))).filter(x=>x.em);
+  const ev=[{em:c.criado,t:'Chamado aberto',s:(c.nome?'por '+c.nome:'')+(c.impacto?' · '+(MAN_IMP[c.impacto]||[''])[0]:''),k:'ab'}].concat((c.hist||[]).filter(x=>!/^Chamado aberto/.test(x.o||'')).map(x=>({em:x.em,t:String(x.o||'').split('→').pop().trim(),s:x.por?'por '+nomeDe(x.por):'',k:/Conclu/.test(x.o||'')?'co':'ex'}))).filter(x=>x.em);
   const tl=`<section class="card mp-tl"><div class="label" style="margin-bottom:10px">LINHA DO TEMPO</div>${ev.map(x=>`<div class="mp-tli ${x.k}"><span class="mp-tlh num">${dm(hojeStr(new Date(x.em)))} ${hora(x.em)}</span><i></i><div><b>${esc(x.t)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</div></div>`).join('')}
     ${e.as&&e.co?`<div class="mp-tls">Resposta ${manDur(manMin(e.ab.em,e.as.em))} · reparo ${manDur(manMin(e.as.em,e.co.em))}</div>`:e.as?`<div class="mp-tls">Resposta ${manDur(manMin(e.ab.em,e.as.em))} · em execução há ${manDur(manMin(e.as.em,new Date().toISOString()))}</div>`:''}</section>`;
   return h.replace('<section class="card man-at">',tl+'<section class="card man-at">'); }; }
@@ -10074,7 +10096,7 @@ function mpAvisoPinta(){ let el=document.getElementById('mp-aviso'); const N=S.m
   el.className='mp-aviso '+(par?'crit':'');
   el.innerHTML=`<div class="mp-av-ic">🔔</div><div class="mp-av-tx"><small>${par?'MÁQUINA PARADA · CHAMADO NOVO':'CHAMADO NOVO'}${c.origem==='qr'?' · PELO QR':''}</small><b>${esc(c.linha||'')}</b><span>${esc(String(c.defeito||'').slice(0,110))}${c.nome?' · '+esc(c.nome):''}</span></div>
    <div class="mp-av-bt">${pronta?`<button class="btn" data-act="mm-assumir" data-n="${c.numero}">Assumir</button>`:'<span class="sub" style="color:inherit;opacity:.8;margin:0">gerando a OS…</span>'}<button class="btn sec" data-act="mp-av-ver">Ver</button><button class="mp-av-x" data-act="mp-av-x" aria-label="Fechar">✕</button></div>`; }
-function mpVigia(){ if(!mpPodeAvisar()||!S.acs.pronto) return; const ab=(S.chamados||[]).filter(c=>!c.excluido&&c.status==='Aberta'&&!c.prevId);
+function mpVigia(){ if(!mpPodeAvisar()||!S.acs.pronto) return; const ab=(S.chamados||[]).filter(c=>!manIgnorar(c)&&c.status==='Aberta'&&!c.prevId);
   const ids=new Set(ab.map(mpChave)); if(S.mp.vistos===null){ S.mp.vistos=ids; return; }
   const novos=ab.filter(c=>!S.mp.vistos.has(mpChave(c))&&Date.now()-new Date(c.criado||0).getTime()<30*6e4); S.mp.vistos=new Set([...S.mp.vistos,...ids]);
   if(novos.length) mpAvisa(novos.sort((a,b)=>(b.impacto==='parou')-(a.impacto==='parou'))[0]);
@@ -10122,7 +10144,12 @@ setInterval(()=>{ try{ const X=S.mx; if(X.sub||!S.db||!S.acs||!S.acs.pronto||!vi
   inscrever('pecasmov',()=>S.db.collection('pecasmov').orderBy('em','desc').limit(1000),snap=>{ X.movs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); });
 }catch(e){} },700);
 function mxId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-async function mxGrava(muda){ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const n={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}; muda(n); n.em=new Date().toISOString(); n.por=S.uid||null; await S.db.doc('config/manut').set(n); S.mx.cfg={equips:n.equips,prev:n.prev,pecas:n.pecas,limites:n.limites}; }
+async function mxGrava(muda){ const fs=window.claude&&window.claude._fs&&window.claude._fs(), enc=window.claude&&window.claude._enc;
+  const monta=d=>{ d=d||{}; const n=Object.assign({},d,{equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}); muda(n); n.em=new Date().toISOString(); n.por=S.uid||null; return n; };
+  let n;
+  if(fs&&enc){ const ref=fs.doc('config/manut'); await fs.runTransaction(async t=>{ const g=await t.get(ref); n=monta(g.exists?JSON.parse(JSON.stringify(g.data()||{})):{}); t.set(ref,enc(n)); }); }
+  else { const g=await S.db.doc('config/manut').get(); n=monta(g.exists?(g.data()||{}):{}); await S.db.doc('config/manut').set(n); }
+  S.mx.cfg={equips:n.equips,prev:n.prev,pecas:n.pecas,limites:n.limites}; }
 function mxEquips(linha){ return (S.mx.cfg.equips||[]).filter(e=>e.ativo!==false&&(!linha||e.linha===linha)).sort((a,b)=>String(a.nome).localeCompare(String(b.nome))); }
 function mxEquip(id){ return (S.mx.cfg.equips||[]).find(e=>e.id===id); }
 function mxNorm(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
@@ -10136,20 +10163,20 @@ async function mxNovaOS(base){ let n=(S.chamados||[]).reduce((m,c)=>Math.max(m,(
   return doc; }
 
 /* ---------- confiabilidade por equipamento ---------- */
-function mxChamEquip(e){ const k=mxNorm(e.nome); return (S.chamados||[]).filter(c=>!c.excluido&&(+c.numero||0)<900000&&(c.equipId===e.id||(!c.equipId&&mxNorm(c.equip)===k&&(!c.linha||!e.linha||c.linha===e.linha)))); }
+function mxChamEquip(e){ const k=mxNorm(e.nome); return (S.chamados||[]).filter(c=>!manIgnorar(c)&&(+c.numero||0)<900000&&(c.equipId===e.id||(!c.equipId&&mxNorm(c.equip)===k&&(!c.linha||!e.linha||c.linha===e.linha)))); }
 function mxConf(xs,dias){ const ini=Date.now()-dias*864e5; const cor=xs.filter(c=>!c.prevId&&c.criado&&new Date(c.criado).getTime()>=ini).sort((a,b)=>String(a.criado).localeCompare(String(b.criado)));
   const reps=cor.map(c=>{ const e=manEtapas(c); return e.as&&e.co?manMin(e.as.em,e.co.em):null; }).filter(x=>x!=null);
   const par=cor.reduce((a,c)=>{ const p=c.paradaId&&S.paradas.find(x=>x._id===c.paradaId); return a+(p?manMin(p.inicio,p.fim||new Date().toISOString())||0:0); },0);
   let mtbf=null; if(cor.length>=2){ const t0=new Date(cor[0].criado).getTime(), t1=new Date(cor[cor.length-1].criado).getTime(); mtbf=(t1-t0)/864e5/(cor.length-1); } else if(cor.length===1) mtbf=null;
   return {n:cor.length,mttr:reps.length?Math.round(reps.reduce((a,b)=>a+b,0)/reps.length):null,mtbf,par,ult:cor.length?cor[cor.length-1].criado:null}; }
-function mxConfTabela(){ const eqs=mxEquips(); const livres={}; (S.chamados||[]).filter(c=>!c.excluido&&!c.equipId&&c.equip&&(+c.numero||0)<900000&&!eqs.some(e=>mxNorm(e.nome)===mxNorm(c.equip))).forEach(c=>{ const k=mxNorm(c.equip)+'|'+(c.linha||''); livres[k]=livres[k]||{id:'',nome:c.equip,linha:c.linha||''}; });
+function mxConfTabela(){ const eqs=mxEquips(); const livres={}; (S.chamados||[]).filter(c=>!manIgnorar(c)&&!c.equipId&&c.equip&&(+c.numero||0)<900000&&!eqs.some(e=>mxNorm(e.nome)===mxNorm(c.equip))).forEach(c=>{ const k=mxNorm(c.equip)+'|'+(c.linha||''); livres[k]=livres[k]||{id:'',nome:c.equip,linha:c.linha||''}; });
   const rows=[...eqs,...Object.values(livres)].map(e=>({e,z:mxConf(mxChamEquip(e),90)})).filter(r=>r.z.n).sort((a,b)=>b.z.n-a.z.n||(b.z.par-a.z.par));
   if(!rows.length) return '<div class="empty">Quando os chamados tiverem o equipamento, aparece aqui quanto cada máquina quebra e quanto demora o reparo.</div>';
   return `<div class="mx-tw"><table class="mx-t"><thead><tr><th>Equipamento</th><th>Linha</th><th class="r">Falhas</th><th class="r" title="Tempo médio de reparo">MTTR</th><th class="r" title="Tempo médio entre falhas">MTBF</th><th class="r">Linha parada</th><th>Última falha</th></tr></thead><tbody>
    ${rows.slice(0,10).map(({e,z})=>`<tr class="${z.mtbf!=null&&z.mtbf<7?'crit':z.mtbf!=null&&z.mtbf<15?'warn':''}"><td><b>${esc(e.nome)}</b>${e.tag?`<small>${esc(e.tag)}</small>`:''}</td><td>${esc(e.linha||'—')}</td><td class="r num">${z.n}</td><td class="r num">${mxHoras(z.mttr)}</td><td class="r num">${z.mtbf==null?'<span class="t-mut">1 falha</span>':mxDias(z.mtbf)}</td><td class="r num">${z.par?mxHoras(z.par):'—'}</td><td>${z.ult?dia(z.ult).toLowerCase()+' '+hora(z.ult):'—'}</td></tr>`).join('')}</tbody></table></div>
    <div class="sub" style="font-size:12px;margin-top:8px">Últimos 90 dias, só corretivas. MTTR = tempo médio de reparo (assumiu → concluiu). MTBF = tempo médio entre uma falha e a próxima. MTBF baixo (vermelho, menos de 7 dias) pede preventiva.</div>`; }
 function mxMeses(){ const out=[]; const h=new Date(); for(let i=5;i>=0;i--){ const d=new Date(h.getFullYear(),h.getMonth()-i,1); const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    const xs=(S.chamados||[]).filter(c=>!c.excluido&&(+c.numero||0)<900000&&String(c.criado||'').length&&hojeStr(new Date(c.criado)).slice(0,7)===k);
+    const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&(+c.numero||0)<900000&&String(c.criado||'').length&&hojeStr(new Date(c.criado)).slice(0,7)===k);
     const cor=xs.filter(c=>!c.prevId), prev=xs.filter(c=>c.prevId);
     const reps=cor.map(c=>{ const e=manEtapas(c); return e.as&&e.co?manMin(e.as.em,e.co.em):null; }).filter(x=>x!=null);
     const par=cor.reduce((a,c)=>{ const p=c.paradaId&&S.paradas.find(x=>x._id===c.paradaId); return a+(p?manMin(p.inicio,p.fim||new Date().toISOString())||0:0); },0);
@@ -10199,7 +10226,7 @@ function vManEquip(){ const X=S.mx, F=X.eq, LT=manLinhas(); if(!X.lido) return `
    ${ls.length?ls.map(l=>`<section class="card"><div class="head" style="align-items:baseline"><h2>${esc(l)}</h2><span class="sub" style="margin:0">${porL[l].length} equipamento${porL[l].length>1?'s':''}</span></div>${porL[l].map(row).join('')}</section>`).join(''):'<section class="card"><div class="empty">Nenhum equipamento cadastrado ainda.</div></section>'}`; }
 
 /* ---------- preventivas ---------- */
-function mxOsPrev(p){ return (S.chamados||[]).filter(c=>!c.excluido&&c.prevId===p.id&&c.status!=='Concluída').sort((a,b)=>b.numero-a.numero)[0]||null; }
+function mxOsPrev(p){ return (S.chamados||[]).filter(c=>!manIgnorar(c)&&c.prevId===p.id&&!manFechada(c)).sort((a,b)=>b.numero-a.numero)[0]||null; }
 function mxPrevStatus(){ const h=hojeStr(), em7=addDias(h,7); return (S.mx.cfg.prev||[]).filter(p=>p.ativo!==false).map(p=>{ const os=mxOsPrev(p), e=mxEquip(p.equip);
     const st=os?'aberta':!p.prox?'sem':p.prox<h?'atrasada':p.prox===h?'hoje':p.prox<=em7?'semana':'ok'; return {p,e,os,st}; }).sort((a,b)=>String(a.p.prox||'9').localeCompare(String(b.p.prox||'9'))); }
 function vManPrev(){ const X=S.mx, F=X.pv; if(!X.lido) return `${banner()}<section class="card"><div class="empty">Carregando…</div></section>`;
@@ -10207,7 +10234,7 @@ function vManPrev(){ const X=S.mx, F=X.pv; if(!X.lido) return `${banner()}<secti
   const lab={atrasada:['Atrasada','crit'],hoje:['Hoje','warn'],aberta:['OS aberta','prod'],semana:['Esta semana','neu'],ok:['Em dia','ok'],sem:['Sem data','neu']};
   const fil=F.fil==='todas'?xs:xs.filter(x=>F.fil==='pend'?['atrasada','hoje','aberta'].includes(x.st):x.st===F.fil);
   const row=x=>{ const {p,e,os,st}=x; const [l,c]=lab[st]; const ed=F.ed===p.id;
-    return `<div class="mx-pv ${st}"><div class="mx-pvd"><b class="num">${p.prox?dm(p.prox):'—'}</b><small>a cada ${p.freq} dia${+p.freq>1?'s':''}</small></div><div class="mx-pvt"><b>${esc(p.tarefa)}</b><small>${esc((e&&e.nome)||'equipamento removido')} · ${esc((e&&e.linha)||'')}${p.ultima?' · última '+dm(p.ultima):''}</small></div><span class="pill ${c}">${l}</span>
+    return `<div class="mx-pv ${st}"><div class="mx-pvd"><b class="num">${p.prox?dm(p.prox):'—'}</b><small>a cada ${p.freq} dia${+p.freq>1?'s':''}</small></div><div class="mx-pvt"><b>${esc(p.tarefa)}</b><small>${esc((e&&e.nome)||'equipamento removido')} · ${esc((e&&e.linha)||'')}${p.ultima?' · última '+dm(p.ultima):''}${p.resp?' · resp. '+esc(p.resp):''}</small>${mxPrevExec(p)}</div><span class="pill ${c}">${l}</span>
      <div class="mx-ea">${os?`<button class="btn sec" data-act="man-abrir" data-n="${os.numero}" data-ir="1" style="height:38px">OS ${manNum(os.numero)}</button>`:`<button class="eq-lk" data-act="mx-pv-gerar" data-id="${esc(p.id)}">${ic('play',15,2)}Gerar OS agora</button>`}<button class="eq-lk" data-act="mx-pv-ed" data-id="${esc(p.id)}">${ic('editar',15,2)}Editar</button>${F.conf===p.id?`<button class="eq-lk del" data-act="mx-pv-del" data-id="${esc(p.id)}">Confirmar: tirar</button>`:`<button class="eq-lk del" data-act="mx-pv-conf" data-id="${esc(p.id)}">${ic('lixo',15,2)}Tirar</button>`}</div>
      ${ed?mxPrevForm(true):''}</div>`; };
   return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Preventivas</h1><div class="sub">Cadastre o que precisa ser feito em cada máquina e de quanto em quanto tempo. No dia, a OS abre sozinha na fila da manutenção; ao concluir, a próxima data é marcada.</div></div></div>
@@ -10216,7 +10243,7 @@ function vManPrev(){ const X=S.mx, F=X.pv; if(!X.lido) return `${banner()}<secti
    <section class="card"><div class="chips" style="margin-bottom:10px">${[['todas','Todas'],['pend','Pendentes'],['semana','Esta semana'],['ok','Em dia']].map(([k,l])=>`<button class="chip" data-act="mx-pv-fil" data-v="${k}" aria-pressed="${F.fil===k}">${l}</button>`).join('')}</div>
     ${fil.length?fil.map(row).join(''):'<div class="empty">Nenhuma preventiva aqui.</div>'}</section>`; }
 function mxPrevForm(ed){ const F=S.mx.pv, eqs=mxEquips(); return `<div class="mx-nf ${ed?'mx-pvf':''}"><select class="txt" id="mx-pv-e"><option value="">Equipamento…</option>${manLinhas().map(l=>{ const es=eqs.filter(e=>e.linha===l); return es.length?`<optgroup label="${esc(l)}">${es.map(e=>`<option value="${esc(e.id)}" ${F.equip===e.id?'selected':''}>${esc(e.nome)}</option>`).join('')}</optgroup>`:''; }).join('')}</select>
-   <input class="txt" id="mx-pv-t" placeholder="O que fazer (ex.: lubrificar rolamentos, trocar correia)" value="${esc(F.tarefa)}"><label class="mx-in"><span>a cada</span><input class="txt num" id="mx-pv-f" type="number" min="1" value="${esc(F.freq)}"><span>dias</span></label><label class="mx-in"><span>${ed?'próxima':'primeira'}</span><input class="txt" id="mx-pv-p" type="date" value="${esc(F.prox||hojeStr())}"></label>
+   <input class="txt" id="mx-pv-t" placeholder="O que fazer (ex.: lubrificar rolamentos, trocar correia)" value="${esc(F.tarefa)}"><label class="mx-in"><span>a cada</span><input class="txt num" id="mx-pv-f" type="number" min="1" value="${esc(F.freq)}"><span>dias</span></label><label class="mx-in"><span>${ed?'próxima':'primeira'}</span><input class="txt" id="mx-pv-p" type="date" value="${esc(F.prox||hojeStr())}"></label><input class="txt" id="mx-pv-r" placeholder="Responsável (opcional)" value="${esc(F.resp||'')}" style="max-width:220px" aria-label="Responsável pela preventiva">
    <button class="btn" data-act="mx-pv-salvar">${ic('check',18,2.4)}${ed?'Salvar':'Cadastrar'}</button>${ed?'<button class="btn sec" data-act="mx-pv-x">Cancelar</button>':''}</div>`; }
 /* abre a OS da preventiva no dia */
 S.mx.gerando=false;
@@ -10224,7 +10251,7 @@ async function mxGeraPrev(p,forcar){ const lk=S.db.doc('config/manut-prev-'+p.id
   try{ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const pp=(d.prev||[]).find(x=>x.id===p.id); if(!pp||pp.ativo===false) return false;
     if(!forcar&&(pp.osDe===pp.prox||mxOsPrev(pp))) return false; const e=(d.equips||[]).find(x=>x.id===pp.equip)||{};
     const agora=new Date(), loc=new Date(agora.getTime()-agora.getTimezoneOffset()*6e4).toISOString().slice(0,16);
-    const doc=await mxNovaOS({linha:e.linha||'Outra',quando:loc,defeito:'PREVENTIVA: '+pp.tarefa,impacto:'nao',nome:'Preventiva programada',equip:e.nome||null,equipId:e.id||null,status:'Aberta',criado:agora.toISOString(),por:S.uid||null,prevId:pp.id,origem:'preventiva',exec:{tipo:'Preventiva'}});
+    const doc=await mxNovaOS({linha:e.linha||'Outra',quando:loc,defeito:'PREVENTIVA: '+pp.tarefa,impacto:'nao',nome:'Preventiva programada',equip:e.nome||null,equipId:e.id||null,status:'Aberta',criado:agora.toISOString(),por:S.uid||null,prevId:pp.id,origem:'preventiva',exec:pp.resp?{tipo:'Preventiva',tecnico:pp.resp}:{tipo:'Preventiva'},hist:[{em:agora.toISOString(),por:S.uid||null,o:'OS de preventiva aberta: '+pp.tarefa+(pp.prox?' (prevista para '+dm(pp.prox)+')':'')}]});
     await mxGrava(c=>{ const x=c.prev.find(y=>y.id===pp.id); if(x){ x.osDe=pp.prox||hojeStr(); x.os=doc.numero; } }); return doc; }
   finally{ try{ await lk.release(); }catch(e){} } }
 setInterval(async()=>{ const X=S.mx; if(X.gerando||!X.lido||!S.db||!viewOk('manch')||soVer&&typeof soVer==='function'&&soVer()) return; const h=hojeStr();
@@ -10234,7 +10261,7 @@ setInterval(async()=>{ const X=S.mx; if(X.gerando||!X.lido||!S.db||!viewOk('manc
 { const _ms=manStatus; manStatus=async function(c,st){ const antes=c.status; const r=await _ms.apply(this,arguments);
   try{ if(st==='Concluída'&&antes!=='Concluída'&&c.status==='Concluída'){
       if(c.prevId) await mxGrava(cf=>{ const x=cf.prev.find(y=>y.id===c.prevId); if(x){ const hj=hojeStr(); x.ultima=hj; x.prox=addDias(hj,Math.max(1,+x.freq||30)); } });
-      const E=c.exec||{}; if((E.pecas||[]).length&&!E.pecasBaixa){ for(const p of E.pecas){ if(!(+p.qtd>0)) continue; await S.db.collection('pecasmov').add({cod:p.cod||'',desc:p.desc||'',un:p.un||'un',qtd:-Math.abs(+p.qtd),tipo:'saida',os:c.numero,linha:c.linha||'',em:new Date().toISOString(),por:S.uid||null}); }
+      const E=c.exec||{}; if((E.pecas||[]).length&&!E.pecasBaixa){ for(const [i,p] of E.pecas.entries()){ if(!(+p.qtd>0)) continue; /* id fixo por OS e item: repetir a baixa não duplica a saída */ await S.db.doc('pecasmov/osb_'+c._id+'_'+i).set({cod:p.cod||'',desc:p.desc||'',un:p.un||'un',qtd:-Math.abs(+p.qtd),tipo:'saida',os:c.numero,linha:c.linha||'',em:new Date().toISOString(),por:S.uid||null}); }
         const E2=Object.assign({},E,{pecasBaixa:true}); await S.db.doc('chamados/'+c._id).update({exec:E2}); c.exec=E2; toast('OS '+manNum(c.numero)+' concluída · '+E.pecas.length+' peça'+(E.pecas.length>1?'s':'')+' baixada'+(E.pecas.length>1?'s':'')+' do estoque.'); } } }
   catch(e){ console.warn('pós-conclusão',e); } return r; }; }
 
@@ -10272,33 +10299,49 @@ async function mxComprime(file){ const url=await new Promise((ok,er)=>{ const r=
   let w=img.width, h=img.height, max=1280; if(Math.max(w,h)>max){ const k=max/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); let q=.72, d=cv.toDataURL('image/jpeg',q); while(d.length>700000&&q>.3){ q-=.12; d=cv.toDataURL('image/jpeg',q); } return d; }
 document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id!=='mx-foto-in'&&t.id!=='mx-foto-os') return; const f=t.files&&t.files[0]; if(!f) return;
-  try{ const d=await mxComprime(f); if(t.id==='mx-foto-in'){ S.man.f=S.man.f||{}; S.man.f.foto=d; render(); } else { const c=manDoc(S.man.cur); if(c) await mxSalvaFoto(c,d); } }catch(e){ toast('Não consegui ler a foto.'); } });
-async function mxSalvaFoto(c,d){ const id='f-'+mxId(); await S.db.doc('chamfotos/'+id).set({d,em:new Date().toISOString(),por:S.uid||null,os:c.numero}); const fs=(c.fotos||[]).concat(c.foto?[]:[]); await S.db.doc('chamados/'+c._id).update(c.foto?{fotos:(c.fotos||[]).concat([id])}:{foto:id}); if(c.foto) c.fotos=(c.fotos||[]).concat([id]); else c.foto=id; S.mx.fotos[id]=d; toast('Foto anexada à OS '+manNum(c.numero)+'.'); render(); }
+  const alvo=t.id==='mx-foto-os'?+(t.dataset.n||S.man.cur):null; t.value='';
+  let d; try{ d=await mxComprime(f); }catch(e){ console.warn('[manutenção] ler foto',e); toast('Não consegui ler a foto. Tente outra imagem.'); return; }
+  if(t.id==='mx-foto-in'){ S.man.f=S.man.f||{}; S.man.f.foto=d; render(); return; }
+  const c=manDoc(alvo); if(!c){ toast('A OS da foto não foi encontrada. Nada foi salvo.'); return; }
+  try{ await mxSalvaFoto(c,d); }catch(e){ console.warn('[manutenção] salvar foto',e); manErro(e,'Não foi possível salvar a foto na OS '+manNum(c.numero)+'.'); } });
+async function mxSalvaFoto(c,d){ if(S.mx._fotoGrav) { toast('Aguarde: a foto anterior ainda está sendo salva.'); return; } S.mx._fotoGrav=true; toast('Salvando foto…');
+  try{ const id='f-'+mxId(), agora=new Date().toISOString();
+    await S.db.doc('chamfotos/'+id).set({d,em:agora,por:S.uid||null,os:c.numero,chamado:c._id,equipId:c.equipId||null});
+    const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Foto adicionada'}]).slice(-200);
+    const u=c.foto?{fotos:(c.fotos||[]).concat([id]),hist}:{foto:id,hist}; await S.db.doc('chamados/'+c._id).update(u); Object.assign(c,u); S.mx.fotos[id]=d; toast('Foto anexada à OS '+manNum(c.numero)+'.'); render(); }
+  finally{ S.mx._fotoGrav=false; } }
 /* depois que o chamado é salvo pelo formulário do painel, grava a foto e o equipamento escolhido */
-{ const _sv=manSalvar; manSalvar=async function(){ const F=S.man.f||{}, foto=F.foto, eqId=F.equipId; const antes=S.man.cur; await _sv.apply(this,arguments);
-  const c=S.man.cur!=null&&S.man.cur!==antes&&manDoc(S.man.cur); if(!c||!S.db) return; try{ const u={}; if(eqId){ u.equipId=eqId; } if(Object.keys(u).length){ await S.db.doc('chamados/'+c._id).update(u); Object.assign(c,u); } if(foto) await mxSalvaFoto(c,foto); }catch(e){ console.warn(e); } }; }
+{ const _sv=manSalvar; manSalvar=async function(){ const F=S.man.f||{}, foto=F.foto; S.man._criado=null; await _sv.apply(this,arguments);
+  const n=S.man._criado; S.man._criado=null; const c=n!=null&&manDoc(n); if(!c||!S.db||!foto) return;
+  try{ await mxSalvaFoto(c,foto); }catch(e){ console.warn('[manutenção] foto do chamado',e); manErro(e,'O chamado OS '+manNum(c.numero)+' foi criado, mas a foto não foi salva. Abra a OS e adicione a foto de novo.'); } }; }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mx-f-eq"],[data-act="mx-foto-x"]'); if(!b) return; ev.stopPropagation(); const F=S.man.f=S.man.f||{};
   if(b.dataset.act==='mx-foto-x'){ F.foto=null; render(); return; }
   const e=b.dataset.id?mxEquip(b.dataset.id):null; F.equipId=e?e.id:''; F.equip=e?e.nome:''; render(); },true);
 /* na OS: fotos e peças usadas */
 async function mxFoto(id){ if(id in S.mx.fotos) return S.mx.fotos[id]; S.mx.fotos[id]=null; try{ const g=await S.db.doc('chamfotos/'+id).get(); S.mx.fotos[id]=g.exists?(g.data().d||''):''; }catch(e){ S.mx.fotos[id]=''; } rerenderSeguro(); return S.mx.fotos[id]; }
 { const _md=manDetalhe; manDetalhe=function(c){ let h=_md(c); const ids=[c.foto,...(c.fotos||[])].filter(Boolean); ids.forEach(id=>{ if(!(id in S.mx.fotos)) mxFoto(id); });
-  const fotos=`<section class="card mx-fts"><div class="head" style="align-items:center"><div class="label">FOTOS</div><label class="btn sec" style="height:38px">${ic('foto',16,2)}Adicionar foto<input type="file" accept="image/*" capture="environment" id="mx-foto-os" hidden></label></div>
+  const fotos=`<section class="card mx-fts"><div class="head" style="align-items:center"><div class="label">FOTOS</div><label class="btn sec" style="height:38px">${ic('foto',16,2)}Adicionar foto<input type="file" accept="image/*" capture="environment" id="mx-foto-os" data-n="${c.numero}" hidden></label></div>
     ${ids.length?`<div class="mx-ftg">${ids.map(id=>{ const d=S.mx.fotos[id]; return d?`<a href="${d}" target="_blank" rel="noopener"><img src="${d}" alt="Foto da OS"></a>`:`<div class="mx-ftl">${d===''?'foto indisponível':'carregando…'}</div>`; }).join('')}</div>`:'<div class="sub" style="font-size:13px;margin:0">Nenhuma foto. O operador pode mandar pelo QR ou a manutenção adiciona aqui.</div>'}</section>`;
   const E=c.exec||{}, ps=E.pecas||[], A=S.mx.add;
   const pecas=`<div class="mx-pecas"><span class="label">PEÇAS USADAS ${E.pecasBaixa?'<span class="pill ok" style="margin-left:6px">baixadas do estoque</span>':'<small style="font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)">· saem do estoque ao concluir</small>'}</span>
-    ${ps.length?`<div class="mx-pl">${ps.map((p,i)=>`<div class="mx-pi"><b>${esc(p.desc||p.cod)}</b><span class="num">${esc(p.cod||'')}</span><span class="num"><b>${p.qtd}</b> ${esc(p.un||'')}</span>${E.pecasBaixa?'':`<button type="button" class="eq-lk del" data-act="mx-p-x" data-i="${i}" aria-label="Tirar">${ic('lixo',15,2)}</button>`}</div>`).join('')}</div>`:''}
-    ${E.pecasBaixa?'':`<div class="mx-nf" style="margin-top:6px"><input class="txt" id="mx-p-c" list="mx-pdl" placeholder="Procurar peça (código ou nome)" value="${esc(A.cod)}" autocomplete="off"><label class="mx-in"><span>qtd</span><input class="txt num" id="mx-p-q" type="number" min="0" step="any" value="${esc(A.qtd)}"></label><button type="button" class="btn sec" data-act="mx-p-add">${ic('mais',16,2.4)}Adicionar peça</button></div>${mxDatalist()}`}</div>`;
+    ${ps.length?`<div class="mx-pl">${ps.map((p,i)=>`<div class="mx-pi"><b>${esc(p.desc||p.cod)}${p.obs?`<small style="display:block;font-weight:500;color:var(--muted)">${esc(p.obs)}</small>`:''}</b><span class="num">${esc(p.cod||'')}</span><span class="num"><b>${p.qtd}</b> ${esc(p.un||'')}</span>${E.pecasBaixa?'':`<button type="button" class="eq-lk del" data-act="mx-p-x" data-i="${i}" aria-label="Tirar">${ic('lixo',15,2)}</button>`}</div>`).join('')}</div>`:''}
+    ${E.pecasBaixa?'':`<div class="mx-nf" style="margin-top:6px"><input class="txt" id="mx-p-c" list="mx-pdl" placeholder="Procurar peça (código ou nome)" value="${esc(A.cod)}" autocomplete="off"><label class="mx-in"><span>qtd</span><input class="txt num" id="mx-p-q" type="number" min="0" step="any" value="${esc(A.qtd)}"></label><input class="txt" id="mx-p-u" placeholder="Un." value="${esc(A.un||'')}" style="max-width:80px" aria-label="Unidade"><input class="txt" id="mx-p-o" placeholder="Observação (opcional)" value="${esc(A.obs||'')}" aria-label="Observação da peça"><button type="button" class="btn sec" data-act="mx-p-add">${ic('mais',16,2.4)}Adicionar peça</button></div>${mxDatalist()}`}</div>`;
   h=h.replace(/<label style="display:block;margin-top:10px"><span class="label">MATERIAIS \/ PEÇAS UTILIZADOS<\/span><textarea[^>]*data-man-e="materiais"[^>]*>[\s\S]*?<\/textarea><\/label>/,pecas);
   if(c.equipId||c.equip){ const e=c.equipId&&mxEquip(c.equipId); const z=e?mxConf(mxChamEquip(e),90):null; if(z&&z.n>1) h=h.replace('<section class="card man-at">',`<div class="banner" style="background:var(--teal-wash);color:var(--teal-strong)">${ic('engr',16,2)} <b>${esc(e.nome)}</b>: ${z.n} falhas em 90 dias · reparo médio ${mxHoras(z.mttr)}${z.mtbf!=null?' · uma falha a cada '+mxDias(z.mtbf):''}.</div><section class="card man-at">`); }
   return h.replace('<section class="card man-at">',fotos+'<section class="card man-at">'); }; }
-async function mxPecasGrava(c,ps){ const E=Object.assign({},c.exec||{},{pecas:ps,materiais:ps.map(p=>(p.desc||p.cod)+' — '+p.qtd+' '+(p.un||'')).join('\n')}); await S.db.doc('chamados/'+c._id).update({exec:E}); c.exec=E; render(); }
+async function mxPecasGrava(c,ps,nota){ const E=Object.assign({},c.exec||{},{pecas:ps,materiais:ps.map(p=>(p.desc||p.cod)+' — '+p.qtd+' '+(p.un||'')+(p.obs?' ('+p.obs+')':'')).join('\n')});
+  const hist=nota?(c.hist||[]).concat([{em:new Date().toISOString(),por:S.uid||null,o:nota}]).slice(-200):c.hist; const u=nota?{exec:E,hist}:{exec:E};
+  await S.db.doc('chamados/'+c._id).update(u); c.exec=E; if(nota) c.hist=hist; render(); }
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mx-"]'); if(!b||b.disabled) return; const a=b.dataset.act, X=S.mx;
   const v=id=>{ const e=document.getElementById(id); return e?String(e.value||'').trim():''; };
   try{
-  if(a==='mx-p-add'){ const c=manDoc(S.man.cur); if(!c) return; const q=+String(v('mx-p-q')).replace(',','.'), t=v('mx-p-c'); if(!t||!(q>0)){ toast('Escolha a peça e a quantidade.'); return; }
-    const p=mxBuscaPeca(t)||{cod:'',desc:t.replace(/^[^·]*·\s*/,'')||t,un:'un'}; X.add={cod:'',qtd:'1'}; await mxPecasGrava(c,[...((c.exec||{}).pecas||[]),{cod:p.cod||'',desc:p.desc||t,un:p.un||'un',qtd:q}]); return; }
-  if(a==='mx-p-x'){ const c=manDoc(S.man.cur); if(!c) return; const ps=[...((c.exec||{}).pecas||[])]; ps.splice(+b.dataset.i,1); await mxPecasGrava(c,ps); return; }
+  if(a==='mx-p-add'){ const c=manDoc(S.man.cur); if(!c) return; const q=+String(v('mx-p-q')).replace(',','.'), t=v('mx-p-c'); if(!t||!(q>0)){ toast('Escolha a peça/material e a quantidade.'); return; }
+    const p=mxBuscaPeca(t)||{cod:'',desc:t.replace(/^[^·]*·\s*/,'')||t,un:'un'}; const un=v('mx-p-u')||p.un||'un', obs=v('mx-p-o');
+    const it={cod:p.cod||'',desc:p.desc||t,un,qtd:q}; if(obs) it.obs=obs.slice(0,200);
+    b.disabled=true; try{ await mxPecasGrava(c,[...((c.exec||{}).pecas||[]),it],'Material registrado: '+it.desc+' — '+q+' '+un+(obs?' ('+obs+')':'')); X.add={cod:'',qtd:'1',un:'',obs:''}; toast('Material registrado na OS '+manNum(c.numero)+'.'); }
+    catch(e){ console.warn('[manutenção] material',e); manErro(e,'Não foi possível registrar o material.'); b.disabled=false; } return; }
+  if(a==='mx-p-x'){ const c=manDoc(S.man.cur); if(!c) return; const ps=[...((c.exec||{}).pecas||[])]; const tir=ps.splice(+b.dataset.i,1)[0]; b.disabled=true;
+    try{ await mxPecasGrava(c,ps,'Material retirado: '+((tir&&(tir.desc||tir.cod))||'')); }catch(e){ console.warn('[manutenção] material',e); manErro(e,'Não foi possível retirar o material.'); b.disabled=false; } return; }
   if(a==='mx-eq-novo'||a==='mx-eq-sug'){ const l=a==='mx-eq-sug'?b.dataset.l:v('mx-eqn-l'), n=a==='mx-eq-sug'?b.dataset.n:v('mx-eqn-n'), t=a==='mx-eq-sug'?'':v('mx-eqn-t');
     if(!l||!n){ toast('Escolha a linha e escreva o nome.'); return; } if(mxEquips(l).some(e=>mxNorm(e.nome)===mxNorm(n))){ toast('Já existe '+n+' na '+l+'.'); return; }
     const id=mxId(); await mxGrava(cf=>{ cf.equips.push({id,linha:l,nome:n,tag:t||'',ativo:true,em:new Date().toISOString()}); });
@@ -10312,11 +10355,11 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='mx-eq-del'){ const id=b.dataset.id; await mxGrava(cf=>{ const e=cf.equips.find(x=>x.id===id); if(e){ e.ativo=false; e.tiradoEm=new Date().toISOString(); } cf.prev.forEach(p=>{ if(p.equip===id) p.ativo=false; }); }); X.eq.conf=null; toast('Equipamento tirado da lista (o histórico fica).'); render(); return; }
   if(a==='mx-eq-prev'){ X.pv=Object.assign({},X.pv,{equip:b.dataset.id,tarefa:'',freq:'30',prox:hojeStr(),ed:null}); go('manprev'); setTimeout(()=>{ const i=$('#mx-pv-t'); i&&i.focus(); },60); return; }
   if(a==='mx-pv-fil'){ X.pv.fil=b.dataset.v; render(); return; }
-  if(a==='mx-pv-ed'){ const p=(X.cfg.prev||[]).find(x=>x.id===b.dataset.id); if(!p) return; X.pv=Object.assign({},X.pv,{equip:p.equip,tarefa:p.tarefa,freq:String(p.freq),prox:p.prox||'',ed:p.id}); render(); return; }
+  if(a==='mx-pv-ed'){ const p=(X.cfg.prev||[]).find(x=>x.id===b.dataset.id); if(!p) return; X.pv=Object.assign({},X.pv,{equip:p.equip,tarefa:p.tarefa,freq:String(p.freq),prox:p.prox||'',resp:p.resp||'',ed:p.id}); render(); return; }
   if(a==='mx-pv-x'){ X.pv=Object.assign({},X.pv,{equip:'',tarefa:'',freq:'30',prox:'',ed:null}); render(); return; }
   if(a==='mx-pv-salvar'){ const e=v('mx-pv-e'), t=v('mx-pv-t'), f=Math.round(+v('mx-pv-f')), p=v('mx-pv-p'); if(!e||!t||!(f>0)||!p){ toast('Preencha o equipamento, o que fazer, a frequência e a data.'); return; }
-    const ed=X.pv.ed; await mxGrava(cf=>{ if(ed){ const x=cf.prev.find(y=>y.id===ed); if(x){ x.equip=e; x.tarefa=t; x.freq=f; if(x.prox!==p){ x.prox=p; x.osDe=null; } } } else cf.prev.push({id:mxId(),equip:e,tarefa:t,freq:f,prox:p,ativo:true,em:new Date().toISOString(),por:S.uid||null}); });
-    X.pv=Object.assign({},X.pv,{equip:'',tarefa:'',freq:'30',prox:'',ed:null}); toast(ed?'Preventiva salva.':'Preventiva cadastrada'+(p<=hojeStr()?': a OS abre em instantes.':' para '+dm(p)+'.')); render(); return; }
+    const ed=X.pv.ed, resp=v('mx-pv-r'); b.disabled=true; await mxGrava(cf=>{ if(ed){ const x=cf.prev.find(y=>y.id===ed); if(x){ x.equip=e; x.tarefa=t; x.freq=f; x.resp=resp||null; if(x.prox!==p){ x.prox=p; x.osDe=null; } } } else cf.prev.push({id:mxId(),equip:e,tarefa:t,freq:f,prox:p,resp:resp||null,ativo:true,em:new Date().toISOString(),por:S.uid||null}); });
+    X.pv=Object.assign({},X.pv,{equip:'',tarefa:'',freq:'30',prox:'',resp:'',ed:null}); toast(ed?'Preventiva salva.':'Preventiva cadastrada'+(p<=hojeStr()?': a OS abre em instantes.':' para '+dm(p)+'.')); render(); return; }
   if(a==='mx-pv-gerar'){ const p=(X.cfg.prev||[]).find(x=>x.id===b.dataset.id); if(!p) return; b.disabled=true; const d=await mxGeraPrev(p,true); toast(d?'OS '+manNum(d.numero)+' aberta para a preventiva.':'Não foi possível abrir agora. Tente de novo.'); render(); return; }
   if(a==='mx-pv-conf'){ X.pv.conf=b.dataset.id; render(); return; }
   if(a==='mx-pv-del'){ const id=b.dataset.id; await mxGrava(cf=>{ const x=cf.prev.find(y=>y.id===id); if(x){ x.ativo=false; x.tiradoEm=new Date().toISOString(); } }); X.pv.conf=null; toast('Preventiva tirada.'); render(); return; }
@@ -10327,7 +10370,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
     const p=mxBuscaPeca(t)||{cod:'',desc:t,un:'un'}; await S.db.collection('pecasmov').add({cod:p.cod||'',desc:p.desc||t,un:p.un||'un',qtd:q,tipo:q>0?'entrada':'ajuste',obs:o||null,em:new Date().toISOString(),por:S.uid||null});
     X.pc.ent={cod:'',qtd:'',obs:''}; toast((q>0?'Entrada':'Ajuste')+' lançado: '+q+' '+(p.un||'')+' de '+(p.desc||t)+'.'); render(); return; }
   }catch(e){ erro(e); } });
-document.addEventListener('input',ev=>{ const t=ev.target, X=S.mx; if(!t.id||!t.id.startsWith('mx-')) return; const m={'mx-eqn-n':['eq','nome'],'mx-eqn-t':['eq','tag'],'mx-eq-n':['eq','nome'],'mx-eq-t':['eq','tag'],'mx-pv-t':['pv','tarefa'],'mx-pv-f':['pv','freq'],'mx-pc-c':['pc','cod'],'mx-pc-d':['pc','desc'],'mx-pc-u':['pc','un'],'mx-pc-m':['pc','min'],'mx-p-c':['add','cod'],'mx-p-q':['add','qtd']}[t.id];
+document.addEventListener('input',ev=>{ const t=ev.target, X=S.mx; if(!t.id||!t.id.startsWith('mx-')) return; const m={'mx-eqn-n':['eq','nome'],'mx-eqn-t':['eq','tag'],'mx-eq-n':['eq','nome'],'mx-eq-t':['eq','tag'],'mx-pv-t':['pv','tarefa'],'mx-pv-f':['pv','freq'],'mx-pv-r':['pv','resp'],'mx-pc-c':['pc','cod'],'mx-pc-d':['pc','desc'],'mx-pc-u':['pc','un'],'mx-pc-m':['pc','min'],'mx-p-c':['add','cod'],'mx-p-q':['add','qtd'],'mx-p-u':['add','un'],'mx-p-o':['add','obs']}[t.id];
   if(m){ X[m[0]][m[1]]=t.value; return; } if(t.id==='mx-ent-p') X.pc.ent.cod=t.value; if(t.id==='mx-ent-q') X.pc.ent.qtd=t.value; if(t.id==='mx-ent-o') X.pc.ent.obs=t.value;
   if(t.id==='mx-pc-q'){ X.pc.busca=t.value; const p=t.selectionStart; render(); const n=$('#mx-pc-q'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(e){} } } });
 document.addEventListener('change',ev=>{ const t=ev.target, X=S.mx; if(t.id==='mx-eqn-l') X.eq.linha=t.value; if(t.id==='mx-pv-e') X.pv.equip=t.value; if(t.id==='mx-pv-p') X.pv.prox=t.value; if(t.id==='mx-eq-l') X.eq.linha=t.value; });
@@ -10368,29 +10411,38 @@ const MZ_LIM_PADRAO={parou:15,outro:30};
 S.mz={conc:null,avisados:{},ultBip:0};
 function mzLim(){ const l=(S.mx&&S.mx.cfg&&S.mx.cfg.limites)||{}; return {parou:+l.parou||MZ_LIM_PADRAO.parou,outro:+l.outro||MZ_LIM_PADRAO.outro}; }
 /* ---------- concluir: pede a causa e o que foi feito (uma vez por OS) ---------- */
-{ const _ms=manStatus; manStatus=async function(c,st){ if(st==='Concluída'&&c&&c.status!=='Concluída'&&!(c.exec&&c.exec.causa)&&!c._mzOk){ const E=c.exec||{}; S.mz.conc={n:c.numero,causa:'',txt:E.servicos||'',prev:!!c.prevId}; render(); setTimeout(()=>{ const t=document.getElementById('mz-txt'); t&&t.focus(); },60); return; }
+{ const _ms=manStatus; manStatus=async function(c,st){ if(st==='Concluída'&&c&&c.status!=='Concluída'&&!c._mzOk){ const E=c.exec||{}; /* sempre confirma com os dados mínimos: causa, serviço realizado e responsável */
+    S.mz.conc={n:c.numero,causa:E.causa||'',txt:E.servicos||'',tec:E.tecnico||(S.uid&&S.nomes[S.uid])||'',diag:E.diagnostico||'',prev:!!c.prevId}; render(); setTimeout(()=>{ const t=document.getElementById('mz-txt'); t&&t.focus(); },60); return; }
   return _ms.apply(this,arguments); }; }
 function mzModal(){ const Z=S.mz.conc, c=Z&&manDoc(Z.n); if(!c) return '';
   return `<div class="dbmodal eq-modal" data-mz-fundo="1"><div class="dbmbox eq-box sm mz-box" role="dialog" aria-modal="true" aria-labelledby="mz-t">
    <div class="eyebrow">CONCLUIR OS ${manNum(c.numero)} · ${esc(c.linha||'')}</div><h2 id="mz-t" style="margin:4px 0 2px">${esc(String(c.defeito||'').slice(0,80))}</h2><div class="sub" style="margin:0 0 14px">${esc(c.equip||'')}${c.paradaId?' · a parada da linha também é encerrada':''}</div>
    <div class="label" style="margin-bottom:8px">${Z.prev?'TIPO DO SERVIÇO':'O QUE CAUSOU?'}</div>
    <div class="mz-cs">${(Z.prev?['Preventiva feita','Preventiva com troca de peça','Preventiva com problema encontrado']:MZ_CAUSAS).map(k=>`<button type="button" class="mz-c" data-act="mz-causa" data-v="${esc(k)}" aria-pressed="${Z.causa===k}">${esc(k)}</button>`).join('')}</div>
-   <label style="display:block;margin-top:14px"><span class="label">O QUE FOI FEITO</span><textarea class="txt" id="mz-txt" rows="3" placeholder="Ex.: troquei a correia e regulei a tensão" style="margin-top:6px">${esc(Z.txt)}</textarea></label>
+   <label style="display:block;margin-top:14px"><span class="label">DIAGNÓSTICO (OPCIONAL)</span><input class="txt" id="mz-diag" value="${esc(Z.diag||'')}" placeholder="Ex.: rolamento travado por falta de lubrificação" style="margin-top:6px"></label>
+   <label style="display:block;margin-top:14px"><span class="label">SERVIÇO REALIZADO *</span><textarea class="txt" id="mz-txt" rows="3" placeholder="Ex.: troquei a correia e regulei a tensão" style="margin-top:6px">${esc(Z.txt)}</textarea></label>
+   <label style="display:block;margin-top:14px"><span class="label">RESPONSÁVEL PELA EXECUÇÃO *</span><input class="txt" id="mz-tec" value="${esc(Z.tec||'')}" style="margin-top:6px"></label>
+   ${((c.exec||{}).pecas||[]).length?`<div class="sub" style="margin:10px 0 0;font-size:12.5px">Materiais registrados: ${esc(((c.exec||{}).pecas||[]).map(p=>(p.desc||p.cod)+' '+p.qtd+' '+(p.un||'')).join(' · '))}</div>`:''}
    <div class="eq-err" id="mz-err"></div>
    <div class="eq-mf" style="border:0;padding:14px 0 0"><button class="btn sec" data-act="mz-x">Voltar</button><button class="btn" data-act="mz-ok" style="background:var(--ok-ink)">${ic('check',18,2.6)}Concluir OS</button></div></div></div>`; }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ let el=document.getElementById('mz-ov'); const h=S.mz.conc?mzModal():'';
     if(!h){ if(el) el.remove(); return x; } if(!el){ el=document.createElement('div'); el.id='mz-ov'; document.body.appendChild(el); }
     const t=document.getElementById('mz-txt'), foco=t&&document.activeElement===t, pos=t&&t.selectionStart; el.innerHTML=h; if(foco){ const n=document.getElementById('mz-txt'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }catch(e){} return x; }; }
-document.addEventListener('input',ev=>{ if(ev.target.id==='mz-txt'&&S.mz.conc) S.mz.conc.txt=ev.target.value; });
+document.addEventListener('input',ev=>{ const Z=S.mz.conc; if(!Z) return; if(ev.target.id==='mz-txt') Z.txt=ev.target.value; if(ev.target.id==='mz-tec') Z.tec=ev.target.value; if(ev.target.id==='mz-diag') Z.diag=ev.target.value; });
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mz-"]'), f=ev.target.closest&&ev.target.closest('[data-mz-fundo]');
   if(!b){ if(f&&ev.target===f){ S.mz.conc=null; render(); } return; } const Z=S.mz.conc; if(!Z) return; const a=b.dataset.act;
   if(a==='mz-x'){ S.mz.conc=null; render(); return; }
   if(a==='mz-causa'){ Z.causa=b.dataset.v; render(); return; }
-  if(a==='mz-ok'){ const c=manDoc(Z.n); if(!c) return; if(!Z.causa){ const e=document.getElementById('mz-err'); if(e) e.textContent=Z.prev?'Escolha o tipo do serviço.':'Escolha o que causou o problema.'; return; }
-    b.disabled=true; try{ const E=Object.assign({},c.exec||{},{causa:Z.causa}); if(String(Z.txt||'').trim()) E.servicos=String(Z.txt).trim(); await S.db.doc('chamados/'+c._id).update({exec:E}); c.exec=E; S.mz.conc=null; c._mzOk=true; await manStatus(c,'Concluída'); delete c._mzOk; }
-    catch(e){ b.disabled=false; erro(e); } render(); } });
+  if(a==='mz-ok'){ const c=manDoc(Z.n); if(!c) return; const er=document.getElementById('mz-err'), falta=m=>{ if(er) er.textContent=m; };
+    if(!Z.causa) return falta(Z.prev?'Escolha o tipo do serviço.':'Escolha o que causou o problema.');
+    if(String(Z.txt||'').trim().length<3) return falta('Descreva o serviço realizado.');
+    if(String(Z.tec||'').trim().length<2) return falta('Informe o responsável pela execução.');
+    b.disabled=true; b.textContent='Concluindo…';
+    try{ const E=Object.assign({},c.exec||{},{causa:Z.causa,servicos:String(Z.txt).trim(),tecnico:String(Z.tec).trim()}); if(String(Z.diag||'').trim()) E.diagnostico=String(Z.diag).trim();
+      await S.db.doc('chamados/'+c._id).update({exec:E}); c.exec=E; S.mz.conc=null; c._mzOk=true; await manStatus(c,'Concluída'); delete c._mzOk; }
+    catch(e){ b.disabled=false; console.warn('[manutenção] concluir',e); manErro(e,'Não foi possível concluir a OS. Nada foi perdido: tente de novo.'); } render(); } });
 /* a causa aparece no Resumo (30 dias) e no cartão concluído */
-function mzCausas(){ const ini=Date.now()-30*864e5, cnt={}; (S.chamados||[]).filter(c=>!c.excluido&&!c.prevId&&c.status==='Concluída'&&c.concluidoEm&&new Date(c.concluidoEm).getTime()>=ini).forEach(c=>{ const k=(c.exec&&c.exec.causa)||'Sem causa'; cnt[k]=(cnt[k]||0)+1; }); return Object.entries(cnt).sort((a,b)=>b[1]-a[1]); }
+function mzCausas(){ const ini=Date.now()-30*864e5, cnt={}; (S.chamados||[]).filter(c=>!manIgnorar(c)&&!c.prevId&&c.status==='Concluída'&&c.concluidoEm&&new Date(c.concluidoEm).getTime()>=ini).forEach(c=>{ const k=(c.exec&&c.exec.causa)||'Sem causa'; cnt[k]=(cnt[k]||0)+1; }); return Object.entries(cnt).sort((a,b)=>b[1]-a[1]); }
 { const _vp=vManPainel; vManPainel=function(){ const h=_vp(); const cs=mzCausas(); const mx=Math.max(1,...cs.map(x=>x[1]));
   const card=`<section class="card"><div class="head" style="align-items:baseline"><h2>Causas das falhas</h2><span class="sub" style="margin:0">corretivas concluídas · 30 dias</span></div>${cs.length?`<div class="mp-bars">${cs.map(([k,n])=>`<div class="mp-br"><span>${esc(k)}</span><div class="mp-bt"><i style="width:${n/mx*100}%;${k==='Sem causa'?'background:var(--faint)':''}"></i></div><b class="num">${n}</b></div>`).join('')}</div>`:'<div class="empty">A causa é escolhida ao concluir cada OS. Os números aparecem aqui.</div>'}</section>`;
   return h+`<div class="two mp-two">${card}<section class="card"><div class="head" style="align-items:baseline"><h2>Aviso de chamado sem atendimento</h2></div><div class="sub" style="margin:0 0 10px">Avisa no sino, com som e notificação, quando ninguém assumiu o chamado depois de:</div>
@@ -10398,7 +10450,7 @@ function mzCausas(){ const ini=Date.now()-30*864e5, cnt={}; (S.chamados||[]).fil
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mzl-salvar"]'); if(!b) return; const p=Math.max(1,+document.getElementById('mz-lp').value||15), o=Math.max(1,+document.getElementById('mz-lo').value||30);
   try{ await mxGrava(cf=>{ cf.limites={parou:p,outro:o}; }); S.mx.cfg.limites={parou:p,outro:o}; toast('Aviso: '+p+' min com máquina parada, '+o+' min nos outros.'); render(); }catch(e){ erro(e); } });
 /* ---------- aviso de chamado esquecido ---------- */
-function mzAtrasados(){ const L=mzLim(), ag=Date.now(); return (S.chamados||[]).filter(c=>!c.excluido&&!c.prevId&&c.status==='Aberta'&&c.criado&&(+c.numero||0)<900000).map(c=>({c,min:Math.round((ag-new Date(c.criado).getTime())/6e4)})).filter(x=>x.min>=(x.c.impacto==='parou'?L.parou:L.outro)); }
+function mzAtrasados(){ const L=mzLim(), ag=Date.now(); return (S.chamados||[]).filter(c=>!manIgnorar(c)&&!c.prevId&&c.status==='Aberta'&&c.criado&&(+c.numero||0)<900000).map(c=>({c,min:Math.round((ag-new Date(c.criado).getTime())/6e4)})).filter(x=>x.min>=(x.c.impacto==='parou'?L.parou:L.outro)); }
 NAV_EXTRA.push(()=>{ try{ if(!viewOk('manch')) return []; const xs=mzAtrasados(); if(!xs.length) return []; const pior=xs.sort((a,b)=>b.min-a.min)[0];
   return [{n:xs.length,t:'Chamado'+(xs.length>1?'s':'')+' sem atendimento',s:'OS '+manNum(pior.c.numero)+' · '+pior.c.linha+' · há '+manDur(pior.min),acao:'manch',c:'crit'}]; }catch(e){ return []; } });
 setInterval(()=>{ try{ if(!S.acs||!S.acs.pronto||!viewOk('manch')) return; for(const {c,min} of mzAtrasados()){ const k=c._id+'|'+(min>=2*(c.impacto==='parou'?mzLim().parou:mzLim().outro)?2:1); if(S.mz.avisados[k]) continue; S.mz.avisados[k]=1;
@@ -10643,6 +10695,382 @@ document.head.insertAdjacentHTML('beforeend',`<style id="mt-css">
   .mt-g{grid-template-columns:minmax(0,1fr)}.mt-g>*{grid-column:auto!important}.mt-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mt-bd{padding:10px}.mt-d{font-size:14px}.mt-rd{flex-direction:column;align-items:stretch}.mt-bx{padding:18px 16px 6px} }
 </style>`);
 /* ===FIM MATERIAIS=== */
+/* ===================== MANUTENÇÃO · CONFIABILIDADE (07/10): papéis, cancelamento, diagnóstico, QR do equipamento, histórico ===================== */
+/* Mesma estrutura de dados: chamados/os-NNNNN é o chamado e a OS; config/manut guarda equipamentos, preventivas e materiais. */
+function manErro(e,msg){ const c=(e&&e.code)||''; console.warn('[manutenção]',msg,c,e&&e.message);
+  if(c==='sem-permissao'||c==='permission-denied') return toast('Você não possui permissão para esta operação. Fale com o administrador.');
+  if(/unavailable|network|tempo|deadline/.test(c)) return toast(msg+' Verifique sua conexão e tente novamente.');
+  toast(msg+' Tente novamente.'); }
+/* quem atende: administrador ou quem tem o módulo Manutenção. Produção/Paradas: abre e acompanha. Só ver: nada grava. */
+function manPodeAtender(){ try{ if(S.acs&&S.acs.dono) return true; if(typeof soVer==='function'&&soVer()) return false; const p=acsP(); return !!p&&(p.tudo||(p.mods||[]).includes('manut')); }catch(e){ return false; } }
+const MAN_ACOES_ATENDER=['man-st','man-salvar-at','mm-assumir','mm-concluir','mx-p-add','mx-p-x','mx-pv-gerar','mx-pv-salvar','mx-pv-del','mx-pv-conf','mx-pv-ed','mx-eq-novo','mx-eq-salvar','mx-eq-del','mx-eq-conf','mx-eq-sug','mx-eq-ed','mx-pc-novo','mx-pc-cad','mx-ent','mzl-salvar','mz-ok','mcx-ok'];
+/* antes de qualquer outro ouvinte (fase de captura na janela) */
+window.addEventListener('click',ev=>{ const b=ev.target&&ev.target.closest&&ev.target.closest('[data-act]'); if(!b) return; const a=b.dataset.act;
+  if(MAN_ACOES_ATENDER.includes(a)&&!manPodeAtender()){ ev.stopImmediatePropagation(); ev.preventDefault(); toast('Você não possui permissão para esta ação. Ela é da equipe de manutenção.'); } },true);
+
+/* ---------- cancelar com motivo ---------- */
+S.mcx=null;
+{ const _ms=manStatus; manStatus=async function(c,st){ if(st==='Cancelada'&&c&&c.status!=='Cancelada'&&!c._cxOk){ S.mcx={n:c.numero,motivo:''}; render(); setTimeout(()=>{ const t=document.getElementById('mcx-txt'); t&&t.focus(); },60); return; }
+  return _ms.apply(this,arguments); }; }
+function mcxModal(){ const Z=S.mcx, c=Z&&manDoc(Z.n); if(!c) return '';
+  return `<div class="dbmodal eq-modal" data-mcx-fundo="1"><div class="dbmbox eq-box sm mz-box" role="dialog" aria-modal="true" aria-labelledby="mcx-t">
+   <div class="eyebrow">CANCELAR OS ${manNum(c.numero)} · ${esc(c.linha||'')}</div><h2 id="mcx-t" style="margin:4px 0 2px">${esc(String(c.defeito||'').slice(0,80))}</h2>
+   <div class="sub" style="margin:0 0 12px">A OS continua no histórico, marcada como cancelada.${c.paradaId?' A parada da linha ligada a ela é encerrada agora.':''}</div>
+   <label style="display:block"><span class="label">MOTIVO DO CANCELAMENTO *</span><textarea class="txt" id="mcx-txt" rows="2" style="margin-top:6px" placeholder="Ex.: chamado aberto em duplicidade">${esc(Z.motivo)}</textarea></label>
+   <div class="eq-err" id="mcx-err"></div>
+   <div class="eq-mf" style="border:0;padding:14px 0 0"><button class="btn sec" data-act="mcx-x">Voltar</button><button class="btn" data-act="mcx-ok" style="background:var(--crit-ink)">Cancelar OS</button></div></div></div>`; }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ let el=document.getElementById('mcx-ov'); const h=S.mcx?mcxModal():'';
+    if(!h){ if(el) el.remove(); return x; } if(!el){ el=document.createElement('div'); el.id='mcx-ov'; document.body.appendChild(el); }
+    const t=document.getElementById('mcx-txt'), foco=t&&document.activeElement===t; el.innerHTML=h; if(foco){ const n=document.getElementById('mcx-txt'); n&&n.focus(); } }catch(e){} return x; }; }
+document.addEventListener('input',ev=>{ if(ev.target.id==='mcx-txt'&&S.mcx) S.mcx.motivo=ev.target.value; });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mcx-"]'), f=ev.target.closest&&ev.target.closest('[data-mcx-fundo]');
+  if(!b){ if(f&&ev.target===f){ S.mcx=null; render(); } return; } const Z=S.mcx; if(!Z) return;
+  if(b.dataset.act==='mcx-x'){ S.mcx=null; render(); return; }
+  if(b.dataset.act==='mcx-ok'){ const c=manDoc(Z.n); if(!c) return; const m=String(Z.motivo||'').trim(); if(m.length<3){ const e=document.getElementById('mcx-err'); if(e) e.textContent='Informe o motivo do cancelamento.'; return; }
+    b.disabled=true; b.textContent='Cancelando…'; c._cxOk=true; c._motivoCancel=m.slice(0,300); try{ await manStatus(c,'Cancelada'); } finally { delete c._cxOk; delete c._motivoCancel; } S.mcx=null; render(); } });
+/* rerenderSeguro não apaga o que se digita nos modais */
+{ const _rs=rerenderSeguro; rerenderSeguro=function(){ const a=document.activeElement; if(a&&(a.id==='mcx-txt'||a.id==='mz-tec'||a.id==='mz-diag'||a.id==='mx-p-u'||a.id==='mx-p-o'||a.id==='mx-pv-r')) return; return _rs.apply(this,arguments); }; }
+
+/* ---------- detalhe da OS: diagnóstico e causa no atendimento; quem não é da manutenção só acompanha ---------- */
+{ const _md=manDetalhe; manDetalhe=function(c){ let h=_md.apply(this,arguments); if(!c) return h; const E=c.exec||{}, ed=S.man.ed||{}; const v=k=>ed[k]!=null?ed[k]:(E[k]||'');
+  const extra=`<label style="display:block;margin-top:10px"><span class="label">DIAGNÓSTICO</span><textarea class="txt" rows="2" data-man-e="diagnostico" placeholder="O que foi encontrado">${esc(v('diagnostico'))}</textarea></label>
+   <div class="two" style="gap:12px;margin-top:10px"><label><span class="label">CAUSA</span><select class="txt" data-man-e="causa"><option value="">—</option>${(c.prevId?['Preventiva feita','Preventiva com troca de peça','Preventiva com problema encontrado']:MZ_CAUSAS).map(t=>`<option ${v('causa')===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label><span></span></div>`;
+  h=h.replace('<label style="display:block;margin-top:10px"><span class="label">SERVIÇOS EXECUTADOS / PROCEDIMENTOS</span>',extra+'<label style="display:block;margin-top:10px"><span class="label">SERVIÇO REALIZADO</span>');
+  h=h.replace('<span class="label">PENDÊNCIAS / RECOMENDAÇÕES</span>','<span class="label">OBSERVAÇÕES / PENDÊNCIAS</span>');
+  const eqo=c.equipId&&mxEquip(c.equipId);
+  const info=`<section class="card"><div class="two" style="gap:10px 18px"><div><div class="label">EQUIPAMENTO</div><div style="margin-top:4px"><b>${esc((eqo&&eqo.nome)||c.equip||'—')}</b>${eqo&&eqo.tag?` <span class="sub" style="display:inline;margin:0">${esc(eqo.tag)}</span>`:''}</div></div>
+    <div><div class="label">SETOR / LINHA</div><div style="margin-top:4px"><b>${esc(c.linha||'—')}</b></div></div><div><div class="label">STATUS</div><div style="margin-top:4px"><span class="pill ${manStCor(c.status)}">${esc(c.status||'')}</span>${c.status==='Cancelada'&&c.motivoCancel?` <small class="sub" style="display:inline;margin:0">${esc(c.motivoCancel)}</small>`:''}</div></div>
+    <div><div class="label">RESPONSÁVEL</div><div style="margin-top:4px"><b>${esc(E.tecnico||'—')}</b></div></div></div></section>`;
+  const i=h.indexOf('<section class="card">'); if(i>=0) h=h.slice(0,i)+info+h.slice(i);
+  if(!manPodeAtender()){
+    h=h.replace(/<button[^>]*data-act="(man-st|man-salvar-at|mm-assumir|mx-p-add|mx-p-x|ax-conf)"[^>]*>[\s\S]*?<\/button>/g,'');
+    h=h.replace(/<(input|select|textarea)([^>]*?)(data-man-e=|id="mx-p-)/g,'<$1 disabled$2$3');
+    h=h.replace('<section class="card man-at">','<div class="banner" style="background:var(--teal-wash);color:var(--teal-strong)">Você acompanha este chamado. O atendimento, o status e os materiais são registrados pela equipe de manutenção.</div><section class="card man-at">');
+  }
+  return h; }; }
+
+/* ---------- QR do equipamento: ?chamado=Linha&equip=id → o chamado já abre com a máquina escolhida ---------- */
+function mxEqLink(e){ const l=encodeURIComponent(e.linha||''), id=encodeURIComponent(e.id); return ((window.claude&&window.claude.link)||(S.cfg&&S.cfg.linkPainel)||LINK_PAINEL)+'?chamado='+l+'&equip='+id+'#chamado='+l+'&equip='+id; }
+function mxQrParam(txt){ const m=String(txt||'').match(/[?&#]equip=([^&#]+)/); if(!m) return ''; try{ return decodeURIComponent(m[1]); }catch(e){ return m[1]; } }
+S.mx.qrEq=mxQrParam(location.search+'&'+location.hash);
+/* quando o formulário do chamado abrir pelo QR, escolhe o equipamento */
+setInterval(()=>{ try{ const id=S.mx.qrEq; if(!id||!S.man.f||!S.mx.lido) return; const e=mxEquip(id); S.mx.qrEq='';
+    if(!e||e.ativo===false){ toast('O equipamento deste QR não está mais cadastrado. Escolha na lista.'); return; }
+    Object.assign(S.man.f,{linha:S.man.f.linha||e.linha,equipId:e.id,equip:e.nome,origem:'qr-equip'}); render(); toast('Equipamento identificado pelo QR: '+e.nome); }catch(e){} },400);
+{ const _mf=manForm; manForm=function(){ let h=_mf.apply(this,arguments); const F=S.man.f||{};
+  if(F.origem==='qr-equip'&&F.equip) h=h.replace('<div class="label" style="margin:12px 0 6px">LINHA</div>',`<div class="banner" style="background:var(--teal-wash);color:var(--teal-strong);margin-top:10px">${ic('engr',16,2)} Equipamento identificado pelo QR: <b>${esc(F.equip)}</b></div><div class="label" style="margin:12px 0 6px">LINHA</div>`);
+  return h; }; }
+/* escanear de dentro do painel também reconhece o QR do equipamento */
+{ const _esc=manEscanear; manEscanear=function(){ const i=document.createElement('input'); i.type='file'; i.accept='image/*'; i.setAttribute('capture','environment'); i.style.display='none';
+  i.onchange=async()=>{ const f=i.files&&i.files[0]; i.remove(); if(!f) return; toast('Lendo o QR…'); let t=null; try{ t=await manLerQr(f); }catch(e){ t=null; }
+    const eq=mxQrParam(t); if(!eq){ /* QR de linha: segue o caminho antigo */ return _escLinha(t); }
+    const e=mxEquip(eq); if(!e){ toast('Equipamento do QR não encontrado no cadastro.'); return; } if(!viewOk('manch')){ toast('Você não possui permissão para acessar este módulo.'); return; }
+    manNovo(e.linha); Object.assign(S.man.f,{equipId:e.id,equip:e.nome,origem:'qr-equip'}); S.man.cur=null;
+    if(S.view==='linhatv'){ S.man.novo=false; S.man.ltv=e.linha; render(); } else { go('manch'); setTimeout(()=>{ const x=$('#man-form'); x&&x.scrollIntoView({block:'start'}); const ta=document.querySelector('[data-man="defeito"]'); ta&&ta.focus(); },80); }
+    toast('Equipamento identificado: '+e.nome); };
+  document.body.appendChild(i); i.click(); };
+  function _escLinha(t){ const m=t&&String(t).match(/chamado=([^&#]+)/); let l=''; if(m){ try{ l=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ l=m[1]; } }
+    if(!l||!manLinhas().includes(l)){ toast(t?'Este QR não é de chamado de linha nem de equipamento.':'Não consegui ler o QR. Chegue mais perto e tente de novo.'); return; }
+    if(!viewOk('manch')){ toast('Você não possui permissão para acessar este módulo.'); return; }
+    manNovo(l); S.man.cur=null; if(S.view==='linhatv'){ S.man.novo=false; if(S.paradas.some(p=>p.linha===l&&!p.fim)) S.man.f.impacto='parou'; S.man.ltv=l; render(); } else { go('manch'); setTimeout(()=>{ const x=$('#man-form'); x&&x.scrollIntoView({block:'start'}); },80); } } }
+
+/* ---------- equipamentos: QR e histórico de chamados ---------- */
+function mxEqChamados(e){ const k=mxNorm(e.nome); return (S.chamados||[]).filter(c=>!c.excluido&&(+c.numero||0)<900000&&(c.equipId===e.id||(!c.equipId&&mxNorm(c.equip)===k&&(!c.linha||!e.linha||c.linha===e.linha)))).sort((a,b)=>String(b.criado).localeCompare(String(a.criado))); }
+function mxPrevExec(p){ const xs=(S.chamados||[]).filter(c=>!c.excluido&&c.prevId===p.id&&c.status==='Concluída').sort((a,b)=>String(b.concluidoEm).localeCompare(String(a.concluidoEm))).slice(0,3);
+  return xs.length?`<small style="display:block;margin-top:2px">Realizadas: ${xs.map(c=>`${dm(hojeStr(new Date(c.concluidoEm)))} (OS ${manNum(c.numero)}${c.exec&&c.exec.tecnico?' · '+esc(c.exec.tecnico):''})`).join(' · ')}</small>`:''; }
+{ const _ve=vManEquip; vManEquip=function(){ let h=_ve.apply(this,arguments); const X=S.mx; if(!X.lido) return h;
+  h=h.replace(/<button class="eq-lk" data-act="mx-eq-prev" data-id="([^"]+)">/g,(m,id)=>`<button class="eq-lk" data-act="mx-eq-qr" data-id="${id}">${ic('grid',15,2)}QR</button><button class="eq-lk" data-act="mx-eq-hist" data-id="${id}">${ic('relogio',15,2)}Histórico</button>`+m);
+  h=h.replace('<div class="sub">Cadastre as máquinas de cada linha.','<div class="pg-acts" style="display:flex;gap:10px;margin-top:10px"><button class="btn sec" data-act="mx-eq-qrpdf">'+ic('baixar',18,2)+'Baixar QR de todos os equipamentos</button></div><div class="sub">Cadastre as máquinas de cada linha.');
+  let painel='';
+  if(X.eqQr){ const e=mxEquip(X.eqQr); if(e) painel+=`<section class="card"><div class="head" style="align-items:baseline"><h2>QR do equipamento · ${esc(e.nome)}</h2><button class="lnk" data-act="mx-eq-fecha">Fechar</button></div>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><div class="man-qr" style="max-width:240px"><div class="man-qr-t">CHAMADO DE MANUTENÇÃO</div>${manQrSvg(mxEqLink(e),180)}<b>${esc(e.nome)}</b><small>${esc(e.linha||'')}${e.tag?' · '+esc(e.tag):''}</small></div>
+    <div class="sub" style="max-width:420px">O operador escaneia com a câmera do celular e o chamado abre com este equipamento já escolhido.<br><small style="word-break:break-all">${esc(mxEqLink(e))}</small><div style="margin-top:10px"><button class="btn" data-act="mx-eq-qrpdf" data-id="${esc(e.id)}">${ic('baixar',18,2)}Baixar PDF para imprimir</button></div></div></div></section>`; }
+  if(X.eqHist){ const e=mxEquip(X.eqHist); if(e){ const xs=mxEqChamados(e); painel+=`<section class="card"><div class="head" style="align-items:baseline"><h2>Histórico · ${esc(e.nome)}</h2><button class="lnk" data-act="mx-eq-fecha">Fechar</button></div>
+    ${xs.length?xs.slice(0,60).map(c=>`<div class="row" style="grid-template-columns:110px 120px minmax(0,1fr) auto;gap:10px;align-items:start"><button class="lnk" data-act="man-abrir" data-n="${c.numero}" data-ir="1" style="padding:0;text-align:left">OS ${manNum(c.numero)}</button><span class="num" style="color:var(--muted)">${c.criado?dm(hojeStr(new Date(c.criado)))+' '+hora(c.criado):''}</span><span>${esc(String(c.defeito||'').slice(0,120))}${c.exec&&c.exec.causa?`<small style="display:block;color:var(--muted)">causa: ${esc(c.exec.causa)}${c.exec.tecnico?' · '+esc(c.exec.tecnico):''}</small>`:''}</span><span class="pill ${manStCor(c.status)}">${esc(c.status)}</span></div>`).join(''):'<div class="empty">Nenhum chamado para este equipamento ainda.</div>'}</section>`; } }
+  if(painel){ const i=h.indexOf('<section class="card mx-new">'); h=i<0?h+painel:h.slice(0,i)+painel+h.slice(i); }
+  return h; }; }
+async function mxEqQrPdf(id){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } const es=id?[mxEquip(id)].filter(Boolean):mxEquips(); if(!es.length){ toast('Nenhum equipamento cadastrado.'); return; }
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=210, cw=95, ch=135, mx=(W-2*cw)/2, my=12;
+  es.forEach((e,i)=>{ const k=i%4; if(i&&k===0) pdf.addPage(); const x=mx+(k%2)*cw, y=my+Math.floor(k/2)*ch;
+    pdf.setDrawColor(150); pdf.setLineDashPattern([1.5,1.5],0); pdf.rect(x+3,y+3,cw-6,ch-6); pdf.setLineDashPattern([],0);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(10); pdf.setTextColor(31,56,100); pdf.text('CHAMADO DE MANUTENÇÃO',x+cw/2,y+15,{align:'center'});
+    desenharQR(pdf,mxEqLink(e),x+(cw-70)/2,y+20,70); pdf.setTextColor(0,0,0); pdf.setFontSize(17); pdf.text(pdf.splitTextToSize(e.nome,cw-12)[0],x+cw/2,y+102,{align:'center'});
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.text((e.linha||'')+(e.tag?' · '+e.tag:''),x+cw/2,y+110,{align:'center'});
+    pdf.setFontSize(8); pdf.setTextColor(90,90,90); pdf.text('Escaneie com o celular para abrir um chamado deste equipamento',x+cw/2,y+120,{align:'center'}); pdf.setTextColor(0,0,0); });
+  await manBaixar(pdf,id?'QR_'+String(es[0].nome).replace(/\W+/g,'_')+'.pdf':'QR_equipamentos.pdf','PDF com '+es.length+' QR gerado. Abra e imprima.'); }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mx-eq-qr"],[data-act="mx-eq-hist"],[data-act="mx-eq-fecha"],[data-act="mx-eq-qrpdf"]'); if(!b) return; const a=b.dataset.act, X=S.mx;
+  if(a==='mx-eq-qr'){ X.eqQr=b.dataset.id; X.eqHist=null; render(); window.scrollTo(0,0); return; }
+  if(a==='mx-eq-hist'){ X.eqHist=b.dataset.id; X.eqQr=null; render(); window.scrollTo(0,0); return; }
+  if(a==='mx-eq-fecha'){ X.eqQr=null; X.eqHist=null; render(); return; }
+  if(a==='mx-eq-qrpdf'){ mxEqQrPdf(b.dataset.id||''); return; } });
+/* ===FIM MANUTENÇÃO CONFIÁVEL=== */
+/* ===================== CRACHÁ + TABLET DA PAREDE (07/10): o funcionário passa o crachá na câmera e abre o chamado ===================== */
+/* crachas/{codigo} = {codigo,nome,linha,papel:'operador'|'tecnico',ativo,criadoEm,por}
+   QR do crachá = "COLAFIX:CRACHA:<codigo>" (só o código: nada de senha, CPF ou dados pessoais).
+   O tablet entra com uma conta própria (cargo "Produção · Tela da linha"); o crachá diz QUEM está usando. */
+const TT_ALFA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const TT_RE=/^COLAFIX:CRACHA:([A-Z0-9]{6,12})$/;
+const TT_DEFEITOS=['Parou / travou','Barulho anormal','Vazamento','Correia / corrente','Elétrico / painel','Sensor / falha de leitura','Aquecendo','Outro'];
+const TT_PAPEL={operador:'Operador(a)',tecnico:'Técnico(a) da manutenção'};
+S.cr={lista:[],sub:false,f:{nome:'',linha:'',papel:'operador'},conf:null,salv:false};
+S.tt={fase:'espera',p:null,linha:'',equipId:'',equip:'',defeito:'',txt:'',ult:0,ocioso:45000,recente:{},msg:'',enviando:false,numero:null,cam:'',linhas:null};
+function crCodigo(){ const a=new Uint8Array(8); try{ crypto.getRandomValues(a); }catch(e){ for(let i=0;i<8;i++) a[i]=Math.floor(Math.random()*256); } return [...a].map(x=>TT_ALFA[x%TT_ALFA.length]).join(''); }
+function crQrTexto(cod){ return 'COLAFIX:CRACHA:'+cod; }
+function crAssinar(){ if(S.cr.sub||!S.db) return; S.cr.sub=true; inscrever('crachas',()=>S.db.collection('crachas').limit(1000),snap=>{ S.cr.lista=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); }); }
+function crDe(cod){ return S.cr.lista.find(c=>c.codigo===cod||c._id===cod)||null; }
+function crPodeGerir(){ return !!(S.acs&&S.acs.dono); }
+function ttPodeUsar(){ try{ if(S.acs&&S.acs.dono) return true; const p=acsP(); return !!p&&(p.tudo||['paradas','producao','manut'].some(m=>(p.mods||[]).includes(m))); }catch(e){ return false; } }
+/* regra: quem abre e quem conserta se identificam pelo crachá. "Sem crachá" só se a administradora liberar (emergência). */
+function ttSemCrachaOk(){ return !!(S.cfg&&S.cfg.totemSemCracha); }
+function ttLinhas(){ if(S.tt.linhas) return S.tt.linhas; let l=null; try{ l=JSON.parse(localStorage.getItem('painel.totem.linhas')||'null'); }catch(e){} return (S.tt.linhas=Array.isArray(l)&&l.length?l:['Linha 1','Linha 2']); }
+
+/* ---------- telas no menu ---------- */
+Object.assign(VIEWS,{mancrachas:{nome:'Crachás',ic:'equipe',mob:'Crachás'},mantotem:{nome:'Tablet da parede',ic:'tela',mob:'Tablet'}});
+Object.assign(CRUMB,{mancrachas:'Crachás (QR dos funcionários)',mantotem:'Tablet da parede'});
+{ const M=MODS.find(m=>m.id==='manut'); if(M&&!M.views.includes('mancrachas')) M.views.push('mancrachas'); }
+{ const _vo=viewOk; viewOk=function(v){ if(v==='mancrachas') return crPodeGerir(); if(v==='mantotem') return ttPodeUsar(); return _vo.apply(this,arguments); }; }
+{ const _mv=manView; manView=function(v){ if(v==='mancrachas'||v==='mantotem') crAssinar(); return v==='mancrachas'?vCrachas():v==='mantotem'?vTotem():_mv(v); }; }
+setInterval(()=>{ try{ if(S.db&&S.acs&&S.acs.pronto&&(S.view==='mantotem'||S.view==='mancrachas')) crAssinar(); }catch(e){} },1000);
+/* botão para abrir o modo tablet na tela de chamados */
+{ const _vc=vManCh; vManCh=function(){ let h=_vc.apply(this,arguments); if(S.man.cur!=null||!ttPodeUsar()) return h; return h.replace('<div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap">','<div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-go="mantotem">'+ic('tela',18,2)+'Modo tablet da parede</button>'); }; }
+/* endereço do tablet: ...?totem=1 abre direto no modo parede */
+(function(){ if(!/[?&#]totem=1/.test(location.search+'&'+location.hash)) return; let t=0; const tenta=()=>{ if(S.acs&&S.acs.pronto&&acsP()){ if(ttPodeUsar()) go('mantotem'); else toast('Você não possui permissão para acessar este módulo.'); return; } if(++t<120) setTimeout(tenta,500); }; setTimeout(tenta,300); })();
+
+/* ---------- cadastro dos crachás (só a administradora) ---------- */
+function vCrachas(){ const F=S.cr.f, LT=linhasOrd(); const xs=S.cr.lista.slice().sort((a,b)=>(a.ativo===false)-(b.ativo===false)||String(a.linha).localeCompare(String(b.linha))||String(a.nome).localeCompare(String(b.nome)));
+  const row=c=>`<div class="mx-er" style="${c.ativo===false?'opacity:.55':''}"><span class="mx-eic">${manQrSvg(crQrTexto(c.codigo),34)}</span><div class="mx-en"><b>${esc(c.nome)}</b><small>${esc(TT_PAPEL[c.papel]||c.papel)} · ${esc(c.linha||'todas as linhas')} · código ${esc(c.codigo)}${c.ativo===false?' · DESATIVADO':''}</small></div>
+    <div class="mx-ea">${c.ativo===false?'':`<button class="eq-lk" data-act="cr-pdf" data-id="${esc(c._id)}">${ic('baixar',15,2)}Imprimir crachá</button><button class="eq-lk" data-act="cr-novo-cod" data-id="${esc(c._id)}" title="Para crachá perdido: o código antigo para de funcionar">${ic('chaveacesso',15,2)}Novo código</button>`}${S.cr.conf===c._id?`<button class="eq-lk del" data-act="cr-desat" data-id="${esc(c._id)}">Confirmar</button>`:c.ativo===false?`<button class="eq-lk" data-act="cr-reat" data-id="${esc(c._id)}">Reativar</button>`:`<button class="eq-lk del" data-act="cr-conf" data-id="${esc(c._id)}">${ic('lixo',15,2)}Desativar</button>`}</div></div>`;
+  return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Crachás</h1><div class="sub">Cada funcionário recebe um QR no crachá. No tablet da parede ele passa o crachá na câmera e o chamado sai no nome dele, já na linha dele. O QR só tem um código: não abre o painel em outro aparelho.</div></div>
+   <div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="cr-pdf-todos">${ic('baixar',18,2)}Imprimir todos os crachás</button><button class="btn sec" data-go="mantotem">${ic('tela',18,2)}Abrir modo tablet</button></div></div>
+   <section class="card"><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="cr-semcr" ${ttSemCrachaOk()?'checked':''} style="width:22px;height:22px;margin-top:2px"><span><b>Permitir chamado sem crachá no tablet</b><small style="display:block;color:var(--muted)">Desligado: só abre chamado quem passa o crachá. Ligue só se precisar de uma saída para quem esqueceu o crachá (o chamado fica marcado como "sem crachá").</small></span></label></section>
+   <section class="card mx-new"><div class="label" style="margin-bottom:8px">NOVO CRACHÁ</div><div class="mx-nf"><input class="txt" id="cr-nome" placeholder="Nome como vai aparecer (ex.: Ana Souza)" value="${esc(F.nome)}" maxlength="60"><select class="txt" id="cr-linha"><option value="">Linha…</option>${LT.map(l=>`<option ${F.linha===l?'selected':''}>${esc(l)}</option>`).join('')}<option value="" disabled>──</option><option value="*" ${F.linha==='*'?'selected':''}>Todas (manutenção)</option></select>
+    <select class="txt" id="cr-papel"><option value="operador" ${F.papel==='operador'?'selected':''}>Operador(a) da linha</option><option value="tecnico" ${F.papel==='tecnico'?'selected':''}>Técnico(a) da manutenção</option></select><button class="btn" data-act="cr-add" ${S.cr.salv?'disabled':''}>${ic('mais',18,2.4)}${S.cr.salv?'Salvando…':'Criar crachá'}</button></div></section>
+   <section class="card"><div class="head" style="align-items:baseline"><h2>Funcionários com crachá</h2><span class="sub" style="margin:0">${xs.filter(c=>c.ativo!==false).length} ativo(s)</span></div>${xs.length?xs.map(row).join(''):'<div class="empty">Nenhum crachá ainda.</div>'}</section>`; }
+async function crPdf(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } if(!cs.length){ toast('Nenhum crachá para imprimir.'); return; }
+  /* tamanho de crachá padrão (CR80): 85,6 × 54 mm · QR de 30 mm · 10 por folha A4, com linhas de corte */
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=85.6, Hc=54, gx=8, x0=(210-2*W-gx)/2, y0=12, gy=4.5; const logo=(document.querySelector('.brand img')||{}).src;
+  cs.forEach((c,i)=>{ const k=i%10; if(i&&k===0) pdf.addPage(); const x=x0+(k%2)*(W+gx), y=y0+Math.floor(k/2)*(Hc+gy);
+    pdf.setDrawColor(170); pdf.setLineDashPattern([1,1],0); pdf.roundedRect(x,y,W,Hc,3,3); pdf.setLineDashPattern([],0);
+    pdf.setFillColor(20,63,84); pdf.rect(x,y,W,9,'F'); pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(255,255,255); pdf.text('COLAFIX · MANUTENÇÃO',x+4,y+6);
+    if(logo&&/^data:image\/png/.test(logo)){ try{ pdf.setFillColor(255,255,255); pdf.roundedRect(x+W-24,y+1.5,21,6,1,1,'F'); pdf.addImage(logo,'PNG',x+W-23.5,y+2,20,5); }catch(e){} }
+    /* QR de 30 mm com ~5 mm de margem branca em volta (a faixa de cima e a borda não encostam) */ pdf.setFillColor(255,255,255); pdf.rect(x+W-40,y+9.5,40,Hc-9.5,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+W-35,y+14.5,30);
+    pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(14); const nm=pdf.splitTextToSize(String(c.nome||''),W-44); pdf.text(nm.slice(0,2),x+4,y+18);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(60,60,60); pdf.text(TT_PAPEL[c.papel]||'',x+4,y+(nm.length>1?31:26)); pdf.text(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas',x+4,y+(nm.length>1?36:31));
+    pdf.setFontSize(7); pdf.setTextColor(110,110,110); pdf.text('Aproxime o QR da câmera do tablet',x+4,y+Hc-8); pdf.text('Código '+c.codigo,x+4,y+Hc-4); pdf.setTextColor(0,0,0); });
+  await manBaixar(pdf,cs.length===1?'Cracha_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Crachas_manutencao.pdf','PDF com '+cs.length+' crachá(s). Imprima em 100% (sem ajustar à página) para o QR sair com 3 cm.'); }
+document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='cr-nome') S.cr.f.nome=t.value; });
+document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id==='cr-semcr'){ if(!crPodeGerir()){ t.checked=!t.checked; return; } const v=!!t.checked; t.disabled=true;
+    try{ await S.db.doc('config/geral').update({totemSemCracha:v}); S.cfg.totemSemCracha=v; toast(v?'Tablet aceita chamado sem crachá (marcado como "sem crachá").':'Tablet exige crachá para abrir chamado.'); }catch(e){ t.checked=!v; manErro(e,'Não foi possível salvar a opção.'); } t.disabled=false; return; }
+  if(t.id==='cr-linha') S.cr.f.linha=t.value; if(t.id==='cr-papel') S.cr.f.papel=t.value; });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="cr-"]'); if(!b) return; const a=b.dataset.act, C=S.cr;
+  if(!crPodeGerir()){ toast('Você não possui permissão para gerenciar crachás.'); return; }
+  const c=b.dataset.id&&crDe(b.dataset.id);
+  try{
+    if(a==='cr-add'){ if(C.salv) return; const nome=String(($('#cr-nome')||{}).value||'').trim().replace(/\s+/g,' '), linha=($('#cr-linha')||{}).value||'', papel=($('#cr-papel')||{}).value||'operador';
+      if(nome.length<2){ toast('Escreva o nome.'); return; } if(!linha){ toast('Escolha a linha do funcionário.'); return; }
+      if(C.lista.some(x=>x.ativo!==false&&mxNorm(x.nome)===mxNorm(nome))){ toast('Já existe um crachá ativo para '+nome+'.'); return; }
+      C.salv=true; render(); const cod=crCodigo(); await S.db.doc('crachas/'+cod).set({codigo:cod,nome,linha,papel,ativo:true,criadoEm:new Date().toISOString(),por:S.uid||null});
+      C.f={nome:'',linha:linha,papel}; toast('Crachá de '+nome+' criado. Toque em “Imprimir crachá”.'); }
+    else if(a==='cr-pdf'&&c) await crPdf([c]);
+    else if(a==='cr-pdf-todos') await crPdf(C.lista.filter(x=>x.ativo!==false).sort((p,q)=>String(p.linha).localeCompare(String(q.linha))||String(p.nome).localeCompare(String(q.nome))));
+    else if(a==='cr-conf'){ C.conf=b.dataset.id; }
+    else if(a==='cr-desat'&&c){ await S.db.doc('crachas/'+c._id).update({ativo:false,desativadoEm:new Date().toISOString(),desativadoPor:S.uid||null}); C.conf=null; toast('Crachá de '+c.nome+' desativado: ele para de funcionar no tablet.'); }
+    else if(a==='cr-reat'&&c){ await S.db.doc('crachas/'+c._id).update({ativo:true}); toast('Crachá reativado.'); }
+    else if(a==='cr-novo-cod'&&c){ C.salv=true; const cod=crCodigo(); await S.db.doc('crachas/'+cod).set({codigo:cod,nome:c.nome,linha:c.linha,papel:c.papel,ativo:true,criadoEm:new Date().toISOString(),por:S.uid||null,substitui:c.codigo});
+      await S.db.doc('crachas/'+c._id).update({ativo:false,desativadoEm:new Date().toISOString(),substituidoPor:cod}); toast('Novo código para '+c.nome+'. Imprima o crachá novo; o antigo não funciona mais.'); }
+  }catch(e){ console.warn('[crachás]',e); manErro(e,'Não foi possível salvar o crachá.'); }
+  C.salv=false; render(); });
+
+/* ---------- tablet da parede ---------- */
+const ttCam={stream:null,video:null,cv:null,timer:null,det:null,lendo:false,erro:''};
+function ttAtivo(){ return S.view==='mantotem'; }
+async function ttDetector(){ if(ttCam.det) return ttCam.det;
+  if('BarcodeDetector' in window){ try{ const bd=new BarcodeDetector({formats:['qr_code']}); ttCam.det=async c=>{ const r=await bd.detect(c); return r&&r[0]&&r[0].rawValue||''; }; return ttCam.det; }catch(e){} }
+  await carregarScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'); if(!window.jsQR) throw new Error('leitor de QR indisponível');
+  ttCam.det=async c=>{ const x=c.getContext('2d'); const d=x.getImageData(0,0,c.width,c.height); const q=window.jsQR(d.data,c.width,c.height,{inversionAttempts:'dontInvert'}); return q?q.data:''; }; return ttCam.det; }
+async function ttCamLiga(){ if(ttCam.stream||ttCam.lendo) return; ttCam.lendo=true;
+  try{ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'sem-camera'};
+    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    if(!ttAtivo()||S.tt.fase!=='espera'){ st.getTracks().forEach(t=>t.stop()); return; }
+    ttCam.stream=st; let v=document.getElementById('tt-video'); if(!v){ v=document.createElement('video'); v.id='tt-video'; v.muted=true; v.setAttribute('playsinline',''); v.autoplay=true; document.body.appendChild(v); }
+    v.srcObject=st; ttCam.video=v; try{ await v.play(); }catch(e){} ttCam.erro=''; S.tt.cam='ok';
+    const det=await ttDetector(); ttCam.cv=ttCam.cv||document.createElement('canvas');
+    ttCam.timer=setInterval(async()=>{ if(ttCam.ocupado||!ttCam.video||ttCam.video.readyState<2) return; ttCam.ocupado=true;
+      try{ const vw=ttCam.video.videoWidth, vh=ttCam.video.videoHeight; if(!vw) return; const k=Math.min(1,1280/Math.max(vw,vh)); /* resolução cheia da câmera: reduzir para 800 px fazia o QR um pouco mais longe deixar de ser lido */ ttCam.cv.width=Math.round(vw*k); ttCam.cv.height=Math.round(vh*k);
+        ttCam.cv.getContext('2d').drawImage(ttCam.video,0,0,ttCam.cv.width,ttCam.cv.height); const txt=await det(ttCam.cv); if(txt) ttLeu(txt); }
+      catch(e){ console.warn('[tablet] leitura',e); } finally{ ttCam.ocupado=false; } },250);
+  }catch(e){ console.warn('[tablet] câmera',e); ttCam.erro=e&&e.name==='NotAllowedError'?'A câmera foi bloqueada. Libere a câmera para este site nas configurações do navegador.':e&&e.name==='sem-camera'?'Este aparelho não tem câmera disponível.':'Não consegui ligar a câmera ('+((e&&(e.name||e.message))||'erro')+').'; S.tt.cam='erro'; rerenderTt(); }
+  finally{ ttCam.lendo=false; } }
+function ttCamDesliga(){ if(ttCam.timer){ clearInterval(ttCam.timer); ttCam.timer=null; } if(ttCam.stream){ ttCam.stream.getTracks().forEach(t=>t.stop()); ttCam.stream=null; } const v=document.getElementById('tt-video'); if(v){ v.srcObject=null; v.remove(); } ttCam.video=null; if(S.tt.cam==='ok') S.tt.cam=''; }
+/* leitura do crachá */
+function ttLeu(txt){ const T=S.tt; if(T.fase!=='espera') return; const m=String(txt).trim().toUpperCase().match(TT_RE);
+  const agora=Date.now(); const chave=m?m[1]:String(txt).slice(0,40); if(T.recente[chave]&&agora-T.recente[chave]<8000) return; T.recente[chave]=agora;
+  if(!m){ ttMsg('Este QR não é um crachá do painel.'); return; }
+  const c=crDe(m[1]); if(!c){ ttMsg(S.cr.lista.length?'Crachá não reconhecido. Procure o PCP.':'Ainda carregando os crachás… tente de novo em instantes.'); if(!S.cr.lista.length) delete T.recente[chave]; return; }
+  if(c.ativo===false){ ttMsg('Este crachá foi desativado. Procure o PCP.'); return; }
+  ttBip(); ttInicia({codigo:c.codigo,nome:c.nome,linha:c.linha,papel:c.papel}); }
+function ttBip(){ try{ const A=window.AudioContext||window.webkitAudioContext; if(!A) return; const x=ttCam.ac||(ttCam.ac=new A()); const o=x.createOscillator(), g=x.createGain(); o.frequency.value=1250; o.connect(g); g.connect(x.destination); g.gain.setValueAtTime(0.2,x.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,x.currentTime+0.15); o.start(); o.stop(x.currentTime+0.16); }catch(e){} }
+function ttMsg(t){ S.tt.msg=t; rerenderTt(); clearTimeout(ttMsg._t); ttMsg._t=setTimeout(()=>{ S.tt.msg=''; rerenderTt(); },5000); }
+function ttInicia(p){ const T=S.tt; Object.assign(T,{p,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:p.papel==='tecnico'?'tecnico':'maquina',ult:Date.now()}); ttCamDesliga(); render(); }
+function ttVoltar(){ Object.assign(S.tt,{fase:'espera',p:null,linha:'',equipId:'',equip:'',defeito:'',txt:'',enviando:false,numero:null}); render(); }
+function rerenderTt(){ if(!ttAtivo()) return; const a=document.activeElement; if(a&&a.closest&&a.closest('.tt')&&a.matches('input,textarea')) return; render(); }
+/* sem toque por um tempo → volta para a espera (o próximo não herda o chamado pela metade) */
+setInterval(()=>{ const T=S.tt; if(!ttAtivo()){ if(ttCam.stream) ttCamDesliga(); return; } if(T.fase!=='espera'&&!T.enviando&&Date.now()-T.ult>(T.fase==='ok'||T.fase==='fimok'?8000:T.ocioso)) ttVoltar(); if(T.fase==='espera'&&!ttCam.stream&&!ttCam.lendo&&S.tt.cam!=='erro') ttCamLiga(); },500);
+['pointerdown','keydown','input'].forEach(t=>document.addEventListener(t,()=>{ S.tt.ult=Date.now(); },true));
+/* tela sempre acesa enquanto o modo parede está aberto */
+let ttWake=null; async function ttAcorda(){ try{ if(ttAtivo()&&!ttWake&&navigator.wakeLock) { ttWake=await navigator.wakeLock.request('screen'); ttWake.addEventListener('release',()=>{ ttWake=null; }); } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') ttAcorda(); else if(ttCam.stream) ttCamDesliga(); });
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ const on=ttAtivo(); document.body.classList.toggle('tt-on',on); if(on) ttAcorda(); else if(ttCam.stream) ttCamDesliga(); }catch(e){} return x; }; }
+{ const _rs=rerenderSeguro; rerenderSeguro=function(){ if(ttAtivo()&&S.tt.fase!=='espera'&&S.tt.fase!=='tecnico') return; /* (inclui 'fim': não apaga o texto digitado) */ return _rs.apply(this,arguments); }; }
+
+function ttEstadoLinha(l){ const ab=(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)&&c.linha===l&&(+c.numero||0)<900000);
+  const par=(S.paradas||[]).find(p=>p.linha===l&&!p.fim);
+  if(!ab.length) return {c:par?'crit':'ok',t:par?'Parada · '+esc(par.motivo||''):'Funcionando',s:par?'desde '+hora(par.inicio):'nenhum chamado aberto'};
+  const k=ab.sort((a,b)=>String(a.criado).localeCompare(String(b.criado)))[0]; const tec=k.exec&&k.exec.tecnico;
+  return {c:k.status==='Aberta'?'crit':/Aguardando/.test(k.status)?'warn':'teal',t:k.status==='Aberta'?'Manutenção chamada':k.status==='Em execução'?(tec?esc(tec)+' trabalhando':'Em execução'):esc(k.status),s:'OS '+manNum(k.numero)+' · '+esc(k.equip||String(k.defeito||'').slice(0,40))+' · há '+manIdade(k.criado)+(ab.length>1?' · +'+(ab.length-1)+' chamado(s)':'')}; }
+function vTotem(){ const T=S.tt, L=ttLinhas();
+  const topo=`<div class="tt-top"><div><b>Chamar manutenção</b><span>${L.map(esc).join(' · ')}</span></div><div class="tt-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div><button class="tt-x" data-act="tt-sair" title="Sair do modo tablet">✕</button></div>`;
+  let corpo='';
+  if(T.fase==='espera'){ corpo=`<div class="tt-linhas">${L.map(l=>{ const e=ttEstadoLinha(l); return `<div class="tt-ln ${e.c}"><small>${esc(l)}</small><b>${e.t}</b><span>${e.s}</span></div>`; }).join('')}</div>
+    <div class="tt-cta"><div class="tt-qr">${ic('grid',64,1.6)}</div><div><h1>Aproxime seu crachá da câmera</h1><p>O QR do crachá fica a um palmo da tela, virado para a câmera de cima.</p>${ttCam.erro?`<p class="tt-err">${esc(ttCam.erro)}${ttSemCrachaOk()?'':' Enquanto isso, chame a manutenção pelo ramal.'}</p>`:''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}</div></div>
+    <div class="tt-rod">${ttSemCrachaOk()?'<button class="btn sec" data-act="tt-sem">Estou sem crachá</button>':''}<button class="btn sec" data-act="tt-cheia">${ic('tela',18,2)}Tela cheia</button></div>`; }
+  else if(T.fase==='sem'){ corpo=`<div class="tt-box"><h1>Sem crachá</h1><p>Escreva seu nome para o chamado sair identificado.</p><input class="txt tt-in" id="tt-nome" maxlength="60" autocomplete="off" value="${esc(T.txtNome||'')}"><div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Voltar</button><button class="btn" data-act="tt-sem-ok">Continuar</button></div></div>`; }
+  else if(T.fase==='maquina'){ const ord=L.slice().sort((a,b)=>(b===T.p.linha)-(a===T.p.linha));
+    corpo=`<div class="tt-ola">Olá, <b>${esc(T.p.nome)}</b>${T.p.semCracha?' <small>(sem crachá)</small>':''}</div><h1 class="tt-h">Qual máquina?</h1>
+    <div class="tt-cols">${ord.map(l=>{ const es=mxEquips(l); return `<section class="tt-col ${l===T.p.linha?'sua':''}"><h2>${esc(l)}${l===T.p.linha?' <small>sua linha</small>':''}</h2><div class="tt-grid">${es.map(e=>`<button class="tt-bt" data-act="tt-eq" data-l="${esc(l)}" data-id="${esc(e.id)}"><b>${esc(e.nome)}</b>${e.tag?`<small>${esc(e.tag)}</small>`:''}</button>`).join('')}<button class="tt-bt q" data-act="tt-eq" data-l="${esc(l)}" data-id=""><b>Não sei qual</b><small>só a linha</small></button></div></section>`; }).join('')}</div>
+    <div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button></div>`; }
+  else if(T.fase==='defeito'){ corpo=`<div class="tt-ola">${esc(T.p.nome)} · <b>${esc(T.linha)}</b>${T.equip?' · '+esc(T.equip):''}</div><h1 class="tt-h">O que está acontecendo?</h1>
+    <div class="tt-grid tt-def">${TT_DEFEITOS.map(d=>`<button class="tt-bt" data-act="tt-def" data-v="${esc(d)}" aria-pressed="${T.defeito===d}"><b>${esc(d)}</b></button>`).join('')}</div>
+    <label class="tt-lab">Detalhe (opcional)<textarea class="txt tt-in" id="tt-txt" rows="2" maxlength="300" placeholder="Ex.: correia do elevador saiu do lugar">${esc(T.txt)}</textarea></label>
+    <div class="tt-rod"><button class="btn sec" data-act="tt-volta-maq">Voltar</button><button class="btn" data-act="tt-def-ok" ${T.defeito||String(T.txt||'').trim()?'':'disabled'}>Continuar</button></div>`; }
+  else if(T.fase==='impacto'){ corpo=`<div class="tt-ola">${esc(T.linha)}${T.equip?' · '+esc(T.equip):''} · ${esc(T.defeito||'')}</div><h1 class="tt-h">E a linha?</h1>
+    <div class="tt-imp">${Object.keys(MAN_IMP).map(k=>`<button class="tt-bt imp ${MAN_IMP[k][1]}" data-act="tt-imp" data-v="${k}" ${T.enviando?'disabled':''}><b>${k==='parou'?'Parou':k==='reduziu'?'Está produzindo menos':'Continua normal'}</b></button>`).join('')}</div>
+    ${T.enviando?'<p class="tt-wait">Enviando o chamado…</p>':''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}<div class="tt-rod"><button class="btn sec" data-act="tt-volta-def" ${T.enviando?'disabled':''}>Voltar</button></div>`; }
+  else if(T.fase==='fimok'){ corpo=`<div class="tt-box ok"><div class="tt-okic">${ic('check',56,2.6)}</div><h1>OS ${manNum(T.numero)} concluída</h1><p>Conserto registrado no nome de ${esc(T.p.nome)}.</p><div class="tt-rod"><button class="btn" data-act="tt-voltar">Pronto</button></div></div>`; }
+  else if(T.fase==='ok'){ corpo=`<div class="tt-box ok"><div class="tt-okic">${ic('check',56,2.6)}</div><h1>Chamado enviado</h1><p>OS ${manNum(T.numero)} · ${esc(T.linha)}${T.equip?' · '+esc(T.equip):''}</p><p>A manutenção já foi avisada. Acompanhe aqui na tela.</p><div class="tt-rod"><button class="btn" data-act="tt-voltar">Pronto</button></div></div>`; }
+  else if(T.fase==='fim'){ const c=manDoc(T.osFim); if(!c){ T.fase='tecnico'; return vTotem(); } const cs=c.prevId?['Preventiva feita','Preventiva com troca de peça','Preventiva com problema encontrado']:MZ_CAUSAS;
+    corpo=`<div class="tt-ola">${esc(T.p.nome)} · OS ${manNum(c.numero)} · ${esc(c.linha)}${c.equip?' · '+esc(c.equip):''}</div><h1 class="tt-h">${c.prevId?'Como foi a preventiva?':'O que causou?'}</h1>
+    <div class="tt-grid tt-def">${cs.map(k=>`<button class="tt-bt" data-act="tt-causa" data-v="${esc(k)}" aria-pressed="${T.causa===k}"><b>${esc(k)}</b></button>`).join('')}</div>
+    <label class="tt-lab">O que foi feito? *<textarea class="txt tt-in" id="tt-serv" rows="2" maxlength="500" placeholder="Ex.: troquei a correia e regulei a tensão">${esc(T.serv||'')}</textarea></label>
+    <p class="sub" style="margin:0;font-size:15px">Fica registrado que <b>${esc(T.p.nome)}</b> consertou, pelo crachá.${c.paradaId?' A parada da linha também é encerrada.':''}</p>${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}
+    <div class="tt-rod"><button class="btn sec" data-act="tt-fim-volta" ${T.enviando?'disabled':''}>Voltar</button><button class="btn" data-act="tt-fim-ok" ${T.enviando?'disabled':''} style="background:var(--ok-ink)">${T.enviando?'Concluindo…':'Concluir OS'}</button></div>`; }
+  else if(T.fase==='tecnico'){ const xs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)&&(+c.numero||0)<900000&&L.includes(c.linha)).sort((a,b)=>(b.impacto==='parou')-(a.impacto==='parou')||String(a.criado).localeCompare(String(b.criado)));
+    corpo=`<div class="tt-ola">Olá, <b>${esc(T.p.nome)}</b> · ${esc(TT_PAPEL.tecnico)}</div><h1 class="tt-h">${xs.length?'Qual chamado você está atendendo?':'Nenhum chamado aberto nestas linhas'}</h1>
+    <div class="tt-lst">${xs.map(c=>{ const meu=c.exec&&c.exec.tecnico&&mxNorm(c.exec.tecnico)===mxNorm(T.p.nome)&&c.status==='Em execução'; return `<div class="tt-ch ${c.impacto==='parou'?'crit':''}"><div><b>OS ${manNum(c.numero)} · ${esc(c.linha)}${c.equip?' · '+esc(c.equip):''}</b><span>${esc(String(c.defeito||'').slice(0,90))}</span><small>${esc(c.status)} · aberto há ${manIdade(c.criado)}${c.nome?' por '+esc(c.nome):''}</small></div><div class="tt-acs">${c.status==='Em execução'?(meu?'<span class="pill teal">você está nele</span>':''):`<button class="btn sec" data-act="tt-cheguei" data-n="${c.numero}" ${T.enviando?'disabled':''}>Cheguei na máquina</button>`}<button class="btn" data-act="tt-fim" data-n="${c.numero}" ${T.enviando?'disabled':''}>Terminei o conserto</button></div></div>`; }).join('')}</div>
+    ${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}<div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Sair</button><button class="btn sec" data-act="tt-tec-abrir">Abrir um chamado</button></div>`; }
+  return `<div class="tt">${topo}${corpo}</div>`; }
+document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='tt-serv'){ S.tt.serv=t.value; return; } if(t.id==='tt-txt'){ S.tt.txt=t.value; const b=document.querySelector('[data-act="tt-def-ok"]'); if(b) b.disabled=!(S.tt.defeito||t.value.trim()); } if(t.id==='tt-nome') S.tt.txtNome=t.value; });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="tt-"]'); if(!b||b.disabled) return; const a=b.dataset.act, T=S.tt; T.ult=Date.now();
+  if(a==='tt-sair'){ if(!confirm('Sair do modo tablet da parede?')) return; ttCamDesliga(); ttVoltar(); go(viewOk('manch')?'manch':primeiraView()); return; }
+  if(a==='tt-cheia'){ try{ document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); }catch(e){} return; }
+  if(a==='tt-voltar'){ ttVoltar(); return; }
+  if(a==='tt-sem'){ if(!ttSemCrachaOk()) return; ttCamDesliga(); T.fase='sem'; T.txtNome=''; render(); setTimeout(()=>{ const i=$('#tt-nome'); i&&i.focus(); },50); return; }
+  if(a==='tt-sem-ok'){ const n=String(T.txtNome||'').trim().replace(/\s+/g,' '); if(n.length<2){ toast('Escreva seu nome.'); return; } ttInicia({codigo:null,nome:n.slice(0,60),linha:'',papel:'operador',semCracha:true}); return; }
+  if(a==='tt-eq'){ T.linha=b.dataset.l; const e=b.dataset.id?mxEquip(b.dataset.id):null; T.equipId=e?e.id:''; T.equip=e?e.nome:''; T.fase='defeito'; render(); return; }
+  if(a==='tt-volta-maq'){ T.fase='maquina'; render(); return; }
+  if(a==='tt-def'){ T.defeito=T.defeito===b.dataset.v?'':b.dataset.v; render(); return; }
+  if(a==='tt-def-ok'){ if(!T.defeito&&!String(T.txt||'').trim()) return; T.fase='impacto'; T.msg=''; render(); return; }
+  if(a==='tt-volta-def'){ T.fase='defeito'; render(); return; }
+  if(a==='tt-tec-abrir'){ T.fase='maquina'; render(); return; }
+  if(a==='tt-imp'){ if(T.enviando) return; T.enviando=true; T.msg=''; render();
+    const det=[T.defeito&&T.defeito!=='Outro'?T.defeito:'',String(T.txt||'').trim()].filter(Boolean).join(': ')||'Outro';
+    manNovo(T.linha); Object.assign(S.man.f,{linha:T.linha,quando:manAgoraLocal(),defeito:det,impacto:b.dataset.v,nome:T.p.nome,equip:T.equip||'',equipId:T.equipId||'',origem:'tablet',cracha:T.p.codigo||null});
+    S.man.novo=false; S.man.cur=null; try{ await manSalvar(); }catch(e){ console.warn('[tablet] chamado',e); }
+    const n=S.man.cur; S.man.cur=null; S.man.novo=false; T.enviando=false;
+    if(n!=null){ T.numero=n; T.fase='ok'; T.ult=Date.now(); if(T.p.codigo) T.recente[T.p.codigo]=Date.now()+22000; /* quem acabou de chamar não reabre o fluxo por 30 s */ } else { T.msg='Não foi possível enviar o chamado. Verifique a internet e toque de novo. Se a máquina parou, avise a manutenção pelo ramal.'; }
+    render(); return; }
+  if(a==='tt-fim'){ const c=manDoc(+b.dataset.n); if(!c) return; T.osFim=c.numero; T.causa=(c.exec&&c.exec.causa)||''; T.serv=(c.exec&&c.exec.servicos)||''; T.msg=''; T.fase='fim'; render(); return; }
+  if(a==='tt-fim-volta'){ T.fase='tecnico'; T.msg=''; render(); return; }
+  if(a==='tt-causa'){ T.causa=b.dataset.v; T.serv=String(($('#tt-serv')||{}).value||T.serv||''); render(); return; }
+  if(a==='tt-fim-ok'){ const c=manDoc(T.osFim); if(!c||T.enviando) return; T.serv=String(($('#tt-serv')||{}).value||'').trim();
+    if(!T.causa){ T.msg=c.prevId?'Escolha como foi a preventiva.':'Escolha o que causou.'; render(); return; } if(T.serv.length<3){ T.msg='Escreva o que foi feito.'; render(); return; }
+    if(!T.p.codigo){ T.msg='Para concluir é preciso passar o crachá.'; render(); return; }
+    T.enviando=true; T.msg=''; render();
+    try{ const agora=new Date().toISOString(); const E=Object.assign({},c.exec||{},{causa:T.causa,servicos:T.serv,tecnico:T.p.nome,tecnicoCracha:T.p.codigo}); if(!E.inicio) E.inicio=manAgoraLocal();
+      const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Conserto concluído no tablet por '+T.p.nome+' (crachá)'}]).slice(-200);
+      await S.db.doc('chamados/'+c._id).update({exec:E,hist,concluidoPorNome:T.p.nome,concluidoPorCracha:T.p.codigo}); c.exec=E; c.hist=hist;
+      c._mzOk=true; try{ await manStatus(c,'Concluída'); } finally { delete c._mzOk; }
+      T.enviando=false; if(c.status!=='Concluída'){ T.msg='Não foi possível concluir agora. Verifique a internet e tente de novo.'; render(); return; }
+      T.recente[T.p.codigo]=Date.now()+22000; toast('OS '+manNum(c.numero)+' concluída por '+T.p.nome+'.'); T.numero=c.numero; T.fase='fimok'; T.ult=Date.now(); render(); }
+    catch(e){ T.enviando=false; console.warn('[tablet] concluir',e); T.msg='Não foi possível concluir agora. Verifique a internet e tente de novo.'; render(); }
+    return; }
+  if(a==='tt-cheguei'){ const c=manDoc(+b.dataset.n); if(!c||T.enviando) return; T.enviando=true; render();
+    try{ const agora=new Date().toISOString(); const E=Object.assign({},c.exec||{}); if(!E.tecnico) E.tecnico=T.p.nome; if(!E.inicio) E.inicio=manAgoraLocal();
+      const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Técnico no local: '+T.p.nome+(T.p.codigo?' (crachá)':'')}]).slice(-200);
+      await S.db.doc('chamados/'+c._id).update({exec:E,hist,noLocalEm:c.noLocalEm||agora,noLocalPor:T.p.nome}); c.exec=E; c.hist=hist;
+      if(c.status!=='Em execução') await manStatus(c,'Em execução');
+      T.enviando=false; if(T.p.codigo) T.recente[T.p.codigo]=Date.now()+22000; toast('OS '+manNum(c.numero)+': '+T.p.nome+' no local.'); ttVoltar(); }
+    catch(e){ T.enviando=false; console.warn('[tablet] cheguei',e); T.msg='Não foi possível registrar agora. Verifique a internet e tente de novo.'; render(); }
+    return; } });
+document.head.insertAdjacentHTML('beforeend',`<style id="tt-css">
+body.tt-on .side,body.tt-on header.top,body.tt-on .bottomnav,body.tt-on nav.tabs{display:none!important}body.tt-on .content{padding:0!important;max-width:none!important}body.tt-on .main{margin:0!important}
+.tt{min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:18px 22px 22px;background:var(--bg);box-sizing:border-box;user-select:none;-webkit-user-select:none}
+.tt-top{display:flex;align-items:center;gap:16px}.tt-top>div:first-child{flex:1;display:flex;flex-direction:column}.tt-top b{font-size:26px;color:var(--teal-strong)}.tt-top span{color:var(--muted);font-size:15px}
+.tt-clk{font-size:40px;font-weight:800;color:var(--ink)}.tt-x{border:0;background:transparent;color:var(--faint);font-size:20px;width:44px;height:44px;cursor:pointer}
+.tt-linhas{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.tt-ln{border-radius:18px;padding:18px 22px;background:var(--surface);box-shadow:var(--shadow);border-left:10px solid var(--ok);display:flex;flex-direction:column;gap:4px}
+.tt-ln small{font-size:14px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.tt-ln b{font-size:30px;line-height:1.15}.tt-ln span{font-size:15px;color:var(--ink-2)}
+.tt-ln.crit{border-left-color:var(--crit);animation:mpviv 1.6s ease-in-out infinite}.tt-ln.crit b{color:var(--crit-ink)}.tt-ln.warn{border-left-color:var(--warn)}.tt-ln.teal{border-left-color:var(--teal)}
+.tt-cta{flex:1;display:flex;align-items:center;justify-content:center;gap:28px;text-align:left;padding:10px}.tt-cta h1{font-size:40px;line-height:1.1;margin:0 0 8px}.tt-cta p{font-size:18px;color:var(--ink-2);margin:0;max-width:30ch}
+.tt-qr{width:130px;height:130px;border-radius:28px;background:var(--teal-wash);color:var(--teal-strong);display:flex;align-items:center;justify-content:center;animation:mpsino 2.5s ease-in-out infinite}
+.tt-err{color:var(--crit-ink)!important;font-weight:700;font-size:18px!important;margin-top:10px!important}.tt-wait{font-size:20px;font-weight:700;color:var(--teal-strong);text-align:center}
+.tt-rod{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}.tt-rod .btn{height:60px;min-width:180px;font-size:19px}
+.tt-ola{font-size:20px;color:var(--ink-2)}.tt-ola small{color:var(--muted)}.tt-h{font-size:34px;margin:0}
+.tt-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;flex:1}.tt-col{background:var(--surface-2);border:1px solid var(--line);border-radius:18px;padding:14px}.tt-col.sua{border:2px solid var(--teal)}
+.tt-col h2{margin:0 0 10px;font-size:22px}.tt-col h2 small{font-size:13px;color:var(--teal-strong);font-weight:700;margin-left:6px}
+.tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}.tt-bt{min-height:84px;border-radius:16px;border:2px solid var(--line);background:var(--surface);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:12px 16px;text-align:left;color:var(--ink)}
+.tt-bt b{font-size:20px;line-height:1.2}.tt-bt small{font-size:13px;color:var(--muted)}.tt-bt.q{border-style:dashed}.tt-bt[aria-pressed="true"]{border-color:var(--teal-strong);background:var(--teal-wash)}.tt-bt:active{transform:scale(.98)}
+.tt-def .tt-bt{min-height:72px}.tt-lab{display:flex;flex-direction:column;gap:6px;font-weight:700;color:var(--ink-2)}.tt-in{font-size:20px!important;min-height:56px}
+.tt-imp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.tt-bt.imp{min-height:150px;align-items:center;text-align:center}.tt-bt.imp b{font-size:24px}.tt-bt.imp.crit{border-color:var(--crit);background:var(--crit-tint)}.tt-bt.imp.warn{border-color:var(--warn);background:var(--warn-tint)}.tt-bt.imp.ok{border-color:var(--ok);background:var(--ok-tint)}
+.tt-box{margin:auto;max-width:640px;width:100%;background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:30px;display:flex;flex-direction:column;gap:12px;text-align:center}.tt-box h1{font-size:34px;margin:0}.tt-box p{font-size:19px;margin:0;color:var(--ink-2)}
+.tt-okic{width:110px;height:110px;margin:0 auto;border-radius:999px;background:var(--ok-tint);color:var(--ok-ink);display:flex;align-items:center;justify-content:center}
+.tt-lst{display:flex;flex-direction:column;gap:10px}.tt-ch{display:flex;gap:14px;align-items:center;background:var(--surface);border-radius:16px;box-shadow:var(--shadow);padding:14px 18px;border-left:8px solid var(--teal)}.tt-ch.crit{border-left-color:var(--crit)}
+.tt-ch>div{flex:1;display:flex;flex-direction:column;gap:2px}.tt-ch b{font-size:20px}.tt-ch span{font-size:16px}.tt-ch small{color:var(--muted);font-size:14px}.tt-ch .btn{height:64px;font-size:19px}.tt-acs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+#tt-video{position:fixed;right:16px;bottom:16px;width:200px;height:150px;object-fit:cover;border-radius:16px;border:3px solid var(--teal);transform:scaleX(-1);z-index:900;background:#000;box-shadow:var(--shadow)}
+body:not(.tt-on) #tt-video{display:none}
+@media (max-width:760px){ .tt-imp{grid-template-columns:minmax(0,1fr)} .tt-cta{flex-direction:column;text-align:center} .tt-cta h1{font-size:30px} #tt-video{width:130px;height:100px} }
+</style>`);
+/* ===FIM CRACHÁ=== */
+/* ===================== SILOS · SÓ CONSULTA (07/10): login que só vê o nível dos silos ===================== */
+/* Perfil pronto "silosver": um único módulo, uma única tela, nenhum botão que grava. No banco, o perfil é "só ver" (firestore.rules). */
+MODS.push({id:'silosver',nome:'Nível dos silos',ic:'silo',views:['silosver']});
+VIEWS.silosver={nome:'Nível dos silos',ic:'silo',mob:'Silos'}; CRUMB.silosver='Nível dos silos';
+ACS_MODS.splice(ACS_MODS.findIndex(m=>m[0]==='ajustes'),0,['silosver','Só consulta do nível dos silos']);
+{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.silosver={nome:'Silos (só consulta)',mods:['silosver'],locais:[]}; ACS_PERFIS.outro=_o; }
+if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('silosver')) EQ_PRONTO_ORD.splice(EQ_PRONTO_ORD.indexOf('ver')>=0?EQ_PRONTO_ORD.indexOf('ver')+1:EQ_PRONTO_ORD.length,0,'silosver'); /* junto dos outros perfis só de ver */
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.silosver='Só olha o nível dos silos (cimento e areia), atualizando sozinho. Não muda nada.';
+if(!ACS_SO_VER.includes('silosver')) ACS_SO_VER.push('silosver');
+if(typeof EQ_MOD!=='undefined'&&!EQ_MOD.silosver) EQ_MOD.silosver=['silo','Nível dos silos (só consulta)'];
+function vSilosVer(){ const ult=saldoPorSilo(), agora=Date.now(); const L=S.cfg.limites||CFG_PADRAO.limites;
+  const tanque=s=>{ const u=ult[s.id]; if(!u) return `<div class="sv-t"><div class="sv-tk">${tankSvg(0,'var(--ok)',92,190,1.5)}</div><b class="sv-n">${esc(s.nome)}</b><div class="sv-q" style="color:var(--faint)">—</div><small>de ${s.cap} t · sem medição</small></div>`;
+    const p=u.q/s.cap, nv=nivel(p), vel=agora-new Date(u.em).getTime()>24*36e5;
+    return `<div class="sv-t ${nv.c}"><div class="sv-tk">${tankSvg(p,nv.fill,92,190,1.5)}</div><b class="sv-n">${esc(s.nome)}</b>
+      <div class="sv-q num">${f1(u.q)} <small>t</small></div><div class="sv-p num" style="color:${nv.ink}">${f1(Math.min(p,9.99)*100)}% · ${nv.n}</div><small>de ${s.cap} t</small>
+      <small class="sv-h ${vel?'velho':''}">${u.origem==='consumo'||u.origem==='estorno'?'⚙️ automático':'📏 medido'} · ${dia(u.em)==='Hoje'?'hoje '+hora(u.em):dia(u.em).toLowerCase()+' '+hora(u.em)}</small></div>`; };
+  const grupo=g=>{ const ss=(S.cfg.silos||[]).filter(s=>s.grupo===g); if(!ss.length) return ''; const tot=ss.reduce((a,s)=>a+(ult[s.id]?ult[s.id].q:0),0), cap=ss.reduce((a,s)=>a+(+s.cap||0),0), nv=nivel(cap?tot/cap:0);
+    return `<section class="card sv-g"><div class="sv-gh"><h2>${esc(g)}</h2><span class="num"><b style="color:${nv.ink}">${f1(tot)} t</b> de ${cap} t · ${f1(cap?tot/cap*100:0)}%</span></div><div class="sv-ts">${ss.map(tanque).join('')}</div></section>`; };
+  const grupos=[...new Set((S.cfg.silos||[]).map(s=>s.grupo))];
+  const datas=Object.values(ult).map(u=>new Date(u.em).getTime()).filter(Boolean), maisVelho=datas.length?Math.min(...datas):null;
+  const aviso=maisVelho&&agora-maisVelho>24*36e5?`<div class="banner">Algum silo não é atualizado há mais de 24 horas. O número pode não refletir o nível real.</div>`:'';
+  const aCaminho=(S.cargas||[]).filter(c=>etapaCarga(c)===0), naFab=(S.cargas||[]).filter(c=>etapaCarga(c)===1);
+  let cim=''; try{ cim=cimentoCard(previsaoCimento(),true); }catch(e){}
+  return `${banner()}<div class="head"><div><div class="eyebrow">SILOS · SÓ CONSULTA</div><h1>Nível dos silos</h1><div class="sub">Atualiza sozinho a cada medição ou apontamento. Normal a partir de ${L.normal}% · crítico abaixo de ${L.atencao}%.</div></div>
+    <div class="sv-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div></div>
+   ${aviso}${grupos.map(grupo).join('')}
+   <div class="two" style="gap:14px">${cim}<section class="card"><div class="label">CARGAS DE CIMENTO</div><div class="sv-car num"><div><b>${aCaminho.length}</b><span>a caminho${aCaminho.length?' · '+f1(aCaminho.reduce((a,c)=>a+(+c.qtd||0),0))+' t':''}</span></div><div><b>${naFab.length}</b><span>na fábrica, aguardando descarga</span></div></div></section></div>`; }
+document.head.insertAdjacentHTML('beforeend',`<style id="sv-css">
+.sv-clk{font-size:40px;font-weight:800;color:var(--teal-strong)}
+.sv-g{padding:18px 20px}.sv-gh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}.sv-gh h2{margin:0;font-size:20px;letter-spacing:.06em;text-transform:uppercase}.sv-gh span{font-size:16px;color:var(--muted)}.sv-gh b{font-size:22px}
+.sv-ts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sv-t{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding:12px 8px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+.sv-t.crit{border-color:var(--crit);background:var(--crit-tint)}.sv-t.warn{border-color:var(--warn)}
+.sv-n{font-size:16px;margin-top:6px}.sv-q{font-size:30px;font-weight:800;line-height:1.1}.sv-q small{font-size:15px;font-weight:600}.sv-p{font-size:14px;font-weight:700}.sv-t small{color:var(--muted);font-size:12.5px}.sv-h.velho{color:var(--crit-ink)!important;font-weight:700}
+.sv-car{display:flex;flex-direction:column;gap:10px;margin-top:10px}.sv-car div{display:flex;align-items:baseline;gap:10px}.sv-car b{font-size:30px}.sv-car span{color:var(--ink-2)}
+@media (max-width:520px){ .sv-ts{grid-template-columns:repeat(2,minmax(0,1fr))} .sv-clk{font-size:28px} }
+</style>`);
+/* ===FIM SILOS CONSULTA=== */
+
+
+
 /* ===================== LAYOUT DO CELULAR (06/10): barra de baixo com "Mais", topo limpo, botões e filtros no tamanho do dedo ===================== */
 P.mais3='<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
 S.mob={sheet:false};
@@ -10715,6 +11143,200 @@ document.head.insertAdjacentHTML('beforeend',`<style id="mob-css">
 @media (max-width:420px){ .mob-brand img{height:18px!important} .tp-ib,.tp-busca{width:36px!important;height:36px!important} }
 </style>`);
 /* ===FIM MOB=== */
+/* ===================== SILOS · SALDO ÚNICO (07/10): consumo automático pelos apontamentos + medição manual ===================== */
+/* Fonte única do saldo: silos/{siloId}  { saldoKg, medidoKg, medidoEm, atualizadoEm, origem, ultimoMov, medicaoId, porUid, porNome }
+   Histórico (só inclusão): silomov/{id}  tipos: consumo · estorno · medicao · recusado
+   - consumo  id c_{entregaId}  (um apontamento nunca desconta duas vezes)
+   - estorno  id e_{entregaId}  (apontamento desfeito devolve o que tinha descontado)
+   - recusado id r_{entregaId}  (estoque insuficiente: nada é descontado, fica registrado)
+   - medicao  id m_{medicaoId}_{siloId} (medição física: o saldo passa a ser o medido; não é consumo)
+   Qual silo cada linha consome: config/geral.siloConsumo = {'Linha 1':'c2', …}. Linha sem silo = nada é descontado. */
+S.siloSaldo={}; S.siloMov=[]; S.siloSub=false; S.sm=null; S.siloAvisados={};
+const SILO_MOTIVOS=['Medição física','Correção de divergência','Inventário','Erro de apontamento','Outro'];
+const SILO_TIPO={consumo:{ic:'⚙️',n:'Consumo (apontamento)'},estorno:{ic:'↩️',n:'Estorno (apontamento desfeito)'},medicao:{ic:'📏',n:'Medição manual'},recusado:{ic:'⛔',n:'Consumo recusado'}};
+const siloR=n=>Math.round((+n||0)*1000)/1000;
+const fkg=n=>(Math.round(+n||0)).toLocaleString('pt-BR')+' kg';
+const fkgS=n=>((+n||0)>0?'+':(+n||0)<0?'−':'')+(Math.round(Math.abs(+n||0))).toLocaleString('pt-BR')+' kg';
+function siloFs(){ try{ return window.claude&&window.claude._fs?window.claude._fs():null; }catch(e){ return null; } }
+function siloNome(id){ const s=(S.cfg.silos||[]).find(x=>x.id===id); return s?s.nome+(s.grupo?' ('+s.grupo.toLowerCase()+')':''):id; }
+function siloPodeMedir(){ try{ return !!(S.acs&&S.acs.dono)||viewOk('medicao'); }catch(e){ return false; } }
+function siloPodeConfig(){ try{ return !!(S.acs&&S.acs.dono)||viewOk('ajustes'); }catch(e){ return false; } }
+function siloEu(){ return {porUid:S.uid||null,porNome:(S.uid&&S.nomes[S.uid])||''}; }
+/* aviso que não some sozinho em 3 s (o toast pode ser coberto pela confirmação do apontamento) */
+function siloAviso(msg,tipo){ console.warn('[silos]',msg); let b=document.getElementById('silo-aviso');
+  if(!b){ b=document.createElement('div'); b.id='silo-aviso'; b.setAttribute('role','alert'); b.style.cssText='position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:2100;max-width:min(640px,calc(100% - 24px));border-radius:12px;padding:12px 14px;font:14px/1.4 "Segoe UI",system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.15);display:flex;gap:10px;align-items:center'; document.body.appendChild(b); }
+  b.style.background=tipo==='erro'?'#F8E6E3':'#FFF7E6'; b.style.border='1px solid '+(tipo==='erro'?'#D9A39C':'#E8CB8A'); b.style.color=tipo==='erro'?'#7A2B23':'#5C4210';
+  b.innerHTML=`<span style="flex:1">${esc(msg)}</span><button type="button" style="border:0;background:none;font-size:16px;cursor:pointer;color:inherit" aria-label="Fechar">✕</button>`;
+  b.querySelector('button').onclick=()=>b.remove(); clearTimeout(siloAviso._t); siloAviso._t=setTimeout(()=>{ const x=document.getElementById('silo-aviso'); if(x) x.remove(); },20000); }
+function siloAvisoUmaVez(k,msg,tipo){ if(S.siloAvisados[k]) return; S.siloAvisados[k]=true; siloAviso(msg,tipo); }
+
+/* ---------- leitura ---------- */
+function siloAssinar(){ if(S.siloSub||!S.db) return; S.siloSub=true;
+  inscrever('silos',()=>S.db.collection('silos').limit(100),snap=>{ const o={}; snap.docs.forEach(d=>{ o[d.id]=d.data(); }); S.siloSaldo=o; rerenderSeguro(); });
+  inscrever('silomov',()=>S.db.collection('silomov').orderBy('em','desc').limit(400),snap=>{ S.siloMov=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); }); }
+setInterval(()=>{ try{ if(S.db&&S.acs&&S.acs.pronto&&acsP()) siloAssinar(); }catch(e){} },1000);
+/* saldo atual por silo, no formato que as telas já usam ({q em toneladas, em}). Sem saldo no sistema novo = última medição (como antes). */
+function saldoPorSilo(){ const base=ultimoPorSilo(), out={};
+  (S.cfg.silos||[]).forEach(s=>{ const d=S.siloSaldo[s.id];
+    if(d&&d.saldoKg!=null) out[s.id]={q:siloR(d.saldoKg/1000),em:d.atualizadoEm||d.medidoEm,origem:d.origem||'medicao',kg:+d.saldoKg,doc:d};
+    else if(base[s.id]) out[s.id]=Object.assign({origem:'legado',kg:base[s.id].q*1000},base[s.id]); });
+  return out; }
+function siloOrigemCurta(u){ return !u?'':u.origem==='consumo'||u.origem==='estorno'?'⚙️ ':u.origem==='medicao'?'📏 Medido ':'Medido '; }
+function siloAgoraSub(s,u){ if(!u) return 'sem medição';
+  const quando=new Date(u.em).toLocaleDateString('pt-BR')+' '+hora(u.em);
+  if(u.origem==='legado') return `${fkg(u.kg)} · medido ${dia(u.em).toLowerCase()} ${hora(u.em)} · <b>desconto automático ainda não iniciado</b>: registre uma medição 📏 para começar`;
+  return `${fkg(u.kg)} · Última atualização: ${quando} · Origem: ${u.origem==='medicao'?'📏 Medição manual':'⚙️ Atualização automática'}`; }
+
+/* ---------- consumo pelo apontamento (entregas) ---------- */
+let siloFila=Promise.resolve();
+const siloEmFila=fn=>(siloFila=siloFila.then(fn,fn));
+/* quando o cimento saiu do silo: hora do apontamento (antecipado conta a partir de quando foi registrado, como no resto do painel) */
+function siloRefEm(e){ return (e.antecipado&&e.registradoEm)?e.registradoEm:(e.em||e.registradoEm||''); }
+function siloConsumoDe(e){ const o=ordById(e.ordem); const linha=(o&&o.linha)||e.linha; if(!linha||!usaCimFab(linha)) return null;
+  const cod=o?codigoDe(o):''; const kgU=kgCimento(cod); const kg=siloR((+e.qtd||0)*kgU); if(!(kg>0)) return null;
+  return {linha,cod,kgU,kg,sid:(S.cfg.siloConsumo||{})[linha]||''}; }
+async function siloProcessarEntrega(id,e,silencioso){ const fs=siloFs(); if(!fs||!id||!e) return null;
+  if(e.anula) return siloEstornar(e.anula,id,silencioso);
+  const c=siloConsumoDe(e); if(!c) return null;
+  if(!c.sid){ if(!silencioso&&Object.values(S.cfg.siloConsumo||{}).some(Boolean)) siloAvisoUmaVez('sem-'+c.linha,`A ${c.linha} não tem silo de consumo configurado (Silos → Consumo automático). O apontamento foi salvo, mas nenhum silo foi descontado.`); return null; }
+  const agora=new Date().toISOString(), eu=siloEu(), movId='c_'+id;
+  const r=await fs.runTransaction(async t=>{ const mref=fs.doc('silomov/'+movId), rref=fs.doc('silomov/r_'+id), sref=fs.doc('silos/'+c.sid);
+    const m=await t.get(mref); if(m.exists) return {dup:true};
+    const rc=await t.get(rref); if(rc.exists) return {dup:true};
+    const sd=await t.get(sref); if(!sd.exists) return {semSaldo:true};
+    const ref=siloRefEm(e)||agora; if(sd.data().medidoEm&&ref<=sd.data().medidoEm) return {jaMedido:true}; /* produzido antes da última medição: a medição já enxergou */
+    const antes=siloR(sd.data().saldoKg);
+    const base={silo:c.sid,entregaId:id,ordem:e.ordem||null,num:e.num||null,linha:c.linha,codigo:c.cod,qtd:+e.qtd||0,kgPorUn:c.kgU,refEm:ref,em:agora,origem:'apontamento',gravadoEm:firebase.firestore.FieldValue.serverTimestamp(),...eu};
+    if(c.kg>antes+1e-6){ t.set(rref,Object.assign({tipo:'recusado',antesKg:antes,pedidoKg:c.kg,deltaKg:0,depoisKg:antes,motivo:'Estoque insuficiente no silo'},base)); return {insuf:true,antes}; }
+    const depois=siloR(antes-c.kg);
+    t.set(mref,Object.assign({tipo:'consumo',antesKg:antes,deltaKg:-c.kg,depoisKg:depois},base));
+    t.set(sref,{saldoKg:depois,atualizadoEm:agora,origem:'consumo',ultimoMov:movId,...eu},{merge:true});
+    return {ok:true,antes,depois}; });
+  if(r.semSaldo&&!silencioso) siloAvisoUmaVez('semsaldo-'+c.sid,`O ${siloNome(c.sid)} ainda não tem saldo inicial. Registre uma medição (📏 Registrar medição) para ativar o desconto automático. O apontamento foi salvo.`);
+  if(r.insuf) siloAviso(`Estoque insuficiente no silo ${siloNome(c.sid)}: saldo ${fkg(r.antes)}, consumo de ${fkg(c.kg)} (ordem ${e.num||''}). O apontamento foi salvo, mas o saldo do silo NÃO foi alterado. Confira o silo e registre uma medição.`,'erro');
+  return Object.assign({sid:c.sid,kg:c.kg},r); }
+async function siloEstornar(origId,anulaId,silencioso){ const fs=siloFs(); if(!fs) return null; const agora=new Date().toISOString(), eu=siloEu(), movId='e_'+origId;
+  return fs.runTransaction(async t=>{ const cref=fs.doc('silomov/c_'+origId), eref=fs.doc('silomov/'+movId);
+    const ce=await t.get(cref); if(!ce.exists) return {nada:true};   /* esse apontamento não tinha descontado silo */
+    const ee=await t.get(eref); if(ee.exists) return {dup:true};
+    const c=ce.data(); const sref=fs.doc('silos/'+c.silo); const sd=await t.get(sref); const antes=siloR(sd.exists?sd.data().saldoKg:0);
+    const kg=siloR(-c.deltaKg); const sdd=sd.exists?sd.data():{};
+    /* uma medição feita DEPOIS do consumo já enxergou o silo sem esse material: devolver agora contaria duas vezes */
+    const medidoDepois=sdd.medidoEm&&c.em&&sdd.medidoEm>c.em;
+    const depois=medidoDepois?antes:siloR(antes+kg);
+    t.set(eref,{tipo:'estorno',silo:c.silo,entregaId:origId,anulaId:anulaId||null,ordem:c.ordem||null,num:c.num||null,linha:c.linha||null,antesKg:antes,deltaKg:medidoDepois?0:kg,depoisKg:depois,
+      motivo:medidoDepois?'Apontamento desfeito depois de uma medição: saldo mantido (a medição já vale)':'Apontamento desfeito',refEm:agora,em:agora,origem:'apontamento',gravadoEm:firebase.firestore.FieldValue.serverTimestamp(),...eu});
+    if(!medidoDepois) t.set(sref,{saldoKg:depois,atualizadoEm:agora,origem:'estorno',ultimoMov:movId,...eu},{merge:true});
+    return {ok:true,antes,depois}; }); }
+
+/* ---------- medição manual (física) ---------- */
+/* o saldo passa a ser o medido. Se a medição foi feita mais cedo (hora informada), os consumos lançados depois daquela hora continuam valendo. */
+async function siloRegistrarMedicao(p){ const fs=siloFs(); if(!fs) throw {code:'sem-db'};
+  const agora=new Date().toISOString(), eu=siloEu(), em=p.em||agora, movId='m_'+p.medicaoId+'_'+p.sid;
+  const depoisDaMedicao=S.siloMov.filter(m=>m.silo===p.sid&&(m.tipo==='consumo'||m.tipo==='estorno')&&String(m.refEm||m.em)>em).reduce((a,m)=>a+(+m.deltaKg||0),0);
+  const legado=(ultimoPorSilo()[p.sid]||null);
+  return fs.runTransaction(async t=>{ const mref=fs.doc('silomov/'+movId), sref=fs.doc('silos/'+p.sid);
+    const m=await t.get(mref); if(m.exists) return {dup:true};
+    const sd=await t.get(sref); const d=sd.exists?sd.data():null;
+    const antes=d?siloR(d.saldoKg):(legado?siloR(legado.q*1000):null);
+    const base={tipo:'medicao',silo:p.sid,medicaoId:p.medicaoId,motivo:p.motivo,obs:p.obs||null,medidoPor:p.medidoPor||null,refEm:em,em:agora,medidoEm:em,horaInformada:em!==agora&&!!p.horaManual,origem:'medicao',gravadoEm:firebase.firestore.FieldValue.serverTimestamp(),...eu};
+    let novo, aplicado=true, nota=null;
+    if(p.corrige&&d&&d.medicaoId===p.corrige&&p.corrigeKg!=null){ novo=Math.max(0,siloR(antes+(p.kg-p.corrigeKg))); nota='Correção da medição anterior: diferença aplicada sobre o saldo atual'; }
+    else if(p.corrige){ aplicado=false; novo=antes; nota='Correção de uma medição antiga: já existe medição mais nova, saldo mantido'; }
+    else if(d&&d.medidoEm&&d.medidoEm>em){ aplicado=false; novo=antes; nota='Medição com hora anterior à última medição: registrada no histórico, saldo mantido'; }
+    else { novo=Math.max(0,siloR(p.kg+depoisDaMedicao)); if(depoisDaMedicao) nota='Medição com hora informada: '+fkgS(depoisDaMedicao)+' de apontamentos lançados depois dessa hora continuam valendo'; }
+    t.set(mref,Object.assign(base,{antesKg:antes,medidoKg:siloR(p.kg),diferencaKg:antes==null?null:siloR(p.kg-antes),deltaKg:antes==null?null:siloR(novo-antes),depoisKg:novo,aplicado,nota}));
+    if(aplicado) t.set(sref,{saldoKg:novo,medidoKg:p.corrige?siloR((d.medidoKg||0)+(p.kg-p.corrigeKg)):siloR(p.kg),medidoEm:p.corrige?d.medidoEm:em,medicaoId:p.corrige?p.medicaoId:p.medicaoId,atualizadoEm:agora,origem:'medicao',ultimoMov:movId,...eu},{merge:true});
+    return {ok:true,antes,novo,aplicado,nota}; }); }
+/* medição salva pela tela "Nova medição" (vários silos de uma vez): cada silo medido atualiza o saldo */
+async function siloMedicaoSalva(id,doc){ const corr=doc.corrige?S.medicoes.find(m=>m._id===doc.corrige):null; const res=[];
+  for(const sid of Object.keys(doc.itens||{})){ const t=+doc.itens[sid]; if(isNaN(t)) continue;
+    const orig=corr&&corr.itens&&corr.itens[sid]!=null?+corr.itens[sid]*1000:null;
+    try{ res.push(await siloRegistrarMedicao({sid,kg:t*1000,motivo:doc.motivo||(doc.corrige?'Correção de divergência':'Medição física'),obs:doc.obs,medidoPor:doc.medidoPor,em:doc.em,horaManual:!!doc.horaManual,medicaoId:id,corrige:orig!=null?doc.corrige:null,corrigeKg:orig})); }
+    catch(e){ console.warn('[silos] medição',sid,e); siloAviso('A medição foi salva, mas o saldo do '+siloNome(sid)+' não foi atualizado agora ('+((e&&e.code)||'erro')+'). Tente registrar de novo.','erro'); } }
+  return res; }
+
+/* ---------- gravação: entregas e medições passam por aqui (mesmo comportamento de antes + saldo do silo) ---------- */
+{ const _sv=salvar; salvar=async function(col,doc){ if((col!=='entregas'&&col!=='medicoes')||!S.db) return _sv(col,doc);
+    if(col==='medicoes') doc.saldoV=2; /* marca: medição que alimenta o saldo (para a rede de segurança) */
+    let id; try{ const ref=S.db.collection(col).doc(); id=ref.id; await ref.set(doc); }catch(e){ erro(e); return false; }
+    if(col==='entregas') siloEmFila(()=>siloProcessarEntrega(id,doc).catch(e=>{ console.warn('[silos] consumo',e); siloAviso('O apontamento foi salvo, mas não consegui descontar o silo agora ('+((e&&e.code)||'erro')+'). O painel tenta de novo sozinho.'); }));
+    else await siloEmFila(()=>siloMedicaoSalva(id,doc));
+    return true; }; }
+/* rede de segurança: apontamentos que não descontaram (sem internet, aba fechada no meio, aparelho com versão antiga) são processados por qualquer painel aberto */
+async function siloReconciliar(){ if(!S.db||!siloFs()||!S.siloSub||S._siloRec) return;
+  const feitos=new Set(S.siloMov.map(m=>m._id)); const lim=new Date(Date.now()-3*864e5).toISOString(); const pend=[];
+  for(const e of S.entregas||[]){ if(pend.length>=20) break; const reg=siloRefEm(e); if(!reg||reg<lim) continue;
+    if(e.anula){ if(feitos.has('c_'+e.anula)&&!feitos.has('e_'+e.anula)) pend.push(e); continue; }
+    if(feitos.has('c_'+e._id)||feitos.has('r_'+e._id)) continue;
+    const c=siloConsumoDe(e); if(!c||!c.sid) continue; const sd=S.siloSaldo[c.sid]; if(!sd||!sd.medidoEm||reg<=sd.medidoEm) continue; pend.push(e); }
+  /* medições gravadas pelo painel novo que ainda não chegaram ao saldo (ex.: salvas sem internet) */
+  const medPend=(S.medicoes||[]).filter(m=>m.saldoV===2&&!m.corrige&&m.em>=lim&&Object.keys(m.itens||{}).some(sid=>!feitos.has('m_'+m._id+'_'+sid)&&!(S.siloSaldo[sid]&&S.siloSaldo[sid].medidoEm>m.em))).slice(0,5);
+  if(!pend.length&&!medPend.length) return; S._siloRec=true;
+  try{ for(const m of medPend) await siloEmFila(()=>siloMedicaoSalva(m._id,m).catch(x=>console.warn('[silos] reconciliar medição',x&&x.code)));
+    for(const e of pend) await siloEmFila(()=>siloProcessarEntrega(e._id,e,true).catch(x=>console.warn('[silos] reconciliar',x&&x.code))); } finally { S._siloRec=false; } }
+setInterval(()=>{ siloReconciliar().catch(()=>{}); },45000);
+
+/* ---------- cimento × programação: usa o mesmo saldo dos tanques quando o sistema novo está completo ---------- */
+{ const _pc=previsaoCimento; previsaoCimento=function(){ const cs=S.cfg.silos.filter(s=>s.grupo==='Cimento'); const map=S.cfg.siloConsumo||{};
+    const ativo=cs.length&&cs.every(s=>S.siloSaldo[s.id]&&S.siloSaldo[s.id].saldoKg!=null)&&linhasOrd().filter(usaCimFab).every(l=>map[l]);
+    if(!ativo) return _pc();
+    const ds=cs.map(s=>S.siloSaldo[s.id]); const base=ds.map(d=>d.medidoEm||d.atualizadoEm).sort()[0];
+    const saldo=ds.reduce((a,d)=>a+(+d.saldoKg||0),0)/1000, medido=ds.reduce((a,d)=>a+(+(d.medidoKg!=null?d.medidoKg:d.saldoKg)||0),0)/1000, consumido=Math.max(0,medido-saldo);
+    let chegou=0; S.cargas.forEach(c=>{ const d=(c.etapas||{}).descarregado; if(d&&d>base&&+c.qtd>0) chegou+=+c.qtd; });
+    const pend=S.cargas.filter(c=>etapaCarga(c)<2); const aCaminho=pend.reduce((a,c)=>a+(+c.qtd||0),0);
+    const estoque=Math.max(0,saldo+chegou); const L=linhasOrd(); const abertas=ordAbertas().filter(o=>usaCimFab(o.linha));
+    const fila=abertas.map(o=>({o,kg:kgCimento(codigoDe(o))})).filter(x=>x.kg>0).map(x=>({o:x.o,t:Math.max(0,x.o.total-entregueDe(x.o))*x.kg/1000})).filter(x=>x.t>0)
+      .sort((a,b)=>dataEf(a.o).localeCompare(dataEf(b.o))||L.indexOf(a.o.linha)-L.indexOf(b.o.linha)||String(a.o.num).localeCompare(String(b.o.num)));
+    let acc=0, falta=null; fila.forEach(x=>{ const antes=acc; acc+=x.t; if(!falta&&acc>estoque+0.0001) falta={o:x.o,dia:dataEf(x.o),sacosOk:Math.max(0,Math.floor((estoque-antes)*1000/kgCimento(codigoDe(x.o))))}; });
+    const semKg=abertas.filter(o=>/^(AC|AB)\d/.test(codigoDe(o))&&!kgCimento(codigoDe(o))).length;
+    return {medido,base,consumido,chegou,estoque,necessario:acc,falta,aCaminho,nCaminho:pend.length,semKg,nOrdens:fila.length}; }; }
+
+/* ---------- tela do silo: formulário 📏, movimentações e configuração ---------- */
+function siloFormHtml(s){ const F=S.sm; if(!F||F.silo!==s.id) return ''; const u=saldoPorSilo()[s.id];
+  return `<section class="card" id="sm-form" style="border:1.5px solid var(--teal)"><div class="head" style="align-items:baseline"><h2>📏 Registrar medição · ${esc(s.nome)}</h2><button class="lnk" data-act="sm-fechar">Cancelar</button></div>
+   <div class="sub" style="margin:4px 0 14px">A medição física substitui o saldo do sistema. Não é lançada como consumo.</div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;align-items:end">
+    <div><div class="label">SALDO NO SISTEMA</div><div class="num" style="font-size:24px;font-weight:700;margin-top:4px" id="sm-antes" data-kg="${u?u.kg:''}">${u?fkg(u.kg):'—'}</div></div>
+    <label style="display:flex;flex-direction:column;gap:6px"><span class="label">MEDIÇÃO FÍSICA (KG)</span><input class="txt" id="sm-kg" inputmode="decimal" autocomplete="off" value="${esc(F.kg||'')}" style="height:48px;font-size:20px" placeholder="ex.: 9200"></label>
+    <div><div class="label">DIFERENÇA</div><div class="num" style="font-size:20px;font-weight:700;margin-top:4px" id="sm-dif">—</div></div></div>
+   <div class="label" style="margin:16px 0 6px">MOTIVO</div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap" role="radiogroup" aria-label="Motivo da medição">${SILO_MOTIVOS.map(m=>`<button type="button" class="opt" role="radio" data-act="sm-motivo" data-v="${esc(m)}" aria-pressed="${F.motivo===m}" aria-checked="${F.motivo===m}" style="min-height:44px;padding:8px 14px">${esc(m)}</button>`).join('')}</div>
+   ${F.motivo==='Outro'?`<label style="display:flex;flex-direction:column;gap:6px;margin-top:12px"><span class="label">DESCREVA O MOTIVO</span><input class="txt" id="sm-outro" maxlength="120" value="${esc(F.outro||'')}" style="height:44px"></label>`:''}
+   <label style="display:flex;flex-direction:column;gap:6px;margin-top:12px"><span class="label">OBSERVAÇÃO (OPCIONAL)</span><textarea class="txt" id="sm-obs" rows="2" maxlength="500">${esc(F.obs||'')}</textarea></label>
+   <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:14px"><button class="btn big" data-act="sm-salvar" ${F.salvando?'disabled':''}>${F.salvando?'Salvando…':'Salvar medição'}</button></div></section>`; }
+function siloMovHtml(s){ const xs=S.siloMov.filter(m=>m.silo===s.id).slice(0,60);
+  const row=m=>{ const T=SILO_TIPO[m.tipo]||{ic:'',n:m.tipo}; const mov=m.tipo==='medicao'?`medido ${fkg(m.medidoKg)}${m.diferencaKg!=null?' · diferença '+fkgS(m.diferencaKg):''}`:m.tipo==='recusado'?`pedido ${fkg(m.pedidoKg)}`:fkgS(m.deltaKg);
+    const det=m.tipo==='medicao'?[m.motivo,m.obs,m.nota].filter(Boolean).join(' · '):[m.num?'Ordem '+m.num:'',m.linha,m.qtd?fq(m.qtd)+' un × '+fq(m.kgPorUn)+' kg':'',m.motivo&&m.tipo!=='consumo'?m.motivo:''].filter(Boolean).join(' · ');
+    return `<div class="row num" style="grid-template-columns:135px minmax(0,1.3fr) 110px 110px minmax(0,1fr);gap:10px;align-items:start"><span style="color:var(--ink-2)">${new Date(m.em).toLocaleDateString('pt-BR')} ${hora(m.em)}</span><span><b>${T.ic} ${T.n}</b><small style="display:block;color:var(--muted)">${esc(det)}</small></span><span style="text-align:right">${m.antesKg!=null?fkg(m.antesKg):'—'}<small style="display:block;color:var(--muted)">antes</small></span><span style="text-align:right"><b>${fkg(m.depoisKg)}</b><small style="display:block;color:var(--muted)">${esc(mov)}</small></span><span style="color:var(--ink-2)">${esc(m.porNome||nomeDe(m.porUid))}<small style="display:block;color:var(--muted)">${m.origem==='medicao'?'📏 manual':'⚙️ apontamento'}</small></span></div>`; };
+  return `<section class="card"><div class="label" style="margin-bottom:6px">MOVIMENTAÇÕES DO ${esc(s.nome).toUpperCase()} (SALDO)</div><div style="overflow-x:auto"><div style="min-width:720px">${xs.length?xs.map(row).join(''):'<div class="empty">Ainda não há movimentações neste silo. Elas começam na primeira medição registrada com 📏.</div>'}</div></div></section>`; }
+function siloCfgHtml(){ const cs=(S.cfg.silos||[]).filter(s=>s.grupo==='Cimento'); const map=S.cfg.siloConsumo||{}; const ls=linhasOrd().filter(usaCimFab); const pode=siloPodeConfig();
+  return `<section class="card"><div class="label">CONSUMO AUTOMÁTICO DE CIMENTO</div><div class="sub" style="margin:4px 0 10px">Cada apontamento desconta do silo da linha: quantidade × kg de cimento do item (cadastro de Itens). Linha sem silo não desconta nada.</div>
+   ${ls.map(l=>`<div class="row" style="grid-template-columns:minmax(0,1fr) 240px;align-items:center"><b>${esc(l)}</b>${pode?`<select class="txt" data-silo-linha="${esc(l)}" style="height:40px"><option value="">— não descontar —</option>${cs.map(s=>`<option value="${esc(s.id)}" ${map[l]===s.id?'selected':''}>${esc(s.nome)}</option>`).join('')}</select>`:`<span>${map[l]?esc(siloNome(map[l])):'não desconta'}</span>`}</div>`).join('')}
+   ${pode?'<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn sec" data-act="sm-cfg">Salvar silos das linhas</button></div>':''}</section>`; }
+{ const _vs=vSilos; vSilos=function(){ const s=S.cfg.silos.find(x=>x.id===S.siloSel)||S.cfg.silos[0]; return _vs.apply(this,arguments)+(s?siloMovHtml(s):'')+(s&&s.grupo==='Cimento'?siloCfgHtml():''); }; }
+function siloDifAtualiza(){ const i=$('#sm-kg'), a=$('#sm-antes'), d=$('#sm-dif'); if(!i||!a||!d) return; const n=numIn(i.value), ant=a.dataset.kg===''?null:+a.dataset.kg;
+  d.textContent=n==null?'—':ant==null?'(sem saldo anterior)':fkgS(n-ant); d.style.color=n!=null&&ant!=null&&n<ant?'var(--crit-ink)':''; }
+document.addEventListener('input',ev=>{ if(ev.target&&ev.target.id==='sm-kg'){ if(S.sm) S.sm.kg=ev.target.value; siloDifAtualiza(); } else if(ev.target&&ev.target.id==='sm-outro'&&S.sm) S.sm.outro=ev.target.value; else if(ev.target&&ev.target.id==='sm-obs'&&S.sm) S.sm.obs=ev.target.value; });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="sm-"]'); if(!b) return; const a=b.dataset.act;
+  if(a==='sm-abrir'){ if(!siloPodeMedir()){ toast('Você não possui permissão para acessar este módulo.'); return; } S.sm={silo:b.dataset.silo,kg:'',motivo:'Medição física',outro:'',obs:'',salvando:false}; render(); setTimeout(()=>{ const i=$('#sm-kg'); i&&i.focus(); siloDifAtualiza(); },30); return; }
+  if(a==='sm-fechar'){ S.sm=null; render(); return; }
+  if(a==='sm-motivo'&&S.sm){ S.sm.motivo=b.dataset.v; render(); siloDifAtualiza(); return; }
+  if(a==='sm-cfg'){ if(!siloPodeConfig()) return; const m={}; document.querySelectorAll('[data-silo-linha]').forEach(x=>{ m[x.dataset.siloLinha]=x.value||''; });
+    try{ await S.db.doc('config/geral').update({siloConsumo:m}); S.cfg.siloConsumo=Object.assign({},S.cfg.siloConsumo||{},m); toast('Silos das linhas salvos.'); render(); }catch(e){ erro(e); } return; }
+  if(a==='sm-salvar'&&S.sm&&!S.sm.salvando){ const F=S.sm; const kg=numIn(($('#sm-kg')||{}).value); const s=S.cfg.silos.find(x=>x.id===F.silo);
+    if(kg==null||kg<0){ toast('Informe a medição em kg (0 = vazio).'); return; }
+    if(s&&s.cap&&kg>s.cap*1000*1.05&&!confirm(`A medição (${fkg(kg)}) passa da capacidade do silo (${fkg(s.cap*1000)}). Salvar mesmo assim?`)) return;
+    const motivo=F.motivo==='Outro'?('Outro: '+String(($('#sm-outro')||{}).value||'').trim()):F.motivo; if(F.motivo==='Outro'&&motivo.length<8){ toast('Descreva o motivo.'); return; }
+    if(!S.db){ toast('Sem conexão com o armazenamento.'); return; }
+    F.salvando=true; render(); const em=new Date().toISOString(); const obs=String(($('#sm-obs')||{}).value||F.obs||'').trim();
+    try{ const ref=S.db.collection('medicoes').doc(); const doc={em,por:S.uid,itens:{[F.silo]:Math.round(kg/100)/10},caps:Object.fromEntries(S.cfg.silos.map(x=>[x.id,x.cap])),medidoPor:(S.uid&&S.nomes[S.uid])||'',motivo,origem:'silo-medicao',saldoV:2}; if(obs) doc.obs=obs;
+      await ref.set(doc);
+      const r=await siloEmFila(()=>siloRegistrarMedicao({sid:F.silo,kg,motivo,obs,em,medicaoId:ref.id}));
+      S.sm=null; toast(r&&r.ok?`Medição salva · ${siloNome(F.silo)}: ${fkg(r.novo)}${r.antes!=null?' (diferença '+fkgS(kg-r.antes)+')':''}`:'Medição salva.'); render(); }
+    catch(e){ console.warn('[silos] medição',e); F.salvando=false; render(); siloAviso(e&&e.code==='unavailable'?'Não foi possível conectar ao servidor. A medição não foi salva. Verifique sua conexão e tente novamente.':'A medição não foi salva ('+((e&&e.code)||'erro')+').','erro'); }
+    return; } });
+
 iniciar();
 })();
 </script>
