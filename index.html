@@ -9636,7 +9636,7 @@ const EQ_PRONTO_ORD=['almoxpmx','linha','manut','producao','sup','supsis','tv','
 const EQ_PRONTO_DESC={almoxpmx:'Premix, diário de bordo dos ranchos e contagem',linha:'Computador fixo da linha: parar e voltar a linha e abrir chamado',manut:'Atende os chamados de manutenção',producao:'Vê o Meu dia e a programação, sem mudar nada',
   sup:'Inventário: contagem e recebimento de todos os almox',supsis:'Inventário completo, com auditoria',tv:'Só a TV das linhas',cal:'Só consulta do calendário',auditor:'Consulta a auditoria do inventário',
   conf:'Contagem e recebimento do Almox 3',conf2:'Contagem do Almox 30',conf3:'Contagem do Rejunte e da Separação',confa1:'Contagem do Almox 1',confa2:'Contagem do Almox 2',pcp:'Tudo, igual a você'};
-const EQ_PRINCIPAIS=6;
+const EQ_PRINCIPAIS=8;
 if(ACS_PERFIS.almoxpmx) ACS_PERFIS.almoxpmx.nome='Almoxarifado'; if(ACS_PERFIS.manut) ACS_PERFIS.manut.nome='Manutenção'; if(ACS_PERFIS.linha) ACS_PERFIS.linha.nome='Produção · Tela da linha';
 S.eq={maisCg:false,aba:'pessoas',q:'',fil:'',nv:null,cartao:null,conf:null,cg:null,cgConf:null,cgMove:'',salv:false,usu:{}};
 function eqOnline(){ return !!(window.claude&&window.claude.online&&typeof window.claude.criarUsuario==='function'); }
@@ -10139,7 +10139,7 @@ Object.assign(CRUMB,{manprev:'Manutenção preventiva',manequip:'Equipamentos',m
 { const _vo=viewOk; viewOk=function(v){ if(['manprev','manequip','manpecas'].includes(v)){ if(S.acs&&S.acs.dono) return true; const p=acsP(); return !!p&&!p.tudo&&(p.mods||[]).includes('manut'); } return _vo.apply(this,arguments); }; }
 { const _mv=manView; manView=function(v){ return v==='manprev'?vManPrev():v==='manequip'?vManEquip():v==='manpecas'?vManPecas():_mv(v); }; }
 /* assinaturas */
-setInterval(()=>{ try{ const X=S.mx; if(X.sub||!S.db||!S.acs||!S.acs.pronto||!viewOk('manch')) return; X.sub=true;
+setInterval(()=>{ try{ const X=S.mx; if(X.sub||!S.db||!S.acs||!S.acs.pronto||!(viewOk('manch')||viewOk('mantotem'))) return; X.sub=true;
   S.db.doc('config/manut').onSnapshot(s=>{ const d=s.exists?(s.data()||{}):{}; X.cfg={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}; X.lido=true; rerenderSeguro(); },()=>{ X.lido=true; });
   inscrever('pecasmov',()=>S.db.collection('pecasmov').orderBy('em','desc').limit(1000),snap=>{ X.movs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); });
 }catch(e){} },700);
@@ -10822,7 +10822,9 @@ function crPodeGerir(){ return !!(S.acs&&S.acs.dono); }
 function ttPodeUsar(){ try{ if(S.acs&&S.acs.dono) return true; const p=acsP(); return !!p&&(p.tudo||['paradas','producao','manut'].some(m=>(p.mods||[]).includes(m))); }catch(e){ return false; } }
 /* regra: quem abre e quem conserta se identificam pelo crachá. "Sem crachá" só se a administradora liberar (emergência). */
 function ttSemCrachaOk(){ return !!(S.cfg&&S.cfg.totemSemCracha); }
-function ttLinhas(){ if(S.tt.linhas) return S.tt.linhas; let l=null; try{ l=JSON.parse(localStorage.getItem('painel.totem.linhas')||'null'); }catch(e){} return (S.tt.linhas=Array.isArray(l)&&l.length?l:['Linha 1','Linha 2']); }
+function ttLinhas(){ const m=(location.search+'&'+location.hash).match(/[?&#]linhas=([^&#]+)/); if(m){ let v=''; try{ v=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ v=m[1]; } const ls=v.split(',').map(x=>x.trim()).filter(x=>linhasOrd().includes(x)); if(ls.length) return ls; }
+  const todas=linhasOrd(); if(todas.length) return todas; /* padrão: todas as linhas */
+  if(S.tt.linhas) return S.tt.linhas; let l=null; try{ l=JSON.parse(localStorage.getItem('painel.totem.linhas')||'null'); }catch(e){} return (S.tt.linhas=Array.isArray(l)&&l.length?l:['Linha 1','Linha 2']); }
 
 /* ---------- telas no menu ---------- */
 Object.assign(VIEWS,{mancrachas:{nome:'Crachás',ic:'equipe',mob:'Crachás'},mantotem:{nome:'Tablet da parede',ic:'tela',mob:'Tablet'}});
@@ -10911,7 +10913,7 @@ function ttLeu(txt){ const T=S.tt; if(T.fase!=='espera') return; const m=String(
   ttBip(); ttInicia({codigo:c.codigo,nome:c.nome,linha:c.linha,papel:c.papel}); }
 function ttBip(){ try{ const A=window.AudioContext||window.webkitAudioContext; if(!A) return; const x=ttCam.ac||(ttCam.ac=new A()); const o=x.createOscillator(), g=x.createGain(); o.frequency.value=1250; o.connect(g); g.connect(x.destination); g.gain.setValueAtTime(0.2,x.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,x.currentTime+0.15); o.start(); o.stop(x.currentTime+0.16); }catch(e){} }
 function ttMsg(t){ S.tt.msg=t; rerenderTt(); clearTimeout(ttMsg._t); ttMsg._t=setTimeout(()=>{ S.tt.msg=''; rerenderTt(); },5000); }
-function ttInicia(p){ const T=S.tt; Object.assign(T,{p,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:p.papel==='tecnico'?'tecnico':'maquina',ult:Date.now()}); ttCamDesliga(); render(); }
+function ttInicia(p){ const T=S.tt; Object.assign(T,{p,outra:false,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:p.papel==='tecnico'?'tecnico':'maquina',ult:Date.now()}); ttCamDesliga(); render(); }
 function ttVoltar(){ Object.assign(S.tt,{fase:'espera',p:null,linha:'',equipId:'',equip:'',defeito:'',txt:'',enviando:false,numero:null}); render(); }
 function rerenderTt(){ if(!ttAtivo()) return; const a=document.activeElement; if(a&&a.closest&&a.closest('.tt')&&a.matches('input,textarea')) return; render(); }
 /* sem toque por um tempo → volta para a espera (o próximo não herda o chamado pela metade) */
@@ -10935,10 +10937,10 @@ function vTotem(){ const T=S.tt, L=ttLinhas();
     <div class="tt-cta"><div class="tt-qr">${ic('grid',64,1.6)}</div><div><h1>Aproxime seu crachá da câmera</h1><p>O QR do crachá fica a um palmo da tela, virado para a câmera de cima.</p>${ttCam.erro?`<p class="tt-err">${esc(ttCam.erro)}${ttSemCrachaOk()?'':' Enquanto isso, chame a manutenção pelo ramal.'}</p>`:''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}</div></div>
     <div class="tt-rod">${ttSemCrachaOk()?'<button class="btn sec" data-act="tt-sem">Estou sem crachá</button>':''}<button class="btn sec" data-act="tt-cheia">${ic('tela',18,2)}Tela cheia</button></div>`; }
   else if(T.fase==='sem'){ corpo=`<div class="tt-box"><h1>Sem crachá</h1><p>Escreva seu nome para o chamado sair identificado.</p><input class="txt tt-in" id="tt-nome" maxlength="60" autocomplete="off" value="${esc(T.txtNome||'')}"><div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Voltar</button><button class="btn" data-act="tt-sem-ok">Continuar</button></div></div>`; }
-  else if(T.fase==='maquina'){ const ord=L.slice().sort((a,b)=>(b===T.p.linha)-(a===T.p.linha));
+  else if(T.fase==='maquina'){ const sua=L.includes(T.p.linha)&&!T.outra; const ord=sua?[T.p.linha]:L.slice().sort((a,b)=>(b===T.p.linha)-(a===T.p.linha));
     corpo=`<div class="tt-ola">Olá, <b>${esc(T.p.nome)}</b>${T.p.semCracha?' <small>(sem crachá)</small>':''}</div><h1 class="tt-h">Qual máquina?</h1>
     <div class="tt-cols">${ord.map(l=>{ const es=mxEquips(l); return `<section class="tt-col ${l===T.p.linha?'sua':''}"><h2>${esc(l)}${l===T.p.linha?' <small>sua linha</small>':''}</h2><div class="tt-grid">${es.map(e=>`<button class="tt-bt" data-act="tt-eq" data-l="${esc(l)}" data-id="${esc(e.id)}"><b>${esc(e.nome)}</b>${e.tag?`<small>${esc(e.tag)}</small>`:''}</button>`).join('')}<button class="tt-bt q" data-act="tt-eq" data-l="${esc(l)}" data-id=""><b>Não sei qual</b><small>só a linha</small></button></div></section>`; }).join('')}</div>
-    <div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button></div>`; }
+    <div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button>${sua&&L.length>1?'<button class="btn sec" data-act="tt-outra">É em outra linha</button>':''}</div>`; }
   else if(T.fase==='defeito'){ corpo=`<div class="tt-ola">${esc(T.p.nome)} · <b>${esc(T.linha)}</b>${T.equip?' · '+esc(T.equip):''}</div><h1 class="tt-h">O que está acontecendo?</h1>
     <div class="tt-grid tt-def">${TT_DEFEITOS.map(d=>`<button class="tt-bt" data-act="tt-def" data-v="${esc(d)}" aria-pressed="${T.defeito===d}"><b>${esc(d)}</b></button>`).join('')}</div>
     <label class="tt-lab">Detalhe (opcional)<textarea class="txt tt-in" id="tt-txt" rows="2" maxlength="300" placeholder="Ex.: correia do elevador saiu do lugar">${esc(T.txt)}</textarea></label>
@@ -10966,6 +10968,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='tt-voltar'){ ttVoltar(); return; }
   if(a==='tt-sem'){ if(!ttSemCrachaOk()) return; ttCamDesliga(); T.fase='sem'; T.txtNome=''; render(); setTimeout(()=>{ const i=$('#tt-nome'); i&&i.focus(); },50); return; }
   if(a==='tt-sem-ok'){ const n=String(T.txtNome||'').trim().replace(/\s+/g,' '); if(n.length<2){ toast('Escreva seu nome.'); return; } ttInicia({codigo:null,nome:n.slice(0,60),linha:'',papel:'operador',semCracha:true}); return; }
+  if(a==='tt-outra'){ T.outra=true; render(); return; }
   if(a==='tt-eq'){ T.linha=b.dataset.l; const e=b.dataset.id?mxEquip(b.dataset.id):null; T.equipId=e?e.id:''; T.equip=e?e.nome:''; T.fase='defeito'; render(); return; }
   if(a==='tt-volta-maq'){ T.fase='maquina'; render(); return; }
   if(a==='tt-def'){ T.defeito=T.defeito===b.dataset.v?'':b.dataset.v; render(); return; }
@@ -11149,6 +11152,44 @@ document.head.insertAdjacentHTML('beforeend',`<style id="av-css">.av-sw{display:
 .av-ops{display:flex;flex-direction:column;gap:8px;margin:12px 0}.av-ops label{display:flex;gap:8px;align-items:center;cursor:pointer}
 .av-ol{margin:10px 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}.av-top{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:8px}.av-tn{font-size:20px;font-weight:800;color:var(--teal-strong);word-break:break-all;margin:4px 0}</style>`);
 /* ===FIM AVISOS=== */
+/* ===================== LOGIN DO TABLET + ADESIVO DE QR PARA O CRACHÁ (08/10) ===================== */
+/* Cargo pronto "tablet": só o modo tablet da parede (todas as linhas). Abre chamado e registra o atendimento pelo crachá. */
+MODS.push({id:'tablet',nome:'Tablet da parede',ic:'tela',views:['mantotem']});
+{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.tablet={nome:'Tablet da parede (chamados)',mods:['tablet'],locais:[]}; ACS_PERFIS.outro=_o; }
+if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('tablet')) EQ_PRONTO_ORD.splice(EQ_PRONTO_ORD.indexOf('manut')>=0?EQ_PRONTO_ORD.indexOf('manut')+1:0,0,'tablet');
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.tablet='Tablet na parede das linhas: o operador passa o crachá e abre o chamado; o técnico registra que chegou e que terminou.';
+if(typeof EQ_MOD!=='undefined'&&!EQ_MOD.tablet) EQ_MOD.tablet=['tela','Tablet da parede'];
+ACS_MODS.splice(ACS_MODS.findIndex(m=>m[0]==='ajustes'),0,['tablet','Tablet da parede (chamados pelo crachá)']);
+function ttSoTablet(){ try{ const A=S.acs; if(!A||A.dono) return false; const p=acsP(); return !!p&&(p.mods||[]).length>0&&(p.mods||[]).every(m=>m==='tablet'); }catch(e){ return false; } }
+{ const _tp=ttPodeUsar; ttPodeUsar=function(){ try{ const p=acsP(); if(p&&(p.mods||[]).includes('tablet')) return true; }catch(e){} return _tp(); }; }
+/* o tablet não sai do modo parede (sem o ✕) */
+{ const _vt=vTotem; vTotem=function(){ const h=_vt.apply(this,arguments); return ttSoTablet()?h.replace(/<button class="tt-x"[^>]*>✕<\/button>/,''):h; }; }
+/* cartão de acesso do tablet já vem com o endereço do modo parede */
+{ const _el=eqLinkDe; eqLinkDe=function(c){ return c&&c.perfil==='tablet'?eqLinkPainel()+'?totem=1':_el.apply(this,arguments); }; }
+
+/* adesivo para colar em qualquer crachá (deitado ou em pé): QR de 25 mm + nome e linha · 30 por folha A4 */
+async function crAdesivos(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } if(!cs.length){ toast('Nenhum crachá para imprimir.'); return; }
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=32, H=42, gx=4, gy=4, cols=5, rows=6, x0=(210-cols*W-(cols-1)*gx)/2, y0=(297-rows*H-(rows-1)*gy)/2;
+  cs.forEach((c,i)=>{ const k=i%(cols*rows); if(i&&k===0) pdf.addPage(); const x=x0+(k%cols)*(W+gx), y=y0+Math.floor(k/cols)*(H+gy);
+    pdf.setDrawColor(170); pdf.setLineDashPattern([1,1],0); pdf.roundedRect(x,y,W,H,2,2); pdf.setLineDashPattern([],0);
+    pdf.setFillColor(255,255,255); pdf.rect(x+0.5,y+0.5,W-1,W-1,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+3.5,y+3.5,25);
+    pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.text(pdf.splitTextToSize(String(c.nome||''),W-3)[0],x+W/2,y+33.5,{align:'center'});
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(70,70,70); pdf.text((c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas')),x+W/2,y+37.5,{align:'center'});
+    pdf.setTextColor(0,0,0); });
+  await manBaixar(pdf,cs.length===1?'Adesivo_QR_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Adesivos_QR_crachas.pdf','PDF com '+cs.length+' adesivo(s) de 3 × 4 cm. Imprima em 100% (sem ajustar à página) e cole no crachá.'); }
+{ const _vc=vCrachas; vCrachas=function(){ let h=_vc.apply(this,arguments);
+  h=h.replace(/<button class="eq-lk" data-act="cr-pdf" data-id="([^"]+)">/g,(m,id)=>`<button class="eq-lk" data-act="cr-ades" data-id="${id}">${ic('grid',15,2)}Adesivo</button>`+m);
+  h=h.replace('<button class="btn sec" data-act="cr-pdf-todos">','<button class="btn" data-act="cr-ades-todos">'+ic('baixar',18,2)+'Adesivos de QR de todos (3 × 4 cm)</button><button class="btn sec" data-act="cr-pdf-todos">');
+  h=h.replace('Cada funcionário recebe um QR no crachá.','Cada funcionário recebe um QR no crachá: um <b>adesivo de 3 × 4 cm</b> para colar no crachá que ele já usa, ou um crachá completo.');
+  return h; }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cr-ades"],[data-act="cr-ades-todos"]'); if(!b) return; if(!crPodeGerir()){ toast('Você não possui permissão para gerenciar crachás.'); return; }
+  try{ if(b.dataset.act==='cr-ades'){ const c=crDe(b.dataset.id); if(c) await crAdesivos([c]); }
+    else await crAdesivos(S.cr.lista.filter(x=>x.ativo!==false).sort((p,q)=>String(p.linha).localeCompare(String(q.linha))||String(p.nome).localeCompare(String(q.nome)))); }
+  catch(e){ console.warn('[crachás] adesivo',e); toast('Não foi possível gerar o PDF. Tente de novo.'); } });
+/* no menu, "Tablet da parede" aparece só para a conta do tablet (os outros abrem pelo botão em Chamados) */
+{ const _mv=modsVis; modsVis=function(){ const r=_mv.apply(this,arguments); let tem=false; try{ const p=acsP(); tem=!!p&&(p.mods||[]).includes('tablet'); }catch(e){} return tem?r:r.filter(m=>m.id!=='tablet'); }; }
+/* ===FIM TABLET LOGIN=== */
+
 
 
 
