@@ -10,26 +10,6 @@
   const emailDe = s => { s = String(s || '').trim().toLowerCase(); return s.includes('@') ? s : usuarioLimpo(s) + '@' + DOM; };
   const usuarioDe = em => { em = String(em || '').toLowerCase(); return em.endsWith('@' + DOM) ? em.slice(0, -DOM.length - 1) : em; };
   const DONOS = (CFG.donos || []).map(emailDe);
-  /* texto de erro para a tela (antes esta função não existia e o botão ficava preso em "Entrando…") */
-  const msgErro = e => { const c = (e && e.code) || '';
-    const M = {
-      'auth/network-request-failed': 'Sem conexão com o Firebase. Confira a internet (ou VPN/bloqueador de anúncios) e tente de novo.',
-      'auth/operation-not-allowed': 'O login por e-mail e senha está desligado no Firebase (Authentication → Sign-in method → E-mail/senha → Ativar).',
-      'auth/unauthorized-domain': 'Este endereço do site não está autorizado no Firebase (Authentication → Settings → Authorized domains).',
-      'auth/too-many-requests': 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.',
-      'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
-      'auth/invalid-email': 'Usuário inválido. Use só letras, números, ponto, traço ou sublinhado.',
-      'auth/user-disabled': 'Esta conta foi desativada. Fale com o PCP.',
-      'auth/invalid-api-key': 'A chave do Firebase (apiKey) no config.js está inválida.',
-      'auth/api-key-not-valid': 'A chave do Firebase (apiKey) no config.js está inválida.',
-      'auth/requests-from-referer-blocked': 'A chave do Firebase está restrita e não aceita este endereço do site (Google Cloud → Credenciais).',
-      'auth/requires-recent-login': 'Por segurança, saia e entre de novo antes de trocar a senha.',
-      'usuario-vazio': 'Digite um usuário válido.',
-      'sem-permissao': 'Você não tem permissão para isso.',
-      'tempo-esgotado': 'O Firebase demorou demais para responder. Tente de novo.' };
-    if (M[c]) return M[c];
-    if (/referer.*blocked/i.test(c + ' ' + ((e && e.message) || ''))) return M['auth/requests-from-referer-blocked'];
-    return 'Não deu certo (' + (c || (e && e.message) || 'erro') + '). Tente de novo ou avise o PCP.'; };
   firebase.initializeApp(CFG.firebase);
   const auth = firebase.auth();
   /* banco com nome (ex.: "default" sem parênteses) ou o padrão "(default)" */
@@ -57,10 +37,29 @@
       const o = {}; for (const k of ks) o[k === '__vazio' ? '' : /^___.*__$/.test(k) ? k.slice(1) : k] = dec(v[k]); return o; }
     return v;
   }
+  /* Mensagens de erro para quem usa o painel (nunca o texto técnico do Firebase). Antes esta função não existia:
+     qualquer erro fora de "senha errada" (sem internet, muitas tentativas, usuário desativado…) quebrava o login. */
+  function msgErro(e) { const c = (e && e.code) || '';
+    console.warn('[login] erro', c, e && e.message);
+    if (c === 'auth/invalid-credential' || c === 'auth/wrong-password' || c === 'auth/invalid-login-credentials') return 'Usuário ou senha incorretos.';
+    if (c === 'auth/user-not-found') return 'Usuário não encontrado.';
+    if (c === 'auth/invalid-email' || c === 'usuario-vazio') return 'Usuário inválido. Use só letras, números, ponto, hífen ou sublinhado.';
+    if (c === 'auth/missing-password') return 'Informe a senha.';
+    if (c === 'auth/user-disabled') return 'Este usuário está desativado. Fale com o administrador.';
+    if (c === 'auth/too-many-requests') return 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.';
+    if (c === 'auth/network-request-failed' || c === 'unavailable' || c === 'tempo-esgotado') return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
+    if (c === 'auth/weak-password') return 'A senha precisa ter pelo menos 6 caracteres.';
+    if (c === 'auth/email-already-in-use') return 'Esse usuário já existe.';
+    if (c === 'auth/requires-recent-login') return 'Por segurança, saia e entre de novo antes de trocar a senha.';
+    if (c === 'auth/operation-not-allowed') return 'O login por usuário e senha está desligado no Firebase. Avise o administrador.';
+    if (c === 'permission-denied' || c === 'sem-permissao') return 'Sem permissão para esta operação.';
+    return 'Não foi possível concluir agora. Tente novamente.' + (c ? ' (' + c + ')' : ''); }
   const erroCod = e => { if (e && !e.code) e.code = 'erro'; if (e && e.code === 'permission-denied') e.code = 'sem-permissao'; return e; };
 
   /* ---------- objetos no mesmo formato que o painel já usa ---------- */
-  function DocSnap(s) { return { id: s.id, exists: s.exists, data: () => (s.exists ? dec(s.data()) : undefined), ref: Doc(s.ref.path) }; }
+  function DocSnap(s) { return { id: s.id, exists: s.exists, data: () => (s.exists ? dec(s.data()) : undefined), ref: Doc(s.ref.path),
+    /* login/acesso: distinguir "o servidor confirmou" de "só o cache local respondeu" */
+    metadata: { fromCache: !!(s.metadata && s.metadata.fromCache), hasPendingWrites: !!(s.metadata && s.metadata.hasPendingWrites) } }; }
   function QSnap(q) { const docs = q.docs.map(DocSnap); return { docs, size: docs.length, empty: !docs.length, forEach: f => docs.forEach(f) }; }
   function Doc(path) {
     const r = fs.doc(path);
@@ -71,7 +70,7 @@
       /* no painel, update mescla objetos internos (ex.: etapas:{chegada}) sem apagar os outros */
       update: d => r.set(enc(d), { merge: true }).catch(e => { throw erroCod(e); }),
       delete: () => r.delete().catch(e => { throw erroCod(e); }),
-      onSnapshot: (ok, err) => r.onSnapshot(s => ok(DocSnap(s)), e => err && err(erroCod(e))),
+      onSnapshot: (ok, err, opts) => (opts ? r.onSnapshot(opts, s => ok(DocSnap(s)), e => err && err(erroCod(e))) : r.onSnapshot(s => ok(DocSnap(s)), e => err && err(erroCod(e)))),
       /* trava curta para numerar sem repetir (ex.: OS de manutenção) */
       acquire: async ({ holder, ttlMs } = {}) => {
         const lk = fs.doc('_travas/' + path.replace(/\//g, '__')); const agora = Date.now();
@@ -232,18 +231,24 @@
     f.onsubmit = async ev => { ev.preventDefault(); const b = f.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Entrando…'; er.textContent = '';
       const us = el.querySelector('#lg-e').value, em = emailDe(us), se = el.querySelector('#lg-s').value;
       const volta = () => { b.disabled = false; b.textContent = pri ? 'Criar e entrar' : 'Entrar'; };
+      if (!usuarioLimpo(us) && !String(us).includes('@')) { er.textContent = 'Informe o usuário.'; volta(); return; }
+      if (!se) { er.textContent = 'Informe a senha.'; volta(); return; }
       try {
         if (pri) { if (!DONOS.includes(em)) { er.textContent = 'O primeiro acesso é só da responsável pelo PCP. As outras contas o PCP cria em Equipe e cargos.'; volta(); return; }
           const nome = el.querySelector('#lg-n').value.trim(); const c = await auth.createUserWithEmailAndPassword(em, se);
           await c.user.updateProfile({ displayName: nome }); await fs.doc('perfis/' + c.user.uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString() }); }
         else await auth.signInWithEmailAndPassword(em, se);
-      } catch (e) { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : (e && (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password')) ? 'Usuário ou senha incorretos.' : msgErro(e); volta(); } };
+        b.textContent = 'Carregando seu acesso…'; /* autenticou: o painel abre e confere o perfil (não é erro de senha) */
+      } catch (e) { try { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : msgErro(e); }
+        catch (x) { er.textContent = 'Não foi possível entrar agora. Tente novamente.'; } volta(); } };
     setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
     if (!logo) document.addEventListener('DOMContentLoaded', () => { const src = (document.querySelector('.brand img') || {}).src, bx = el.querySelector('.bx'); if (src && bx && !bx.querySelector('.lg-logo')) { const im = document.createElement('img'); im.className = 'lg-logo'; im.src = src; im.alt = 'Colafix'; bx.prepend(im); } }, { once: true });
   }
   /* ---------- chamado pelo QR da linha, sem login (entra como anônimo e só consegue criar o chamado) ---------- */
   const QR_LINHA = (() => { const m = (location.search + '&' + location.hash).match(/[?&#]chamado=([^&#]+)/); if (!m) return ''; try { return decodeURIComponent(m[1].replace(/\+/g, ' ')); } catch (e) { return m[1]; } })();
   let MODO_QR = false;
+  /* QR do equipamento: ?chamado=Linha 1&equip=<id> → o formulário já vem com a máquina escolhida */
+  const QR_EQUIP = (() => { const m = (location.search + '&' + location.hash).match(/[?&#]equip=([^&#]+)/); if (!m) return ''; try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; } })();
   const RANCHO_QR = ((location.search + '&' + location.hash).match(/[?&#]rancho=(\d{4,})/) || [])[1] || '';
   const cssQr = `#lg .qr-bx{max-width:480px}#lg .qr-top{display:flex;align-items:center;gap:14px;margin:0 0 18px}#lg .qr-ic{width:56px;height:56px;border-radius:16px;background:linear-gradient(150deg,#0F2A38,#1B5C7A);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   #lg .qr-top small{display:block;font-size:11px;font-weight:800;letter-spacing:.16em;color:#1B5C7A}#lg .qr-top b{display:block;font-size:26px;line-height:1.1;color:#143F54}
@@ -265,7 +270,7 @@
     let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
     if (!document.getElementById('lg-css3')) { const st3 = document.createElement('style'); st3.id = 'lg-css3'; st3.textContent = cssQr; document.head.appendChild(st3); }
     const nome = (() => { try { return localStorage.getItem('painel.qrnome') || ''; } catch (e) { return ''; } })();
-    if (fase === 'ok') { el.innerHTML = `<div class="bx qr-bx qr-ok"><div class="qr-big">${svg('check', 44, 2.6)}</div><h1>Chamado enviado</h1><p>A manutenção já foi avisada no painel dela${info && info.parou ? ' e a parada da ' + esc(QR_LINHA) + ' fica registrada' : ''}. Acompanhe pela TV ou fale com o PCP.</p>
+    if (fase === 'ok') { el.innerHTML = `<div class="bx qr-bx qr-ok"><div class="qr-big">${svg('check', 44, 2.6)}</div><h1>Chamado enviado</h1><p>A manutenção já foi avisada no painel dela${info && info.parou ? ' e a parada da ' + esc(QR_LINHA) + ' fica registrada' : ''}. Acompanhe pela TV ou fale com o PCP.</p>${info && info.fotoFalhou ? '<p style="color:#A2453D;font-weight:600">A foto não pôde ser enviada (o chamado foi enviado sem ela).</p>' : ''}
         <button type="button" class="lg-go" id="qr-mais" style="width:100%;margin-top:12px">Abrir outro chamado</button><div class="lg-pe">Colafix · Manutenção</div></div>`;
       el.querySelector('#qr-mais').onclick = () => telaChamado(); return; }
     el.innerHTML = `<form class="bx qr-bx" autocomplete="off"><div class="qr-top"><span class="qr-ic">${svg('manutencao', 30, 2)}</span><div><small>CHAMAR MANUTENÇÃO</small><b>${esc(QR_LINHA)}</b></div></div>
@@ -276,11 +281,14 @@
       <label for="qr-n">SEU NOME</label><div class="lg-in"><input id="qr-n" required maxlength="60" autocomplete="name" value="${esc(nome)}"></div>
       <div class="er" id="qr-er" role="alert"></div><button type="submit" class="lg-go">Enviar chamado</button>
       <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">Não precisa de usuário nem senha.</span><button type="button" class="lk" id="qr-login">Entrar com usuário</button></div><div class="lg-pe">Colafix · Manutenção</div></form>`;
-    const f = el.querySelector('form'), er = el.querySelector('#qr-er'); let imp = '', eqId = '', foto = '';
+    const f = el.querySelector('form'), er = el.querySelector('#qr-er'); let imp = '', eqId = QR_EQUIP || '', foto = '', enviando = false;
     /* equipamentos da linha (lista da manutenção) e foto */
     (async () => { try { await entrarAnonimo(); const g = await fs.doc('config/manut').get(); const es = ((g.exists && g.data().equips) || []).filter(e => e.ativo !== false && e.linha === QR_LINHA);
       const box = el.querySelector('#qr-eqs'); if (!box || !es.length) return;
-      box.innerHTML = es.map(e => `<button type="button" data-id="${esc(e.id)}" data-n="${esc(e.nome)}">${esc(e.nome)}</button>`).join('');
+      box.innerHTML = es.map(e => `<button type="button" data-id="${esc(e.id)}" data-n="${esc(e.nome)}" aria-pressed="${e.id === eqId}">${esc(e.nome)}</button>`).join('');
+      const eqQ = QR_EQUIP && es.find(e => e.id === QR_EQUIP);
+      if (eqQ) { el.querySelector('#qr-e').value = eqQ.nome; const t = el.querySelector('.qr-top div'); if (t && !t.querySelector('.qr-eqn')) t.insertAdjacentHTML('beforeend', `<span class="qr-eqn" style="display:block;font-size:15px;font-weight:700;color:#1B5C7A">${esc(eqQ.nome)}${eqQ.tag ? ' · ' + esc(eqQ.tag) : ''}</span>`); }
+      else if (QR_EQUIP) { eqId = ''; console.warn('[qr] equipamento do QR não encontrado na linha', QR_EQUIP); }
       box.querySelectorAll('button').forEach(b => b.onclick = () => { const on = eqId !== b.dataset.id; eqId = on ? b.dataset.id : ''; el.querySelector('#qr-e').value = on ? b.dataset.n : ''; box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b && on)); });
     } catch (e) { console.warn('equipamentos', e); } })();
     el.querySelector('#qr-e').oninput = () => { eqId = ''; el.querySelectorAll('#qr-eqs button').forEach(x => x.setAttribute('aria-pressed', 'false')); };
@@ -293,29 +301,44 @@
     f.querySelectorAll('.qr-imp button').forEach(b => b.onclick = () => { imp = b.dataset.v; f.querySelectorAll('.qr-imp button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
     el.querySelector('#qr-login').onclick = () => { MODO_QR = false; telaEntrar('entrar'); };
     setTimeout(() => { const t = el.querySelector('#qr-d'); t && t.focus(); }, 60);
-    f.onsubmit = async ev => { ev.preventDefault(); const b = f.querySelector('.lg-go'); er.textContent = '';
+    f.onsubmit = async ev => { ev.preventDefault(); if (enviando) return; const b = f.querySelector('.lg-go'); er.textContent = '';
       const d = f.querySelector('#qr-d').value.trim(), n = f.querySelector('#qr-n').value.trim().replace(/\s+/g, ' '), eq = f.querySelector('#qr-e').value.trim();
       if (!d) { er.textContent = 'Escreva o que está acontecendo.'; return; } if (!imp) { er.textContent = 'Toque em como está a linha.'; return; } if (n.length < 2) { er.textContent = 'Escreva o seu nome.'; return; }
-      b.disabled = true; b.textContent = 'Enviando…'; try { localStorage.setItem('painel.qrnome', n); } catch (e) {}
+      enviando = true; b.disabled = true; b.textContent = 'Enviando…'; try { localStorage.setItem('painel.qrnome', n); } catch (e) {}
       try { await entrarAnonimo();
         const id = 'q-' + novoId(), agora = new Date(), loc = new Date(agora.getTime() - agora.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
-        let fid = null; if (foto) { fid = 'f-' + novoId(); try { await fs.doc('chamfotos/' + fid).set({ d: foto, em: agora.toISOString(), origem: 'qr' }); } catch (e) { console.warn('foto', e); fid = null; } }
+        let fid = null, fotoFalhou = false; if (foto) { fid = 'f-' + novoId(); try { await fs.doc('chamfotos/' + fid).set({ d: foto, em: agora.toISOString(), origem: 'qr' }); } catch (e) { console.warn('foto', e); fid = null; fotoFalhou = true; } }
         const doc = { linha: QR_LINHA.slice(0, 59), quando: loc, defeito: d.slice(0, 900), impacto: imp, nome: n.slice(0, 60), equip: eq ? eq.slice(0, 80) : null, status: 'Aberta', criado: agora.toISOString(), por: null, numero: 999999, qr: true, qid: id, origem: 'qr' };
         if (fid) doc.foto = fid; if (eqId) doc.equipId = eqId;
         await fs.doc('chamados/' + id).set(doc);
-        telaChamado('ok', { parou: imp === 'parou' });
-      } catch (e) { console.warn('qr', e); b.disabled = false; b.textContent = 'Enviar chamado';
+        enviando = false; telaChamado('ok', { parou: imp === 'parou', fotoFalhou });
+      } catch (e) { console.warn('qr', e); enviando = false; b.disabled = false; b.textContent = 'Enviar chamado';
         er.textContent = e && (e.code === 'permission-denied' || e.code === 'sem-permissao') ? 'O banco recusou o chamado: as regras do Firebase estão desatualizadas. Avise o PCP (Firestore → Regras → colar e Publicar).' : e && (e.code === 'auth/network-request-failed' || e.code === 'unavailable') ? 'Sem internet. Tente de novo.' : 'Não deu certo (' + ((e && e.code) || 'erro') + '). Tente de novo ou avise o PCP.'; } };
   }
 
   let jaLogou = false; try { jaLogou = localStorage.getItem('painel.logado') === '1'; } catch (e) {}
+  /* 'painel.logado' só evita piscar a tela de entrada; quem decide se a pessoa está logada é sempre o Firebase Auth. */
+  const LS = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
+  /* Apaga a cópia local do banco (cache do Firestore neste aparelho), para a próxima pessoa não ver dados de quem saiu. */
+  async function limparCacheLocal() { try { await fs.terminate(); } catch (e) {} try { await fs.clearPersistence(); } catch (e) { console.info('[login] cache local não foi limpo agora (' + ((e && e.code) || 'erro') + '); outra aba ainda usa o painel.'); } }
+  let saindo = false;
+  /* Sair: espera as gravações pendentes subirem, encerra a sessão, limpa o cache local e volta para a entrada. */
+  async function sair() { if (saindo) return; saindo = true;
+    try { const pend = await Promise.race([fs.waitForPendingWrites().then(() => false), new Promise(r => setTimeout(() => r(true), 5000))]);
+      if (pend && !confirm('Há registros deste aparelho que ainda não chegaram ao servidor (sem internet?). Se sair agora, eles podem se perder.\n\nSair mesmo assim?')) { saindo = false; return; } } catch (e) {}
+    try { await auth.signOut(); } catch (e) { console.warn('[login] signOut', e && e.code); }
+    LS.del('painel.logado'); /* painel.uid fica: se OUTRA pessoa entrar aqui, a cópia local é apagada antes de abrir */
+    location.reload(); }
   const primeiraTela = () => (QR_LINHA && !jaLogou ? telaChamado() : telaEntrar('entrar'));
   if (!jaLogou) { if (document.body) primeiraTela(); else document.addEventListener('DOMContentLoaded', () => { if (!EU) primeiraTela(); }); }
   auth.onAuthStateChanged(async u => {
+    if (saindo) return; /* sair() cuida do resto (limpar cache e recarregar) */
     if (u && u.isAnonymous) { if (!MODO_QR) auth.signOut(); return; } /* anônimo só serve para o chamado do QR */
-    if (!u) { jaLogou = false; try { localStorage.removeItem('painel.logado'); } catch (e) {} if (EU) { location.reload(); return; } if (!document.getElementById('lg')) primeiraTela(); return; }
-    try { localStorage.setItem('painel.logado', '1'); } catch (e) {}
-    if (EU && EU.uid !== u.uid) { location.reload(); return; }
+    if (!u) { jaLogou = false; LS.del('painel.logado'); if (EU) { saindo = true; location.reload(); return; } /* a cópia local só é apagada se outra pessoa entrar */ if (!document.getElementById('lg')) primeiraTela(); return; }
+    /* troca de pessoa no mesmo aparelho: o cache local é da pessoa anterior → limpa antes de abrir o painel */
+    const uidAnt = LS.get('painel.uid');
+    if ((EU && EU.uid !== u.uid) || (uidAnt && uidAnt !== u.uid)) { saindo = true; LS.set('painel.uid', u.uid); LS.set('painel.logado', '1'); await limparCacheLocal(); location.reload(); return; }
+    LS.set('painel.uid', u.uid); LS.set('painel.logado', '1');
     EU = u; const el = document.getElementById('lg'); if (el) el.remove(); setTimeout(() => { const q = document.querySelector('.quem'); if (q) { q.title = 'Usuário ' + usuarioDe(u.email) + ' · trocar senha ou sair'; q.style.cursor = 'pointer'; } }, 500);
     prontoOk(); /* o painel abre na hora; o perfil é conferido em segundo plano */
     diagnostico(u);
@@ -324,6 +347,7 @@
       if (!g.exists) await fs.doc('perfis/' + u.uid).set({ nome: u.displayName || usuarioDe(u.email), usuario: usuarioDe(u.email), criadoEm: new Date().toISOString() }); }
     catch (e) { const c = (e && e.code) || 'erro'; console.warn('firestore', c, e && e.message);
       aviso(c === 'permission-denied' || c === 'sem-permissao' ? 'O banco recusou o acesso: as regras do Firestore não estão publicadas. No Firebase: Firestore Database → Regras → cole o firestore.rules → Publicar.'
+        : c === 'resource-exhausted' ? 'A cota grátis diária do Firebase acabou (resource-exhausted). Nenhum dado foi perdido: o painel volta sozinho quando a cota renovar, por volta das 4h da manhã (horário de Brasília).'
         : 'O banco de dados está demorando para responder (' + c + '). Confira a internet e, no Firebase, se o Firestore Database foi criado.', [['Tentar de novo', () => location.reload()]]); } })();
   });
   /* confere, no servidor, se o banco responde para este usuário (aparece na tela se o painel ficar preso em "Verificando") */
@@ -384,13 +408,13 @@
     await fs.doc('perfis/' + uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString(), criadoPor: EU.uid });
     return uid; }
   /* menu do usuário: tocar no nome/avatar no topo */
-  document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('[data-act="sair-conta"]')) { auth.signOut().then(() => location.reload()); return; }
+  document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('[data-act="sair-conta"]')) { sair(); return; }
     const mn = document.getElementById('pf-menu'); if (mn && !mn.contains(ev.target)) mn.remove();
     const q = ev.target.closest && ev.target.closest('.quem'); if (!q || !EU || mn) return;
     if (!mcssOk) { const st = document.createElement('style'); st.textContent = mcss; document.head.appendChild(st); mcssOk = true; }
     const r = q.getBoundingClientRect(), m = document.createElement('div'); m.id = 'pf-menu'; m.style.top = (r.bottom + 6) + 'px'; m.style.right = Math.max(8, innerWidth - r.right) + 'px';
     m.innerHTML = `<div>Usuário <b>${usuarioDe(EU.email)}</b></div><button data-m="senha">Trocar minha senha</button>${instalarPossivel() ? '<button data-m="instalar">Instalar o app neste aparelho</button>' : ''}<button data-m="sair">Sair</button>`;
-    m.onclick = e => { const k = e.target.dataset.m; if (!k) return; m.remove(); if (k === 'senha') trocarSenha(); else if (k === 'instalar') instalar(); else auth.signOut().then(() => location.reload()); };
+    m.onclick = e => { const k = e.target.dataset.m; if (!k) return; m.remove(); if (k === 'senha') trocarSenha(); else if (k === 'instalar') instalar(); else sair(); };
     document.body.appendChild(m); });
 
   window.claude = {
