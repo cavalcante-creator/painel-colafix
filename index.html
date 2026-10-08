@@ -1,4 +1,4 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#143F54"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Painel Colafix"><meta name="robots" content="noindex"><style>body{margin:0}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#143F54"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/favicon-32.png?v=3" sizes="32x32"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Painel Colafix"><meta name="robots" content="noindex"><style>body{margin:0}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Painel de Operação Colafix</title>
 <style>
 :root{
@@ -11095,6 +11095,61 @@ document.addEventListener('change',async ev=>{ const t=ev.target, id=t.dataset&&
   try{ await S.db.doc('acessos/'+id).update({linhas:v,alteradoEm:new Date().toISOString(),alteradoPor:S.uid||null}); d.linhas=v; toast(acsNome(id)+(v.length?' vê só a '+v[0]+' no calendário.':' vê todas as linhas no calendário.')); }
   catch(e){ console.warn('[equipe] linhas',e); erro(e); } t.disabled=false; render(); });
 /* ===FIM CONSULTA=== */
+/* ===================== AVISOS NO CELULAR (07/10): medição dos silos e silo crítico, grátis, via ntfy ===================== */
+/* Sem servidor: o navegador de quem salvou envia o aviso para https://ntfy.sh/<tópico>. Quem recebe instala o app "ntfy"
+   (App Store / Play Store) e assina o tópico. config/geral.avisos = {ativo, topico, medicao, critico}.
+   O tópico funciona como senha: quem souber o nome recebe os avisos. Por isso ele é longo e aleatório. */
+const AV_SERV='https://ntfy.sh';
+function avCfg(){ const a=(S.cfg&&S.cfg.avisos)||{}; return a.ativo&&a.topico?a:null; }
+function avTopicoNovo(){ const a=new Uint8Array(9); try{ crypto.getRandomValues(a); }catch(e){ for(let i=0;i<9;i++) a[i]=Math.floor(Math.random()*256); } return 'colafix-silos-'+[...a].map(x=>'abcdefghijkmnpqrstuvwxyz23456789'[x%32]).join(''); }
+function avLink(){ try{ return (window.claude&&window.claude.link)||''; }catch(e){ return ''; } }
+/* fila no aparelho: se a internet falhar, tenta de novo (até 6 h) */
+function avFila(){ try{ return JSON.parse(localStorage.getItem('painel.avisos.fila')||'[]'); }catch(e){ return []; } }
+function avFilaGrava(f){ try{ localStorage.setItem('painel.avisos.fila',JSON.stringify(f.slice(-30))); }catch(e){} }
+async function avPost(m){ const ct=new AbortController(); const t=setTimeout(()=>ct.abort(),8000);
+  try{ const r=await fetch(AV_SERV+'/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(m),signal:ct.signal}); if(!r.ok) throw new Error('ntfy '+r.status); return true; }
+  finally{ clearTimeout(t); } }
+async function avEnviar(m){ const a=avCfg(); if(!a) return false; m=Object.assign({topic:a.topico},m); const link=avLink(); if(link&&!m.click) m.click=link;
+  try{ await avPost(m); return true; }catch(e){ console.warn('[avisos] não enviou agora, vai tentar de novo',e&&e.message); const f=avFila(); f.push({m,em:Date.now()}); avFilaGrava(f); return false; } }
+setInterval(async()=>{ const f=avFila(); if(!f.length||!navigator.onLine) return; const resta=[];
+  for(const x of f){ if(Date.now()-x.em>6*36e5) continue; try{ await avPost(x.m); }catch(e){ resta.push(x); } } avFilaGrava(resta); },30000);
+function avLinhaSilo(sid,t){ const s=(S.cfg.silos||[]).find(x=>x.id===sid); if(!s) return null; const p=s.cap?t/s.cap:0, nv=nivel(p); return {txt:`${s.nome}: ${f1(t)} t (${f1(p*100)}% · ${nv.n})`,crit:nv.c==='crit',warn:nv.c==='warn'}; }
+/* medição salva (formulário 📏 ou "Nova medição") → um aviso por medição */
+const avJa=new Set();
+async function avMedicao(id,doc){ const a=avCfg(); if(!a||a.medicao===false||!doc||avJa.has(id)) return; avJa.add(id);
+  const sal=saldoPorSilo(); const ls=Object.keys(doc.itens||{}).map(sid=>avLinhaSilo(sid,sal[sid]&&sal[sid].doc&&sal[sid].doc.medicaoId===id?sal[sid].q:+doc.itens[sid])).filter(Boolean); if(!ls.length) return;
+  const quem=doc.medidoPor||(S.uid&&S.nomes[S.uid])||''; const crit=ls.some(x=>x.crit);
+  await avEnviar({title:(doc.corrige?'Medição corrigida':'Medição dos silos')+(crit?' · atenção: silo crítico':''),message:ls.map(x=>x.txt).join('\n')+(quem?'\nMedido por '+quem:'')+' · '+hora(doc.em||new Date().toISOString()),tags:[crit?'rotating_light':'straight_ruler'],priority:crit?4:3}); }
+/* silo que fica crítico pelo consumo dos apontamentos → um aviso por vez que cruza o limite */
+{ const _pe=siloProcessarEntrega; siloProcessarEntrega=async function(){ const r=await _pe.apply(this,arguments);
+  try{ const a=avCfg(); if(a&&a.critico!==false&&r&&r.ok&&r.sid){ const s=(S.cfg.silos||[]).find(x=>x.id===r.sid); const L=S.cfg.limites||CFG_PADRAO.limites;
+      if(s&&s.cap){ const lim=s.cap*1000*L.atencao/100; if(r.antes>=lim&&r.depois<lim){ const l=avLinhaSilo(r.sid,r.depois/1000);
+        avEnviar({title:'Silo crítico: '+s.nome,message:l.txt+'\nPelo consumo dos apontamentos. Confira e programe carga.',tags:['rotating_light'],priority:5}); } } } }catch(e){ console.warn('[avisos] crítico',e); }
+  return r; }; }
+/* ---------- configuração (administradora) e instruções para quem recebe ---------- */
+function avCard(){ const a=(S.cfg&&S.cfg.avisos)||{}; const dono=!!(S.acs&&S.acs.dono); if(!dono&&!avCfg()) return '';
+  const inst=a.topico?`<ol class="av-ol"><li>No iPhone, instale o app <b>ntfy</b> da App Store (é grátis).</li><li>Abra o ntfy, toque em <b>+</b> e digite o tópico abaixo, sem mudar o servidor (ntfy.sh).</li><li>Toque em <b>Assinar</b> e permita as notificações.</li></ol>
+    <div class="av-top"><div class="man-qr" style="max-width:190px;margin:0">${manQrSvg(AV_SERV+'/'+a.topico,150)}<small>abre o tópico no celular</small></div><div><div class="label">TÓPICO</div><div class="av-tn num">${esc(a.topico)}</div><small class="sub" style="margin:0">Quem souber este nome recebe os avisos. Não divulgue fora da equipe.</small></div></div>`:'';
+  if(!dono) return `<section class="card"><div class="label">RECEBER AVISOS NO CELULAR</div><div class="sub" style="margin:4px 0 8px">Aviso a cada medição dos silos${a.critico!==false?' e quando um silo fica crítico':''}.</div>${inst}</section>`;
+  return `<section class="card"><div class="head" style="align-items:baseline"><div><div class="label">AVISOS NO CELULAR · GRÁTIS (NTFY)</div><div class="sub" style="margin:4px 0 0">Funciona no iPhone e no Android, com o celular bloqueado. Não precisa de servidor nem do plano pago do Firebase.</div></div>
+    <label class="av-sw"><input type="checkbox" id="av-ativo" ${a.ativo?'checked':''}> <b>${a.ativo?'Ligado':'Desligado'}</b></label></div>
+   ${a.topico?`<div class="av-ops"><label><input type="checkbox" id="av-med" ${a.medicao!==false?'checked':''}> Avisar a cada medição</label><label><input type="checkbox" id="av-cri" ${a.critico!==false?'checked':''}> Avisar quando um silo ficar crítico pelo consumo</label></div>${inst}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button class="btn sec" data-act="av-teste" ${a.ativo?'':'disabled'}>Enviar aviso de teste</button><button class="btn sec" data-act="av-novo">Trocar tópico</button></div>`:`<div style="margin-top:12px"><button class="btn" data-act="av-novo">Criar tópico e ligar</button></div>`}</section>`; }
+async function avGrava(mud){ const a=Object.assign({},(S.cfg&&S.cfg.avisos)||{},mud); await S.db.doc('config/geral').update({avisos:a}); S.cfg.avisos=a; render(); }
+document.addEventListener('change',async ev=>{ const t=ev.target; if(!['av-ativo','av-med','av-cri'].includes(t.id)) return; if(!(S.acs&&S.acs.dono)){ t.checked=!t.checked; return; }
+  try{ await avGrava(t.id==='av-ativo'?{ativo:!!t.checked}:t.id==='av-med'?{medicao:!!t.checked}:{critico:!!t.checked}); toast('Avisos atualizados.'); }catch(e){ t.checked=!t.checked; erro(e); } });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="av-"]'); if(!b) return; const a=b.dataset.act; if(!(S.acs&&S.acs.dono)) return;
+  if(a==='av-novo'){ if((S.cfg.avisos||{}).topico&&!confirm('Trocar o tópico? Quem já assinou vai precisar assinar o novo.')) return; b.disabled=true;
+    try{ await avGrava({topico:avTopicoNovo(),ativo:true}); toast('Tópico criado. Assine no app ntfy do celular.'); }catch(e){ erro(e); } b.disabled=false; return; }
+  if(a==='av-teste'){ b.disabled=true; const ok=await avEnviar({title:'Teste do Painel Colafix',message:'Se você recebeu isto, os avisos dos silos estão funcionando.',tags:['white_check_mark']});
+    toast(ok?'Aviso de teste enviado. Deve chegar no celular em segundos.':'Não consegui enviar agora (sem internet?). Vai tentar de novo sozinho.'); b.disabled=false; } });
+{ const _vs=vSilos; vSilos=function(){ return _vs.apply(this,arguments)+avCard(); }; }
+{ const _sv=vSilosVer; vSilosVer=function(){ return _sv.apply(this,arguments)+avCard(); }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="av-css">.av-sw{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:15px}.av-sw input,.av-ops input{width:20px;height:20px}
+.av-ops{display:flex;flex-direction:column;gap:8px;margin:12px 0}.av-ops label{display:flex;gap:8px;align-items:center;cursor:pointer}
+.av-ol{margin:10px 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}.av-top{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:8px}.av-tn{font-size:20px;font-weight:800;color:var(--teal-strong);word-break:break-all;margin:4px 0}</style>`);
+/* ===FIM AVISOS=== */
+
 
 
 
@@ -11289,7 +11344,7 @@ async function siloMedicaoSalva(id,doc){ const corr=doc.corrige?S.medicoes.find(
     if(col==='medicoes') doc.saldoV=2; /* marca: medição que alimenta o saldo (para a rede de segurança) */
     let id; try{ const ref=S.db.collection(col).doc(); id=ref.id; await ref.set(doc); }catch(e){ erro(e); return false; }
     if(col==='entregas') siloEmFila(()=>siloProcessarEntrega(id,doc).catch(e=>{ console.warn('[silos] consumo',e); siloAviso('O apontamento foi salvo, mas não consegui descontar o silo agora ('+((e&&e.code)||'erro')+'). O painel tenta de novo sozinho.'); }));
-    else await siloEmFila(()=>siloMedicaoSalva(id,doc));
+    else { await siloEmFila(()=>siloMedicaoSalva(id,doc)); try{ avMedicao(id,doc); }catch(e){ console.warn('[avisos]',e); } }
     return true; }; }
 /* rede de segurança: apontamentos que não descontaram (sem internet, aba fechada no meio, aparelho com versão antiga) são processados por qualquer painel aberto */
 async function siloReconciliar(){ if(!S.db||!siloFs()||!S.siloSub||S._siloRec) return;
@@ -11360,7 +11415,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
     F.salvando=true; render(); const em=new Date().toISOString(); const obs=String(($('#sm-obs')||{}).value||F.obs||'').trim();
     try{ const ref=S.db.collection('medicoes').doc(); const doc={em,por:S.uid,itens:{[F.silo]:Math.round(kg/100)/10},caps:Object.fromEntries(S.cfg.silos.map(x=>[x.id,x.cap])),medidoPor:(S.uid&&S.nomes[S.uid])||'',motivo,origem:'silo-medicao',saldoV:2}; if(obs) doc.obs=obs;
       await ref.set(doc);
-      const r=await siloEmFila(()=>siloRegistrarMedicao({sid:F.silo,kg,motivo,obs,em,medicaoId:ref.id}));
+      const r=await siloEmFila(()=>siloRegistrarMedicao({sid:F.silo,kg,motivo,obs,em,medicaoId:ref.id})); try{ avMedicao(ref.id,doc); }catch(e){ console.warn('[avisos]',e); }
       S.sm=null; toast(r&&r.ok?`Medição salva · ${siloNome(F.silo)}: ${fkg(r.novo)}${r.antes!=null?' (diferença '+fkgS(kg-r.antes)+')':''}`:'Medição salva.'); render(); }
     catch(e){ console.warn('[silos] medição',e); F.salvando=false; render(); siloAviso(e&&e.code==='unavailable'?'Não foi possível conectar ao servidor. A medição não foi salva. Verifique sua conexão e tente novamente.':'A medição não foi salva ('+((e&&e.code)||'erro')+').','erro'); }
     return; } });
