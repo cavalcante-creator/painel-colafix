@@ -329,7 +329,30 @@
     try { await auth.signOut(); } catch (e) { console.warn('[login] signOut', e && e.code); }
     LS.del('painel.logado'); /* painel.uid fica: se OUTRA pessoa entrar aqui, a cópia local é apagada antes de abrir */
     location.reload(); }
-  const primeiraTela = () => (QR_LINHA && !jaLogou ? telaChamado() : telaEntrar('entrar'));
+  /* QR da folha de produção (rancho), sem login: a pessoa da linha confirma que recebeu o rancho.
+     Só cria rancrec/{id} (não lê nem altera nada); o painel do diário de bordo aplica nas ordens do rancho. */
+  function telaRancho(fase) { MODO_QR = true; entrarAnonimo();
+    let el = document.getElementById('lg'); if (!el) { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); el = document.createElement('div'); el.id = 'lg'; document.body.appendChild(el); }
+    if (!document.getElementById('lg-css3')) { const st3 = document.createElement('style'); st3.id = 'lg-css3'; st3.textContent = cssQr; document.head.appendChild(st3); }
+    const nome = (() => { try { return localStorage.getItem('painel.qrnome') || ''; } catch (e) { return ''; } })();
+    if (fase === 'ok') { el.innerHTML = `<div class="bx qr-bx qr-ok"><div class="qr-big">${svg('check', 44, 2.6)}</div><h1>Recebimento registrado</h1><p>Rancho <b>${esc(RANCHO_QR)}</b> recebido na linha. O almoxarifado já vê no diário de bordo.</p><button type="button" class="lk" id="qr-ent" style="margin-top:8px">Entrar com usuário</button></div>`;
+      el.querySelector('#qr-ent').onclick = () => { MODO_QR = false; telaEntrar('entrar'); }; return; }
+    el.innerHTML = `<form class="bx qr-bx" autocomplete="on"><div class="qr-top"><div class="qr-ic">${svg('check', 30, 2.2)}</div><div><small>FOLHA DE PRODUÇÃO · RANCHO</small><b>${esc(RANCHO_QR)}</b></div></div>
+      <p style="margin:0 0 14px;color:#4A463D">Confirme que o rancho chegou na linha.</p>
+      <label for="rr-n">SEU NOME</label><div class="lg-in"><input id="rr-n" required maxlength="60" autocomplete="name" value="${esc(nome)}"></div>
+      <div class="er" id="rr-er" role="alert"></div><button class="lg-go" type="submit">Recebi o rancho</button>
+      <div class="lg-pe"><button type="button" class="lk" id="rr-ent">Entrar com usuário</button></div></form>`;
+    el.querySelector('#rr-ent').onclick = () => { MODO_QR = false; telaEntrar('entrar'); };
+    let enviando = false; const f = el.querySelector('form'), er = el.querySelector('#rr-er');
+    f.onsubmit = async ev => { ev.preventDefault(); if (enviando) return; const b = f.querySelector('.lg-go'); er.textContent = '';
+      const n = String(el.querySelector('#rr-n').value || '').trim().replace(/\s+/g, ' ').slice(0, 60); if (n.length < 2) { er.textContent = 'Escreva seu nome.'; return; }
+      enviando = true; b.disabled = true; b.textContent = 'Enviando…'; try { localStorage.setItem('painel.qrnome', n); } catch (e) {}
+      try { const id = 'r-' + RANCHO_QR + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        await fs.doc('rancrec/' + id).set({ rancho: RANCHO_QR, nome: n, em: new Date().toISOString(), status: 'novo', origem: 'qr' }); telaRancho('ok'); }
+      catch (e) { console.warn('rancho qr', e); enviando = false; b.disabled = false; b.textContent = 'Recebi o rancho';
+        er.textContent = e && /network|unavailable/.test(e.code || '') ? 'Sem internet. Confira a conexão e tente de novo.' : 'Não foi possível registrar agora. Tente de novo ou avise o almoxarifado.'; } };
+  }
+  const primeiraTela = () => (QR_LINHA && !jaLogou ? telaChamado() : RANCHO_QR && !jaLogou ? telaRancho() : telaEntrar('entrar'));
   if (!jaLogou) { if (document.body) primeiraTela(); else document.addEventListener('DOMContentLoaded', () => { if (!EU) primeiraTela(); }); }
   auth.onAuthStateChanged(async u => {
     if (saindo) return; /* sair() cuida do resto (limpar cache e recarregar) */

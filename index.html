@@ -2871,7 +2871,7 @@ function render(){
   S._div=divergencias();
   renderNav();
   const v=S.view, el=$('#view');
-  el.innerHTML = abas() + (v==='gestao'?vGestao():v==='silosver'?vSilosVer():v==='modulos'?vModulos():v==='cimento'?vCimento():v==='geral'?vGeral():v==='medicao'?vMedicao():v==='silos'?vSilos():v==='cargas'?vCargas():v==='paradas'?vParadas():v==='programacao'?vProgramacao():v==='aprogramar'?vAProgramar():v==='meudia'?vMeuDia()+anlResDiaModal():v==='indicadores'?anlInjeta(vIndicadores(),adeCard()+anlEficiencia()):v==='tvfab'?vTvFab():v==='calendario'?vCalendario():v==='ranchos'?vRanchos():v==='diario'?vDiario():v==='itens'?vItens():v==='historico'?vHistorico():String(v).startsWith('anl')?anlView(v):String(v).startsWith('alx')?alxView(v):String(v).startsWith('man')?manView(v):String(v).startsWith('pmx')?pmxView(v):v==='linhatv'?vLinhaTv():v==='tvapres'?vApres():v==='painel'?vPainel():v==='paineis'?vPaineis():v==='acessos'?vAcessos():anlInjeta(vAjustes(),anlBackupCard()+corAjustes())) + repModal();
+  el.innerHTML = abas() + (v==='tvsplit'?vSplit():v==='gestao'?vGestao():v==='silosver'?vSilosVer():v==='modulos'?vModulos():v==='cimento'?vCimento():v==='geral'?vGeral():v==='medicao'?vMedicao():v==='silos'?vSilos():v==='cargas'?vCargas():v==='paradas'?vParadas():v==='programacao'?vProgramacao():v==='aprogramar'?vAProgramar():v==='meudia'?vMeuDia()+anlResDiaModal():v==='indicadores'?anlInjeta(vIndicadores(),adeCard()+anlEficiencia()):v==='tvfab'?vTvFab():v==='calendario'?vCalendario():v==='ranchos'?vRanchos():v==='diario'?vDiario():v==='itens'?vItens():v==='historico'?vHistorico():String(v).startsWith('anl')?anlView(v):String(v).startsWith('alx')?alxView(v):String(v).startsWith('man')?manView(v):String(v).startsWith('pmx')?pmxView(v):v==='linhatv'?vLinhaTv():v==='tvapres'?vApres():v==='painel'?vPainel():v==='paineis'?vPaineis():v==='acessos'?vAcessos():anlInjeta(vAjustes(),anlBackupCard()+corAjustes())) + repModal();
   document.body.classList.toggle('dbmon',S.view==='diario'&&S.dbo&&S.dbo.modo==='monitor');
   if(v==='medicao') medAtualizaResumo();
   { const bx=S.rep&&S.rep.aberto&&document.querySelector('.rep.dbmbox'); if(bx&&S.rep.st) bx.scrollTop=S.rep.st; }
@@ -6382,6 +6382,14 @@ function ritDesc(c){ const I=((S.anl.base.itens||{}).l||{})[c]||{}; return Strin
 function ritNome(c){ return ritDesc(c).replace(/^ARGAMASSA\s+/i,'').replace(/\s+EMB\b/i,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b/i,'').replace(/\s+/g,' ').trim()||c; }
 function ritMeses(){ const P=S.anl.base.prev||{}; return Object.keys(P.mes||{}).filter(cp=>Object.values(P.mes[cp]||{}).some(v=>v>0)).sort(); }
 
+/* Curva S: todas as entregas do mês consultado, sem o limite das 1.000 mais recentes da tela.
+   A faixa vai de 1 dia antes a 1 dia depois do mês (fuso: o horário gravado é UTC) e o filtro pelo dia local é feito em ritDados. */
+S._ritEnt={}; const _ritSub={};
+function ritEntMes(cp){ if(!S.db||!cp) return null; if(!_ritSub[cp]){ _ritSub[cp]=true; const a=new Date(+cp.slice(0,4),+cp.slice(5,7)-1,0), b=new Date(+cp.slice(0,4),+cp.slice(5,7),2);
+    const de=a.toISOString().slice(0,10), ate=b.toISOString().slice(0,10);
+    inscrever('ritent-'+cp,()=>S.db.collection('entregas').where('em','>=',de).where('em','<',ate).orderBy('em'),snap=>{ S._ritEnt[cp]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); }); }
+  return S._ritEnt[cp]||null; }
+function ritEntregas(cp){ const m=new Map(); (S.entregas||[]).forEach(e=>m.set(e._id,e)); (ritEntMes(cp)||[]).forEach(e=>m.set(e._id,e)); return [...m.values()]; }
 function ritDados(cp,fonte){
   const P=S.anl.base.prev||{}; const pm=(P.mes||{})[cp]; if(!pm) return null;
   const C=ritCfg(), LT=linhasOrd(), LS=C.linhas.filter(l=>LT.includes(l)); if(!LS.length) return null;
@@ -6400,8 +6408,8 @@ function ritDados(cp,fonte){
   let fonteAte='';
   if(fonte==='focco'){ const V=S.anl.base.vendas||{}, D=V.diario||{}; fonteAte=V.ate||'';
     its.forEach(x=>{ const dd=D[x.c]||{}; for(const d in dd){ if(d.slice(0,7)!==cp) continue; const q=+((dd[d]||[])[0])||0; if(!q) continue; for(const l in x.dv) add(d,l,x.c,q*x.dv[l]); } }); }
-  else { const an=anuladas(), OM={}; S.ordens.forEach(o=>OM[o._id]=o);
-    S.entregas.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d.slice(0,7)!==cp) return; const o=OM[e.ordem]; if(!o) return;
+  else { const EM=ritEntregas(cp), an=new Set(EM.filter(e=>e.anula).map(e=>e.anula)), OM={}; S.ordens.forEach(o=>OM[o._id]=o);
+    EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d.slice(0,7)!==cp) return; const o=OM[e.ordem]; if(!o) return;
       const l=e.linha||o.linha, q=+e.qtd||0; if(!LS.includes(l)||!q) return; const c=codigoDe(o);
       if(!IC[c]){ outros[l]+=q; sem[c]=(sem[c]||0)+q; } add(d,l,c,q); }); }
   /* planejado: o que está programado no calendário (ordens + previsões sem número) por dia útil e linha */
@@ -6416,7 +6424,7 @@ function ritDados(cp,fonte){
       if(!sAt){ x.ei=null; x.metaL=x.prev; } else { let ei=(+it.a3||0)+(+it.a30||0); for(const d in dd){ const v=dd[d]||[], m=(+v[0]||0)-(+v[1]||0); if(d>sAt&&d<i0) ei+=m; else if(d>=i0&&d<=sAt) ei-=m; } x.ei=Math.max(0,ei); x.seg=+it.seg||0; x.metaL=Math.max(0,Math.round(x.prev+x.seg-x.ei)); }
       if((S.rit.meta||'liq')==='liq') x.prev=x.metaL; }); }
   /* 3) aderência ao programa: do que estava programado para o dia em cada ordem, quanto saiu no próprio dia */
-  const ADH={}; if(fonte!=='focco'){ const an=anuladas(), feito={}; S.entregas.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d.slice(0,7)!==cp) return; const k=diaUtil(d)+'|'+e.ordem; feito[k]=(feito[k]||0)+(+e.qtd||0); });
+  const ADH={}; if(fonte!=='focco'){ const EM=ritEntregas(cp), an=new Set(EM.filter(e=>e.anula).map(e=>e.anula)), feito={}; EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d.slice(0,7)!==cp) return; const k=diaUtil(d)+'|'+e.ordem; feito[k]=(feito[k]||0)+(+e.qtd||0); });
     S.ordens.forEach(o=>{ if(!o.linha||!LS.includes(o.linha)||['cancelada','excluida','vinculada'].includes(o.status)) return; const d0=o.data||''; if(!d0) return; const d1=o.ate&&o.ate>d0?o.ate:d0; if(d1<ini||d0>fimM) return;
       const ds=calDiasUteis(d0,d1,anlCfg().sab).filter(d=>anlUtil(d)); const dd=ds.length?ds:[d0]; const q=(+o.total||0)/dd.length;
       dd.forEach(d=>{ if(d.slice(0,7)!==cp||d>h) return; const k=diaUtil(d); const a=ADH[k]=ADH[k]||{}; const b=a[o.linha]=a[o.linha]||{pl:0,ok:0}; b.pl+=q; b.ok+=Math.min(q,feito[k+'|'+o._id]||0); }); }); }
@@ -6551,7 +6559,7 @@ function ritCvBox(D,tv){ const A=S.rit, op=ritCvAtual(D,tv), k=ritStats(D,op.f),
    <div class="rit-cvsvg">${ritCurva(D,op.f,Object.assign(tv?{w:1240,h:560,big:true}:{},{jan:ritJan(D)}))}</div>`; }
 function ritJan(D){ const j=S.rit.jan||'auto'; if(j!=='auto') return j; const k=ritStats(D,{}); return k.du<=6&&k.n>12?'perto':'mes'; }
 S.rit.auto=true; S.rit._cvi=-1; S.rit.jan='auto';
-setInterval(()=>{ try{ const A=S.rit; const tvf=S.view==='tvfab'&&S.tvf&&S.tvf.rit&&S.tvf.fase===1&&document.body.classList.contains('tv'); if(S.view!=='anlrit'&&!tvf) return;
+setInterval(()=>{ try{ const A=S.rit; const tvf=S.view==='tvfab'&&S.tvf&&S.tvf.rit&&S.tvf.fase===1&&document.body.classList.contains('tv'); const spl=S.view==='tvsplit'&&!!document.getElementById('rit-cvbox'); /* tela dividida com o Previsto × Realizado */ if(S.view!=='anlrit'&&!tvf&&!spl) return;
   const tv=tvf||document.body.classList.contains('tv'); if(!tv&&!A.auto) return;
   const box=document.getElementById('rit-cvbox'); if(!box) return;
   const D=tvf?ritDados(hojeStr().slice(0,7),'painel'):ritDados(A.cp,A.fonte); if(!D) return;
@@ -6966,7 +6974,7 @@ function aprIniciar(lista){ const A=S.apres; if(!lista.length) return;
 function aprSair(){ const A=S.apres; if(!A.on) return; A.on=false; const ant=A.ant||{};
   S.dbo.modo=ant.dbo||''; S.tvf.rit=!!ant.tvfRit; document.body.classList.remove('tv');
   try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
-  const bar=document.getElementById('apr-bar'); if(bar) bar.remove(); go('tvapres'); }
+  const bar=document.getElementById('apr-bar'); if(bar) bar.remove(); go(ant.view==='gestao'?'gestao':'tvapres'); /* aberta pela Visão do gestor: volta para ela */ }
 function aprPassa(d){ const A=S.apres; if(!A.on) return; A.i=(A.i+d+A.lista.length)%A.lista.length; aprAplica(); }
 function aprBarra(){ const A=S.apres; let bar=document.getElementById('apr-bar');
   if(!bar){ bar=document.createElement('div'); bar.id='apr-bar'; bar.className='apr-bar'; document.body.appendChild(bar); }
@@ -9675,7 +9683,7 @@ const EQ_PRONTO_ORD=['almoxpmx','linha','manut','producao','sup','supsis','tv','
 const EQ_PRONTO_DESC={almoxpmx:'Premix, diário de bordo dos ranchos e contagem',linha:'Computador fixo da linha: parar e voltar a linha e abrir chamado',manut:'Atende os chamados de manutenção',producao:'Vê o Meu dia e a programação, sem mudar nada',
   sup:'Inventário: contagem e recebimento de todos os almox',supsis:'Inventário completo, com auditoria',tv:'Só a TV das linhas',cal:'Só consulta do calendário',auditor:'Consulta a auditoria do inventário',
   conf:'Contagem e recebimento do Almox 3',conf2:'Contagem do Almox 30',conf3:'Contagem do Rejunte e da Separação',confa1:'Contagem do Almox 1',confa2:'Contagem do Almox 2',pcp:'Tudo, igual a você'};
-const EQ_PRINCIPAIS=8;
+const EQ_PRINCIPAIS=10;
 if(ACS_PERFIS.almoxpmx) ACS_PERFIS.almoxpmx.nome='Almoxarifado'; if(ACS_PERFIS.manut) ACS_PERFIS.manut.nome='Manutenção'; if(ACS_PERFIS.linha) ACS_PERFIS.linha.nome='Produção · Tela da linha';
 S.eq={maisCg:false,aba:'pessoas',q:'',fil:'',nv:null,cartao:null,conf:null,cg:null,cgConf:null,cgMove:'',salv:false,usu:{}};
 function eqOnline(){ return !!(window.claude&&window.claude.online&&typeof window.claude.criarUsuario==='function'); }
@@ -10101,7 +10109,7 @@ body.ltv-k .mp-k b{font-size:38px} body.ltv-k .mp-df{font-size:17px}
 /* ---------- chamados que chegam pelo QR sem login: viram OS numerada no primeiro painel aberto ---------- */
 { const _mn=manNum; manNum=function(n){ return (+n||0)>=900000?'nova':_mn(n); }; }
 S.mp.conv=false;
-async function mpConverteQr(){ if(S.mp.conv||!S.db||!S.acs||!S.acs.pronto||!viewOk('manch')) return;
+async function mpConverteQr(){ if(S.mp.conv||!S.db||!S.acs||!S.acs.pronto||!viewOk('manch')||(typeof soVer==='function'&&soVer())) return;
   const pend=(S.chamados||[]).filter(c=>c.qr&&String(c._id||'').startsWith('q-')&&!c.excluido).sort((a,b)=>String(a.criado).localeCompare(String(b.criado))); if(!pend.length) return;
   S.mp.conv=true;
   try{ for(const q of pend){ const qref=S.db.doc('chamados/'+q._id); const lk=await qref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:9000}); if(!lk.acquired) continue;
@@ -10286,7 +10294,7 @@ function mxPrevForm(ed){ const F=S.mx.pv, eqs=mxEquips(); return `<div class="mx
    <button class="btn" data-act="mx-pv-salvar">${ic('check',18,2.4)}${ed?'Salvar':'Cadastrar'}</button>${ed?'<button class="btn sec" data-act="mx-pv-x">Cancelar</button>':''}</div>`; }
 /* abre a OS da preventiva no dia */
 S.mx.gerando=false;
-async function mxGeraPrev(p,forcar){ const lk=S.db.doc('config/manut-prev-'+p.id); const r=await lk.acquire({holder:S.uid||('t'+Math.random()),ttlMs:9000}); if(!r.acquired) return false;
+async function mxGeraPrev(p,forcar){ if(typeof soVer==='function'&&soVer()) return false; const lk=S.db.doc('config/manut-prev-'+p.id); const r=await lk.acquire({holder:S.uid||('t'+Math.random()),ttlMs:9000}); if(!r.acquired) return false;
   try{ const g=await S.db.doc('config/manut').get(); const d=g.exists?(g.data()||{}):{}; const pp=(d.prev||[]).find(x=>x.id===p.id); if(!pp||pp.ativo===false) return false;
     if(!forcar&&(pp.osDe===pp.prox||mxOsPrev(pp))) return false; const e=(d.equips||[]).find(x=>x.id===pp.equip)||{};
     const agora=new Date(), loc=new Date(agora.getTime()-agora.getTimezoneOffset()*6e4).toISOString().slice(0,16);
@@ -10545,11 +10553,11 @@ async function cbPdf(){ if(!window.jspdf){ toast('Gerador de PDF indisponível. 
 /* ---------- o que o leitor digitar ---------- */
 S.cb.buf=''; S.cb.t=0; S.cb.inicio=null;
 document.addEventListener('keydown',ev=>{ if(ev.ctrlKey||ev.altKey||ev.metaKey) return; const agora=performance.now(), gap=agora-S.cb.t; S.cb.t=agora;
-  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(cod.length>=4&&/^(CH|RA)-/i.test(cod)&&gap<120){ const a=document.activeElement;
+  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(cod.length>=4&&(/^(CH|RA)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod))&&gap<120){ const a=document.activeElement;
       if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&typeof a.value==='string'&&a.value.toUpperCase().endsWith(cod.toUpperCase())){ a.value=a.value.slice(0,a.value.length-cod.length); a.dispatchEvent(new Event('input',{bubbles:true})); }
       ev.preventDefault(); ev.stopPropagation(); cbLeu(cod); } return; }
   if(ev.key&&ev.key.length===1){ if(gap>80) S.cb.buf=''; else if(S.cb.buf&&gap<50) ev.stopImmediatePropagation(); /* rajada do leitor: não dispara os atalhos do teclado (N, A, P, F) */ S.cb.buf+=ev.key; if(S.cb.buf.length>40) S.cb.buf=S.cb.buf.slice(-40); } },true);
-function cbLeu(cod){ cod=String(cod).toUpperCase(); const naTela=S.view==='manqr'&&S.cb.modo==='barras';
+function cbLeu(cod){ cod=String(cod).toUpperCase(); const mcr=cod.match(/^CX([A-Z0-9]{8})$/)||cod.match(/CRACHA\W*([A-Z0-9]{8})$/); if(mcr){ crColetor(mcr[1]); return; } const naTela=S.view==='manqr'&&S.cb.modo==='barras';
   if(cod.startsWith('CH-')){ const l=cbLinhaDe(cod); if(!l){ S.cb.ultimo={cod,ok:false}; toast('Código '+cod+' não é de nenhuma linha.'); if(naTela) render(); return; }
     if(naTela){ S.cb.ultimo={cod,ok:true,txt:'abre o chamado da '+l}; render(); toast('Leitor funcionando: '+l+'.'); return; }
     if(typeof tabOn==='function'&&tabOn()&&linhasOrd().includes(l)){ tabSet(l); go('linhatv'); toast('Tablet: '+l); return; }
@@ -10857,6 +10865,11 @@ function crCodigo(){ const a=new Uint8Array(8); try{ crypto.getRandomValues(a); 
 function crQrTexto(cod){ return 'COLAFIX:CRACHA:'+cod; }
 function crAssinar(){ if(S.cr.sub||!S.db) return; S.cr.sub=true; inscrever('crachas',()=>S.db.collection('crachas').limit(1000),snap=>{ S.cr.lista=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); }); }
 function crDe(cod){ return S.cr.lista.find(c=>c.codigo===cod||c._id===cod)||null; }
+/* crachá lido pelo coletor */
+function crColetor(cod){ if(S.view==='mantotem'){ S.tt.ult=Date.now(); if(S.tt.fase!=='espera'){ toast('Termine ou cancele o que está na tela antes de passar outro crachá.'); return; } ttLeu('COLAFIX:CRACHA:'+cod); return; }
+  const c=crDe(cod);
+  if(S.view==='mancrachas'){ S.cr.teste=c?{ok:true,txt:'Leu o crachá de '+c.nome+(c.ativo===false?' (DESATIVADO)':'')}:{ok:false,txt:'Leu '+cod+', mas não é um crachá cadastrado'}; toast(S.cr.teste.txt+'.'); render(); return; }
+  toast(c?'Crachá de '+c.nome+' lido. Ele é usado no tablet da parede (modo parede).':'Crachá não reconhecido.'); }
 function crPodeGerir(){ return !!(S.acs&&S.acs.dono); }
 function ttPodeUsar(){ try{ if(S.acs&&S.acs.dono) return true; const p=acsP(); return !!p&&(p.tudo||['paradas','producao','manut'].some(m=>(p.mods||[]).includes(m))); }catch(e){ return false; } }
 /* regra: quem abre e quem conserta se identificam pelo crachá. "Sem crachá" só se a administradora liberar (emergência). */
@@ -10884,6 +10897,7 @@ function vCrachas(){ const F=S.cr.f, LT=linhasOrd(); const xs=S.cr.lista.slice()
   return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Crachás</h1><div class="sub">Cada funcionário recebe um QR no crachá. No tablet da parede ele passa o crachá na câmera e o chamado sai no nome dele, já na linha dele. O QR só tem um código: não abre o painel em outro aparelho.</div></div>
    <div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="cr-pdf-todos">${ic('baixar',18,2)}Imprimir todos os crachás</button><button class="btn sec" data-go="mantotem">${ic('tela',18,2)}Abrir modo tablet</button></div></div>
    <section class="card"><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="cr-semcr" ${ttSemCrachaOk()?'checked':''} style="width:22px;height:22px;margin-top:2px"><span><b>Permitir chamado sem crachá no tablet</b><small style="display:block;color:var(--muted)">Desligado: só abre chamado quem passa o crachá. Ligue só se precisar de uma saída para quem esqueceu o crachá (o chamado fica marcado como "sem crachá").</small></span></label></section>
+   <div class="cb-teste ${S.cr.teste?(S.cr.teste.ok?'ok':'err'):''}" style="margin-bottom:14px">${ic('grid',18,2)}<span>${S.cr.teste?esc(S.cr.teste.txt):'Teste o coletor: bipe o código de barras de um crachá impresso.'}</span></div>
    <section class="card mx-new"><div class="label" style="margin-bottom:8px">NOVO CRACHÁ</div><div class="mx-nf"><input class="txt" id="cr-nome" placeholder="Nome como vai aparecer (ex.: Ana Souza)" value="${esc(F.nome)}" maxlength="60"><select class="txt" id="cr-linha"><option value="">Linha…</option>${LT.map(l=>`<option ${F.linha===l?'selected':''}>${esc(l)}</option>`).join('')}<option value="" disabled>──</option><option value="*" ${F.linha==='*'?'selected':''}>Todas (manutenção)</option></select>
     <select class="txt" id="cr-papel"><option value="operador" ${F.papel==='operador'?'selected':''}>Operador(a) da linha</option><option value="tecnico" ${F.papel==='tecnico'?'selected':''}>Técnico(a) da manutenção</option></select><button class="btn" data-act="cr-add" ${S.cr.salv?'disabled':''}>${ic('mais',18,2.4)}${S.cr.salv?'Salvando…':'Criar crachá'}</button></div></section>
    <section class="card"><div class="head" style="align-items:baseline"><h2>Funcionários com crachá</h2><span class="sub" style="margin:0">${xs.filter(c=>c.ativo!==false).length} ativo(s)</span></div>${xs.length?xs.map(row).join(''):'<div class="empty">Nenhum crachá ainda.</div>'}</section>`; }
@@ -10897,7 +10911,7 @@ async function crPdf(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível
     /* QR de 30 mm com ~5 mm de margem branca em volta (a faixa de cima e a borda não encostam) */ pdf.setFillColor(255,255,255); pdf.rect(x+W-40,y+9.5,40,Hc-9.5,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+W-35,y+14.5,30);
     pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(14); const nm=pdf.splitTextToSize(String(c.nome||''),W-44); pdf.text(nm.slice(0,2),x+4,y+18);
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(60,60,60); pdf.text(TT_PAPEL[c.papel]||'',x+4,y+(nm.length>1?31:26)); pdf.text(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas',x+4,y+(nm.length>1?36:31));
-    pdf.setFontSize(7); pdf.setTextColor(110,110,110); pdf.text('Aproxime o QR da câmera do tablet',x+4,y+Hc-8); pdf.text('Código '+c.codigo,x+4,y+Hc-4); pdf.setTextColor(0,0,0); });
+    pdfCode128(pdf,crBarras(c.codigo),x+3,y+36,W-45,9); pdf.setFontSize(6.5); pdf.setTextColor(90,90,90); pdf.text(crBarras(c.codigo)+' · QR na câmera do tablet ou barras no coletor',x+4,y+Hc-3.5); pdf.setTextColor(0,0,0); });
   await manBaixar(pdf,cs.length===1?'Cracha_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Crachas_manutencao.pdf','PDF com '+cs.length+' crachá(s). Imprima em 100% (sem ajustar à página) para o QR sair com 3 cm.'); }
 document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='cr-nome') S.cr.f.nome=t.value; });
 document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id==='cr-semcr'){ if(!crPodeGerir()){ t.checked=!t.checked; return; } const v=!!t.checked; t.disabled=true;
@@ -10932,7 +10946,7 @@ async function ttDetector(){ if(ttCam.det) return ttCam.det;
 async function ttCamLiga(){ if(ttCam.stream||ttCam.lendo) return; ttCam.lendo=true;
   try{ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'sem-camera'};
     const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
-    if(!ttAtivo()||S.tt.fase!=='espera'){ st.getTracks().forEach(t=>t.stop()); return; }
+    if(!ttAtivo()||!(S.tt.fase==='espera'||(S.tt.fase==='rancho'&&!S.tt.p))){ st.getTracks().forEach(t=>t.stop()); return; }
     ttCam.stream=st; let v=document.getElementById('tt-video'); if(!v){ v=document.createElement('video'); v.id='tt-video'; v.muted=true; v.setAttribute('playsinline',''); v.autoplay=true; document.body.appendChild(v); }
     v.srcObject=st; ttCam.video=v; try{ await v.play(); }catch(e){} ttCam.erro=''; S.tt.cam='ok';
     const det=await ttDetector(); ttCam.cv=ttCam.cv||document.createElement('canvas');
@@ -10958,7 +10972,7 @@ function ttPendentes(p){ if(!p||p.papel==='tecnico') return []; const L=ttLinhas
 function ttVoltar(){ Object.assign(S.tt,{fase:'espera',p:null,linha:'',equipId:'',equip:'',defeito:'',txt:'',enviando:false,numero:null}); render(); }
 function rerenderTt(){ if(!ttAtivo()) return; const a=document.activeElement; if(a&&a.closest&&a.closest('.tt')&&a.matches('input,textarea')) return; render(); }
 /* sem toque por um tempo → volta para a espera (o próximo não herda o chamado pela metade) */
-setInterval(()=>{ const T=S.tt; if(!ttAtivo()){ if(ttCam.stream) ttCamDesliga(); return; } if(T.fase!=='espera'&&!T.enviando&&Date.now()-T.ult>(T.fase==='ok'||T.fase==='fimok'||T.fase==='voltaok'?8000:T.ocioso)) ttVoltar(); if(T.fase==='espera'&&!ttCam.stream&&!ttCam.lendo&&S.tt.cam!=='erro') ttCamLiga(); },500);
+setInterval(()=>{ const T=S.tt; if(!ttAtivo()){ if(ttCam.stream) ttCamDesliga(); return; } if(T.fase!=='espera'&&!T.enviando&&Date.now()-T.ult>(T.fase==='ok'||T.fase==='fimok'||T.fase==='voltaok'||T.fase==='rcok'?8000:T.fase==='rancho'?120000:T.ocioso)) ttVoltar(); if((T.fase==='espera'||(T.fase==='rancho'&&!T.p))&&!ttCam.stream&&!ttCam.lendo&&S.tt.cam!=='erro') ttCamLiga(); },500);
 ['pointerdown','keydown','input'].forEach(t=>document.addEventListener(t,()=>{ S.tt.ult=Date.now(); },true));
 /* tela sempre acesa enquanto o modo parede está aberto */
 let ttWake=null; async function ttAcorda(){ try{ if(ttAtivo()&&!ttWake&&navigator.wakeLock) { ttWake=await navigator.wakeLock.request('screen'); ttWake.addEventListener('release',()=>{ ttWake=null; }); } }catch(e){} }
@@ -10976,7 +10990,7 @@ function vTotem(){ const T=S.tt, L=ttLinhas();
   const topo=`<div class="tt-top"><div><b>Chamar manutenção</b><span>${L.map(esc).join(' · ')}</span></div><div class="tt-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div><button class="tt-x" data-act="tt-sair" title="Sair do modo tablet">✕</button></div>`;
   let corpo='';
   if(T.fase==='espera'){ corpo=`<div class="tt-linhas">${L.map(l=>{ const e=ttEstadoLinha(l); return `<div class="tt-ln ${e.c}"><small>${esc(l)}</small><b>${e.t}</b><span>${e.s}</span></div>`; }).join('')}</div>
-    <div class="tt-cta"><div class="tt-qr">${ic('grid',64,1.6)}</div><div><h1>Aproxime seu crachá da câmera</h1><p>O QR do crachá fica a um palmo da tela, virado para a câmera de cima.</p>${ttCam.erro?`<p class="tt-err">${esc(ttCam.erro)}${ttSemCrachaOk()?'':' Enquanto isso, chame a manutenção pelo ramal.'}</p>`:''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}</div></div>
+    <div class="tt-cta"><div class="tt-qr">${ic('grid',64,1.6)}</div><div><h1>Aproxime seu crachá da câmera</h1><p>O QR do crachá fica a um palmo da tela, virado para a câmera de cima.</p><p style="margin-top:8px!important">Para conferir um rancho, mostre o QR da folha de produção.</p>${ttCam.erro?`<p class="tt-err">${esc(ttCam.erro)}${ttSemCrachaOk()?'':' Enquanto isso, chame a manutenção pelo ramal.'}</p>`:''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}</div></div>
     <div class="tt-rod">${ttSemCrachaOk()?'<button class="btn sec" data-act="tt-sem">Estou sem crachá</button>':''}<button class="btn sec" data-act="tt-cheia">${ic('tela',18,2)}Tela cheia</button></div>`; }
   else if(T.fase==='volta'){ const xs=ttPendentes(T.p);
     if(!xs.length){ T.fase='maquina'; return vTotem(); }
@@ -11066,7 +11080,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
     return; } });
 document.head.insertAdjacentHTML('beforeend',`<style id="tt-css">
 body.tt-on .side,body.tt-on header.top,body.tt-on .bottomnav,body.tt-on nav.tabs{display:none!important}body.tt-on .content{padding:0!important;max-width:none!important}body.tt-on .main{margin:0!important}
-.tt{min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:18px 22px 22px;background:var(--bg);box-sizing:border-box;user-select:none;-webkit-user-select:none}
+.tt{min-height:100vh;display:flex;flex-direction:column;gap:18px;padding:18px 22px 22px;background:var(--ground);box-sizing:border-box;user-select:none;-webkit-user-select:none}
 .tt-top{display:flex;align-items:center;gap:16px}.tt-top>div:first-child{flex:1;display:flex;flex-direction:column}.tt-top b{font-size:26px;color:var(--teal-strong)}.tt-top span{color:var(--muted);font-size:15px}
 .tt-clk{font-size:40px;font-weight:800;color:var(--ink)}.tt-x{border:0;background:transparent;color:var(--faint);font-size:20px;width:44px;height:44px;cursor:pointer}
 .tt-linhas{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.tt-ln{border-radius:18px;padding:18px 22px;background:var(--surface);box-shadow:var(--shadow);border-left:10px solid var(--ok);display:flex;flex-direction:column;gap:4px}
@@ -11228,18 +11242,18 @@ function ttSoTablet(){ try{ const A=S.acs; if(!A||A.dono) return false; const p=
 
 /* adesivo para colar em qualquer crachá (deitado ou em pé): QR de 25 mm + nome e linha · 30 por folha A4 */
 async function crAdesivos(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } if(!cs.length){ toast('Nenhum crachá para imprimir.'); return; }
-  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=32, H=42, gx=4, gy=4, cols=5, rows=6, x0=(210-cols*W-(cols-1)*gx)/2, y0=(297-rows*H-(rows-1)*gy)/2;
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=38, H=54, gx=4, gy=4, cols=4, rows=5, x0=(210-cols*W-(cols-1)*gx)/2, y0=(297-rows*H-(rows-1)*gy)/2;
   cs.forEach((c,i)=>{ const k=i%(cols*rows); if(i&&k===0) pdf.addPage(); const x=x0+(k%cols)*(W+gx), y=y0+Math.floor(k/cols)*(H+gy);
     pdf.setDrawColor(170); pdf.setLineDashPattern([1,1],0); pdf.roundedRect(x,y,W,H,2,2); pdf.setLineDashPattern([],0);
-    pdf.setFillColor(255,255,255); pdf.rect(x+0.5,y+0.5,W-1,W-1,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+3.5,y+3.5,25);
-    pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.text(pdf.splitTextToSize(String(c.nome||''),W-3)[0],x+W/2,y+33.5,{align:'center'});
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(70,70,70); pdf.text((c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas')),x+W/2,y+37.5,{align:'center'});
-    pdf.setTextColor(0,0,0); });
-  await manBaixar(pdf,cs.length===1?'Adesivo_QR_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Adesivos_QR_crachas.pdf','PDF com '+cs.length+' adesivo(s) de 3 × 4 cm. Imprima em 100% (sem ajustar à página) e cole no crachá.'); }
+    pdf.setFillColor(255,255,255); pdf.rect(x+0.5,y+0.5,W-1,H-1,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+(W-25)/2,y+3.5,25);
+    pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.text(pdf.splitTextToSize(String(c.nome||''),W-3)[0],x+W/2,y+33,{align:'center'});
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(70,70,70); pdf.text((c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas')),x+W/2,y+36.5,{align:'center'});
+    pdfCode128(pdf,crBarras(c.codigo),x+1,y+39,W-2,9); pdf.setTextColor(0,0,0); pdf.setFontSize(6.5); pdf.text(crBarras(c.codigo),x+W/2,y+51,{align:'center'}); });
+  await manBaixar(pdf,cs.length===1?'Adesivo_QR_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Adesivos_QR_crachas.pdf','PDF com '+cs.length+' adesivo(s) de 3,8 × 5,4 cm (QR para o tablet e código de barras para o coletor). Imprima em 100% (sem ajustar à página) e cole no crachá.'); }
 { const _vc=vCrachas; vCrachas=function(){ let h=_vc.apply(this,arguments);
   h=h.replace(/<button class="eq-lk" data-act="cr-pdf" data-id="([^"]+)">/g,(m,id)=>`<button class="eq-lk" data-act="cr-ades" data-id="${id}">${ic('grid',15,2)}Adesivo</button>`+m);
-  h=h.replace('<button class="btn sec" data-act="cr-pdf-todos">','<button class="btn" data-act="cr-ades-todos">'+ic('baixar',18,2)+'Adesivos de QR de todos (3 × 4 cm)</button><button class="btn sec" data-act="cr-pdf-todos">');
-  h=h.replace('Cada funcionário recebe um QR no crachá.','Cada funcionário recebe um QR no crachá: um <b>adesivo de 3 × 4 cm</b> para colar no crachá que ele já usa, ou um crachá completo.');
+  h=h.replace('<button class="btn sec" data-act="cr-pdf-todos">','<button class="btn" data-act="cr-ades-todos">'+ic('baixar',18,2)+'Adesivos de todos (QR + barras)</button><button class="btn sec" data-act="cr-pdf-todos">');
+  h=h.replace('Cada funcionário recebe um QR no crachá.','Cada funcionário recebe um QR no crachá: um <b>adesivo de 3,8 × 5,4 cm</b> (QR para a câmera do tablet e código de barras para o coletor) para colar no crachá que ele já usa, ou um crachá completo.');
   return h; }; }
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cr-ades"],[data-act="cr-ades-todos"]'); if(!b) return; if(!crPodeGerir()){ toast('Você não possui permissão para gerenciar crachás.'); return; }
   try{ if(b.dataset.act==='cr-ades'){ const c=crDe(b.dataset.id); if(c) await crAdesivos([c]); }
@@ -11247,18 +11261,34 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   catch(e){ console.warn('[crachás] adesivo',e); toast('Não foi possível gerar o PDF. Tente de novo.'); } });
 /* no menu, "Tablet da parede" aparece só para a conta do tablet (os outros abrem pelo botão em Chamados) */
 { const _mv=modsVis; modsVis=function(){ const r=_mv.apply(this,arguments); let tem=false; try{ const p=acsP(); tem=!!p&&(p.mods||[]).includes('tablet'); }catch(e){} return tem?r:r.filter(m=>m.id!=='tablet'); }; }
+/* ===================== CRACHÁ NO COLETOR (08/10): código de barras Code 128 no crachá + leitura pelo coletor ===================== */
+/* Coletor laser lê só barras: o crachá leva também "CX"+código em Code 128 (desenhado em vetor no PDF).
+   Tabela conferida símbolo por símbolo com a implementação do reportlab. */
+const C128=['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+function c128Larg(txt){ const v=[104].concat([...txt].map(c=>c.charCodeAt(0)-32)); let k=v[0]; for(let i=1;i<v.length;i++) k+=v[i]*i; return v.concat([k%103,106]).map(x=>C128[x]).join(''); }
+function crBarras(cod){ return 'CX'+cod; }
+/* desenha as barras no PDF ocupando a largura w (com 10 módulos de margem branca de cada lado) */
+function pdfCode128(pdf,txt,x,y,w,h){ const L=c128Larg(txt), mods=[...L].reduce((a,c)=>a+(+c),0)+20, m=w/mods; let px=x+10*m, barra=true;
+  pdf.setFillColor(255,255,255); pdf.rect(x,y,w,h,'F'); pdf.setFillColor(0,0,0);
+  for(const c of L){ const n=+c*m; if(barra) pdf.rect(px,y,n,h,'F'); px+=n; barra=!barra; } }
 /* ===FIM TABLET LOGIN=== */
 /* ===================== GESTOR (08/10): resumo de produção, paradas, manutenção e silos + acesso aos módulos ===================== */
 MODS.splice(1,0,{id:'gestor',nome:'Visão do gestor',ic:'grafico',views:['gestao']});
 VIEWS.gestao={nome:'Visão do gestor',ic:'grafico',mob:'Gestor'}; CRUMB.gestao='Visão do gestor';
-{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.gestor={nome:'Gestor (acompanha e age)',mods:['gestor','producao','silos','manut'],locais:[]}; ACS_PERFIS.outro=_o; }
+{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.gestor={nome:'Gestor (acompanha e age)',mods:['gestor','producao','silos','manut','telas','analise'],locais:[]}; ACS_PERFIS.outro=_o; }
 if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('gestor')) EQ_PRONTO_ORD.splice(0,0,'gestor');
-if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.gestor='Resumo de produção, paradas, manutenção e silos numa tela, no celular e no PC, com acesso às telas completas para agir.';
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.gestor='Resumo de produção, paradas, manutenção e silos, todas as TVs em destaque e acesso às telas completas para agir. Celular e PC.';
 if(typeof EQ_MOD!=='undefined'&&!EQ_MOD.gestor) EQ_MOD.gestor=['grafico','Visão do gestor'];
 ACS_MODS.splice(0,0,['gestor','Visão do gestor (resumo)']);
 if(typeof LEIT_CONHECIDOS!=='undefined'&&!LEIT_CONHECIDOS.includes('gestor')){ LEIT_CONHECIDOS.push('gestor'); ['prod','silos','paradas','chamados'].forEach(g=>LEIT_GRUPOS[g].push('gestor')); }
 /* quem tem o resumo começa por ele */
 { const _pv=primeiraView; primeiraView=function(){ try{ if(S.acs&&!S.acs.dono&&viewOk('gestao')) return 'gestao'; }catch(e){} return _pv(); }; }
+function gTvs(){ let ts=[]; try{ ts=aprTelas(); }catch(e){} if(!ts.length) return '';
+  return `<section class="card gs-tv"><div class="gs-tvh"><div><div class="label">TELAS DE TV</div><div class="sub" style="margin:2px 0 0">As mesmas telas das TVs da fábrica, ao vivo. Toque para abrir em tela cheia (Esc volta).</div></div>
+    <button class="btn big" data-act="gs-tv-todas">${ic('tv',20,2)}Passar todas as TVs</button></div>
+    <div class="gs-tvg">${ts.map(t=>`<button class="gs-tvc" data-act="gs-tv" data-k="${esc(t.k)}" style="--c:${t.cor}"><div class="gs-tvp">${aprMini(t.k)}</div><b>${esc(t.nome)}</b><small>${esc(t.d)}</small><span>${ic('tv',15,2)}Abrir em tela cheia</span></button>`).join('')}</div></section>`; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="gs-tv"],[data-act="gs-tv-todas"]'); if(!b) return; let ts=[]; try{ ts=aprTelas(); }catch(e){}
+  if(b.dataset.act==='gs-tv-todas'){ if(ts.length) aprIniciar(ts); return; } const t=ts.find(x=>x.k===b.dataset.k); if(t) aprIniciar([t]); });
 function gHoje(iso){ return iso&&hojeStr(new Date(iso))===hojeStr(); }
 function gMin(ms){ const m=Math.round(ms/60000); return m<60?m+' min':Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'); }
 function gN(n){ return Math.round(+n||0).toLocaleString('pt-BR'); }
@@ -11286,6 +11316,7 @@ function vGestao(){ const L=linhasOrd(), h=hojeStr(), agora=Date.now(), ini=new 
   const card=(go,titulo,grande,sub,corpo,cor)=>`<button class="card gs-c ${cor||''}" data-go="${go}"><div class="label">${titulo}</div><div class="gs-n num">${grande}</div><div class="gs-s">${sub}</div>${corpo||''}<span class="gs-ir">Abrir ›</span></button>`;
   const lista=(o,f)=>Object.keys(o).sort((a,b)=>L.indexOf(a)-L.indexOf(b)).map(k=>`<div class="gs-r"><span>${esc(k)}</span><b class="num">${f(o[k])}</b></div>`).join('');
   return `${banner()}<div class="head"><div><div class="eyebrow">VISÃO DO GESTOR</div><h1>Como está a fábrica agora</h1><div class="sub">Atualiza sozinho. Toque num quadro para ver os detalhes e agir.</div></div><div class="gs-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div></div>
+   ${gTvs()}
    <section class="card"><div class="label" style="margin-bottom:10px">LINHAS AGORA</div><div class="gs-ls">${L.map(linha).join('')}</div></section>
    <div class="gs-g">
     ${card('programacao','PRODUÇÃO DE HOJE',gN(tot)+' <small>un</small>',atras.length?`<b style="color:var(--crit-ink)">${atras.length} ordem(ns) atrasada(s)</b>`:'nenhuma ordem atrasada',lista(prod,gN),atras.length?'warn':'')}
@@ -11300,8 +11331,276 @@ document.head.insertAdjacentHTML('beforeend',`<style id="gs-css">.gs-clk{font-si
 .gs-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.gs-c{text-align:left;font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
 .gs-c:hover{border-color:var(--teal)}.gs-c.crit{border-left:6px solid var(--crit)}.gs-c.warn{border-left:6px solid var(--warn)}.gs-n{font-size:34px;font-weight:800;line-height:1.1}.gs-n small{font-size:16px;font-weight:600;color:var(--muted)}.gs-s{font-size:14px;color:var(--ink-2)}
 .gs-r{align-self:stretch;display:flex;justify-content:space-between;gap:10px;font-size:14px;border-top:1px solid var(--line);padding-top:6px;margin-top:4px}.gs-r span{color:var(--muted)}.gs-ir{margin-top:auto;align-self:flex-end;padding-top:10px;font-size:13px;font-weight:700;color:var(--teal-strong)}
-@media (max-width:520px){ .gs-clk{font-size:28px} .gs-n{font-size:28px} .gs-ls{grid-template-columns:1fr} }</style>`);
+.gs-tv{border:2px solid var(--teal)}.gs-tvh{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.gs-tvg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}.gs-tvc{font:inherit;color:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);border-top:5px solid var(--c);border-radius:14px;background:var(--surface-2);padding:10px;display:flex;flex-direction:column;gap:4px}
+.gs-tvc:hover{border-color:var(--c)}.gs-tvp{border-radius:8px;overflow:hidden;background:var(--surface);aspect-ratio:16/9}.gs-tvp svg{width:100%;height:100%;display:block}.gs-tvc b{font-size:15px}.gs-tvc small{color:var(--muted);font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gs-tvc span{margin-top:auto;padding-top:6px;font-size:13px;font-weight:700;color:var(--teal-strong);display:flex;gap:6px;align-items:center}
+@media (max-width:520px){ .gs-clk{font-size:28px} .gs-n{font-size:28px} .gs-ls{grid-template-columns:1fr} .gs-tvg{grid-template-columns:repeat(2,minmax(0,1fr))} .gs-tvc small{display:none} .gs-tvh .btn{width:100%} }</style>`);
 /* ===FIM GESTOR=== */
+/* ===================== TV DA FÁBRICA: login com todas as telas + TELA DIVIDIDA (08/10) ===================== */
+{ const _o=ACS_PERFIS.outro; delete ACS_PERFIS.outro; ACS_PERFIS.tvtodas={nome:'TV da fábrica (todas as telas)',mods:['tv','telas','cal','analise','producao','silos','manut'],locais:[]}; ACS_PERFIS.outro=_o; }
+if(!ACS_SO_VER.includes('tvtodas')) ACS_SO_VER.push('tvtodas');
+if(typeof EQ_PRONTO_ORD!=='undefined'&&!EQ_PRONTO_ORD.includes('tvtodas')) EQ_PRONTO_ORD.splice(EQ_PRONTO_ORD.indexOf('gestor')+1,0,'tvtodas');
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.tvtodas='Para a TV da fábrica: todas as telas de TV, uma de cada vez ou com a tela dividida. Só mostra, não muda nada.';
+if(typeof EQ_AREA!=='undefined') EQ_AREA.tvtodas='telas';
+VIEWS.tvsplit={nome:'Tela dividida',ic:'tv',mob:'Dividida'}; CRUMB.tvsplit='Tela dividida';
+{ const _vo=viewOk; viewOk=function(v){ if(v==='tvsplit') return _vo('tvapres'); return _vo.apply(this,arguments); }; }
+const SP_LAY={'2':{n:2,nome:'2 lado a lado'},'2v':{n:2,nome:'2 em cima e embaixo'},'3':{n:3,nome:'1 grande + 2'},'4':{n:4,nome:'4 telas'}};
+S.split=(()=>{ let o={}; try{ o=JSON.parse(localStorage.getItem('colafix.split')||'{}')||{}; }catch(e){} return {lay:SP_LAY[o.lay]?o.lay:'4',slots:Array.isArray(o.slots)&&o.slots.length?o.slots:['tvfab','manut','silos','monitor'],auto:!!o.auto}; })();
+function spSalva(){ try{ localStorage.setItem('colafix.split',JSON.stringify(S.split)); }catch(e){} }
+function spTelas(){ try{ return aprTelas(); }catch(e){ return []; } }
+/* o que cada tela de TV desenha (as mesmas funções da TV em tela cheia) */
+function spRota(v){ return v==='tvfab'?vTvFab():v==='anlrit'?anlView('anlrit'):v==='diario'?vDiario():v==='geral'?vGeral():v==='calendario'?vCalendario():String(v).startsWith('man')?manView(v):''; }
+function spConteudo(k){ const t=spTelas().find(x=>x.k===k); if(!t) return '<div class="sp-vz">Tela indisponível neste login</div>';
+  const vAnt=S.view, dAnt=S.dbo&&S.dbo.modo, diaAnt=S.dbo&&S.dbo.dia;
+  try{ S.view=t.v; if(k==='monitor'&&S.dbo){ S.dbo.modo='monitor'; S.dbo.dia=hojeStr(); } return spRota(t.v); }
+  catch(e){ console.warn('[tela dividida]',k,e); return '<div class="sp-vz">Não consegui mostrar esta tela agora</div>'; }
+  finally{ S.view=vAnt; if(S.dbo){ S.dbo.modo=dAnt; S.dbo.dia=diaAnt; } } }
+function vSplit(){ const P=S.split, L=SP_LAY[P.lay]||SP_LAY['4'], ts=spTelas();
+  const slots=[...Array(L.n)].map((_,i)=>P.slots[i]||(ts[i]&&ts[i].k)||'');
+  return `<div class="sp sp-${P.lay}">${slots.map((k,i)=>{ const t=ts.find(x=>x.k===k); return `<div class="sp-p" data-i="${i}"><div class="sp-in">${spConteudo(k)}</div>${t?`<span class="sp-tag" style="--c:${t.cor}">${esc(t.nome)}</span>`:''}</div>`; }).join('')}</div>
+   <button class="sp-sair" data-act="sp-sair" title="Sair da tela dividida (Esc)">✕ Sair</button>`; }
+/* cada parte mostra a tela inteira, reduzida para caber */
+function spEscala(){ const W=Math.max(1024,innerWidth), H=Math.max(600,innerHeight);
+  document.querySelectorAll('.sp-p').forEach(p=>{ const i=p.querySelector('.sp-in'); if(!i) return; const k=Math.min(p.clientWidth/W,p.clientHeight/H);
+    i.style.width=W+'px'; i.style.height=H+'px'; i.style.transform=`scale(${k})`; i.style.left=((p.clientWidth-W*k)/2)+'px'; i.style.top=((p.clientHeight-H*k)/2)+'px'; }); }
+let spEra=false;
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ if(S.view==='tvsplit'){ document.body.classList.add('tv','tv-split'); spEra=true; spEscala(); }
+    else if(spEra){ spEra=false; document.body.classList.remove('tv-split'); if(!(S.apres&&S.apres.on)) document.body.classList.remove('tv'); } }catch(e){} return x; }; }
+addEventListener('resize',()=>{ if(S.view==='tvsplit') spEscala(); });
+function spAbrir(){ try{ const el=document.documentElement; if(!document.fullscreenElement&&el.requestFullscreen) el.requestFullscreen().catch(()=>{}); }catch(e){} go('tvsplit'); }
+function spSair(){ try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){} go('tvapres'); }
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.view==='tvsplit'){ ev.preventDefault(); spSair(); } });
+let spMexeu=0; document.addEventListener('pointermove',()=>{ if(S.view!=='tvsplit') return; document.body.classList.add('sp-mexeu'); clearTimeout(spMexeu); spMexeu=setTimeout(()=>document.body.classList.remove('sp-mexeu'),2500); });
+/* escolha na tela "Telas de TV" */
+function spCard(){ const P=S.split, ts=spTelas(), L=SP_LAY[P.lay]; if(!ts.length) return '';
+  const desenho=k=>{ const b=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="currentColor"/>`; return `<svg viewBox="0 0 48 27" width="48" height="27" aria-hidden="true">${k==='2'?b(0,0,23.5,27)+b(24.5,0,23.5,27):k==='2v'?b(0,0,48,13)+b(0,14,48,13):k==='3'?b(0,0,31,27)+b(32,0,16,13)+b(32,14,16,13):b(0,0,23.5,13)+b(24.5,0,23.5,13)+b(0,14,23.5,13)+b(24.5,14,23.5,13)}</svg>`; };
+  return `<section class="card sp-cfg"><div class="label">TELA DIVIDIDA</div><div class="sub" style="margin:4px 0 12px">Várias telas ao mesmo tempo, ao vivo, em tela cheia. Use Esc para sair.</div>
+   <div class="sp-lays">${Object.keys(SP_LAY).map(k=>`<button class="sp-lay" data-act="sp-lay" data-v="${k}" aria-pressed="${P.lay===k}">${desenho(k)}<span>${SP_LAY[k].nome}</span></button>`).join('')}</div>
+   <div class="sp-slots">${[...Array(L.n)].map((_,i)=>`<label><span class="label">${P.lay==='3'&&i===0?'TELA GRANDE':'PARTE '+(i+1)}</span><select class="txt" data-sp-slot="${i}">${ts.map(t=>`<option value="${esc(t.k)}" ${(P.slots[i]||(ts[i]&&ts[i].k))===t.k?'selected':''}>${esc(t.nome)}</option>`).join('')}</select></label>`).join('')}</div>
+   <div class="sp-go"><label class="apr-ck"><input type="checkbox" id="sp-auto" ${P.auto?'checked':''}> Abrir sempre a tela dividida quando esta TV ligar</label><button class="btn big" data-act="sp-abrir">${ic('tv',20,2)}Abrir tela dividida</button></div></section>`; }
+{ const _va=vApres; vApres=function(){ const h=_va.apply(this,arguments); const i=h.indexOf('<section class="card apr-cfg">'); return i<0?h+spCard():h.slice(0,i)+spCard()+h.slice(i); }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="sp-"]'); if(!b) return; const a=b.dataset.act;
+  if(a==='sp-lay'){ S.split.lay=b.dataset.v; spSalva(); render(); return; } if(a==='sp-abrir'){ spAbrir(); return; } if(a==='sp-sair'){ spSair(); return; } });
+document.addEventListener('change',ev=>{ const t=ev.target; if(t.dataset&&t.dataset.spSlot!=null){ S.split.slots[+t.dataset.spSlot]=t.value; spSalva(); } if(t.id==='sp-auto'){ S.split.auto=!!t.checked; spSalva(); toast(t.checked?'Esta TV vai abrir direto na tela dividida.':'Esta TV abre normalmente.'); } });
+/* TV ligada: abre direto na tela dividida (se marcado neste aparelho) */
+(function(){ let n=0; const t=setInterval(()=>{ if(++n>60){ clearInterval(t); return; } try{ if(S.acs&&S.acs.pronto&&acsP()){ clearInterval(t); if(S.split.auto&&viewOk('tvsplit')) go('tvsplit'); } }catch(e){} },500); })();
+/* login da TV começa pelas Telas de TV */
+{ const _pv=primeiraView; primeiraView=function(){ try{ if(S.acs&&!S.acs.dono&&S.acs.doc&&S.acs.doc.perfil==='tvtodas') return S.split.auto?'tvsplit':'tvapres'; }catch(e){} return _pv(); }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="sp-css">
+body.tv-split .content{padding:0!important;max-width:none!important}body.tv-split .main{margin:0!important}
+.sp{position:fixed;inset:0;z-index:50;display:grid;gap:6px;padding:6px;background:#0E1B24}
+.sp-2{grid-template-columns:1fr 1fr}.sp-2v{grid-template-rows:1fr 1fr}.sp-4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.sp-3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}.sp-3 .sp-p:first-child{grid-row:1 / span 2}
+.sp-p{position:relative;overflow:hidden;border-radius:10px;background:var(--ground);min-width:0;min-height:0}.sp-in{position:absolute;transform-origin:0 0;overflow:hidden;pointer-events:none}
+.sp-tag{position:absolute;left:10px;bottom:8px;background:var(--c);color:#fff;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;opacity:.85}
+.sp-vz{display:flex;align-items:center;justify-content:center;height:100%;font-size:28px;color:var(--muted)}
+.sp-sair{position:fixed;top:12px;right:12px;z-index:60;border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:800;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;opacity:0;transition:opacity .3s}body.sp-mexeu .sp-sair,.sp-sair:focus{opacity:1}
+.sp-cfg{border:2px solid var(--teal)}.sp-lays{display:flex;gap:10px;flex-wrap:wrap}.sp-lay{font:inherit;cursor:pointer;border:2px solid var(--line);border-radius:12px;background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);min-width:120px}
+.sp-lay span{font-size:13px;font-weight:700;color:var(--ink-2)}.sp-lay[aria-pressed="true"]{border-color:var(--teal-strong);color:var(--teal-strong);background:var(--teal-wash)}
+.sp-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:14px 0}.sp-slots label{display:flex;flex-direction:column;gap:4px}
+.sp-go{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}</style>`);
+/* ===FIM TELA DIVIDIDA=== */
+/* ===================== LIBERAÇÕES POR PESSOA (08/10): módulos extras, só ver, telas avulsas e ações ===================== */
+/* acessos/{uid}: extras[] (módulos somados ao cargo) · semMods[] (tirados do cargo) · soVerMods[] (módulos só de leitura)
+   telas[] (telas avulsas) · acoes{chave:true|false} (ajuste de ações; sem chave = padrão) · bloqCols[] (para as regras do Firestore)
+   Sem nada disso, a pessoa continua exatamente como antes. */
+const ACX_ACOES=[
+  {k:'apontar',mod:'producao',n:'Apontar produção (entregas)'},
+  {k:'programar',mod:'producao',n:'Editar programação, ordens, previsões e itens'},
+  {k:'paradas',mod:'producao',n:'Registrar e editar paradas'},
+  {k:'medir',mod:'silos',n:'Medir silos e registrar cargas'},
+  {k:'abrirch',mod:'manut',n:'Abrir chamados de manutenção'},
+  {k:'atender',mod:'manut',n:'Atender chamados (status, atendimento, materiais)'},
+  {k:'concluir',mod:'manut',n:'Concluir e cancelar OS'},
+  {k:'cadman',mod:'manut',n:'Cadastros da manutenção (equipamentos, preventivas, peças)'},
+  {k:'apagar',mod:'',n:'Apagar registros'}];
+/* quais ações liberam gravar em cada coleção (basta uma delas) */
+const ACX_COL={entregas:['apontar'],ordens:['programar'],previsoes:['programar'],itens:['programar'],paradas:['paradas','abrirch','atender','concluir'],
+  medicoes:['medir'],cargas:['medir'],premix:['medir'],silos:['medir','apontar'],silomov:['medir','apontar'],chamados:['abrirch','atender','concluir'],chamfotos:['abrirch','atender'],pecasmov:['atender','cadman']};
+function acxDoc(){ const A=S.acs; return A&&!A.dono&&A.doc?A.doc:null; }
+function acxPode(k,d){ d=d||acxDoc(); if(!d) return true; const o=d.acoes||{}; if(o[k]===true) return true; if(o[k]===false) return false; const a=ACX_ACOES.find(x=>x.k===k); return !(a&&a.mod&&(d.soVerMods||[]).includes(a.mod)); }
+function acxAlgum(ks,d){ return ks.some(k=>acxPode(k,d)); }
+function acxBloqCols(d){ return Object.keys(ACX_COL).filter(c=>!acxAlgum(ACX_COL[c],d)); }
+function acxAjustada(d){ return !!d&&!!((d.extras||[]).length||(d.semMods||[]).length||(d.soVerMods||[]).length||(d.telas||[]).length||Object.keys(d.acoes||{}).length); }
+/* motivo da recusa (null = pode gravar) */
+function acxBloqueio(col,id,op,data){ const d=acxDoc(); if(!d||!acxAjustada(d)) return null; const err={code:'sem-permissao',message:'Sem permissão para esta ação'};
+  if(col==='config'&&id==='manut') return acxPode('cadman',d)?null:err;
+  let ks=ACX_COL[col]; if(!ks) return null;
+  if(col==='chamados'){ if(op==='delete') ks=String(id).startsWith('q-')?['atender']:['apagar'];
+    else { const existe=(S.chamados||[]).some(c=>c._id===id); if(!existe) ks=['abrirch','atender']; else if(data&&['Concluída','Cancelada'].includes(data.status)) ks=['concluir']; else if(data&&data.status) ks=['atender']; /* mudar para outro status = atender */ else ks=['atender','concluir']; /* preencher atendimento (para concluir) */ } }
+  if(!acxAlgum(ks,d)) return err;
+  if(op==='delete'&&col!=='chamados'&&!acxPode('apagar',d)) return err;
+  return null; }
+/* todo o painel grava por S.db: a verificação fica na frente de set/update/delete/add */
+function acxGuardaDoc(ref,path){ if(!ref||ref._acx) return ref; const seg=String(path||ref.path||'').split('/'), col=seg[0], id=seg[1]||ref.id||'';
+  const g=Object.assign({},ref,{_acx:true});
+  ['set','update','delete'].forEach(op=>{ const f=ref[op]; if(typeof f!=='function') return; g[op]=function(dados){ const e=acxBloqueio(col,id,op,dados); if(e){ console.warn('[acesso] bloqueado:',op,path); return Promise.reject(e); } return f.apply(ref,arguments); }; });
+  return g; }
+function acxGuardaQuery(q,col){ if(!q||q._acx) return q; const g=Object.assign({},q,{_acx:true});
+  if(typeof q.add==='function') g.add=function(dados){ const e=acxBloqueio(col,'novo-'+Date.now(),'set',dados); if(e) return Promise.reject(e); return q.add.apply(q,arguments); };
+  if(typeof q.doc==='function') g.doc=function(id){ const r=q.doc.apply(q,arguments); return acxGuardaDoc(r,col+'/'+(r&&r.id||id)); };
+  ['where','orderBy','limit'].forEach(m=>{ if(typeof q[m]==='function') g[m]=function(){ return acxGuardaQuery(q[m].apply(q,arguments),col); }; });
+  return g; }
+setInterval(()=>{ const db=S.db; if(!db||db._acx) return; const d0=db.doc, c0=db.collection; if(typeof d0!=='function'||typeof c0!=='function') return;
+  db.doc=function(p){ return acxGuardaDoc(d0.apply(db,arguments),p); }; db.collection=function(p){ return acxGuardaQuery(c0.apply(db,arguments),p); }; db._acx=true; },200);
+/* gravações que não passam por S.db (transações) */
+{ const _m=mxGrava; mxGrava=async function(){ if(!acxPode('cadman')&&acxAjustada(acxDoc())) throw {code:'sem-permissao'}; return _m.apply(this,arguments); }; }
+{ const _r=siloRegistrarMedicao; siloRegistrarMedicao=async function(){ if(acxAjustada(acxDoc())&&!acxPode('medir')) throw {code:'sem-permissao'}; return _r.apply(this,arguments); }; }
+{ const _p=siloProcessarEntrega; siloProcessarEntrega=async function(){ if(acxAjustada(acxDoc())&&!acxAlgum(['apontar','medir'])) return null; return _p.apply(this,arguments); }; }
+
+/* ---------- o que a pessoa vê: módulos do cargo + extras − tirados; telas avulsas ---------- */
+{ const _a=acsP; acsP=function(){ const p=_a.apply(this,arguments); const d=acxDoc(); if(!p||!d||!acxAjustada(d)) return p;
+  const mods=[...new Set([...(p.mods||[]),...(d.extras||[]),...(d.soVerMods||[])])].filter(m=>!(d.semMods||[]).includes(m)); return Object.assign({},p,{mods}); }; }
+/* telas que nunca viram avulsas (só da administradora ou do próprio sistema) */
+const ACX_NUNCA=['mancrachas','acessos','paineis','painel','meudia','mantotem','tvsplit'];
+function acxModDaTela(v){ const m=MODS.find(x=>(x.views||[]).includes(v)); return m?m.id:''; }
+{ const _vo=viewOk; viewOk=function(v){ if(_vo.apply(this,arguments)) return true; const d=acxDoc(); return !!(d&&(d.telas||[]).includes(v)&&VIEWS[v]&&!ACX_NUNCA.includes(v)); }; }
+/* as telas avulsas também precisam dos dados do módulo delas */
+if(typeof leitPrecisa==='function'){ const _lp=leitPrecisa; leitPrecisa=function(g){ if(_lp(g)) return true; const d=acxDoc(); if(!d||!(d.telas||[]).length) return false;
+  const ms=[...new Set(d.telas.map(acxModDaTela).filter(Boolean))]; return ms.some(m=>(LEIT_GRUPOS[g]||[]).includes(m)); }; }
+/* aviso nas telas de módulo "só ver" */
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ const d=acxDoc(); const m=acxModDaTela(S.view);
+    if(d&&m&&(d.soVerMods||[]).includes(m)){ const el=document.getElementById('view'); if(el&&!el.querySelector('.acx-sover')) el.insertAdjacentHTML('afterbegin',`<div class="banner acx-sover" style="background:var(--teal-wash);color:var(--teal-strong)">${ic('olho',16,2)} Só visualização: você pode ver este módulo, mas não alterar.</div>`); } }catch(e){} return x; }; }
+
+/* ---------- editor (Equipe e cargos → Ajustar acesso) ---------- */
+S.acx={};
+function acxEstado(id){ if(!S.acx[id]){ const d=(S.acs.lista||[]).find(x=>x._id===id)||{}; S.acx[id]={extras:[...(d.extras||[])],semMods:[...(d.semMods||[])],soVerMods:[...(d.soVerMods||[])],telas:[...(d.telas||[])],acoes:Object.assign({},d.acoes||{}),mudou:false}; } return S.acx[id]; }
+function acxBase(id){ const d=(S.acs.lista||[]).find(x=>x._id===id)||{}; try{ return eqModsDe(d)||[]; }catch(e){ return d.mods||[]; } }
+function acxNivel(X,base,k){ if(X.semMods.includes(k)) return 'nao'; if(X.soVerMods.includes(k)) return 'ver'; if(base.includes(k)||X.extras.includes(k)) return 'mexer'; return 'nao'; }
+function acxSecao(id){ const X=acxEstado(id), base=acxBase(id); const mods=ACS_MODS.filter(([k])=>MODS.some(m=>m.id===k||(k==='cal'))&&k!=='ajustes');
+  const seg=(k,v,t,nv)=>`<button data-act="acx-mod" data-id="${esc(id)}" data-k="${esc(k)}" data-v="${v}" aria-pressed="${nv===v}">${t}</button>`;
+  const linhaMod=([k,n])=>{ const nv=acxNivel(X,base,k); return `<div class="acx-row"><span>${esc(n)}${base.includes(k)?' <small class="acx-tag">do cargo</small>':''}</span><div class="seg acx-seg">${seg(k,'nao','—',nv)}${seg(k,'ver','Só ver',nv)}${seg(k,'mexer','Ver e mexer',nv)}</div></div>`; };
+  const efet=k=>acxNivel(X,base,k)!=='nao';
+  const avulsas=MODS.filter(m=>!efet(m.id)&&(m.views||[]).some(v=>VIEWS[v]&&!ACX_NUNCA.includes(v))&&!['tablet','gestor','silosver','meupainel'].includes(m.id)).map(m=>`<div class="acx-tg"><b>${esc(m.nome)}</b>${(m.views||[]).filter(v=>VIEWS[v]&&!ACX_NUNCA.includes(v)).map(v=>`<label class="ck"><input type="checkbox" data-acx-tela="${esc(v)}" data-id="${esc(id)}" ${X.telas.includes(v)?'checked':''}>${esc(VIEWS[v].nome)}</label>`).join('')}</div>`).join('');
+  const dsim={extras:X.extras,semMods:X.semMods,soVerMods:X.soVerMods,acoes:X.acoes};
+  const acoes=ACX_ACOES.map(a=>{ const pad=!(a.mod&&X.soVerMods.includes(a.mod)), aj=X.acoes[a.k]!==undefined, val=acxPode(a.k,dsim);
+    return `<label class="ck acx-ac"><input type="checkbox" data-acx-acao="${a.k}" data-id="${esc(id)}" ${val?'checked':''}>${esc(a.n)} <small class="acx-tag ${aj?'aj':''}">${aj?'ajustado':'padrão: '+(pad?'pode':'não pode')}</small></label>`; }).join('');
+  return `<section class="card acx" id="acx-${esc(id)}"><div class="label">AJUSTES DESTA PESSOA (ALÉM DO CARGO)</div><div class="sub" style="margin:4px 0 12px">Some módulos, deixe um módulo só para ver, libere telas avulsas ou ajuste ações. Vale só para esta pessoa; o cargo não muda.</div>
+   <div class="label" style="margin:10px 0 6px">MÓDULOS</div><div class="acx-mods">${mods.map(linhaMod).join('')}</div>
+   ${avulsas?`<div class="label" style="margin:16px 0 6px">TELAS AVULSAS (SEM DAR O MÓDULO INTEIRO)</div><div class="acx-tgs">${avulsas}</div>`:''}
+   <div class="label" style="margin:16px 0 6px">AÇÕES</div><div class="acx-acs">${acoes}</div>
+   <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px"><button class="lnk" data-act="acx-limpar" data-id="${esc(id)}">Voltar tudo ao padrão do cargo</button><button class="btn" data-act="acx-salvar" data-id="${esc(id)}" ${X.salv?'disabled':''}>${ic('check',18,2.2)}${X.salv?'Salvando…':'Salvar ajustes'}</button></div></section>`; }
+{ const _ae=acsEditor; acsEditor=function(ed){ const h=_ae.apply(this,arguments); if(!ed||ed.novo||!ed.id) return h; return h+acxSecao(ed.id); }; }
+/* cartão da pessoa: botão renomeado e selo quando há ajustes */
+{ const _ep=eqPessoas; eqPessoas=function(){ let h=_ep.apply(this,arguments); h=h.split('Ajustar telas</button>').join('Ajustar acesso</button>');
+  (S.acs.lista||[]).forEach(d=>{ if(acxAjustada(d)) h=h.replace(`data-act="acs-editar" data-id="${d._id}">`,`data-act="acs-editar" data-id="${d._id}"><span class="pill teal" style="margin-right:4px">ajustado</span>`); }); return h; }; }
+function acxToggle(arr,k,on){ const i=arr.indexOf(k); if(on&&i<0) arr.push(k); if(!on&&i>=0) arr.splice(i,1); }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="acx-"]'); if(!b) return; if(!S.acs.dono){ toast('Só a administradora ajusta acessos.'); return; }
+  const id=b.dataset.id, X=acxEstado(id), base=acxBase(id), a=b.dataset.act;
+  if(a==='acx-mod'){ const k=b.dataset.k, v=b.dataset.v;
+    acxToggle(X.semMods,k,v==='nao'&&base.includes(k)); acxToggle(X.soVerMods,k,v==='ver'); acxToggle(X.extras,k,v!=='nao'&&!base.includes(k));
+    if(v!=='nao') X.telas=X.telas.filter(t=>acxModDaTela(t)!==k); X.mudou=true; render(); return; }
+  if(a==='acx-limpar'){ Object.assign(X,{extras:[],semMods:[],soVerMods:[],telas:[],acoes:{},mudou:true}); render(); return; }
+  if(a==='acx-salvar'){ X.salv=true; render(); const dados={extras:X.extras,semMods:X.semMods,soVerMods:X.soVerMods,telas:X.telas,acoes:X.acoes};
+    dados.bloqCols=acxBloqCols(dados);
+    try{ await S.db.doc('acessos/'+id).update(Object.assign({},dados,{alteradoEm:new Date().toISOString(),alteradoPor:S.uid||null})); const d=(S.acs.lista||[]).find(x=>x._id===id); if(d) Object.assign(d,dados); X.mudou=false; toast('Ajustes de '+acsNome(id)+' salvos.'); }
+    catch(e){ console.warn('[acesso] salvar',e); erro(e); } X.salv=false; render(); return; } });
+document.addEventListener('change',ev=>{ const t=ev.target; const id=t.dataset&&t.dataset.id; if(!id||!(t.dataset.acxTela||t.dataset.acxAcao)) return; const X=acxEstado(id);
+  if(t.dataset.acxTela){ acxToggle(X.telas,t.dataset.acxTela,t.checked); }
+  else { const k=t.dataset.acxAcao, a=ACX_ACOES.find(x=>x.k===k); const pad=!(a.mod&&X.soVerMods.includes(a.mod)); if(t.checked===pad) delete X.acoes[k]; else X.acoes[k]=t.checked; }
+  X.mudou=true; render(); });
+/* trocar o cargo não apaga os ajustes */
+{ const _ag=acsGravar; acsGravar=async function(id,f,novo){ const ant=(S.acs.lista||[]).find(x=>x._id===id); const ok=await _ag.apply(this,arguments);
+  if(ok&&ant&&acxAjustada(ant)){ const k=['extras','semMods','soVerMods','telas','acoes','bloqCols'], u={}; k.forEach(x=>{ if(ant[x]!==undefined) u[x]=ant[x]; }); try{ await S.db.doc('acessos/'+id).update(u); }catch(e){ console.warn('[acesso] manter ajustes',e); } } return ok; }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="acx-css">.acx{border:1.5px solid var(--teal)}.acx-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.acx-seg button{height:34px;font-size:13px}.acx-tag{font-size:11px;color:var(--muted);font-weight:600}.acx-tag.aj{color:var(--teal-strong)}
+.acx-tgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}.acx-tg{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:10px;padding:10px}
+.acx-acs{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px}</style>`);
+/* ===FIM LIBERAÇÕES=== */
+/* ===================== RANCHO PELO QR SEM LOGIN (09/10): aplica os recebimentos no diário de bordo ===================== */
+S.rrec=[]; let rrSub=false, rrProc=false;
+setInterval(()=>{ try{ if(rrSub||!S.db||!S.acs||!S.acs.pronto||!acsP()) return; if(!(viewOk('diario')||viewOk('ranchos'))||(typeof soVer==='function'&&soVer())) return;
+  rrSub=true; inscrever('rancrec',()=>S.db.collection('rancrec').where('status','==','novo').limit(50),snap=>{ S.rrec=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rrProcessa(); }); }catch(e){} },1500);
+setInterval(()=>{ if(S.rrec.length) rrProcessa(); },20000);  /* ordens do rancho podem chegar depois */
+async function rrProcessa(){ if(rrProc||!S.db) return; const fs=window.claude&&window.claude._fs&&window.claude._fs(); if(!fs) return; rrProc=true;
+  try{ for(const r of S.rrec.slice()){ const os=(S.ordens||[]).filter(o=>String(o.rancho||'')===String(r.rancho)); if(!os.length) continue;
+      /* reserva: só um painel aplica cada recebimento */
+      let pegou=false; await fs.runTransaction(async t=>{ const ref=fs.doc('rancrec/'+r._id); const g=await t.get(ref); if(!g.exists||g.data().status!=='novo') return; t.update(ref,{status:'aplicando',feitoPor:S.uid||null}); pegou=true; });
+      if(!pegou) continue; let n=0, falhou=false;
+      for(const x of os){ const rx=Object.assign({},x.rdb||{}); if(rx.ent) continue; rx.ent={em:r.em,por:null,nome:r.nome,origem:'qr'}; if(!rx.sep) rx.sep={em:r.em,por:null};
+        if(await dbSalvar(x,rx,'Rancho '+r.rancho+' recebido na linha por '+r.nome+' (QR da folha)',r.rancho)) n++; else falhou=true; }
+      await S.db.doc('rancrec/'+r._id).update(falhou&&!n?{status:'novo',feitoPor:null}:{status:'feito',feitoEm:new Date().toISOString(),ordens:n});
+      if(n) toast('Rancho '+r.rancho+' recebido na linha por '+r.nome+' (QR).'); } }
+  catch(e){ console.warn('[rancho QR]',e); } finally{ rrProc=false; } }
+/* ===FIM RANCHO QR=== */
+/* ===================== TABLET: CONFERÊNCIA DO RANCHO PELA FOLHA (09/10) ===================== */
+/* Na tela de espera do tablet, a pessoa mostra o QR da folha de produção (ou bipa o RA-… no coletor), passa o crachá e confere item a item.
+   Grava igual à conferência do diário de bordo (rdb.ent + rdb.conf nas ordens do rancho), com o nome de quem conferiu. */
+/* o tablet precisa dos ranchos e das ordens abertas (só isso, para gastar pouca leitura) */
+{ const _ap=assinaPorPerfil; assinaPorPerfil=function(db){ _ap.apply(this,arguments); try{ if(!db||!S.acs||!S.acs.pronto||!acsP()||!ttPodeUsar()) return;
+    if(!leitPrecisa('prod')&&!_leit.ttOrd){ _leit.ttOrd=true; assinarQ(()=>db.collection('ordens').where('status','==','aberta').limit(1000),'_ordA'); }
+    if(!leitPrecisa('diario')&&!_leit.ttRch){ _leit.ttRch=true; assinarQ(()=>db.collection('ranchos').orderBy('criadoEm','desc').limit(300),'ranchos'); } }catch(e){} }; }
+function ttRancho(num){ const T=S.tt; num=String(num).replace(/\D/g,''); const os=(S.ordens||[]).filter(o=>String(o.rancho||'')===num);
+  if(!os.length){ ttMsg('Rancho '+num+' não encontrado no painel (ou já encerrado).'); return; }
+  const o=os.find(x=>!(x.rdb&&x.rdb.conf))||os[0];
+  Object.assign(T,{fase:'rancho',p:null,ult:Date.now(),msg:'',enviando:false,rch:{num,oid:o._id,itens:null,modo:'',obs:'',falta:false}}); ttCarregaItens(); render(); }
+function ttCarregaItens(){ const R=S.tt.rch; if(!R||R.itens) return; const o=ordById(R.oid); if(!o) return; const r=dbItensRc(o);
+  if(r.st==='ok'){ R.itens=r.itens.map(x=>({c:x.c,d:x.d,um:x.um||'',q:+x.q||0,ok:true,qr:+x.q||0})); R.modo='itens'; }
+  else if(r.st==='sem'||r.st==='erro'){ R.itens=[]; R.modo='livre'; } else R.modo='lendo'; }
+setInterval(()=>{ const T=S.tt; if(ttAtivo()&&T.fase==='rancho'&&T.rch&&!T.rch.itens){ ttCarregaItens(); if(T.rch.itens) render(); } },1000);
+/* leitura: folha (QR com rancho= ou RA-) e, na conferência, o crachá de quem confere */
+{ const _tl=ttLeu; ttLeu=function(txt){ const T=S.tt, s=String(txt||'').trim(); const mr=s.match(/rancho=(\d{4,})/i)||s.toUpperCase().match(/^RA-?(\d{4,})$/);
+  if(mr){ if(T.fase==='espera') ttRancho(mr[1]); return; }
+  if(T.fase==='rancho'&&!T.p){ const m=s.toUpperCase().match(TT_RE); if(!m){ ttMsg('Agora passe o seu crachá.'); return; } const c=crDe(m[1]);
+    if(!c||c.ativo===false){ ttMsg('Crachá não reconhecido.'); return; } ttBip(); T.p={codigo:c.codigo,nome:c.nome,linha:c.linha,papel:c.papel}; T.ult=Date.now(); ttCamDesliga(); render(); return; }
+  return _tl.apply(this,arguments); }; }
+/* coletor: RA- da folha e crachá durante a conferência */
+{ const _cl=cbLeu; cbLeu=function(cod){ const c=String(cod||'').toUpperCase(); if(S.view==='mantotem'&&/^RA-\d{4,}$/.test(c)){ S.tt.ult=Date.now(); ttLeu(c); return; } return _cl.apply(this,arguments); }; }
+{ const _cc=crColetor; crColetor=function(cod){ if(S.view==='mantotem'&&S.tt.fase==='rancho'&&!S.tt.p){ S.tt.ult=Date.now(); ttLeu('COLAFIX:CRACHA:'+cod); return; } return _cc.apply(this,arguments); }; }
+function vTtRancho(){ const T=S.tt, R=T.rch, o=R&&ordById(R.oid); if(!R||!o) return '<div class="tt-box"><h1>Rancho não encontrado</h1></div>';
+  const irm=dbIrmas(o); const ja=o.rdb&&o.rdb.conf;
+  const cab=`<div class="tt-ola">Rancho <b>${esc(R.num)}</b> · ordem(ns) ${irm.map(x=>esc(x.num)).join(', ')} · ${esc(o.linha||'')}</div>`;
+  const quem=T.p?`<div class="tt-ola">Conferindo: <b>${esc(T.p.nome)}</b></div>`:`<div class="tt-rcq">${ic('grid',26,2)}<div><b>Passe o seu crachá para conferir</b><span>Câmera ou coletor${ttSemCrachaOk()?' · ou toque em "Estou sem crachá"':''}</span></div></div>`;
+  let corpo='';
+  if(ja&&!R.refazer) corpo=`<div class="tt-box"><h1>Este rancho já foi conferido</h1><p>${esc(ja.nome||nomeDe(ja.por))} · ${new Date(ja.em).toLocaleDateString('pt-BR')} ${hora(ja.em)}${ja.falta?' · com falta registrada':' · completo'}</p><div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Voltar</button><button class="btn" data-act="tt-rc-refazer">Conferir de novo</button></div></div>`;
+  else if(R.modo==='lendo') corpo='<p class="tt-wait">Carregando os itens do rancho…</p>';
+  else if(R.modo==='itens') corpo=`<h1 class="tt-h">Confira os itens</h1><div class="sub" style="margin:-6px 0 4px;font-size:16px">Tudo vem marcado como OK. Toque em <b>Diferente</b> no que faltou ou veio a menos.</div>
+    <div class="tt-rcl">${R.itens.map((x,i)=>`<div class="tt-rci ${x.ok?'':'dif'}"><div><b>${esc(x.c)}</b><span>${esc(x.d||'')}</span><small>previsto ${fQ(x.q)} ${esc(x.um)}</small></div>
+      <div class="tt-rcb"><button data-act="tt-rc-ok" data-i="${i}" aria-pressed="${x.ok}">OK</button><button data-act="tt-rc-dif" data-i="${i}" aria-pressed="${!x.ok}">Diferente</button></div>
+      ${x.ok?'':`<label class="tt-rcn">Recebido<input class="txt tt-in" inputmode="decimal" data-rc-q="${i}" value="${esc(String(x.qr))}"> ${esc(x.um)}</label>`}</div>`).join('')}</div>`;
+  else corpo=`<h1 class="tt-h">Como chegou o rancho?</h1><div class="sub" style="font-size:16px">Os itens deste rancho não estão no painel. Confirme como chegou.</div>
+    <div class="tt-imp" style="grid-template-columns:repeat(2,minmax(0,1fr))"><button class="tt-bt imp ok" data-act="tt-rc-livre" data-v="0" aria-pressed="${!R.falta}"><b>Veio tudo</b></button><button class="tt-bt imp warn" data-act="tt-rc-livre" data-v="1" aria-pressed="${R.falta}"><b>Faltou alguma coisa</b></button></div>`;
+  const pode=!(ja&&!R.refazer)&&R.modo!=='lendo';
+  return `${cab}${quem}${corpo}${pode?`<label class="tt-lab">Observação ${R.modo==='livre'&&R.falta?'(diga o que faltou) *':'(opcional)'}<textarea class="txt tt-in" id="tt-rc-obs" rows="2" maxlength="300">${esc(R.obs)}</textarea></label>
+    ${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}<div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button>${!T.p&&ttSemCrachaOk()?'<button class="btn sec" data-act="tt-rc-sem">Estou sem crachá</button>':''}<button class="btn" data-act="tt-rc-salvar" ${T.p&&!T.enviando?'':'disabled'} style="background:var(--ok-ink)">${T.enviando?'Salvando…':'Confirmar conferência'}</button></div>`:''}`; }
+{ const _vt=vTotem; vTotem=function(){ const T=S.tt; if(T.fase!=='rancho'&&T.fase!=='rcok') return _vt.apply(this,arguments);
+  const L=ttLinhas(); const topo=`<div class="tt-top"><div><b>Conferir rancho</b><span>${L.map(esc).join(' · ')}</span></div><div class="tt-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div>${ttSoTablet()?'':'<button class="tt-x" data-act="tt-sair" title="Sair do modo tablet">✕</button>'}</div>`;
+  const corpo=T.fase==='rcok'?`<div class="tt-box ok"><div class="tt-okic">${ic('check',56,2.6)}</div><h1>Rancho ${esc(T.rch.num)} conferido</h1><p>${T.rch.falta?'Com falta registrada: o almoxarifado já vê no diário de bordo.':'Tudo certo. Registrado no diário de bordo.'}</p><p>${esc((T.p&&T.p.nome)||'')}</p><div class="tt-rod"><button class="btn" data-act="tt-voltar">Pronto</button></div></div>`:vTtRancho();
+  return `<div class="tt">${topo}${corpo}</div>`; }; }
+document.addEventListener('input',ev=>{ const t=ev.target, R=S.tt.rch; if(!R) return; if(t.id==='tt-rc-obs') R.obs=t.value; if(t.dataset&&t.dataset.rcQ!=null){ const x=R.itens[+t.dataset.rcQ]; if(x) x.qr=t.value; } S.tt.ult=Date.now(); });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="tt-rc-"]'); if(!b||b.disabled) return; const T=S.tt, R=T.rch; if(!R) return; const a=b.dataset.act; T.ult=Date.now();
+  if(a==='tt-rc-ok'||a==='tt-rc-dif'){ const x=R.itens[+b.dataset.i]; if(!x) return; x.ok=a==='tt-rc-ok'; if(!x.ok&&x.qr===x.q) x.qr=0; if(x.ok) x.qr=x.q; render(); return; }
+  if(a==='tt-rc-livre'){ R.falta=b.dataset.v==='1'; render(); return; }
+  if(a==='tt-rc-refazer'){ R.refazer=true; render(); return; }
+  if(a==='tt-rc-sem'){ const n=prompt('Seu nome:'); if(n&&n.trim().length>1){ T.p={codigo:null,nome:n.trim().slice(0,60),semCracha:true}; ttCamDesliga(); render(); } return; }
+  if(a==='tt-rc-salvar'){ if(!T.p||T.enviando) return; const o=ordById(R.oid); if(!o) return; const obs=String(R.obs||'').trim();
+    let itens=[], rec=null;
+    if(R.modo==='itens'){ for(const x of R.itens){ if(!x.ok){ const q=numIn(String(x.qr)); if(q==null||q<0){ T.msg='Informe quanto chegou de '+x.c+'.'; render(); return; } x.qr=q; } }
+      rec=R.itens.map(x=>({c:x.c,q:x.q,qe:null,qr:x.ok?x.q:x.qr}));
+      itens=R.itens.map(x=>{ const r0=x.ok?x.q:x.qr, d=x.q-r0; return d>1e-6?{c:x.c,i:x.c+' '+(x.d||''),q:fQ(d)+' '+x.um}:null; }).filter(Boolean); }
+    else if(R.falta){ if(obs.length<3){ T.msg='Diga o que faltou na observação.'; render(); return; } itens=[{i:obs,q:''}]; }
+    const falta=itens.length>0, agora=new Date().toISOString(), quem=T.p.nome, cr=T.p.codigo||null; T.enviando=true; T.msg=''; render();
+    try{ const r=Object.assign({},o.rdb||{}); if(!r.ent) r.ent={em:agora,por:S.uid||null,nome:quem,origem:'tablet'}; if(!r.sep) r.sep={em:agora,por:S.uid||null};
+      r.conf={em:agora,por:S.uid||null,falta,itens,obs,nome:quem,cracha:cr,origem:'tablet'}; if(rec) r.conf.rec=rec;
+      for(const x of dbIrmas(o)){ if(x===o) continue; const rx=Object.assign({},x.rdb||{}); if(!rx.ent) rx.ent={em:agora,por:S.uid||null,nome:quem,origem:'tablet'}; if(!rx.sep) rx.sep={em:agora,por:S.uid||null}; if(rx.conf&&!R.refazer) continue;
+        rx.conf={em:agora,por:S.uid||null,falta:false,itens:[],obs:falta?'Conferido junto com a ordem '+o.num+' (falta registrada nela)':obs,junto:o.num,nome:quem,origem:'tablet'}; await dbSalvar(x,rx,'Rancho '+o.rancho+' conferido junto com a ordem '+o.num+' por '+quem+' (tablet)',o.rancho); }
+      const ok=await dbSalvar(o,r,(falta?'Rancho recebido a menos: '+itens.map(x=>x.i+(x.q?' ('+x.q+')':'')).join(', '):'Rancho conferido completo')+' por '+quem+' (tablet)',o.rancho);
+      T.enviando=false; if(!ok){ T.msg='Não foi possível salvar. Verifique a internet e tente de novo.'; render(); return; }
+      R.falta=falta; if(cr) T.recente[cr]=Date.now()+22000; T.fase='rcok'; T.ult=Date.now(); render(); }
+    catch(e){ T.enviando=false; console.warn('[tablet] conferência',e); T.msg='Não foi possível salvar. Verifique a internet e tente de novo.'; render(); }
+    return; } });
+/* volta sozinho da confirmação */
+setInterval(()=>{ const T=S.tt; if(ttAtivo()&&T.fase==='rcok'&&Date.now()-T.ult>8000) ttVoltar(); },700);
+document.head.insertAdjacentHTML('beforeend',`<style id="rc-css">.tt-rcq{display:flex;gap:14px;align-items:center;background:var(--teal-wash);color:var(--teal-strong);border-radius:16px;padding:14px 18px}.tt-rcq b{display:block;font-size:20px}.tt-rcq span{font-size:15px}
+.tt-rcl{display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:52vh}.tt-rci{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center;background:var(--surface);border-radius:14px;padding:12px 14px;border-left:6px solid var(--ok)}
+.tt-rci.dif{border-left-color:var(--warn);background:var(--warn-tint)}.tt-rci b{font-size:18px}.tt-rci span{display:block;font-size:15px}.tt-rci small{color:var(--muted);font-size:14px}
+.tt-rcb{display:flex;gap:6px}.tt-rcb button{min-width:110px;height:56px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font:inherit;font-size:17px;font-weight:700;cursor:pointer}
+.tt-rcb button[aria-pressed="true"]{border-color:var(--teal-strong);background:var(--teal-wash)}.tt-rcn{grid-column:1/-1;display:flex;gap:10px;align-items:center;font-weight:700}.tt-rcn input{max-width:160px}</style>`);
+/* ===FIM CONFERÊNCIA RANCHO TABLET=== */
+
+
+
+
 
 
 
@@ -11502,7 +11801,7 @@ async function siloMedicaoSalva(id,doc){ const corr=doc.corrige?S.medicoes.find(
     else { await siloEmFila(()=>siloMedicaoSalva(id,doc)); try{ avMedicao(id,doc); }catch(e){ console.warn('[avisos]',e); } }
     return true; }; }
 /* rede de segurança: apontamentos que não descontaram (sem internet, aba fechada no meio, aparelho com versão antiga) são processados por qualquer painel aberto */
-async function siloReconciliar(){ if(!S.db||!siloFs()||!S.siloSub||S._siloRec) return;
+async function siloReconciliar(){ if(!S.db||!siloFs()||!S.siloSub||S._siloRec||(typeof soVer==='function'&&soVer())) return;
   const feitos=new Set(S.siloMov.map(m=>m._id)); const lim=new Date(Date.now()-3*864e5).toISOString(); const pend=[];
   for(const e of S.entregas||[]){ if(pend.length>=20) break; const reg=siloRefEm(e); if(!reg||reg<lim) continue;
     if(e.anula){ if(feitos.has('c_'+e.anula)&&!feitos.has('e_'+e.anula)) pend.push(e); continue; }
