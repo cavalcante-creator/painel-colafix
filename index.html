@@ -3611,7 +3611,7 @@ function semAcento(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,
 function dataBR(s){ if(!s) return ''; const p=String(s).split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:String(s); }
 function statusFolha(o){ const e=entregueDe(o); if(o.status==='aberta'){ if(o.continuaEm&&o.continuaEm>(o.data||'')) return 'CONTINUAÇÃO (desde '+dataBR(o.data)+')'; return e>0?'EM PRODUÇÃO':'PROGRAMAÇÃO LIBERADA'; } return stInfo(o,e).t.toUpperCase(); }
 const LINK_PAINEL='https://claude.ai/artifact/DAXN22FZGyfvxgVkKaA9WB';
-function linkRancho(n){ const n2=encodeURIComponent(n); return ((window.claude&&window.claude.link)||(S.cfg&&S.cfg.linkPainel)||LINK_PAINEL)+'?rancho='+n2+'#rancho='+n2; }
+function linkRancho(n){ const n2=encodeURIComponent(n); return ((window.claude&&window.claude.link)||(S.cfg&&S.cfg.linkPainel)||LINK_PAINEL)+'?rancho='+n2; }
 function desenharQR(pdf,txt,x,y,tam){ if(typeof qrcode!=='function') return; const q=qrcode(0,'M'); q.addData(txt); q.make(); const n=q.getModuleCount(), m=tam/n;
   pdf.setFillColor(255,255,255); pdf.rect(x-1,y-1,tam+2,tam+2,'F'); pdf.setFillColor(0,0,0);
   for(let r=0;r<n;r++){ let c=0; while(c<n){ if(q.isDark(r,c)){ let c2=c; while(c2+1<n&&q.isDark(r,c2+1)) c2++; pdf.rect(x+c*m,y+r*m,(c2-c+1)*m+0.02,m+0.02,'F'); c=c2+1; } else c++; } } }
@@ -3628,7 +3628,7 @@ function desenharFolhaProducao(pdf,o,dia,logo){
   let y=6;
   if(logo){ try{ const pr=pdf.getImageProperties(logo); pdf.addImage(logo,'PNG',ML,y,30,(pr.height*30)/pr.width); }catch(err){} }
   pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text('ORDEM DE PRODUÇÃO',105,y+9,{align:'center'});
-  if(o.rancho) try{ desenharQR(pdf,linkRancho(o.rancho),184,2.5,16); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdf.text(['Escaneie para','entregar/conferir','o rancho '+o.rancho],182.5,7,{align:'right'});pdf.setTextColor(0,0,0); }catch(err){}
+  if(o.rancho) try{ desenharQR(pdf,linkRancho(o.rancho),184,2.5,16); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdfCode128(pdf,'RA-'+o.rancho,140,3,41,9); pdf.text('RA-'+o.rancho+' · QR: celular ou tablet · barras: coletor',160.5,15,{align:'center'});pdf.setTextColor(0,0,0); }catch(err){}
   y+=15;
   pdf.setFillColor(44,62,80);pdf.rect(ML,y,LARGURA,9,'F');
   pdf.setTextColor(255,255,255);pdf.setFontSize(10.5);pdf.setFont('helvetica','bold');
@@ -4031,11 +4031,11 @@ function dbFimHtml(o,e,podeA){ const f=e.fim, id=esc(o._id); let h='';
   if(f) h+=`<small class="dbcp">${f.st==='encerrado'?'Encerrado':'Pendente'} ${hora(f.em)}${f.por?' · '+esc(nomeDe(f.por)):''}${f.st==='pendente'&&f.motivo&&!/^Faltou:/.test(f.motivo)?' · <b>'+esc(f.motivo)+'</b>':''}</small>`;
   if(podeA&&e.conf&&!(f&&f.st==='encerrado')) h+=`<span class="dbfimb">${f?'':`<button class="dbb dbcb" data-act="db-pend" data-id="${id}">Deixar pendente</button>`}<button class="dbb dbcb" data-act="db-encerrar" data-id="${id}">Encerrar rancho</button></span>`;
   return h; }
-function vDiario(){ const D=S.dbo, h=hojeStr(); if(!D.dia) D.dia=h; const dia=D.dia, am=amanhaStr(), LT=linhasOrd();
+function vDiario(){ const D=S.dbo, h=hojeStr(); if(!D.dia) D.dia=h; const dia=D.dia, am=amanhaStr(), LT=linhasOrd(); const diaP=typeof dbDiaProd==='function'?dbDiaProd(dia):dia; /* dia da produção (no modo entrega: próximo dia útil) */
   S._est={}; LT.forEach(l=>Object.assign(S._est,estimarLinha(l)));
   const PD=dbPode(), pode=PD.prod, podeA=PD.alm; if(!D.modo) D.modo=PD.prod?'tabela':'fila';
   const dq=String(D.q||'').trim().toLowerCase(), dqCasa=o=>[o.num,o.ensaca,o.rancho,o.produto,o.obs].some(v=>v!=null&&String(v).toLowerCase().includes(dq));
-  let xs=S.ordens.filter(o=>o.linha&&(o.status==='aberta'||o.status==='encerrada')).filter(o=>{ if(dq) return dqCasa(o); const d=dataEf(o); const k=o.status==='aberta'&&d<h?h:(o.status==='encerrada'&&o.fimEm?hojeStr(new Date(o.fimEm)):d); return k===dia||(o.status==='aberta'&&d<=dia&&dia===h); });
+  let xs=S.ordens.filter(o=>o.linha&&(o.status==='aberta'||o.status==='encerrada')).filter(o=>{ if(dq) return dqCasa(o); const d=dataEf(o); const k=o.status==='aberta'&&d<h?h:(o.status==='encerrada'&&o.fimEm?hojeStr(new Date(o.fimEm)):d); return k===diaP||(o.status==='aberta'&&d<=diaP&&dia===h); });
   if(D.linha!=='todas') xs=xs.filter(o=>o.linha===D.linha);
   if(D.pri) xs=xs.filter(o=>D.pri==='sem'?!dbPri(o):String(dbPri(o))===D.pri);
   xs.sort((a,b)=>LT.indexOf(a.linha)-LT.indexOf(b.linha)||seqCmp(a,b));
@@ -10553,10 +10553,10 @@ async function cbPdf(){ if(!window.jspdf){ toast('Gerador de PDF indisponível. 
 /* ---------- o que o leitor digitar ---------- */
 S.cb.buf=''; S.cb.t=0; S.cb.inicio=null;
 document.addEventListener('keydown',ev=>{ if(ev.ctrlKey||ev.altKey||ev.metaKey) return; const agora=performance.now(), gap=agora-S.cb.t; S.cb.t=agora;
-  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(cod.length>=4&&(/^(CH|RA)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod))&&gap<120){ const a=document.activeElement;
+  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(cod.length>=4&&(/^(CH|RA|EQ)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod)||/(rancho|chamado|equip)=/i.test(cod))&&gap<(S.view==='mantotem'?400:120)){ const a=document.activeElement;
       if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&typeof a.value==='string'&&a.value.toUpperCase().endsWith(cod.toUpperCase())){ a.value=a.value.slice(0,a.value.length-cod.length); a.dispatchEvent(new Event('input',{bubbles:true})); }
       ev.preventDefault(); ev.stopPropagation(); cbLeu(cod); } return; }
-  if(ev.key&&ev.key.length===1){ if(gap>80) S.cb.buf=''; else if(S.cb.buf&&gap<50) ev.stopImmediatePropagation(); /* rajada do leitor: não dispara os atalhos do teclado (N, A, P, F) */ S.cb.buf+=ev.key; if(S.cb.buf.length>40) S.cb.buf=S.cb.buf.slice(-40); } },true);
+  if(ev.key&&ev.key.length===1){ if(gap>(S.view==='mantotem'?300:80)) S.cb.buf=''; else if(S.cb.buf&&gap<50) ev.stopImmediatePropagation(); /* rajada do leitor: não dispara os atalhos do teclado (N, A, P, F) */ S.cb.buf+=ev.key; if(S.cb.buf.length>40) S.cb.buf=S.cb.buf.slice(-40); } },true);
 function cbLeu(cod){ cod=String(cod).toUpperCase(); const mcr=cod.match(/^CX([A-Z0-9]{8})$/)||cod.match(/CRACHA\W*([A-Z0-9]{8})$/); if(mcr){ crColetor(mcr[1]); return; } const naTela=S.view==='manqr'&&S.cb.modo==='barras';
   if(cod.startsWith('CH-')){ const l=cbLinhaDe(cod); if(!l){ S.cb.ultimo={cod,ok:false}; toast('Código '+cod+' não é de nenhuma linha.'); if(naTela) render(); return; }
     if(naTela){ S.cb.ultimo={cod,ok:true,txt:'abre o chamado da '+l}; render(); toast('Leitor funcionando: '+l+'.'); return; }
@@ -10816,8 +10816,9 @@ setInterval(()=>{ try{ const id=S.mx.qrEq; if(!id||!S.man.f||!S.mx.lido) return;
     if(S.view==='linhatv'){ S.man.novo=false; S.man.ltv=e.linha; render(); } else { go('manch'); setTimeout(()=>{ const x=$('#man-form'); x&&x.scrollIntoView({block:'start'}); const ta=document.querySelector('[data-man="defeito"]'); ta&&ta.focus(); },80); }
     toast('Equipamento identificado: '+e.nome); };
   document.body.appendChild(i); i.click(); };
-  function _escLinha(t){ const m=t&&String(t).match(/chamado=([^&#]+)/); let l=''; if(m){ try{ l=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ l=m[1]; } }
-    if(!l||!manLinhas().includes(l)){ toast(t?'Este QR não é de chamado de linha nem de equipamento.':'Não consegui ler o QR. Chegue mais perto e tente de novo.'); return; }
+  function _escLinha(t){ const mr=t&&String(t).match(/rancho=(\d{4,})/); if(mr){ if(!viewOk('diario')){ toast('Seu acesso não inclui o diário de bordo.'); return; } go('diario'); setTimeout(()=>{ if(!dbAbrirRancho(mr[1])) toast('Rancho '+mr[1]+' não encontrado.'); },120); return; }
+    const m=t&&String(t).match(/chamado=([^&#]+)/); let l=''; if(m){ try{ l=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ l=m[1]; } }
+    if(!l||!manLinhas().includes(l)){ toast(t?'Este QR não é de chamado, equipamento nem folha de produção.':'Não consegui ler o QR. Chegue mais perto e tente de novo.'); return; }
     if(!viewOk('manch')){ toast('Você não possui permissão para acessar este módulo.'); return; }
     manNovo(l); S.man.cur=null; if(S.view==='linhatv'){ S.man.novo=false; if(S.paradas.some(p=>p.linha===l&&!p.fim)) S.man.f.impacto='parou'; S.man.ltv=l; render(); } else { go('manch'); setTimeout(()=>{ const x=$('#man-form'); x&&x.scrollIntoView({block:'start'}); },80); } } }
 
@@ -10843,7 +10844,7 @@ async function mxEqQrPdf(id){ if(!window.jspdf){ toast('Gerador de PDF indispon�
     pdf.setFont('helvetica','bold'); pdf.setFontSize(10); pdf.setTextColor(31,56,100); pdf.text('CHAMADO DE MANUTENÇÃO',x+cw/2,y+15,{align:'center'});
     desenharQR(pdf,mxEqLink(e),x+(cw-70)/2,y+20,70); pdf.setTextColor(0,0,0); pdf.setFontSize(17); pdf.text(pdf.splitTextToSize(e.nome,cw-12)[0],x+cw/2,y+102,{align:'center'});
     pdf.setFont('helvetica','normal'); pdf.setFontSize(10); pdf.text((e.linha||'')+(e.tag?' · '+e.tag:''),x+cw/2,y+110,{align:'center'});
-    pdf.setFontSize(8); pdf.setTextColor(90,90,90); pdf.text('Escaneie com o celular para abrir um chamado deste equipamento',x+cw/2,y+120,{align:'center'}); pdf.setTextColor(0,0,0); });
+    pdfCode128(pdf,'EQ-'+e.id,x+10,y+113,cw-20,9); pdf.setFontSize(7); pdf.setTextColor(90,90,90); pdf.text('EQ-'+e.id+' · QR: celular ou tablet · barras: coletor',x+cw/2,y+126,{align:'center'}); pdf.setTextColor(0,0,0); });
   await manBaixar(pdf,id?'QR_'+String(es[0].nome).replace(/\W+/g,'_')+'.pdf':'QR_equipamentos.pdf','PDF com '+es.length+' QR gerado. Abra e imprima.'); }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mx-eq-qr"],[data-act="mx-eq-hist"],[data-act="mx-eq-fecha"],[data-act="mx-eq-qrpdf"]'); if(!b) return; const a=b.dataset.act, X=S.mx;
   if(a==='mx-eq-qr'){ X.eqQr=b.dataset.id; X.eqHist=null; render(); window.scrollTo(0,0); return; }
@@ -10946,11 +10947,11 @@ async function ttDetector(){ if(ttCam.det) return ttCam.det;
 async function ttCamLiga(){ if(ttCam.stream||ttCam.lendo) return; ttCam.lendo=true;
   try{ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'sem-camera'};
     const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
-    if(!ttAtivo()||!(S.tt.fase==='espera'||(S.tt.fase==='rancho'&&!S.tt.p))){ st.getTracks().forEach(t=>t.stop()); return; }
+    if(!ttAtivo()||!(S.tt.fase==='espera'||((S.tt.fase==='rancho'||S.tt.fase==='pre')&&!S.tt.p)||S.tt.fase==='maquina'||S.tt.fase==='volta')){ st.getTracks().forEach(t=>t.stop()); return; }
     ttCam.stream=st; let v=document.getElementById('tt-video'); if(!v){ v=document.createElement('video'); v.id='tt-video'; v.muted=true; v.setAttribute('playsinline',''); v.autoplay=true; document.body.appendChild(v); }
     v.srcObject=st; ttCam.video=v; try{ await v.play(); }catch(e){} ttCam.erro=''; S.tt.cam='ok';
     const det=await ttDetector(); ttCam.cv=ttCam.cv||document.createElement('canvas');
-    ttCam.timer=setInterval(async()=>{ if(ttCam.ocupado||!ttCam.video||ttCam.video.readyState<2) return; ttCam.ocupado=true;
+    ttCam.timer=setInterval(async()=>{ if(ttCam.ocupado||!ttCam.video||ttCam.video.readyState<2||Date.now()-(ttCam.tecla||0)<1200) return; ttCam.ocupado=true;
       try{ const vw=ttCam.video.videoWidth, vh=ttCam.video.videoHeight; if(!vw) return; const k=Math.min(1,1280/Math.max(vw,vh)); /* resolução cheia da câmera: reduzir para 800 px fazia o QR um pouco mais longe deixar de ser lido */ ttCam.cv.width=Math.round(vw*k); ttCam.cv.height=Math.round(vh*k);
         ttCam.cv.getContext('2d').drawImage(ttCam.video,0,0,ttCam.cv.width,ttCam.cv.height); const txt=await det(ttCam.cv); if(txt) ttLeu(txt); }
       catch(e){ console.warn('[tablet] leitura',e); } finally{ ttCam.ocupado=false; } },250);
@@ -10972,8 +10973,9 @@ function ttPendentes(p){ if(!p||p.papel==='tecnico') return []; const L=ttLinhas
 function ttVoltar(){ Object.assign(S.tt,{fase:'espera',p:null,linha:'',equipId:'',equip:'',defeito:'',txt:'',enviando:false,numero:null}); render(); }
 function rerenderTt(){ if(!ttAtivo()) return; const a=document.activeElement; if(a&&a.closest&&a.closest('.tt')&&a.matches('input,textarea')) return; render(); }
 /* sem toque por um tempo → volta para a espera (o próximo não herda o chamado pela metade) */
-setInterval(()=>{ const T=S.tt; if(!ttAtivo()){ if(ttCam.stream) ttCamDesliga(); return; } if(T.fase!=='espera'&&!T.enviando&&Date.now()-T.ult>(T.fase==='ok'||T.fase==='fimok'||T.fase==='voltaok'||T.fase==='rcok'?8000:T.fase==='rancho'?120000:T.ocioso)) ttVoltar(); if((T.fase==='espera'||(T.fase==='rancho'&&!T.p))&&!ttCam.stream&&!ttCam.lendo&&S.tt.cam!=='erro') ttCamLiga(); },500);
+setInterval(()=>{ const T=S.tt; if(!ttAtivo()){ if(ttCam.stream) ttCamDesliga(); return; } if(T.fase!=='espera'&&!T.enviando&&Date.now()-T.ult>(T.fase==='ok'||T.fase==='fimok'||T.fase==='voltaok'||T.fase==='rcok'?8000:T.fase==='rancho'?120000:T.ocioso)) ttVoltar(); if((T.fase==='espera'||((T.fase==='rancho'||T.fase==='pre')&&!T.p)||T.fase==='maquina'||T.fase==='volta')&&!ttCam.stream&&!ttCam.lendo&&S.tt.cam!=='erro') ttCamLiga(); },500);
 ['pointerdown','keydown','input'].forEach(t=>document.addEventListener(t,()=>{ S.tt.ult=Date.now(); },true));
+document.addEventListener('keydown',()=>{ ttCam.tecla=Date.now(); },true); /* coletor digitando: câmera espera */
 /* tela sempre acesa enquanto o modo parede está aberto */
 let ttWake=null; async function ttAcorda(){ try{ if(ttAtivo()&&!ttWake&&navigator.wakeLock) { ttWake=await navigator.wakeLock.request('screen'); ttWake.addEventListener('release',()=>{ ttWake=null; }); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') ttAcorda(); else if(ttCam.stream) ttCamDesliga(); });
@@ -11597,6 +11599,68 @@ document.head.insertAdjacentHTML('beforeend',`<style id="rc-css">.tt-rcq{display
 .tt-rcb{display:flex;gap:6px}.tt-rcb button{min-width:110px;height:56px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font:inherit;font-size:17px;font-weight:700;cursor:pointer}
 .tt-rcb button[aria-pressed="true"]{border-color:var(--teal-strong);background:var(--teal-wash)}.tt-rcn{grid-column:1/-1;display:flex;gap:10px;align-items:center;font-weight:700}.tt-rcn input{max-width:160px}</style>`);
 /* ===FIM CONFERÊNCIA RANCHO TABLET=== */
+/* ===================== QR E COLETOR EM TUDO (09/10) ===================== */
+/* Um leitor só para câmera (QR) e coletor (barras ou QR "digitado"): crachá, folha do rancho, equipamento e linha. */
+function lerCodigo(txt){ const s=String(txt||'').trim(); let m;
+  if((m=s.match(/[?&#]equip=([^&#\s]+)/i))||(m=s.match(/^EQ-(.+)$/i))){ let id; try{ id=decodeURIComponent(m[1]); }catch(e){ id=m[1]; } const es=(typeof mxEquips==='function'?mxEquips():[])||[];
+    const e=es.find(x=>x.id===id)||es.find(x=>String(x.id).toLowerCase()===String(id).toLowerCase()); return {tipo:'equip',id,e,linha:e?e.linha:''}; }
+  if((m=s.match(/[?&#]rancho=(\d{4,})/i))||(m=s.toUpperCase().match(/^RA-?(\d{4,})$/))) return {tipo:'rancho',num:m[1]};
+  if((m=s.match(/[?&#]chamado=([^&#]+)/i))){ let l; try{ l=decodeURIComponent(m[1].replace(/\+/g,' ')); }catch(e){ l=m[1]; } return {tipo:'linha',linha:l}; }
+  if((m=s.toUpperCase().match(/^CH-(.+)$/))){ const l=linhasOrd().find(x=>cbSlug(x)===m[1].replace(/[^A-Z0-9]/g,'')); return {tipo:'linha',linha:l||''}; }
+  return null; }
+/* painel (coletor): equipamento abre o chamado com a máquina; endereços digitados viram RA-/CH- */
+{ const _c=cbLeu; cbLeu=function(cod){ const k=lerCodigo(cod); if(!k) return _c.apply(this,arguments);
+  if(S.view==='mantotem'){ S.tt.ult=Date.now(); ttLeu(String(cod)); return; }
+  if(k.tipo==='rancho') return _c('RA-'+k.num);
+  if(k.tipo==='linha'){ if(!k.linha){ toast('Linha não encontrada.'); return; } return _c('CH-'+cbSlug(k.linha)); }
+  if(!k.e){ toast('Equipamento não encontrado no cadastro.'); return; } if(!viewOk('manch')){ toast('Você não possui permissão para acessar este módulo.'); return; }
+  manNovo(k.e.linha); Object.assign(S.man.f,{equipId:k.e.id,equip:k.e.nome,origem:'qr-equip'}); S.man.cur=null; go('manch'); toast('Equipamento identificado: '+k.e.nome); }; }
+/* tablet: equipamento ou linha antes do crachá (já sai com a máquina escolhida) ou depois (escolhe a máquina) */
+{ const _tl=ttLeu; ttLeu=function(txt){ const T=S.tt, k=lerCodigo(txt);
+  if(k&&(k.tipo==='equip'||k.tipo==='linha')){
+    if(T.fase!=='espera'&&!((T.fase==='maquina'||T.fase==='volta')&&T.p)) return; /* na pergunta "voltou a funcionar?", bipar a máquina = abrir chamado para ela */
+    if(k.tipo==='equip'&&!k.e){ ttMsg('Equipamento não encontrado no cadastro.'); return; }
+    const linha=k.tipo==='equip'?k.e.linha:k.linha; if(!linha||!ttLinhas().includes(linha)){ ttMsg('Este código é de uma linha que este tablet não atende.'); return; }
+    const pre={linha,equipId:k.tipo==='equip'?k.e.id:'',equip:k.tipo==='equip'?k.e.nome:''}; ttBip();
+    if(T.fase==='espera'){ Object.assign(T,{fase:'pre',pre,p:null,ult:Date.now(),msg:''}); render(); return; }
+    Object.assign(T,{linha:pre.linha,equipId:pre.equipId,equip:pre.equip,fase:'defeito',ult:Date.now()}); ttCamDesliga(); render(); return; }
+  if(T.fase==='pre'&&!T.p){ const m=String(txt||'').trim().toUpperCase().match(TT_RE); if(!m) return; const c=crDe(m[1]); if(!c||c.ativo===false){ ttMsg('Crachá não reconhecido.'); return; }
+    ttBip(); const pre=T.pre; ttInicia({codigo:c.codigo,nome:c.nome,linha:c.linha,papel:c.papel}); if(c.papel!=='tecnico'){ Object.assign(T,{linha:pre.linha,equipId:pre.equipId,equip:pre.equip,fase:'defeito'}); render(); } return; }
+  return _tl.apply(this,arguments); }; }
+{ const _cc=crColetor; crColetor=function(cod){ if(S.view==='mantotem'&&S.tt.fase==='pre'&&!S.tt.p){ S.tt.ult=Date.now(); ttLeu('COLAFIX:CRACHA:'+cod); return; } return _cc.apply(this,arguments); }; }
+function ttTopo(tit){ const L=ttLinhas(); return `<div class="tt-top"><div><b>${esc(tit)}</b><span>${L.map(esc).join(' · ')}</span></div><div class="tt-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div>${ttSoTablet()?'':'<button class="tt-x" data-act="tt-sair" title="Sair do modo tablet">✕</button>'}</div>`; }
+{ const _vt=vTotem; vTotem=function(){ const T=S.tt;
+  if(T.fase==='pre'){ const P=T.pre||{}; return `<div class="tt">${ttTopo('Chamar manutenção')}<div class="tt-box"><h1>${esc(P.linha)}${P.equip?' · '+esc(P.equip):''}</h1><p>${P.equip?'Máquina identificada.':'Linha identificada (a máquina você escolhe depois).'}</p>
+      <div class="tt-rcq" style="justify-content:center">${ic('grid',26,2)}<div><b>Agora passe o seu crachá</b><span>Câmera ou coletor</span></div></div>${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}
+      <div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button>${ttSemCrachaOk()?'<button class="btn sec" data-act="tt-pre-sem">Estou sem crachá</button>':''}</div></div></div>`; }
+  let h=_vt.apply(this,arguments); if(T.fase==='maquina') h=h.replace('<h1 class="tt-h">Qual máquina?</h1>','<h1 class="tt-h">Qual máquina?</h1><div class="sub" style="margin:-6px 0 0;font-size:16px">Toque na máquina, ou mostre o QR / bipe o código da etiqueta dela.</div>'); return h; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="tt-pre-sem"]'); if(!b) return; const T=S.tt, P=T.pre; const n=prompt('Seu nome:'); if(!n||n.trim().length<2) return;
+  ttInicia({codigo:null,nome:n.trim().slice(0,60),linha:'',papel:'operador',semCracha:true}); Object.assign(T,{linha:P.linha,equipId:P.equipId,equip:P.equip,fase:'defeito'}); render(); });
+setInterval(()=>{ const T=S.tt; if(ttAtivo()&&T.fase==='pre'&&Date.now()-T.ult>60000) ttVoltar(); },1000);
+/* ===FIM QR E COLETOR=== */
+/* ===================== ALMOXARIFADO (09/10): dia da entrega no diário + sem manutenção para o almox ===================== */
+/* A entrega do rancho é sempre feita no dia útil anterior à produção: no "Hoje" o almox vê as ordens do próximo dia útil. */
+function dbUtil(d){ const w=new Date(d+'T12:00:00').getDay(); let sab=false, fer=[]; try{ sab=!!anlCfg().sab; }catch(e){} try{ fer=feriados()||[]; }catch(e){} return w!==0&&(w!==6||sab)&&!fer.includes(d); }
+function dbProxUtil(d){ let x=addDias(d,1); for(let i=0;i<20&&!dbUtil(x);i++) x=addDias(x,1); return x; }
+function dbAntUtil(d){ let x=addDias(d,-1); for(let i=0;i<20&&!dbUtil(x);i++) x=addDias(x,-1); return x; }
+function dbEhAlmox(){ try{ const p=acsP(); if(!p||(S.acs&&S.acs.dono)) return false; return (p.mods||[]).some(m=>m==='almox'||m==='premix')||!dbPode().prod; }catch(e){ return false; } }
+function dbEntrega(){ const D=S.dbo; if(D.entrega!==undefined) return D.entrega; return D.modo==='monitor'||dbEhAlmox(); }
+function dbDiaProd(dia){ return dbEntrega()?dbProxUtil(dia):dia; }
+function diaSemana(d){ return ['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(d+'T12:00:00').getDay()]; }
+/* aviso no topo do diário: qual produção está sendo entregue */
+{ const _vd=vDiario; vDiario=function(){ const h=_vd.apply(this,arguments); const D=S.dbo; if(D.modo==='monitor') return h; const dia=D.dia||hojeStr(), p=dbDiaProd(dia);
+  const txt=dbEntrega()?`<b>Entrega ${dia===hojeStr()?'de hoje':'de '+diaSemana(dia)+' '+dm(dia)}:</b> ordens de produção de <b>${diaSemana(p)}, ${dm(p)}</b>${dia===hojeStr()?' (e as atrasadas)':''}`:`<b>Dia da produção:</b> ${diaSemana(dia)}, ${dm(dia)}`;
+  return `<div class="banner db-ent" style="background:var(--teal-wash);color:var(--teal-strong);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span>${ic('cal',16,2)} ${txt}</span><button class="lnk" data-act="db-entrega">${dbEntrega()?'Ver pelo dia da produção':'Ver pelo dia da entrega'}</button></div>`+h; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="db-entrega"]'); if(!b) return; S.dbo.entrega=!dbEntrega(); render(); });
+/* abrir um rancho (QR da folha, coletor RA-, busca): vai para o dia certo da entrega */
+{ const _ab=dbAbrirRancho; dbAbrirRancho=function(num){ const r=_ab.apply(this,arguments); try{ const D=S.dbo, h=hojeStr(); if(r&&dbEntrega()&&D.dia&&D.dia!==h){ const e=dbAntUtil(D.dia); D.dia=e<h?h:e; render(); } }catch(e){} return r; }; }
+/* manutenção não aparece para o almoxarifado (e some de verdade quando tirada em "Ajustar acesso") */
+{ const _vo=viewOk; viewOk=function(v){ const r=_vo.apply(this,arguments); if(!r) return r; try{ const A=S.acs; if(!A||A.dono) return r; const m=(MODS.find(x=>(x.views||[]).includes(v))||{}).id; if(m!=='manut') return r;
+    const d=A.doc||{}; if((d.semMods||[]).includes('manut')) return false; if((d.telas||[]).includes(v)) return r; const p=acsP(); const mods=(p&&p.mods)||[];
+    if(!mods.includes('manut')&&mods.some(x=>x==='almox'||x==='premix')) return false; }catch(e){} return r; }; }
+/* ===FIM ALMOXARIFADO=== */
+
+
 
 
 
