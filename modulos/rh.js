@@ -9,14 +9,16 @@
      rh/dados/terceiros/{id}           terceirizados e prazo do contrato
      rh/dados/fichasmes/{AAAA-MM}      situação das fichas do mês: impressas.{funcId}, assinadas.{funcId}
      rh/dados/modelos/{id}             modelos de documento (contratos, termos, declarações)
-     rh/dados/docsgerados/{id}         histórico de documentos gerados (quem, quando, assinado anexado)
+     rh/dados/docsgerados/{id}         histórico de documentos gerados (quem, quando, assinado anexado, férias, respostas)
+     rh/dados/ferias/{id}              férias marcadas ou já tiradas (CLT) · troca dos PJ: ultimaTroca/trocas no cadastro
      rh/arquivos/lista/{id} + rh/arquivos/partes/{id_n}   PDFs e fichas escaneadas (em pedaços)
    As fichas usam o sistema original (modulos/rh-fichas.html) por uma ponte: window.RHAPI (painel → ficha: window.FICHAS). */
 (function(){ const P=window.Painel; if(!P) return;
   const R={terc:[],ft:null,tfil:'ativos',func:[],funcoes:[],cfg:{},lido:{},f:null,ff:null,filtro:{q:'',st:'ativos',setor:'',emp:'',tipo:''},salv:false,arqAbrir:null,
     fm:{},esc:{},fv:'mes',fmes:P.hojeStr().slice(0,7),ffil:{sit:'todas',q:'',setor:'',n:60},fsel:null,prev:{},
-    modelos:[],docs:[],dv:'modelos',dm:null,dprev:false,dg:{funcId:'',modeloId:'',extra:{},guardar:true},dgReg:{}};
-  const COL={terc:'rh/dados/terceiros',func:'rh/dados/funcionarios',funcoes:'rh/dados/funcoes',fm:'rh/dados/fichasmes',modelos:'rh/dados/modelos',docs:'rh/dados/docsgerados',lista:'rh/arquivos/lista',partes:'rh/arquivos/partes'};
+    modelos:[],docs:[],dv:'modelos',dm:null,dprev:false,dg:{funcId:'',modeloId:'',extra:{},resp:{},feriasId:'',guardar:true},dgReg:{},
+    fer:[],pzv:'ferias',pzfil:'atencao',ffer:null,fpj:null};
+  const COL={terc:'rh/dados/terceiros',func:'rh/dados/funcionarios',funcoes:'rh/dados/funcoes',fm:'rh/dados/fichasmes',modelos:'rh/dados/modelos',docs:'rh/dados/docsgerados',ferias:'rh/dados/ferias',lista:'rh/arquivos/lista',partes:'rh/arquivos/partes'};
   const ST=['Ativo','Férias','Afastado','Desligado'];
   /* empresas: todo CLT é Colafix; PJ é Zenith ou Nexus (ou outra) */
   const EMP_PJ=[['ZENITH','Zenith'],['NEXUS','Nexus']], EMP_NOME={COLAFIX:'Colafix',ZENITH:'Zenith',NEXUS:'Nexus'};
@@ -49,7 +51,7 @@
   /* ---------- leitura ---------- */
   function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); });
     sub('func',()=>P.db().collection(COL.func).limit(3000)); sub('funcoes',()=>P.db().collection(COL.funcoes).limit(500)); sub('terc',()=>P.db().collection(COL.terc).limit(1000));
-    sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300));
+    sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300)); sub('fer',()=>P.db().collection(COL.ferias).limit(3000));
     P.inscrever('rh-fm',()=>P.db().collection(COL.fm).orderBy('mes','desc').limit(14),snap=>{ snap.docs.forEach(d=>{ R.fm[d.id]=d.data(); }); R.lido.fm=true; P.rerender(); });
     P.inscrever('rh-cfg',()=>P.db().collection('rh').limit(5),snap=>{ const d=snap.docs.find(x=>x.id==='config'); R.cfg=d?d.data():{}; P.rerender(); });
     const m=location.search.match(/[?&]rhfile=([^&]+)/); if(m){ R.arqAbrir=decodeURIComponent(m[1]); P.go('rhfichas'); } }
@@ -159,6 +161,7 @@
     tAvisos().forEach(({x,s})=>{ const d=s.d; av.push({c:s.c,r:d<0?'Vencido':d===0?'Vence hoje':'Atenção',t:'Contrato: '+x.nome,s:(d<0?'venceu há '+(-d)+' dia'+(d===-1?'':'s'):d===0?'vence hoje':'vence em '+d+' dia'+(d===1?'':'s'))+' ('+br(x.fim).slice(0,5)+')',act:`data-act="rh-ted" data-go-terc="1" data-id="${x._id}"`,l:'Abrir'}); });
     const porF={}; ativos().filter(f=>f.funcao&&semEpi(f)).forEach(f=>{ const k=norm(f.funcao); (porF[k]=porF[k]||{nome:f.funcao,n:0}).n++; });
     Object.values(porF).sort((a,b)=>b.n-a.n).forEach(o=>av.push({c:'warn',r:'Atenção',t:'Função "'+o.nome+'" sem EPI cadastrado',s:'a ficha de '+o.n+(o.n===1?' pessoa':' pessoas')+' sai sem itens',act:`data-act="rh-fsemepi" data-n="${esc(o.nome)}"`,l:'Resolver'}));
+    avisosPrazo().forEach(a=>av.push(a));
     const semFunc=ativos().filter(f=>!f.funcao);
     if(semFunc.length) av.push({c:'warn',r:'Atenção',t:semFunc.length+(semFunc.length===1?' funcionário sem função':' funcionários sem função'),s:'a ficha não tem itens: '+semFunc.slice(0,3).map(f=>f.nome).join(', ')+(semFunc.length>3?'…':''),act:'data-go="rhfunc"',l:'Resolver'});
     return av; }
@@ -317,7 +320,10 @@
   /* ---------- Documentos e contratos ---------- */
   /* campos que o modelo pode usar; no texto ficam como {NOME}, {CPF}... */
   const CAMPOS=[['NOME','Nome'],['CPF','CPF'],['FUNCAO','Função'],['SETOR','Setor'],['ADMISSAO','Admissão'],['VINCULO','Vínculo'],['EMPRESA','Empresa'],['CNPJ','CNPJ'],
-    ['SALARIO','Salário'],['SALARIO_EXTENSO','Salário por extenso'],['JORNADA','Jornada'],['TELEFONE','Telefone'],['CIDADE','Cidade'],['DATA_HOJE','Data de hoje']];
+    ['SALARIO','Salário'],['SALARIO_EXTENSO','Salário por extenso'],['JORNADA','Jornada'],['TELEFONE','Telefone'],['CIDADE','Cidade'],['DATA_HOJE','Data de hoje'],
+    ['FERIAS_INICIO','Início das férias'],['FERIAS_FIM','Fim das férias'],['FERIAS_DIAS','Dias de férias'],['FERIAS_RETORNO','Volta das férias'],['PERIODO_AQUISITIVO','Período aquisitivo'],
+    ['ULTIMA_TROCA','Última troca (PJ)'],['PROXIMA_TROCA','Próxima troca (PJ)']];
+  const CAMPOS_FER=['FERIAS_INICIO','FERIAS_FIM','FERIAS_DIAS','FERIAS_RETORNO','PERIODO_AQUISITIVO'];
   const CAMPO_NOME=k=>(CAMPOS.find(x=>x[0]===k)||[k,k])[1];
   /* o que pode faltar no cadastro (preenche na hora de gerar) */
   const FALTA_CAMPO={SALARIO:'salario',SALARIO_EXTENSO:'salario',JORNADA:'jornada',FUNCAO:'funcao',SETOR:'setor',ADMISSAO:'admissao',TELEFONE:'telefone'};
@@ -337,21 +343,32 @@
   function extenso(v){ if(v==null) return ''; const r=Math.floor(v+1e-9), c=Math.round((v-r)*100); const p=[];
     if(r) p.push(inteiroExt(r)+(r%1e6===0?' de reais':r===1?' real':' reais')); if(c) p.push(ate999(c)+(c===1?' centavo':' centavos')); return p.join(' e ')||'zero real'; }
   const dataExt=d=>{ d=d||new Date(); return d.getDate()+' de '+MESES[d.getMonth()]+' de '+d.getFullYear(); };
-  function valores(f,ex){ ex=ex||{}; const g=k=>ex[k]!=null&&ex[k]!==''?ex[k]:f[k]; const e=EMP_DOC[f.tipo==='PJ'?f.empresa:'COLAFIX'], sal=numBR(g('salario'));
+  function valores(f,ex,fer){ ex=ex||{}; const g=k=>ex[k]!=null&&ex[k]!==''?ex[k]:f[k]; const e=EMP_DOC[f.tipo==='PJ'?f.empresa:'COLAFIX'], sal=numBR(g('salario')), pb=f.tipo==='PJ'?pjBase(f):'';
     return {NOME:f.nome||'',CPF:fCPF(f.cpf),FUNCAO:g('funcao')||'',SETOR:g('setor')||'',ADMISSAO:br(g('admissao')),VINCULO:f.tipo==='PJ'?'PJ':'CLT',
       EMPRESA:e?e.nome:empNome(f.empresa),CNPJ:e?e.cnpj:'',SALARIO:sal!=null?brl(sal):'',SALARIO_EXTENSO:sal!=null?extenso(sal):'',JORNADA:g('jornada')||'',TELEFONE:g('telefone')||'',
-      CIDADE:R.cfg.cidade||'Gravataí',DATA_HOJE:dataExt()}; }
+      CIDADE:R.cfg.cidade||'Gravataí',DATA_HOJE:dataExt(),
+      FERIAS_INICIO:fer?br(fer.inicio):'',FERIAS_FIM:fer?br(fer.fim):'',FERIAS_DIAS:fer?String(fer.dias):'',FERIAS_RETORNO:fer?br(fer.retorno):'',PERIODO_AQUISITIVO:fer?br(fer.aquisitivo)+' a '+br(fer.aquisitivoFim):'',
+      ULTIMA_TROCA:pb?br(pb):'',PROXIMA_TROCA:pb?br(addMeses(pb,3)):''}; }
+  const EX_FER={inicio:'2026-11-03',fim:'2026-11-22',dias:20,retorno:'2026-11-23',aquisitivo:'2025-03-10',aquisitivoFim:'2026-03-09'};
   const EXEMPLO={nome:'MARIA DA SILVA',cpf:'00000000000',funcao:'Operadora de produção',setor:'Linha 1',admissao:'2024-03-10',tipo:'CLT',empresa:'COLAFIX',salario:2150,jornada:'44 horas semanais',telefone:'(51) 90000-0000'};
   const tkHTML=k=>`<span class="rh-tk" contenteditable="false" data-k="${k}">${esc(CAMPO_NOME(k))}</span>`;
+  /* campo perguntado: no Word {?Data de início das férias}; o painel pergunta na hora de gerar */
+  const tqHTML=q=>`<span class="rh-tq" contenteditable="false" data-q="${esc(q)}">? ${esc(q)}</span>`;
+  const qLimpa=q=>String(q||'').replace(/\s+/g,' ').trim().slice(0,80);
+  const qData=q=>/\bDATA\b|\bDIA\b/.test(norm(q))&&!/\bDIAS\b/.test(norm(q));
   /* limpa o HTML (do editor ou do Word): só formatação simples e os campos */
   const TAGS=new Set(['P','BR','B','STRONG','I','EM','U','H1','H2','H3','UL','OL','LI','TABLE','THEAD','TBODY','TR','TD','TH','DIV','SPAN']);
   function limpar(html){ const doc=new DOMParser().parseFromString('<div>'+String(html||'')+'</div>','text/html'), raiz=doc.body.firstChild;
     const chave=t=>{ const n=norm(t).replace(/\s+/g,'_'); const c=CAMPOS.find(([k,l])=>k===n||norm(l).replace(/\s+/g,'_')===n); return c&&c[0]; };
     (function anda(el){ [...el.childNodes].forEach(n=>{
-      if(n.nodeType===3){ if(n.nodeValue.includes('\u200B')) n.nodeValue=n.nodeValue.replace(/\u200B/g,''); const t=n.nodeValue; if(!/\{[^{}]{2,30}\}/.test(t)) return; const fr=doc.createDocumentFragment(); let u=0; t.replace(/\{\s*([^{}]{2,30}?)\s*\}/g,(m,x,i)=>{ const k=chave(x); if(!k) return m; fr.appendChild(doc.createTextNode(t.slice(u,i))); const s=doc.createElement('span'); s.className='rh-tk'; s.dataset.k=k; fr.appendChild(s); u=i+m.length; return m; }); fr.appendChild(doc.createTextNode(t.slice(u))); n.replaceWith(fr); return; }
+      if(n.nodeType===3){ if(n.nodeValue.includes('\u200B')) n.nodeValue=n.nodeValue.replace(/\u200B/g,''); const t=n.nodeValue; if(!/\{[^{}]{2,82}\}/.test(t)) return; const fr=doc.createDocumentFragment(); let u=0; t.replace(/\{\s*([^{}]{2,82}?)\s*\}/g,(m,x,i)=>{ let s;
+        if(x.charAt(0)==='?'){ const q=qLimpa(x.slice(1)); if(q.length<2) return m; s=doc.createElement('span'); s.className='rh-tq'; s.dataset.q=q; }
+        else { const k=chave(x); if(!k) return m; s=doc.createElement('span'); s.className='rh-tk'; s.dataset.k=k; }
+        fr.appendChild(doc.createTextNode(t.slice(u,i))); fr.appendChild(s); u=i+m.length; return m; }); fr.appendChild(doc.createTextNode(t.slice(u))); n.replaceWith(fr); return; }
       if(n.nodeType!==1){ n.remove(); return; }
       if(/^(SCRIPT|STYLE|IFRAME|OBJECT|IMG|svg|LINK|META)$/i.test(n.tagName)){ n.remove(); return; }
       if(n.tagName==='SPAN'&&n.classList.contains('rh-tk')&&CAMPOS.some(c=>c[0]===n.dataset.k)){ const k=n.dataset.k; [...n.attributes].forEach(a=>n.removeAttribute(a.name)); n.className='rh-tk'; n.dataset.k=k; n.textContent=''; return; }
+      if(n.tagName==='SPAN'&&n.classList.contains('rh-tq')){ const q=qLimpa(n.dataset.q); if(q.length<2){ n.remove(); return; } [...n.attributes].forEach(a=>n.removeAttribute(a.name)); n.className='rh-tq'; n.dataset.q=q; n.textContent=''; return; }
       if(!TAGS.has(n.tagName)){ anda(n); n.replaceWith(...n.childNodes); return; }
       const al=(n.style&&n.style.textAlign)||n.getAttribute('align')||''; [...n.attributes].forEach(a=>n.removeAttribute(a.name));
       if(/^(center|right|justify)$/.test(al)&&/^(P|H1|H2|H3|DIV)$/.test(n.tagName)) n.style.textAlign=al;
@@ -359,10 +376,17 @@
       anda(n); }); })(raiz);
     return raiz.innerHTML; }
   /* modelo salvo → editor (campos viram etiquetas) */
-  const paraEditor=html=>limpar(html).replace(/<span class="rh-tk" data-k="([A-Z_]+)"><\/span>/g,(m,k)=>tkHTML(k));
+  function domDe(html){ const doc=new DOMParser().parseFromString('<div>'+limpar(html)+'</div>','text/html'); return doc.body.firstChild; }
+  function paraEditor(html){ const r=domDe(html); r.querySelectorAll('span.rh-tk').forEach(s=>{ s.setAttribute('contenteditable','false'); s.textContent=CAMPO_NOME(s.dataset.k); });
+    r.querySelectorAll('span.rh-tq').forEach(s=>{ s.setAttribute('contenteditable','false'); s.textContent='? '+s.dataset.q; }); return r.innerHTML; }
   /* modelo + valores → documento pronto (marcar=true realça o que veio do cadastro, como no exemplo) */
-  function montar(html,vals,marcar){ return limpar(html).replace(/<span class="rh-tk" data-k="([A-Z_]+)"><\/span>/g,(m,k)=>{ const v=vals[k]; if(v) return marcar?`<span class="rh-v">${esc(v)}</span>`:esc(v); return `<span class="rh-falta">[${esc(CAMPO_NOME(k))}]</span>`; }); }
-  const camposDe=html=>[...new Set([...String(limpar(html)).matchAll(/data-k="([A-Z_]+)"/g)].map(m=>m[1]))];
+  function montar(html,vals,marcar,resp){ resp=resp||{}; const r=domDe(html), doc=r.ownerDocument;
+    const troca=(s,v,rot)=>{ if(v&&marcar){ const x=doc.createElement('span'); x.className='rh-v'; x.textContent=v; s.replaceWith(x); } else if(v) s.replaceWith(doc.createTextNode(v)); else { const x=doc.createElement('span'); x.className='rh-falta'; x.textContent='['+rot+']'; s.replaceWith(x); } };
+    r.querySelectorAll('span.rh-tk').forEach(s=>troca(s,vals[s.dataset.k],CAMPO_NOME(s.dataset.k)));
+    r.querySelectorAll('span.rh-tq').forEach(s=>{ const q=s.dataset.q, v=String(resp[q]==null?'':resp[q]).trim(); troca(s,okIso(v)?br(v):v,q); });
+    return r.innerHTML; }
+  const camposDe=html=>[...new Set([...domDe(html).querySelectorAll('span.rh-tk')].map(s=>s.dataset.k))];
+  const perguntasDe=html=>[...new Set([...domDe(html).querySelectorAll('span.rh-tq')].map(s=>s.dataset.q))];
   const DOC_CSS='body{font-family:"Times New Roman",Georgia,serif;font-size:12pt;line-height:1.6;color:#111;margin:0}h1,h2,h3{text-align:center;font-size:13pt;letter-spacing:.02em;margin:0 0 14px}p{margin:0 0 10px;text-align:justify}.rh-falta{color:#A2453D}.rh-ass{display:flex;gap:40px;margin-top:56px}.rh-ass div{flex:1;border-top:1px solid #111;text-align:center;padding-top:4px;font-family:"Segoe UI",Arial,sans-serif;font-size:10pt}';
   const assinaturas=f=>`<div class="rh-ass"><div>${f.tipo==='PJ'?'Contratante':'Empregadora'}</div><div>${esc(f.nome||'')}</div></div>`;
 
@@ -375,11 +399,11 @@
       ${dm?`<section class="card rh-ded"><div class="rh-g2"><label><span class="label">Nome do modelo</span><input class="txt" id="rh-dnome" value="${esc(dm.nome||'')}" placeholder="ex.: Contrato de trabalho · CLT"></label>
           <label><span class="label">Vale para</span><select class="txt" id="rh-dvale">${VALE.map(([k,l])=>`<option value="${k}" ${(dm.vale||'TODOS')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
         <div class="label" style="margin:12px 0 6px">Campos (toque para inserir no texto)</div><div class="rh-tks">${CAMPOS.map(([k,l])=>`<button class="rh-tkb" data-act="rh-dtk" data-k="${k}">${esc(l)}</button>`).join('')}</div>
-        <div class="rh-edw"><div class="rh-tb" role="toolbar" aria-label="Formatação"><button data-act="rh-dfmt" data-v="bold" title="Negrito"><b>N</b></button><button data-act="rh-dfmt" data-v="italic" title="Itálico"><i>I</i></button><button data-act="rh-dfmt" data-v="titulo">Título</button><button data-act="rh-dfmt" data-v="clausula">Cláusula numerada</button></div>
-          <div class="rh-ed" id="rh-ed" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Texto do modelo" data-ph="Escreva o texto do documento. Para o nome, CPF, função etc., toque no campo acima.">${paraEditor(dm.html||'')}</div></div>
+        <div class="rh-edw"><div class="rh-tb" role="toolbar" aria-label="Formatação"><button data-act="rh-dfmt" data-v="bold" title="Negrito"><b>N</b></button><button data-act="rh-dfmt" data-v="italic" title="Itálico"><i>I</i></button><button data-act="rh-dfmt" data-v="titulo">Título</button><button data-act="rh-dfmt" data-v="clausula">Cláusula numerada</button><button data-act="rh-dfmt" data-v="pergunta" title="Algo que muda a cada documento (datas, motivo…): o painel pergunta na hora de gerar">Campo perguntado</button></div>
+          <div class="rh-ed" id="rh-ed" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Texto do modelo" data-ph="Escreva o texto do documento. Para o nome, CPF, função etc., toque no campo acima. O que muda a cada vez (datas, trabalhado ou indenizado…) vai em Campo perguntado.">${paraEditor(dm.html||'')}</div></div>
         <div class="rh-dfoot">${dm._id?'<button class="lnk" data-act="rh-ddel" style="color:var(--crit-ink)">Apagar modelo</button>':'<span></span>'}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="rh-dprev">Ver com dados de exemplo</button><button class="btn" data-act="rh-dsalvar" ${R.salv?'disabled':''}>Salvar modelo</button></div></div></section>`
       :`<section class="card"><div class="empty">${ms.length?'Escolha um modelo ao lado para editar.':'Os modelos ficam aqui: contrato de trabalho, de experiência, termo de entrega, declarações.'}</div></section>`}</div>`
-      +(R.dprev&&dm?`<div class="rh-modal" data-act="rh-dprevx"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Prévia com dados de exemplo"><div class="rh-ch"><h2>Prévia com dados de exemplo</h2><button class="lnk" data-act="rh-dprevx">Fechar</button></div><div class="rh-page">${montar(dm.html||'',valores(EXEMPLO),true)}${assinaturas(EXEMPLO)}</div></div></div>`:''); }
+      +(R.dprev&&dm?`<div class="rh-modal" data-act="rh-dprevx"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Prévia com dados de exemplo"><div class="rh-ch"><h2>Prévia com dados de exemplo</h2><button class="lnk" data-act="rh-dprevx">Fechar</button></div><div class="rh-page">${montar(dm.html||'',valores(EXEMPLO,{},EX_FER),true)}${assinaturas(EXEMPLO)}</div></div></div>`:''); }
   function vDocGerar(){ const G=R.dg, fs=ativos().slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')), f=fs.find(x=>x._id===G.funcId)||null;
     const ms=R.modelos.slice().sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR')), cab=f?ms.filter(m=>valePara(m,f)):ms, lista=cab.length?cab:ms;
     if(!lista.some(m=>m._id===G.modeloId)) G.modeloId=lista[0]?lista[0]._id:'';
@@ -387,25 +411,33 @@
     if(!ms.length) return `<section class="card"><div class="empty">Primeiro cadastre um modelo em <button class="lnk" data-act="rh-dv" data-v="modelos">Modelos</button>.</div></section>`;
     const usa=md?camposDe(md.html):[], falta=f?[...new Set(usa.filter(k=>FALTA_CAMPO[k]&&!(f[FALTA_CAMPO[k]]!=null&&f[FALTA_CAMPO[k]]!=='')).map(k=>FALTA_CAMPO[k]))]:[];
     const LBL={salario:'Salário',jornada:'Jornada',funcao:'Função',setor:'Setor',admissao:'Admissão',telefone:'Telefone'}, PH={salario:'R$ 0,00',jornada:'ex.: 44 horas semanais'};
-    const docs=f?R.docs.filter(d=>d.funcId===f._id):[];
+    const docs=f?R.docs.filter(d=>d.funcId===f._id):[], qs=md?perguntasDe(md.html):[], usaFer=usa.some(k=>CAMPOS_FER.includes(k));
+    const fers=f&&usaFer?ferDe(f).filter(x=>!x.anterior).sort((a,b)=>String(b.inicio).localeCompare(String(a.inicio))):[];
+    if(usaFer&&fers.length&&!fers.some(x=>x._id===G.feriasId)) G.feriasId=fers[0]._id;
+    const ferHtml=usaFer&&f?(fers.length?`<label class="rh-lb"><span class="label">Férias</span><select class="txt" id="rh-dgfe">${fers.map(x=>`<option value="${x._id}" ${G.feriasId===x._id?'selected':''}>${br(x.inicio)} a ${br(x.fim)} · ${x.dias} dias</option>`).join('')}</select></label>`
+      :`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);margin:0 0 10px">Este modelo usa as datas das férias. Marque as férias em <button class="lnk" data-act="rh-pzabrir" data-v="ferias">Férias e prazos</button>.</div>`):'';
+    const qHtml=qs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Perguntas deste documento</div>${qs.map((q,i)=>`<label class="rh-lb"><span>${esc(q)}</span><input class="txt rh-amar" data-rh-dq="${i}" ${qData(q)?'type="date"':''} value="${esc(G.resp[q]||'')}"></label>`).join('')}`:'';
     return `<div class="rh-gg"><section class="card"><h2>Para quem?</h2>
         <label class="rh-lb"><span class="label">Funcionário</span><select class="txt" id="rh-dgf"><option value="">Escolha…</option>${fs.map(x=>`<option value="${x._id}" ${G.funcId===x._id?'selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
         <label class="rh-lb"><span class="label">Modelo</span><select class="txt" id="rh-dgm">${lista.map(m=>`<option value="${m._id}" ${G.modeloId===m._id?'selected':''}>${esc(m.nome)}</option>`).join('')}</select></label>
         ${f&&cab.length<ms.length&&!cab.length?'<div class="sub" style="font-size:12.5px">Nenhum modelo marcado para o vínculo desta pessoa; mostrando todos.</div>':''}
+        ${ferHtml}${qHtml}
         ${falta.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Dados que faltam no cadastro</div>${falta.map(k=>`<label class="rh-lb"><span>${LBL[k]}</span><input class="txt rh-amar" data-rh-dx="${k}" ${k==='admissao'?'type="date"':''} placeholder="${PH[k]||''}" value="${esc(G.extra[k]||'')}"></label>`).join('')}
           <label class="ck" style="margin:6px 0 4px"><input type="checkbox" id="rh-dgg" ${G.guardar?'checked':''}> Guardar no cadastro</label>`:''}
         <div class="rh-dbt"><button class="btn" data-act="rh-dgo" data-v="imprimir" ${f&&md?'':'disabled'}>Imprimir</button><button class="btn sec" data-act="rh-dgo" data-v="pdf" ${f&&md?'':'disabled'}>Salvar PDF</button><button class="btn sec" data-act="rh-dgo" data-v="word" ${f&&md?'':'disabled'}>Baixar em Word</button></div>
         <div class="sub" style="font-size:12.5px;margin:10px 0 0">Fica guardado no histórico do funcionário (quem gerou e quando). Depois de assinado, anexe a cópia escaneada aqui embaixo ou no cadastro.</div>
         ${f&&docs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:4px">Já gerados para ${esc(f.nome)}</div>${docs.slice(0,6).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}`:''}</section>
-      <section class="rh-page rh-pageg" aria-label="Documento">${f&&md?montar(md.html||'',valores(f,G.extra),true)+assinaturas(f):`<div class="empty">${f?'Escolha o modelo.':'Escolha o funcionário para ver o documento preenchido.'}</div>`}</section></div>`; }
+      <section class="rh-page rh-pageg" aria-label="Documento">${f&&md?docCorpo(f,md,true)+assinaturas(f):`<div class="empty">${f?'Escolha o modelo.':'Escolha o funcionário para ver o documento preenchido.'}</div>`}</section></div>`; }
   function edSync(){ const ed=document.getElementById('rh-ed'); if(ed&&R.dm) R.dm.html=limpar(ed.innerHTML); const n=document.getElementById('rh-dnome'); if(n&&R.dm) R.dm.nome=n.value; const v=document.getElementById('rh-dvale'); if(v&&R.dm) R.dm.vale=v.value; }
   function inserirNoEditor(html){ const ed=document.getElementById('rh-ed'); if(!ed) return; ed.focus(); const sel=getSelection();
     if(!sel.rangeCount||!ed.contains(sel.anchorNode)){ const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
     /* inserção feita à mão: o insertHTML do navegador quebra a linha antes de um campo */
     const r=sel.getRangeAt(0); r.deleteContents(); const tp=document.createElement('template'); tp.innerHTML=html; const fr=tp.content, ult=fr.lastChild; if(!ult) return;
     r.insertNode(fr); const nr=document.createRange(); nr.setStartAfter(ult); nr.collapse(true); sel.removeAllRanges(); sel.addRange(nr); edSync(); }
+  const ferSel=f=>R.fer.find(x=>x._id===R.dg.feriasId&&x.funcId===f._id&&x.status!=='cancelada')||null;
+  const docCorpo=(f,md,marcar)=>montar(md.html||'',valores(f,R.dg.extra,ferSel(f)),marcar,R.dg.resp);
   /* saída: imprimir, PDF, Word */
-  function docCompleto(f,md){ return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(md.nome+' - '+f.nome)}</title><style>@page{size:A4;margin:22mm 20mm}${DOC_CSS}</style></head><body>${montar(md.html,valores(f,R.dg.extra),false)}${assinaturas(f)}</body></html>`; }
+  function docCompleto(f,md){ return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(md.nome+' - '+f.nome)}</title><style>@page{size:A4;margin:22mm 20mm}${DOC_CSS}</style></head><body>${docCorpo(f,md,false)}${assinaturas(f)}</body></html>`; }
   function imprimirDoc(html){ const fr=document.createElement('iframe'); fr.setAttribute('aria-hidden','true'); fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(fr);
     const d=fr.contentWindow.document; d.open(); d.write(html); d.close(); setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ P.erro(e); } setTimeout(()=>fr.remove(),60000); },300); }
   const carregarJs=src=>new Promise((ok,er)=>{ if([...document.scripts].some(s=>s.src===src)) return ok(); const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>er(new Error('Não consegui carregar '+src.split('/').pop()+'. Confira a internet.')); document.head.appendChild(s); });
@@ -415,22 +447,106 @@
   async function pdfDoc(f,md){ if(!window.html2canvas) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     if(!(window.jspdf&&window.jspdf.jsPDF)) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     const box=document.createElement('div'); box.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:83px 76px;box-sizing:border-box';
-    box.innerHTML=`<style>${DOC_CSS.replace(/body\{/,'.rh-pdf{')}</style><div class="rh-pdf">${montar(md.html,valores(f,R.dg.extra),false)}${assinaturas(f)}</div>`; document.body.appendChild(box);
+    box.innerHTML=`<style>${DOC_CSS.replace(/body\{/,'.rh-pdf{')}</style><div class="rh-pdf">${docCorpo(f,md,false)}${assinaturas(f)}</div>`; document.body.appendChild(box);
     try{ const cv=await window.html2canvas(box,{scale:2,backgroundColor:'#ffffff',logging:false}); const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
       const pxPag=Math.floor(cv.width*297/210); for(let y=0,i=0;y<cv.height;y+=pxPag,i++){ const c=document.createElement('canvas'); c.width=cv.width; c.height=Math.min(pxPag,cv.height-y); c.getContext('2d').drawImage(cv,0,y,cv.width,c.height,0,0,cv.width,c.height);
         if(i) pdf.addPage('a4','portrait'); pdf.addImage(c.toDataURL('image/jpeg',0.9),'JPEG',0,0,210,c.height*210/cv.width); }
       baixar(pdf.output('blob'),nomeArq(md.nome+' - '+f.nome)+'.pdf'); } finally{ box.remove(); } }
-  function wordDoc(f,md){ const h=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(md.nome)}</title><style>@page{size:21cm 29.7cm;margin:2.2cm 2cm}${DOC_CSS}</style></head><body>${montar(md.html,valores(f,R.dg.extra),false)}${assinaturas(f)}</body></html>`;
+  function wordDoc(f,md){ const h=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(md.nome)}</title><style>@page{size:21cm 29.7cm;margin:2.2cm 2cm}${DOC_CSS}</style></head><body>${docCorpo(f,md,false)}${assinaturas(f)}</body></html>`;
     baixar(new Blob(['﻿',h],{type:'application/msword'}),nomeArq(md.nome+' - '+f.nome)+'.doc'); }
   async function registrarDoc(f,md,acao){ const G=R.dg;
     if(G.guardar){ const up={}; Object.entries(G.extra).forEach(([k,v])=>{ if(v==null||v==='') return; if(k==='salario'){ const n=numBR(v); if(n!=null) up.salario=n; } else up[k]=String(v).trim(); });
       if(Object.keys(up).length){ await grava(COL.func+'/'+f._id,up); Object.assign(f,up); G.extra={}; } }
-    const chave=f._id+'|'+md._id+'|'+JSON.stringify(valores(f,G.extra)); if(G.reg===chave) return; G.reg=chave;
-    await P.db().doc(COL.docs+'/'+id()).set({funcId:f._id,funcionario:f.nome,modeloId:md._id,modelo:md.nome,acao,em:agora(),por:P.S.uid||null,porNome:eu()}); }
+    const fe=ferSel(f), resp={}; perguntasDe(md.html).forEach(q=>{ resp[q]=String(G.resp[q]||'').trim(); });
+    const chave=f._id+'|'+md._id+'|'+JSON.stringify([valores(f,G.extra,fe),resp]); if(G.reg===chave) return; G.reg=chave;
+    await P.db().doc(COL.docs+'/'+id()).set(Object.assign({funcId:f._id,funcionario:f.nome,modeloId:md._id,modelo:md.nome,acao,em:agora(),por:P.S.uid||null,porNome:eu()},fe?{feriasId:fe._id}:{},Object.keys(resp).length?{respostas:resp}:{})); }
+
+  /* ---------- Férias e prazos (12/10, pedido da RH) ----------
+     CLT: períodos de férias contados da admissão (12 meses para adquirir, mais 12 para conceder). As férias podem ser
+     marcadas em partes (ex.: 10 + 20, 15 + 15 ou 30 de uma vez). Avisa 15 dias antes do prazo para conceder e das férias
+     marcadas que ainda não têm o aviso de férias gerado.
+     PJ: troca a cada 3 meses, contada da última troca registrada (sem troca registrada, da admissão). Avisa 15 dias antes.
+     Férias: rh/dados/ferias/{id} {funcId, aquisitivo, aquisitivoFim, inicio, dias, fim, retorno, status, anterior?}
+     Troca do PJ: no cadastro, ultimaTroca + trocas[] (histórico). */
+  const PZ_AVISO=()=>+R.cfg.prazoAviso>0?+R.cfg.prazoAviso:15;
+  const isoD=dt=>dt.toISOString().slice(0,10), dU=s=>new Date(s+'T12:00:00Z');
+  const addDias=(s,n)=>{ const d=dU(s); d.setUTCDate(d.getUTCDate()+n); return isoD(d); };
+  const addMeses=(s,n)=>{ const [y,m,d]=s.split('-').map(Number); const ult=new Date(Date.UTC(y,m-1+n+1,0,12)).getUTCDate(); return isoD(new Date(Date.UTC(y,m-1+n,Math.min(d,ult),12))); };
+  const okIso=s=>/^\d{4}-\d{2}-\d{2}$/.test(String(s||''));
+  const ferDe=f=>R.fer.filter(x=>x.funcId===f._id&&x.status!=='cancelada');
+  function periodos(f){ if(f.tipo==='PJ'||!okIso(f.admissao)) return []; const hj=P.hojeStr(), out=[], fs=ferDe(f);
+    for(let k=0;k<80;k++){ const ini=addMeses(f.admissao,12*k); if(ini>hj) break; const fim=addDias(addMeses(f.admissao,12*(k+1)),-1), lim=addDias(addMeses(f.admissao,12*(k+2)),-1);
+      const ps=fs.filter(x=>x.aquisitivo===ini), usados=ps.reduce((a,x)=>a+(+x.dias||0),0); out.push({k,ini,fim,lim,completo:fim<hj,ps,usados,saldo:Math.max(0,30-usados)}); }
+    return out; }
+  const plural=(n,s,p)=>n+' '+(n===1?s:p);
+  function sitFer(f){ const ps=periodos(f); if(!ps.length) return {c:'neu',t:f.tipo==='PJ'?'PJ':'Sem data de admissão',n:9};
+    const hj=P.hojeStr(), agora=ferDe(f).find(x=>!x.anterior&&x.inicio<=hj&&x.fim>=hj), ab=ps.find(p=>p.completo&&p.saldo>0);
+    if(ab){ const d=diasAte(ab.lim); if(d<0) return {c:'crit',t:'Prazo vencido há '+plural(-d,'dia','dias'),n:0,p:ab,d}; if(d<=PZ_AVISO()) return {c:'warn',t:d===0?'Último dia para conceder':'Conceder em até '+plural(d,'dia','dias'),n:1,p:ab,d};
+      return {c:'ok',t:agora?'Em férias até '+br(agora.fim):'Conceder até '+br(ab.lim),n:3,p:ab,d}; }
+    if(agora) return {c:'ok',t:'Em férias até '+br(agora.fim),n:2};
+    return {c:'ok',t:'Em dia',n:4,p:ps[ps.length-1]}; }
+  const ferProximas=()=>{ const hj=P.hojeStr(); return R.fer.filter(x=>!x.anterior&&x.status!=='cancelada'&&x.fim>=hj&&R.func.some(f=>f._id===x.funcId&&f.status!=='Desligado')).sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio))); };
+  const temAviso=x=>R.docs.some(d=>d.feriasId===x._id);
+  const pjBase=f=>okIso(f.ultimaTroca)?f.ultimaTroca:okIso(f.admissao)?f.admissao:'';
+  function pjSit(f){ const b=pjBase(f); if(!b) return {c:'neu',t:'Sem data de admissão',n:9}; const prox=addMeses(b,3), d=diasAte(prox);
+    if(d<0) return {c:'crit',t:'Troca atrasada há '+plural(-d,'dia','dias'),n:0,prox,d}; if(d===0) return {c:'crit',t:'Troca hoje',n:1,prox,d};
+    if(d<=PZ_AVISO()) return {c:'warn',t:'Troca em '+plural(d,'dia','dias'),n:2,prox,d}; return {c:'ok',t:'Em dia',n:3,prox,d}; }
+  const clts=()=>ativos().filter(f=>f.tipo!=='PJ'), pjs=()=>ativos().filter(f=>f.tipo==='PJ');
+  /* avisos de prazo: Início do RH e quadro "Avisos" do Meu dia */
+  function avisosPrazo(){ const av=[], hj=P.hojeStr();
+    clts().forEach(f=>{ const s=sitFer(f); if(s.c==='crit'||s.c==='warn') av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'Férias: '+f.nome,s:(s.d<0?'o prazo para conceder venceu em ':'conceder até ')+br(s.p.lim)+' · faltam '+plural(s.p.saldo,'dia','dias')+' de férias',act:`data-act="rh-pzabrir" data-v="ferias"`,l:'Abrir',go:'rhferias'}); });
+    ferProximas().filter(x=>x.inicio>=hj&&diasAte(x.inicio)<=PZ_AVISO()&&!temAviso(x)).forEach(x=>{ const d=diasAte(x.inicio); av.push({c:'warn',r:'Atenção',t:'Aviso de férias: '+x.funcionario,s:'as férias começam '+(d===0?'hoje':'em '+br(x.inicio))+' e o aviso ainda não foi gerado',act:`data-act="rh-dgfer" data-id="${x._id}"`,l:'Gerar',go:'rhferias'}); });
+    pjs().forEach(f=>{ const s=pjSit(f); if(s.c==='crit'||s.c==='warn') av.push({c:s.c,r:s.c==='crit'?'Atrasada':'Atenção',t:'Troca do PJ: '+f.nome,s:'próxima troca '+br(s.prox)+' · '+s.t.toLowerCase(),act:`data-act="rh-pzabrir" data-v="pj"`,l:'Abrir',go:'rhferias'}); });
+    return av; }
+  P.registrarAviso(()=>avisosPrazo().map(a=>({nivel:a.c,rotulo:a.r,titulo:a.t,texto:a.s,go:a.go})));
+
+  function vFerias(){ const EY='RH · FÉRIAS E PRAZOS', nf=clts().filter(f=>['crit','warn'].includes(sitFer(f).c)).length, np=pjs().filter(f=>['crit','warn'].includes(pjSit(f).c)).length;
+    const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['pj','Troca dos PJ'+(np?' · '+np:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
+    return topo('Férias e prazos',R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
+      +(!R.lido.func||!R.lido.fer?'<section class="card"><div class="empty">Carregando…</div></section>':R.pzv==='pj'?vPJ():vFeriasCLT()); }
+  function vFeriasCLT(){ const hj=P.hojeStr(), F=R.pzfil;
+    let xs=clts().map(f=>({f,s:sitFer(f)})); const nAt=xs.filter(o=>['crit','warn'].includes(o.s.c)).length; if(F==='atencao') xs=xs.filter(o=>['crit','warn'].includes(o.s.c));
+    xs.sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
+    const venc=clts().reduce((n,f)=>n+periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim<hj).length,0), prox=ferProximas();
+    return (R.ffer?formFerias():'')
+      +(prox.length?`<section class="card"><h2>Férias marcadas</h2><div class="rh-tw"><table class="rh-t"><thead><tr><th>Funcionário</th><th>Férias</th><th>Volta</th><th>Aviso de férias</th><th></th></tr></thead><tbody>
+        ${prox.map(x=>{ const ag=x.inicio<=hj; return `<tr><td><b>${esc(x.funcionario)}</b><small style="display:block;color:var(--muted)">período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}</small></td><td class="num">${br(x.inicio)} a ${br(x.fim)} <small style="color:var(--muted)">· ${plural(+x.dias,'dia','dias')}</small>${ag?' <span class="pill ok">em férias</span>':''}</td><td class="num">${br(x.retorno)}</td>
+          <td>${temAviso(x)?'<span class="pill ok">Gerado</span>':`<button class="btn rh-sm" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}</td><td class="rh-ac">${ag?'':`<button class="lnk" data-act="rh-fercanc" data-id="${x._id}" style="color:var(--crit-ink)">Desmarcar</button>`}</td></tr>`; }).join('')}</tbody></table></div></section>`:'')
+      +`<section class="card"><div class="rh-chips">${[['atencao','Precisam de atenção · '+nAt],['todos','Todos os CLT · '+clts().length]].map(([k,l])=>`<button class="rh-chip2" data-act="rh-pzfil" data-v="${k}" aria-pressed="${F===k}">${l}</button>`).join('')}
+          ${venc?`<button class="lnk" data-act="rh-feranteriores" style="margin-left:auto">${venc===1?'Marcar como já tirado o período vencido':'Marcar como já tirados os '+venc+' períodos vencidos'} (antes do painel)</button>`:''}</div>
+        ${xs.length?`<div class="rh-tw"><table class="rh-t rh-tf"><thead><tr><th>Funcionário</th><th>Admissão</th><th>Período em aberto</th><th>Situação</th><th></th></tr></thead><tbody>
+        ${xs.map(({f,s})=>{ const p=s.p; return `<tr><td><b>${esc(f.nome)}</b><small>${esc([f.funcao,f.setor].filter(Boolean).join(' · '))}</small></td><td class="num">${br(f.admissao)||'—'}</td>
+          <td class="num">${p?`${br(p.ini)} a ${br(p.fim)}<small>${p.completo?(p.saldo?'faltam '+plural(p.saldo,'dia','dias')+' · conceder até '+br(p.lim):'tirado'):'em aquisição · completa em '+br(p.fim)}</small>`:'—'}</td>
+          <td><span class="pill ${s.c}">${esc(s.t)}</span></td>
+          <td class="rh-ac">${s.p?`<button class="btn sec rh-sm" data-act="rh-fernova" data-id="${f._id}">Marcar férias</button>`:`<button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${f._id}">Informar admissão</button>`}${s.p&&s.p.completo&&s.p.saldo?` <button class="lnk" data-act="rh-ferant" data-id="${f._id}" data-p="${s.p.ini}" title="Para férias tiradas antes de usar o painel">Já tirou</button>`:''}</td></tr>`; }).join('')}</tbody></table></div>`
+        :`<div class="empty">${F==='atencao'?'Nenhum prazo de férias perto de vencer.':'Nenhum CLT em atividade.'}</div>`}</section>`; }
+  function formFerias(){ const g=R.ffer, f=R.func.find(x=>x._id===g.funcId); if(!f) return ''; const ps=periodos(f).filter(p=>p.saldo>0), p=ps.find(x=>x.ini===g.aquisitivo)||ps.find(x=>x.completo)||ps[0];
+    if(p&&g.aquisitivo!==p.ini) g.aquisitivo=p.ini; const dias=+g.dias||0, fim=okIso(g.inicio)&&dias>0?addDias(g.inicio,dias-1):'', ret=fim?addDias(fim,1):'';
+    const hist=ferDe(f).slice().sort((a,b)=>String(b.inicio||b.aquisitivo).localeCompare(String(a.inicio||a.aquisitivo)));
+    return `<section class="card rh-form"><div class="head" style="align-items:baseline"><h2>Marcar férias de ${esc(f.nome)}</h2><button class="lnk" data-act="rh-ferx">Fechar</button></div>
+      ${p?`<div class="rh-g"><label><span class="label">Período aquisitivo</span><select class="txt" id="rh-ferp">${ps.map(x=>`<option value="${x.ini}" ${x.ini===p.ini?'selected':''}>${br(x.ini)} a ${br(x.fim)} · faltam ${x.saldo} dias${x.completo?'':' (em aquisição)'}</option>`).join('')}</select></label>
+        <label><span class="label">Início das férias</span><input class="txt" type="date" id="rh-feri" value="${esc(g.inicio||'')}"></label>
+        <label><span class="label">Quantos dias</span><input class="txt" type="number" min="1" max="${p.saldo}" id="rh-ferd" inputmode="numeric" value="${esc(g.dias||'')}"></label></div>
+        <div class="rh-chips" style="margin:10px 0 0">${[10,15,20,30].filter(n=>n<=p.saldo).map(n=>`<button class="rh-chip2" data-act="rh-ferdias" data-v="${n}" aria-pressed="${dias===n}">${n} dias</button>`).join('')}${p.saldo<30&&![10,15,20].includes(p.saldo)?`<button class="rh-chip2" data-act="rh-ferdias" data-v="${p.saldo}" aria-pressed="${dias===p.saldo}">O que falta: ${p.saldo} dias</button>`:''}</div>
+        <div class="sub" style="margin:10px 0 0">${fim?`Termina em <b>${br(fim)}</b> e volta ao trabalho em <b>${br(ret)}</b>.`:'Escolha o início e quantos dias.'}${!p.completo?' Este período ainda não se completou ('+br(p.fim)+').':''}</div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-ferx">Cancelar</button><button class="btn" data-act="rh-fersalvar" ${R.salv?'disabled':''}>Marcar férias</button></div>`
+      :'<div class="empty">Nenhum período com dias de férias em aberto.</div>'}
+      ${hist.length?`<div class="rh-docs"><span class="label">JÁ MARCADAS OU TIRADAS</span>${hist.slice(0,8).map(x=>`<div class="rh-dl"><div><b>${x.anterior?'Tiradas antes do painel':br(x.inicio)+' a '+br(x.fim)}</b><small>${plural(+x.dias,'dia','dias')} · período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}${x.porNome?' · '+esc(x.porNome):''}</small></div>${x.anterior?'':temAviso(x)?'<span class="pill ok">Aviso gerado</span>':`<button class="lnk" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}</div>`).join('')}</div>`:''}</section>`; }
+  function vPJ(){ let xs=pjs().map(f=>({f,s:pjSit(f)})).sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
+    return (R.fpj?formPJ():'')+`<section class="card">${xs.length?`<div class="rh-tw"><table class="rh-t rh-tf"><thead><tr><th>PJ</th><th>Contando de</th><th>Próxima troca</th><th>Situação</th><th></th></tr></thead><tbody>
+      ${xs.map(({f,s})=>`<tr><td><b>${esc(f.nome)}</b><small>${esc([f.funcao,empNome(f.empresa)].filter(Boolean).join(' · '))}</small></td><td class="num">${pjBase(f)?br(pjBase(f)):'—'}<small>${okIso(f.ultimaTroca)?'última troca':'admissão'}</small></td><td class="num"><b>${s.prox?br(s.prox):'—'}</b></td>
+        <td><span class="pill ${s.c}">${esc(s.t)}</span></td><td class="rh-ac"><button class="btn sec rh-sm" data-act="rh-pjtroca" data-id="${f._id}">Registrar troca</button> <button class="lnk" data-act="rh-dgpara" data-id="${f._id}">Gerar documento</button></td></tr>`).join('')}</tbody></table></div>`
+      :'<div class="empty">Nenhum PJ em atividade.</div>'}</section>`; }
+  function formPJ(){ const g=R.fpj, f=R.func.find(x=>x._id===g.funcId); if(!f) return ''; const hs=(f.trocas||[]).slice().reverse();
+    return `<section class="card rh-form"><div class="head" style="align-items:baseline"><h2>Registrar troca de ${esc(f.nome)}</h2><button class="lnk" data-act="rh-pjx">Fechar</button></div>
+      <div class="rh-g"><label><span class="label">Data da troca</span><input class="txt" type="date" id="rh-pjd" value="${esc(g.data||P.hojeStr())}"></label><label><span class="label">Observação</span><input class="txt" id="rh-pjo" value="${esc(g.obs||'')}" placeholder="opcional"></label></div>
+      <div class="sub" style="margin:10px 0 0">A próxima troca fica para ${okIso(g.data||P.hojeStr())?'<b>'+br(addMeses(g.data||P.hojeStr(),3))+'</b>':'—'}.</div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-pjx">Cancelar</button><button class="btn" data-act="rh-pjsalvar" ${R.salv?'disabled':''}>Registrar troca</button></div>
+      ${hs.length?`<div class="rh-docs"><span class="label">TROCAS ANTERIORES</span>${hs.slice(0,8).map(t=>`<div class="rh-dl"><div><b>${br(t.data)}</b><small>${esc([t.obs,t.porNome].filter(Boolean).join(' · '))}</small></div></div>`).join('')}</div>`:''}</section>`; }
 
   /* ---------- registro do módulo ---------- */
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:vInicio}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
-    rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhfuncoes:{nome:'Funções e EPIs',mob:'Funções',render:vFuncoes}, rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>bannerTerc()+vTerc()} };
+    rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhfuncoes:{nome:'Funções e EPIs',mob:'Funções',render:vFuncoes}, rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>bannerTerc()+vTerc()} };
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r(); }; });
   P.registrarModulo({ id:'rh', nome:'RH', ic:'equipe', telas:TELAS, iniciar });
   P.registrarPerfil('rh',{ nome:'RH (funcionários, fichas, documentos, terceirizados)', mods:['rh'], soVer:true, pos:2, desc:'Só o módulo RH: funcionários, fichas de EPI e uniforme do mês, documentos e contratos, funções e EPIs e terceirizados. Não vê nem muda nada da fábrica.' });
@@ -452,6 +568,9 @@
     if(t.id==='rh-q'){ const v=t.value; busca('rh-q',()=>{ R.filtro.q=v; }); }
     if(t.id==='rh-fq'){ const v=t.value; busca('rh-fq',()=>{ R.ffil.q=v; R.ffil.n=60; }); }
     if(t.id==='rh-ed'||t.id==='rh-dnome') edSync();
+    if(t.dataset&&t.dataset.rhDq!=null){ const md=R.modelos.find(x=>x._id===R.dg.modeloId), q=md&&perguntasDe(md.html)[+t.dataset.rhDq]; if(q!=null) R.dg.resp[q]=t.value; clearTimeout(R._dx); R._dx=setTimeout(()=>{ const a=document.activeElement, k=a&&a.dataset&&a.dataset.rhDq, pos=a&&a.selectionStart; P.render(); if(k!=null){ const n2=document.querySelector('[data-rh-dq="'+k+'"]'); if(n2){ n2.focus(); try{ n2.setSelectionRange(pos,pos); }catch(e){} } } },400); }
+    if(t.id==='rh-ferd'&&R.ffer){ R.ffer.dias=t.value; clearTimeout(R._fd); R._fd=setTimeout(()=>{ P.render(); const n2=document.getElementById('rh-ferd'); if(n2){ n2.focus(); } },500); }
+    if(t.id==='rh-pjo'&&R.fpj) R.fpj.obs=t.value;
     if(t.dataset&&t.dataset.rhDx){ R.dg.extra[t.dataset.rhDx]=t.value; clearTimeout(R._dx); R._dx=setTimeout(()=>{ const a=document.activeElement, k=a&&a.dataset&&a.dataset.rhDx, pos=a&&a.selectionStart; P.render(); if(k){ const n=document.querySelector('[data-rh-dx="'+k+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } } },400); } });
   /* no editor, Enter cria parágrafo normal */
   document.addEventListener('focusin',ev=>{ if(ev.target&&ev.target.id==='rh-ed') try{ document.execCommand('defaultParagraphSeparator',false,'p'); }catch(e){} });
@@ -463,8 +582,12 @@
       if(t.dataset&&(t.dataset.rhF==='status'||t.dataset.rhF==='tipo'||t.dataset.rhF==='empresaSel')&&R.f){ Object.assign(R.f,val('[data-rh-f]')); P.render(); return; }
       if(t.id==='rh-imp'&&t.files&&t.files[0]){ await importar(t.files[0]); t.value=''; return; }
       if(t.id==='rh-dvale') { edSync(); return; }
-      if(t.id==='rh-dgf'){ R.dg.funcId=t.value; R.dg.extra={}; R.dg.reg=null; P.render(); return; }
+      if(t.id==='rh-dgf'){ R.dg.funcId=t.value; R.dg.extra={}; R.dg.feriasId=''; R.dg.reg=null; P.render(); return; }
       if(t.id==='rh-dgm'){ R.dg.modeloId=t.value; R.dg.reg=null; P.render(); return; }
+      if(t.id==='rh-dgfe'){ R.dg.feriasId=t.value; R.dg.reg=null; P.render(); return; }
+      if(t.id==='rh-ferp'&&R.ffer){ R.ffer.aquisitivo=t.value; P.render(); return; }
+      if(t.id==='rh-feri'&&R.ffer){ R.ffer.inicio=t.value; P.render(); return; }
+      if(t.id==='rh-pjd'&&R.fpj){ R.fpj.data=t.value; P.render(); return; }
       if(t.id==='rh-dgg'){ R.dg.guardar=t.checked; return; }
       if(t.id==='rh-docx'&&t.files&&t.files[0]){ const file=t.files[0]; t.value=''; await importarWord(file); return; }
       if(t.dataset&&t.dataset.rhAnx&&t.files&&t.files[0]){ const file=t.files[0], f=R.func.find(x=>x._id===t.dataset.rhAnx); t.value=''; if(!f) return;
@@ -503,7 +626,7 @@
         const fc=R.funcoes.find(x=>norm(x.nome)===norm(n)); R.ff=fc?JSON.parse(JSON.stringify(fc)):{nome:n,epis:[],uniformes:[]}; P.go('rhfuncoes'); window.scrollTo(0,0); return; }
       /* funcionários */
       if(a==='rh-novo'){ R.f={status:'Ativo',tipo:'CLT'}; if(b.dataset.goFunc) P.go('rhfunc'); else P.render(); return; }
-      if(a==='rh-ed'){ R.f=Object.assign({},R.func.find(x=>x._id===b.dataset.id)); R.f.cpf=fCPF(R.f.cpf); P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-ed'){ R.f=Object.assign({},R.func.find(x=>x._id===b.dataset.id)); R.f.cpf=fCPF(R.f.cpf); if(b.dataset.goFunc) P.go('rhfunc'); else P.render(); window.scrollTo(0,0); return; }
       if(a==='rh-fx'){ R.f=null; P.render(); return; }
       if(a==='rh-salvar'){ const v=Object.assign({},R.f,val('[data-rh-f]')); v.nome=String(v.nome||'').trim().replace(/\s+/g,' ').toUpperCase(); v.cpf=dig(v.cpf);
         if(v.nome.length<3) return P.toast('Escreva o nome completo.'); if(!cpfOk(v.cpf)) return P.toast('CPF inválido. Confira os números.');
@@ -548,6 +671,9 @@
       if(a==='rh-dfmt'){ ev.preventDefault(); const v=b.dataset.v, ed=document.getElementById('rh-ed'); if(!ed) return;
         if(v==='bold'||v==='italic'){ ed.focus(); document.execCommand(v); edSync(); return; }
         if(v==='titulo'){ ed.focus(); document.execCommand('formatBlock',false,'h2'); edSync(); return; }
+        if(v==='pergunta'){ const sel=getSelection(), rg=sel.rangeCount&&ed.contains(sel.anchorNode)?sel.getRangeAt(0).cloneRange():null;
+          const q=qLimpa(prompt('O que o painel deve perguntar na hora de gerar?\nEx.: Data de início das férias · Último dia de trabalho · Trabalhado ou indenizado')||''); if(q.length<2) return;
+          if(rg){ ed.focus(); sel.removeAllRanges(); sel.addRange(rg); } inserirNoEditor(tqHTML(q)+'\u200B'); return; }
         if(v==='clausula'){ const n=(ed.textContent.match(/Cláusula \d+ª/g)||[]).length+1; inserirNoEditor(`<b>Cláusula ${n}ª</b>\u00a0—\u00a0`); return; } return; }
       if(a==='rh-dprev'){ edSync(); R.dprev=true; P.render(); return; }
       if(a==='rh-dprevx'){ if(ev.target.closest('.rh-mbox')&&!ev.target.closest('[data-act="rh-dprevx"].lnk')) return; R.dprev=false; P.render(); return; }
@@ -555,8 +681,43 @@
         if(R.modelos.some(x=>x._id!==d._id&&norm(x.nome)===norm(d.nome))) return P.toast('Já existe um modelo com esse nome.');
         const iD=d._id||id(); R.salv=true; P.render(); try{ await grava(COL.modelos+'/'+iD,Object.assign({nome:d.nome,vale:d.vale||'TODOS',html:limpar(d.html)},d._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null})); d._id=iD; P.toast('Modelo salvo.'); } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-ddel'){ if(!confirm('Apagar o modelo "'+R.dm.nome+'"? Os documentos já gerados continuam no histórico.')) return; await P.db().doc(COL.modelos+'/'+R.dm._id).delete(); R.dm=null; P.render(); return; }
-      if(a==='rh-dgpara'){ R.dg={funcId:b.dataset.id,modeloId:'',extra:{},guardar:true}; R.dv='gerar'; R.f=null; P.go('rhdocs'); return; }
+      if(a==='rh-dgpara'){ R.dg={funcId:b.dataset.id,modeloId:'',extra:{},resp:{},feriasId:'',guardar:true}; R.dv='gerar'; R.f=null; P.go('rhdocs'); return; }
+      if(a==='rh-dgfer'){ const x=R.fer.find(y=>y._id===b.dataset.id), f=x&&R.func.find(y=>y._id===x.funcId); if(!f) return;
+        const md=R.modelos.filter(m=>valePara(m,f)).find(m=>camposDe(m.html).some(k=>CAMPOS_FER.includes(k)))||R.modelos.find(m=>/FERIAS/.test(norm(m.nome)));
+        R.dg={funcId:f._id,modeloId:md?md._id:'',extra:{},resp:{},feriasId:x._id,guardar:true}; R.dv='gerar'; P.go('rhdocs');
+        if(!md) setTimeout(()=>P.toast('Cadastre o modelo do aviso de férias em Documentos e contratos (use os campos de férias).'),100); return; }
+      /* férias e prazos */
+      if(a==='rh-pzabrir'){ R.pzv=b.dataset.v||'ferias'; P.go('rhferias'); return; }
+      if(a==='rh-pzv'){ R.pzv=b.dataset.v; P.render(); return; }
+      if(a==='rh-pzfil'){ R.pzfil=b.dataset.v; P.render(); return; }
+      if(a==='rh-fernova'){ R.ffer={funcId:b.dataset.id,inicio:'',dias:''}; R.pzv='ferias'; P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-ferx'){ R.ffer=null; P.render(); return; }
+      if(a==='rh-ferdias'){ if(R.ffer) R.ffer.dias=b.dataset.v; P.render(); return; }
+      if(a==='rh-fersalvar'){ const g=R.ffer, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const di=document.getElementById('rh-ferd'); if(di) g.dias=di.value; const ii=document.getElementById('rh-feri'); if(ii) g.inicio=ii.value;
+        const p=periodos(f).find(x=>x.ini===g.aquisitivo), dias=Math.round(+g.dias||0);
+        if(!p) return P.toast('Escolha o período aquisitivo.'); if(!okIso(g.inicio)) return P.toast('Informe o início das férias.'); if(!(dias>0)) return P.toast('Informe quantos dias.');
+        if(dias>p.saldo) return P.toast('Neste período faltam só '+p.saldo+' dias.');
+        const fim=addDias(g.inicio,dias-1); if(ferDe(f).some(x=>!x.anterior&&x.inicio<=fim&&x.fim>=g.inicio)) return P.toast('Já tem férias marcadas nessas datas.');
+        R.salv=true; P.render(); try{ await P.db().doc(COL.ferias+'/'+id()).set({funcId:f._id,funcionario:f.nome,aquisitivo:p.ini,aquisitivoFim:p.fim,inicio:g.inicio,dias,fim,retorno:addDias(fim,1),status:'marcada',em:agora(),por:P.S.uid||null,porNome:eu()});
+          R.ffer=null; P.toast('Férias de '+f.nome+' marcadas: '+br(g.inicio)+' a '+br(fim)+'.'); } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-fercanc'){ const x=R.fer.find(y=>y._id===b.dataset.id); if(!x||!confirm('Desmarcar as férias de '+x.funcionario+' ('+br(x.inicio)+' a '+br(x.fim)+')?')) return;
+        await P.db().doc(COL.ferias+'/'+x._id).set({status:'cancelada',canceladaEm:agora(),canceladaPor:eu()},{merge:true}); P.toast('Férias desmarcadas.'); return; }
+      if(a==='rh-ferant'){ const f=R.func.find(x=>x._id===b.dataset.id), p=f&&periodos(f).find(x=>x.ini===b.dataset.p); if(!p||!p.saldo) return;
+        if(!confirm(f.nome+': marcar os '+p.saldo+' dias do período '+br(p.ini)+' a '+br(p.fim)+' como já tirados (antes do painel)?')) return;
+        await P.db().doc(COL.ferias+'/'+id()).set({funcId:f._id,funcionario:f.nome,aquisitivo:p.ini,aquisitivoFim:p.fim,dias:p.saldo,anterior:true,status:'tirada',em:agora(),por:P.S.uid||null,porNome:eu()}); P.toast('Registrado.'); return; }
+      if(a==='rh-feranteriores'){ const hj=P.hojeStr(), xs=[]; clts().forEach(f=>periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim<hj).forEach(p=>xs.push([f,p])));
+        if(!xs.length) return; if(!confirm('Marcar '+plural(xs.length,'período vencido','períodos vencidos')+' como férias já tiradas antes de usar o painel?\n\nUse só se essas férias já foram dadas. Os prazos que ainda não venceram continuam aparecendo.')) return;
+        for(const [f,p] of xs) await P.db().doc(COL.ferias+'/'+id()).set({funcId:f._id,funcionario:f.nome,aquisitivo:p.ini,aquisitivoFim:p.fim,dias:p.saldo,anterior:true,status:'tirada',em:agora(),por:P.S.uid||null,porNome:eu()});
+        P.toast(plural(xs.length,'período registrado','períodos registrados')+' como já tirados.'); return; }
+      if(a==='rh-pjtroca'){ R.fpj={funcId:b.dataset.id,data:P.hojeStr(),obs:''}; R.pzv='pj'; P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-pjx'){ R.fpj=null; P.render(); return; }
+      if(a==='rh-pjsalvar'){ const g=R.fpj, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const di=document.getElementById('rh-pjd'); if(di) g.data=di.value; const oi=document.getElementById('rh-pjo'); if(oi) g.obs=oi.value.trim();
+        if(!okIso(g.data)) return P.toast('Informe a data da troca.'); if(g.data>P.hojeStr()) return P.toast('A data da troca não pode ser no futuro.');
+        R.salv=true; P.render(); try{ await grava(COL.func+'/'+f._id,{ultimaTroca:g.data,trocas:(f.trocas||[]).concat([{data:g.data,obs:g.obs||'',em:agora(),porNome:eu()}]).slice(-40)});
+          R.fpj=null; P.toast('Troca registrada. Próxima: '+br(addMeses(g.data,3))+'.'); } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-dgo'){ const f=R.func.find(x=>x._id===R.dg.funcId), md=R.modelos.find(x=>x._id===R.dg.modeloId); if(!f||!md) return P.toast('Escolha o funcionário e o modelo.');
+        if(camposDe(md.html).some(k=>CAMPOS_FER.includes(k))&&!ferSel(f)) return P.toast('Escolha as férias (ou marque em Férias e prazos).');
+        const semResp=perguntasDe(md.html).filter(q=>!String(R.dg.resp[q]||'').trim()); if(semResp.length) return P.toast('Responda: '+semResp.join(' · '));
         const v=b.dataset.v; b.disabled=true;
         try{ await registrarDoc(f,md,v); if(v==='imprimir') imprimirDoc(docCompleto(f,md)); else if(v==='pdf'){ P.toast('Montando o PDF…'); await pdfDoc(f,md); } else wordDoc(f,md); }
         finally{ b.disabled=false; P.render(); } return; }
@@ -620,6 +781,7 @@
   .rh-edw{border:1.5px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden}.rh-tb{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--surface-2);border-bottom:1px solid var(--line)}.rh-tb button{font:inherit;font-size:13px;min-width:38px;height:36px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0 10px;cursor:pointer;color:var(--ink)}
   .rh-ed{min-height:380px;max-height:62vh;overflow:auto;padding:22px 24px;background:#fff;color:#111;font-family:"Times New Roman",Georgia,serif;font-size:16px;line-height:1.65;outline:none}.rh-ed:empty::before{content:attr(data-ph);color:#8a8578}.rh-ed h1,.rh-ed h2,.rh-ed h3{text-align:center;font-size:17px;margin:0 0 14px}.rh-ed p{margin:0 0 10px}
   .rh-tk{display:inline-block;background:#E3ECF0;color:#143F54;border-radius:6px;padding:0 6px;font-family:"Segoe UI",system-ui,sans-serif;font-size:.82em;font-weight:700;line-height:1.5;user-select:all}
+  .rh-tq{display:inline-block;background:#FFF1CC;color:#7A5410;border-radius:6px;padding:0 6px;font-family:"Segoe UI",system-ui,sans-serif;font-size:.82em;font-weight:700;line-height:1.5;user-select:all}
   .rh-dfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
   .rh-gg{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:16px;align-items:start}.rh-gg>.card{margin:0}.rh-sep{border-top:1px solid var(--line);margin:12px 0}
   .rh-amar{background:#FFF8E6!important;border-color:#E3B341!important;color:#1A1A1A}.rh-dbt{display:flex;flex-direction:column;gap:10px;margin-top:6px}.rh-dbt .btn{justify-content:center;width:100%}
