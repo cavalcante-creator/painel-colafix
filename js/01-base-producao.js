@@ -78,7 +78,7 @@ const pad = n => String(n).padStart(2,'0');
 const hora = iso => { const d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); };
 const ini0 = d => { const x=new Date(d); x.setHours(0,0,0,0); return x; };
 function dia(iso){ const d=ini0(iso), h=ini0(new Date()); const k=Math.round((h-d)/864e5); return k===0?'Hoje':k===1?'Ontem':pad(new Date(iso).getDate())+'/'+pad(new Date(iso).getMonth()+1); }
-function dur(ms){ const m=Math.max(0,Math.round(ms/6e4)); if(m<60) return m+' min'; const h=Math.floor(m/60); return h+'h'+pad(m%60); }
+function dur(ms){ const m=Math.max(0,Math.round(ms/6e4)); if(m<1) return 'menos de 1 min'; if(m<60) return m+' min'; const h=Math.floor(m/60); return h+'h'+pad(m%60); }
 function numBR(s){ if(s==null) return null; s=String(s).trim(); if(s==='') return null; const n=parseFloat(s.replace(/\./g,'').replace(',','.')); return isNaN(n)?null:n; }
 function numIn(s){ s=String(s==null?'':s).replace(/[^0-9.,\-]/g,''); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?null:n; }
 function numQ(s){ s=String(s==null?'':s).replace(/[^0-9.,]/g,'');

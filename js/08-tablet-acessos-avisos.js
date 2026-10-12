@@ -443,7 +443,7 @@ function gTvs(){ let ts=[]; try{ ts=aprTelas(); }catch(e){} if(!ts.length) retur
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="gs-tv"],[data-act="gs-tv-todas"]'); if(!b) return; let ts=[]; try{ ts=aprTelas(); }catch(e){}
   if(b.dataset.act==='gs-tv-todas'){ if(ts.length) aprIniciar(ts); return; } const t=ts.find(x=>x.k===b.dataset.k); if(t) aprIniciar([t]); });
 function gHoje(iso){ return iso&&hojeStr(new Date(iso))===hojeStr(); }
-function gMin(ms){ const m=Math.round(ms/60000); return m<60?m+' min':Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'); }
+function gMin(ms){ const m=Math.round(ms/60000); return m<1?'menos de 1 min':m<60?m+' min':Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'); }
 function gN(n){ return Math.round(+n||0).toLocaleString('pt-BR'); }
 function vGestao(){ const L=linhasOrd(), h=hojeStr(), agora=Date.now(), ini=new Date(); ini.setHours(0,0,0,0); const i0=ini.getTime();
   /* produção de hoje (mesma regra das outras telas: sem anuladas; antecipado conta quando foi registrado) */
@@ -578,10 +578,13 @@ const ACX_ACOES=[
 const ACX_COL={entregas:['apontar'],ordens:['programar','rancho'],previsoes:['programar'],itens:['programar'],paradas:['paradas','abrirch','atender','concluir'],
   medicoes:['medir'],cargas:['medir'],premix:['medir'],silos:['medir','apontar'],silomov:['medir','apontar'],chamados:['abrirch','atender','concluir'],chamfotos:['abrirch','atender'],pecasmov:['atender','cadman']};
 function acxDoc(){ const A=S.acs; return A&&!A.dono&&A.doc?A.doc:null; }
-function acxPode(k,d){ d=d||acxDoc(); if(!d) return true; const o=d.acoes||{}; if(o[k]===true) return true; if(o[k]===false) return false; const a=ACX_ACOES.find(x=>x.k===k); return !(a&&a.mod&&(d.soVerMods||[]).includes(a.mod)); }
+/* padrão de ações por cargo (o ajuste por pessoa vence). "Produção (consulta)": vê tudo; abre chamado, registra parada e marca as etapas do rancho (recebeu). */
+const ACX_CARGO={producao:{apontar:false,programar:false,medir:false,atender:false,concluir:false,cadman:false,apagar:false}};
+function acxPode(k,d){ d=d||acxDoc(); if(!d) return true; const o=Object.assign({},ACX_CARGO[d.perfil]||{},d.acoes||{}); if(o[k]===true) return true; if(o[k]===false) return false; const a=ACX_ACOES.find(x=>x.k===k); return !(a&&a.mod&&(d.soVerMods||[]).includes(a.mod)); }
 function acxAlgum(ks,d){ return ks.some(k=>acxPode(k,d)); }
 function acxBloqCols(d){ return Object.keys(ACX_COL).filter(c=>!acxAlgum(ACX_COL[c],d)); }
-function acxAjustada(d){ return !!d&&!!((d.extras||[]).length||(d.semMods||[]).length||(d.soVerMods||[]).length||(d.telas||[]).length||Object.keys(d.acoes||{}).length); }
+function acxAjustada(d){ return !!d&&(!!ACX_CARGO[d.perfil]||acxPessoal(d)); }
+function acxPessoal(d){ return !!d&&!!((d.extras||[]).length||(d.semMods||[]).length||(d.soVerMods||[]).length||(d.telas||[]).length||Object.keys(d.acoes||{}).length); }
 /* motivo da recusa (null = pode gravar) */
 function acxBloqueio(col,id,op,data){ const d=acxDoc(); if(!d||!acxAjustada(d)) return null; const err={code:'sem-permissao',message:'Sem permissão para esta ação'};
   if(col==='config'&&id==='manut') return acxPode('cadman',d)?null:err;
@@ -589,7 +592,7 @@ function acxBloqueio(col,id,op,data){ const d=acxDoc(); if(!d||!acxAjustada(d)) 
   /* marcar etapa do rancho só mexe em rdb/hist/rancho da ordem: basta "rancho" (não precisa poder editar a programação) */
   if(col==='ordens'&&op!=='delete') ks=data&&Object.keys(data).every(k=>['rdb','hist','rancho','alteradoEm','alteradoPor'].includes(k))?['rancho','programar']:['programar'];
   if(col==='chamados'){ if(op==='delete') ks=String(id).startsWith('q-')?['atender']:['apagar'];
-    else { const existe=(S.chamados||[]).some(c=>c._id===id); if(!existe) ks=['abrirch','atender']; else if(data&&['Concluída','Cancelada'].includes(data.status)) ks=['concluir']; else if(data&&data.status) ks=['atender']; /* mudar para outro status = atender */ else ks=['atender','concluir']; /* preencher atendimento (para concluir) */ } }
+    else { const existe=(S.chamados||[]).some(c=>c._id===id); if(!existe||(data&&Object.keys(data).every(k=>['paradaId','foto','fotos','hist','equipId'].includes(k)))) ks=['abrirch','atender']; /* quem abriu completa: parada ligada, foto, equipamento */ else if(data&&['Concluída','Cancelada'].includes(data.status)) ks=['concluir']; else if(data&&data.status) ks=['atender']; /* mudar para outro status = atender */ else ks=['atender','concluir']; /* preencher atendimento (para concluir) */ } }
   if(!acxAlgum(ks,d)) return err;
   if(op==='delete'&&col!=='chamados'&&!acxPode('apagar',d)) return err;
   return null; }
@@ -627,6 +630,8 @@ if(typeof leitPrecisa==='function'){ const _lp=leitPrecisa; leitPrecisa=function
 /* ---------- editor (Equipe e cargos → Ajustar acesso) ---------- */
 S.acx={};
 function acxEstado(id){ if(!S.acx[id]){ const d=(S.acs.lista||[]).find(x=>x._id===id)||{}; S.acx[id]={extras:[...(d.extras||[])],semMods:[...(d.semMods||[])],soVerMods:[...(d.soVerMods||[])],telas:[...(d.telas||[])],acoes:Object.assign({},d.acoes||{}),mudou:false}; } return S.acx[id]; }
+function acxPerfil(id){ return ((S.acs.lista||[]).find(x=>x._id===id)||{}).perfil; }
+function acxPadrao(id,X,a){ const c=(ACX_CARGO[acxPerfil(id)]||{})[a.k]; return c===false?false:!(a.mod&&X.soVerMods.includes(a.mod)); }
 function acxBase(id){ const d=(S.acs.lista||[]).find(x=>x._id===id)||{}; try{ return eqModsDe(d)||[]; }catch(e){ return d.mods||[]; } }
 function acxNivel(X,base,k){ if(X.semMods.includes(k)) return 'nao'; if(X.soVerMods.includes(k)) return 'ver'; if(base.includes(k)||X.extras.includes(k)) return 'mexer'; return 'nao'; }
 function acxSecao(id){ const X=acxEstado(id), base=acxBase(id); const mods=ACS_MODS.filter(([k])=>MODS.some(m=>m.id===k||(k==='cal'))&&k!=='ajustes');
@@ -634,8 +639,8 @@ function acxSecao(id){ const X=acxEstado(id), base=acxBase(id); const mods=ACS_M
   const linhaMod=([k,n])=>{ const nv=acxNivel(X,base,k); return `<div class="acx-row"><span>${esc(n)}${base.includes(k)?' <small class="acx-tag">do cargo</small>':''}</span><div class="seg acx-seg">${seg(k,'nao','—',nv)}${seg(k,'ver','Só ver',nv)}${seg(k,'mexer','Ver e mexer',nv)}</div></div>`; };
   const efet=k=>acxNivel(X,base,k)!=='nao';
   const avulsas=MODS.filter(m=>!efet(m.id)&&(m.views||[]).some(v=>VIEWS[v]&&!ACX_NUNCA.includes(v))&&!['tablet','gestor','silosver','meupainel'].includes(m.id)).map(m=>`<div class="acx-tg"><b>${esc(m.nome)}</b>${(m.views||[]).filter(v=>VIEWS[v]&&!ACX_NUNCA.includes(v)).map(v=>`<label class="ck"><input type="checkbox" data-acx-tela="${esc(v)}" data-id="${esc(id)}" ${X.telas.includes(v)?'checked':''}>${esc(VIEWS[v].nome)}</label>`).join('')}</div>`).join('');
-  const dsim={extras:X.extras,semMods:X.semMods,soVerMods:X.soVerMods,acoes:X.acoes};
-  const acoes=ACX_ACOES.map(a=>{ const pad=!(a.mod&&X.soVerMods.includes(a.mod)), aj=X.acoes[a.k]!==undefined, val=acxPode(a.k,dsim);
+  const dsim={perfil:acxPerfil(id),extras:X.extras,semMods:X.semMods,soVerMods:X.soVerMods,acoes:X.acoes};
+  const acoes=ACX_ACOES.map(a=>{ const pad=acxPadrao(id,X,a), aj=X.acoes[a.k]!==undefined, val=acxPode(a.k,dsim);
     return `<label class="ck acx-ac"><input type="checkbox" data-acx-acao="${a.k}" data-id="${esc(id)}" ${val?'checked':''}>${esc(a.n)} <small class="acx-tag ${aj?'aj':''}">${aj?'ajustado':'padrão: '+(pad?'pode':'não pode')}</small></label>`; }).join('');
   return `<section class="card acx" id="acx-${esc(id)}"><div class="label">AJUSTES DESTA PESSOA (ALÉM DO CARGO)</div><div class="sub" style="margin:4px 0 12px">Some módulos, deixe um módulo só para ver, libere telas avulsas ou ajuste ações. Vale só para esta pessoa; o cargo não muda.</div>
    <div class="label" style="margin:10px 0 6px">MÓDULOS</div><div class="acx-mods">${mods.map(linhaMod).join('')}</div>
@@ -645,7 +650,7 @@ function acxSecao(id){ const X=acxEstado(id), base=acxBase(id); const mods=ACS_M
 { const _ae=acsEditor; acsEditor=function(ed){ const h=_ae.apply(this,arguments); if(!ed||ed.novo||!ed.id) return h; return h+acxSecao(ed.id); }; }
 /* cartão da pessoa: botão renomeado e selo quando há ajustes */
 { const _ep=eqPessoas; eqPessoas=function(){ let h=_ep.apply(this,arguments); h=h.split('Ajustar telas</button>').join('Ajustar acesso</button>');
-  (S.acs.lista||[]).forEach(d=>{ if(acxAjustada(d)) h=h.replace(`data-act="acs-editar" data-id="${d._id}">`,`data-act="acs-editar" data-id="${d._id}"><span class="pill teal" style="margin-right:4px">ajustado</span>`); }); return h; }; }
+  (S.acs.lista||[]).forEach(d=>{ if(acxPessoal(d)) h=h.replace(`data-act="acs-editar" data-id="${d._id}">`,`data-act="acs-editar" data-id="${d._id}"><span class="pill teal" style="margin-right:4px">ajustado</span>`); }); return h; }; }
 function acxToggle(arr,k,on){ const i=arr.indexOf(k); if(on&&i<0) arr.push(k); if(!on&&i>=0) arr.splice(i,1); }
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="acx-"]'); if(!b) return; if(!S.acs.dono){ toast('Só a administradora ajusta acessos.'); return; }
   const id=b.dataset.id, X=acxEstado(id), base=acxBase(id), a=b.dataset.act;
@@ -654,23 +659,23 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
     if(v!=='nao') X.telas=X.telas.filter(t=>acxModDaTela(t)!==k); X.mudou=true; render(); return; }
   if(a==='acx-limpar'){ Object.assign(X,{extras:[],semMods:[],soVerMods:[],telas:[],acoes:{},mudou:true}); render(); return; }
   if(a==='acx-salvar'){ X.salv=true; render(); const dados={extras:X.extras,semMods:X.semMods,soVerMods:X.soVerMods,telas:X.telas,acoes:X.acoes};
-    dados.bloqCols=acxBloqCols(dados);
+    dados.bloqCols=acxBloqCols(Object.assign({perfil:acxPerfil(id)},dados));
     try{ await S.db.doc('acessos/'+id).update(Object.assign({},dados,{alteradoEm:new Date().toISOString(),alteradoPor:S.uid||null})); const d=(S.acs.lista||[]).find(x=>x._id===id); if(d) Object.assign(d,dados); X.mudou=false; toast('Ajustes de '+acsNome(id)+' salvos.'); }
     catch(e){ console.warn('[acesso] salvar',e); erro(e); } X.salv=false; render(); return; } });
 document.addEventListener('change',ev=>{ const t=ev.target; const id=t.dataset&&t.dataset.id; if(!id||!(t.dataset.acxTela||t.dataset.acxAcao)) return; const X=acxEstado(id);
   if(t.dataset.acxTela){ acxToggle(X.telas,t.dataset.acxTela,t.checked); }
-  else { const k=t.dataset.acxAcao, a=ACX_ACOES.find(x=>x.k===k); const pad=!(a.mod&&X.soVerMods.includes(a.mod)); if(t.checked===pad) delete X.acoes[k]; else X.acoes[k]=t.checked; }
+  else { const k=t.dataset.acxAcao, a=ACX_ACOES.find(x=>x.k===k); const pad=acxPadrao(id,X,a); if(t.checked===pad) delete X.acoes[k]; else X.acoes[k]=t.checked; }
   X.mudou=true; render(); });
 /* trocar o cargo não apaga os ajustes */
 { const _ag=acsGravar; acsGravar=async function(id,f,novo){ const ant=(S.acs.lista||[]).find(x=>x._id===id); const ok=await _ag.apply(this,arguments);
-  if(ok&&ant&&acxAjustada(ant)){ const k=['extras','semMods','soVerMods','telas','acoes','bloqCols'], u={}; k.forEach(x=>{ if(ant[x]!==undefined) u[x]=ant[x]; }); try{ await S.db.doc('acessos/'+id).update(u); }catch(e){ console.warn('[acesso] manter ajustes',e); } } return ok; }; }
+  if(ok&&ant&&acxPessoal(ant)){ const k=['extras','semMods','soVerMods','telas','acoes','bloqCols'], u={}; k.forEach(x=>{ if(ant[x]!==undefined) u[x]=ant[x]; }); try{ await S.db.doc('acessos/'+id).update(u); }catch(e){ console.warn('[acesso] manter ajustes',e); } } return ok; }; }
 document.head.insertAdjacentHTML('beforeend',`<style id="acx-css">.acx{border:1.5px solid var(--teal)}.acx-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .acx-seg button{height:34px;font-size:13px}.acx-tag{font-size:11px;color:var(--muted);font-weight:600}.acx-tag.aj{color:var(--teal-strong)}
 .acx-tgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}.acx-tg{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:10px;padding:10px}
 .acx-acs{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px}</style>`);
 /* quando a regra muda, a administradora atualiza sozinha a lista de bloqueios (usada pelas regras do banco) de quem tem ajuste */
 let acxRecalc=false; setInterval(async()=>{ if(acxRecalc||!S.db||!S.acs||!S.acs.dono||!(S.acs.lista||[]).length) return; acxRecalc=true;
-  for(const d of S.acs.lista){ if(!acxAjustada(d)) continue; const nv=acxBloqCols(d); if(JSON.stringify(nv)!==JSON.stringify(d.bloqCols||[])){ try{ await S.db.doc('acessos/'+d._id).update({bloqCols:nv}); d.bloqCols=nv; }catch(e){ console.warn('[acesso] recalcular',e); } } } },3000);
+  for(const d of S.acs.lista){ if(!acxAjustada(d)){ if((d.bloqCols||[]).length){ try{ await S.db.doc('acessos/'+d._id).update({bloqCols:[]}); d.bloqCols=[]; }catch(e){} } continue; } const nv=acxBloqCols(d); if(JSON.stringify(nv)!==JSON.stringify(d.bloqCols||[])){ try{ await S.db.doc('acessos/'+d._id).update({bloqCols:nv}); d.bloqCols=nv; }catch(e){ console.warn('[acesso] recalcular',e); } } } },3000);
 /* ===FIM LIBERAÇÕES=== */
 /* ===================== RANCHO PELO QR SEM LOGIN (09/10): aplica os recebimentos no diário de bordo ===================== */
 S.rrec=[]; let rrSub=false, rrProc=false;
@@ -824,7 +829,7 @@ function ttEntrega(){ try{ const A=S.acs; if(!A||A.dono) return false; const p=a
 const entR={conf:false};
 function vEntrega(){ const T=S.tt, nomeEu=(S.uid&&S.nomes[S.uid])||'', topo=`<div class="tt-top"><div><b>Entrega de rancho</b><span>${esc(nomeEu)}</span></div><div class="tt-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div></div>`;
   if(T.fase==='espera') return `<div class="tt tt-cel">${topo}<div class="tt-box"><h1>Escaneie o QR da folha de produção</h1><p>Aponte a câmera para o QR no canto da folha.</p>
-      <div class="tt-cman"><input class="txt tt-in" id="tt-rnum" inputmode="numeric" placeholder="ou digite o nº do rancho"><button class="btn" data-act="tt-rnum">Abrir</button></div>${ttCam.erro?`<p class="tt-err">${esc(ttCam.erro)}</p>`:''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}</div></div>`;
+      <div class="tt-cman"><input class="txt tt-in" id="tt-rnum" inputmode="numeric" placeholder="ou nº do rancho"><button class="btn" data-act="tt-rnum">Abrir</button></div>${ttCam.erro?`<p class="tt-err">${esc(ttCam.erro)}</p>`:''}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}</div></div>`;
   if(T.fase==='rcok') return `<div class="tt tt-cel">${topo}<div class="tt-box ok"><div class="tt-okic">${ic('check',56,2.6)}</div><h1>Rancho ${esc(T.rch.num)} entregue</h1><p>Recebido por <b>${esc((T.p&&T.p.nome)||'')}</b>${T.rch.falta?' · com falta registrada':''}.</p><div class="tt-rod"><button class="btn" data-act="tt-voltar">Próximo rancho</button></div></div></div>`;
   if(T.fase!=='rancho') return null;
   const R=T.rch, o=R&&ordById(R.oid); if(!o) return null; if(entR.conf&&T.p) return null; /* conferência item a item: tela do tablet */
@@ -869,3 +874,17 @@ body.tt-ent.tt-mira .tt-cel{padding-bottom:calc(38vh + 28px)}
 .tt-big{width:100%;height:64px;font-size:20px;margin-top:10px}.tt-rec h1{font-size:28px;margin:4px 0}
 .tt-ritens{max-height:28vh;overflow:auto;text-align:left;margin:10px 0;border-top:1px solid var(--line)}.tt-ritens div{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
 </style>`);
+
+/* Botões de gravar só aparecem para quem pode (cargo "só ver", ajuste por pessoa ou padrão do cargo). O banco já recusa; aqui é para não confundir quem usa. */
+const ACX_BOTOES={programar:['.ogcap [data-go="ajustes"]','o-nova-abrir','o-imp-abrir','o-passar','pv-nova','pv-nova-cal','rep-abrir','it-novo','anl-sug','anl-est-rec'],apontar:['md-apt-abrir'],
+  rancho:['o-env-alm','o-anexar-rancho','db-mark','db-urg','r-enviado','r-salvar-email','cst-tog','select[data-pri]'],medir:['sm-abrir','abrir-carga','abrir-premix'],
+  abrirch:['man-novo','mp-novo','mlt-abrir'],paradas:['parar','ltv-abre'],atender:['mm-assumir'],cadman:['mt-novo','mt-lista','mx-eq-conf','mx-eq-ed','mx-eq-prev','.card.mx-new','.sv-cad']};
+{ const sel=x=>/^[.#]|\[/.test(x)?x:`[data-act="${x}"]`;
+  const css=Object.keys(ACX_BOTOES).map(k=>ACX_BOTOES[k].map(x=>`body.sem-${k} ${sel(x)}`).join(',')+'{display:none!important}').join('\n')+'\nbody.so-ver #tp-mais,body.so-ver [data-act="tab-on"]{display:none!important}';
+  document.head.insertAdjacentHTML('beforeend','<style id="acx-bt">'+css+'</style>');
+  let pend=false; const aplica=()=>{ pend=false; let sv=false, d=null; try{ sv=soVer(); d=acxDoc(); }catch(e){}
+    Object.keys(ACX_BOTOES).forEach(k=>{ let sem=false; try{ sem=sv||(!!d&&acxAjustada(d)&&!acxPode(k,d)); }catch(e){} document.body.classList.toggle('sem-'+k,sem); });
+    document.body.classList.toggle('so-ver',sv);
+    document.querySelectorAll('[data-act="mzl-salvar"]').forEach(b=>{ const c=b.closest('section.card'); if(c) c.classList.add('sv-cad'); }); };
+  new MutationObserver(()=>{ if(!pend){ pend=true; requestAnimationFrame(aplica); } }).observe(document.body,{childList:true,subtree:true}); }
+if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.producao='Vê o Meu dia e a programação. Pode abrir chamado, registrar parada e marcar o rancho; não muda a programação nem aponta.';

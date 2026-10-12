@@ -9,7 +9,7 @@ VIEWS.linhatv={nome:'Tela da linha',ic:'pausa',mob:'Linha'}; CRUMB.linhatv='Tela
 { const m=MODS.find(x=>x.id==='producao'); if(m&&!m.views.includes('linhatv')){ const i=m.views.indexOf('paradas'); m.views.splice(i<0?m.views.length:i,0,'linhatv'); } }
 { const _vo=viewOk; viewOk=function(v){ if(v==='linhatv'){ if(S.acs&&S.acs.dono) return true; const p=acsP(); return !!p&&(p.tudo||p.mods.includes('paradas')||p.mods.includes('producao')); } return _vo(v); }; }
 function ltvSoLinha(){ const p=acsP(); return !!p&&!p.tudo&&!(S.acs&&S.acs.dono)&&mViews(MODS.find(m=>m.id==='producao')).every(v=>v==='linhatv'||v==='paradas')&&modsVis().length<=1; }
-function ltvMin(ms){ const m=Math.max(0,Math.round(ms/6e4)); return m<60?m+' min':Math.floor(m/60)+'h'+pad(m%60); }
+function ltvMin(ms){ const m=Math.max(0,Math.round(ms/6e4)); return m<1?'menos de 1 min':m<60?m+' min':Math.floor(m/60)+'h'+pad(m%60); }
 function vLinhaTv(){ const L=linhasParada(), at=S.paradas.filter(p=>!p.fim), h0=ini0(new Date()).getTime(), A=S.ltv;
   const hoje=S.paradas.filter(p=>!p.anulada&&(new Date(p.inicio).getTime()>=h0||!p.fim));
   const minL=l=>hoje.filter(p=>p.linha===l).reduce((a,p)=>a+((p.fim?new Date(p.fim):new Date())-Math.max(h0,new Date(p.inicio).getTime())),0);
@@ -370,7 +370,7 @@ const MAN_COND=['Funcionando normalmente','Funcionando com ressalvas','Equipamen
 const MAN_TIPO=['Corretiva','Preventiva','Preditiva','Emergencial','Inspeção','Instalação'];
 function manNum(n){ return String(n||0).padStart(5,'0'); }
 function manLinhas(){ return linhasOrd().concat(['Outra']); }
-function manIdade(iso){ if(!iso) return ''; const m=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/6e4)); return m<60?m+' min':m<1440?Math.floor(m/60)+'h'+(m%60?String(m%60).padStart(2,'0'):''):Math.floor(m/1440)+'d'; }
+function manIdade(iso){ if(!iso) return ''; const m=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/6e4)); return m<1?'menos de 1 min':m<60?m+' min':m<1440?Math.floor(m/60)+'h'+(m%60?String(m%60).padStart(2,'0'):''):Math.floor(m/1440)+'d'; }
 function manAgoraLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
 function manNovo(linha){ S.man.novo=true; S.man.cur=null; S.man.f={linha:linha||'',quando:manAgoraLocal(),defeito:'',impacto:'',nome:(S.uid&&S.nomes[S.uid])||'',equip:''}; }
 function manDoc(n){ return (S.chamados||[]).find(c=>c.numero===n); }
@@ -385,7 +385,7 @@ function vManCh(){ const M=S.man, h=hojeStr(); const xs=(S.chamados||[]).filter(
   if(M.cur!=null){ const c=manDoc(M.cur); if(c) return manDetalhe(c); M.cur=null; }
   const ab=xs.filter(c=>!manFechada(c)), par=ab.filter(c=>c.impacto==='parou');
   const fil=M.fil==='meus'?xs.filter(c=>c.por&&c.por===S.uid):M.fil==='abertos'?ab:M.fil==='todos'?xs:M.fil==='aguardando'?xs.filter(c=>/^Aguardando/.test(c.status||'')):xs.filter(c=>c.status===M.fil);
-  const card=c=>{ const [it,ic]=MAN_IMP[c.impacto]||['—','neu']; return `<button class="man-it ${manFechada(c)?'feito':''}" data-act="man-abrir" data-n="${c.numero}"><span class="man-n num">OS ${manNum(c.numero)}</span><span class="man-tx"><b>${esc(c.linha||'—')}</b>${c.equip?` · ${esc(c.equip)}`:''}<span class="man-df">${esc(String(c.defeito||'').slice(0,140))}</span><small>${esc(c.nome||'')} · ${c.quando?dm(String(c.quando).slice(0,10))+' '+String(c.quando).slice(11,16):''}${!manFechada(c)?' · há '+manIdade(c.criado):''}</small></span><span class="man-tg"><span class="pill ${ic}">${it}</span><span class="pill ${manStCor(c.status)}">${esc(c.status)}</span></span></button>`; };
+  const card=c=>{ const [it,ic]=MAN_IMP[c.impacto]||['—','neu']; return `<button class="man-it ${manFechada(c)?'feito':''}" data-act="man-abrir" data-n="${c.numero}"><span class="man-n num">OS ${manNum(c.numero)}</span><span class="man-tx"><b>${esc(c.linha||'—')}</b>${c.equip?` · ${esc(c.equip)}`:''}<span class="man-df">${esc(String(c.defeito||'').slice(0,140))}</span><small>${[esc(c.nome||''),c.quando?dm(String(c.quando).slice(0,10))+' '+String(c.quando).slice(11,16):'',!manFechada(c)?'há '+manIdade(c.criado):''].filter(Boolean).join(' · ')}</small></span><span class="man-tg"><span class="pill ${ic}">${it}</span><span class="pill ${manStCor(c.status)}">${esc(c.status)}</span></span></button>`; };
   return `${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Chamados</h1><div class="sub">Quem está na linha abre o chamado (pelo celular ou pelo QR da linha). A manutenção atende e a OS sai pronta para imprimir.</div></div>
    <div class="pg-acts" style="display:flex;gap:10px;flex-wrap:wrap">${viewOk('manqr')?`<button class="btn sec" data-go="manqr">${ic('grid',18,2)}QR das linhas</button>`:''}<button class="btn" data-act="man-novo">${ic('mais',20,2.2)}Abrir chamado</button></div></div>
   ${M.novo?manForm():''}
@@ -645,7 +645,7 @@ const MAN_SCAN_BTN=`<button class="btn man-scanb" data-act="man-scan">${ic('grid
 S.man.dia='';
 function manEtapas(c){ const h=c.hist||[], as=h.find(x=>/→\s*Em execução/.test(x.o||'')), co=c.concluidoEm?{em:c.concluidoEm,por:c.concluidoPor}:null; return {ab:{em:c.criado,nome:c.nome},as:as?{em:as.em,por:as.por,tec:(c.exec||{}).tecnico}:null,co}; }
 function manMin(a,b){ return a&&b?Math.max(0,Math.round((new Date(b)-new Date(a))/6e4)):null; }
-function manDur(m){ return m==null?'—':m<60?m+' min':Math.floor(m/60)+'h'+String(m%60).padStart(2,'0'); }
+function manDur(m){ return m==null?'—':m<1?'menos de 1 min':m<60?m+' min':Math.floor(m/60)+'h'+String(m%60).padStart(2,'0'); }
 function manDiario(){ const M=S.man, h=hojeStr(), dia=M.dia||h, ont=addDias(h,-1), LT=linhasOrd(), agora=new Date().toISOString();
   if(!document.getElementById('mdfont')){ try{ const l=document.createElement('link'); l.id='mdfont'; l.rel='stylesheet'; l.href='https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap'; document.head.appendChild(l); }catch(e){} }
   const doDia=iso=>iso&&hojeStr(new Date(iso))===dia;

@@ -10,7 +10,7 @@ const ord=(num,linha,data,rancho)=>({num,produto:'AC3001 - ARGAMASSA AC3 20KG',l
  const tem=(t,n)=>new RegExp('\\b'+n+'\\b').test(t);
  // segunda 05/10
  let B=await abrir('2026-10-05T10:00:00','almox','alx123'); let r=await ver(B.page);
- ok('Segunda: "Hoje" do almox mostra as ordens de terça (e as de hoje), não as de quarta', tem(r.t,'7002')&&tem(r.t,'7001')&&!tem(r.t,'7003')&&/ordens de produção de terça, 06\/10/.test(r.ban), r.ban);
+ ok('Segunda: "Hoje" do almox mostra as ordens de terça (e as de hoje), não as de quarta', tem(r.t,'7002')&&tem(r.t,'7001')&&!tem(r.t,'7003')&&/ranchos das ordens de terça, 06\/10/.test(r.ban), r.ban);
  const nav=await B.page.evaluate(()=>({nav:document.getElementById('navlist').innerText.replace(/\n/g,'|'),man:['manch','manmon','manequip'].filter(v=>__T.vo(v))}));
  ok('Almoxarifado com Produção não vê nenhuma tela da Manutenção', nav.man.length===0&&!/Manutenção/.test(nav.nav), JSON.stringify(nav));
  await B.page.click('[data-act="db-entrega"]'); await H.dorme(300); r=await B.page.evaluate(()=>({t:document.getElementById('view').innerText}));
