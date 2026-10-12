@@ -1,0 +1,25 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ D['rh/config']={declEpi:'Texto EPI'}; D['rh/dados/funcionarios/f1']={nome:'ANA SOUZA',cpf:'52998224725',status:'Ativo'}; D['rh/dados/terceiros/t1']={nome:'JOSÉ',empresa:'X',fim:'2026-12-01'};
+ D['_arquivos/arq1']={nome:'rancho.pdf',partes:1}; D['_arquivos_p/arq1_0']={d:'JVBERi0xLjQK'}; D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',papel:'operador',ativo:true};
+ D['pedmat/p1']={ordem:'5001',item:'Saco',qtd:10,status:'aberto',em:new Date().toISOString()}; D['rh/dados/presenca/2026-10-14']={data:'2026-10-14',itens:{f1:{st:'F'}}}; D['rh/dados/retiradas/r1']={funcId:'f1',item:'Luva',qtd:1,data:'2026-10-14'};
+ const orig=JSON.parse(JSON.stringify(D));
+ let B=await H.abrir(); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2800);
+ await p.evaluate(()=>__T.go('meudia')); await H.dorme(500); const av=await p.evaluate(()=>(document.querySelector('.md-av')||{}).innerText||'');
+ ok('Meu dia lembra de fazer a cópia de segurança', /Faça uma cópia de segurança/.test(av));
+ await p.evaluate(()=>__T.go('backup')); await H.dorme(400);
+ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:60000}),p.click('[data-act="bk-exp"]')]); const arq='/tmp/copia.json'; await dl.saveAs(arq); await H.dorme(500);
+ const c=JSON.parse(fs.readFileSync(arq,'utf8')); const conta=Object.values(c.colecoes).reduce((a,v)=>a+(v&&!v.__erro?Object.keys(v).length:0),0);
+ const faltando=Object.keys(orig).filter(k=>{ const ps=k.split('/'), id=ps.pop(), col=ps.join('/'); return !(c.colecoes[col]&&c.colecoes[col][id]!==undefined); });
+ ok('Exporta todos os registros (inclusive RH, arquivos e crachás)', faltando.length===0&&c.colecoes['rh/dados/funcionarios'].f1.cpf==='52998224725'&&c.colecoes['_arquivos_p']['arq1_0'].d==='JVBERi0xLjQK', faltando.length?'faltaram: '+faltando.slice(0,8).join(', '):conta+' registros · '+dl.suggestedFilename());
+ const t=await p.evaluate(()=>document.getElementById('view').innerText); ok('Tela mostra a última cópia e o Meu dia para de avisar', /Última cópia neste aparelho/.test(t)&&!(await p.evaluate(()=>{ __T.go('meudia'); return /Faça uma cópia/.test((document.querySelector('.md-av')||{}).innerText||''); })));
+ await B.browser.close();
+ // projeto novo: só a administradora (sem dados)
+ const n=H.seed(); const vazio={users:{'iasmyn@painel-colafix.app':d.users['iasmyn@painel-colafix.app']},docs:{'config/geral':{}}};
+ B=await H.abrir(); p=B.page; await H.preparar(p,vazio); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500); await p.evaluate(()=>__T.go('backup')); await H.dorme(300);
+ p.on('dialog',dg=>dg.accept('IMPORTAR')); await p.setInputFiles('#bk-imp',arq); await H.dorme(4000);
+ const novo=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+ const dif=Object.keys(orig).filter(k=>!/^(acessos|pedidos)\//.test(k)&&k!=='config/geral').filter(k=>JSON.stringify(novo[k])!==JSON.stringify(orig[k]));
+ const semPerm=Object.keys(novo).filter(k=>/^(acessos|pedidos)\//.test(k)).length;
+ ok('Importa num projeto vazio: tudo igual ao original; logins/permissões não vão (são recriados)', dif.length===0&&semPerm===0&&!!novo['perfis/uOPE'], dif.length?'diferentes: '+dif.slice(0,6).join(', '):'ok');
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

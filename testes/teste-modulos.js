@@ -1,0 +1,14 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,220):'')); };
+(async()=>{ const {d}=seedManut(); d.docs['exemplo/a1']={nome:'Primeiro registro'};
+ const abre=async(u,s)=>{ const B=await H.abrir(); await B.page.route('**/modulos/lista.js',r=>r.fulfill({contentType:'text/javascript',body:"(function(){ ['exemplo'].forEach(n=>{ const s=document.createElement('script'); s.src='modulos/'+n+'.js'; s.async=false; document.body.appendChild(s); }); })();"}));
+   await H.preparar(B.page,d); await B.page.goto(H.BASE); await H.entrar(B.page,u,s); await H.dorme(2600); return B; };
+ let B=await abre('iasmyn','senha123'); let p=B.page;
+ const nav=await p.evaluate(()=>document.getElementById('navlist').innerText);
+ await p.evaluate(()=>__T.go('exemplo')); await H.dorme(500); const t=await p.evaluate(()=>({v:__T.S().view,t:document.getElementById('view').innerText}));
+ ok('Módulo em arquivo separado aparece no menu e mostra os dados do banco', /Exemplo/.test(nav)&&t.v==='exemplo'&&/Módulo de exemplo/.test(t.t)&&/Primeiro registro/.test(t.t), t.t.replace(/\n/g,' | ').slice(0,120));
+ await p.evaluate(()=>{ __T.S().eq.aba='pessoas'; __T.go('acessos'); }); await H.dorme(300); await p.click('[data-act="acs-editar"][data-id="uOPE"]'); await H.dorme(300);
+ ok('Ele entra em "Ajustar acesso" como qualquer módulo', await p.evaluate(()=>!!document.querySelector('[data-acx-tela="exemplo"],[data-k="exemplo"]')));
+ await B.browser.close();
+ B=await abre('operador','ope123'); p=B.page; const nav2=await p.evaluate(()=>document.getElementById('navlist').innerText); await p.evaluate(()=>__T.go('exemplo')); await H.dorme(300);
+ ok('Quem não tem o módulo não vê', !/Exemplo/.test(nav2)&&await p.evaluate(()=>__T.S().view)!=='exemplo');
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

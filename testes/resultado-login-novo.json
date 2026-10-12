@@ -1,0 +1,89 @@
+{
+ "res": [
+  {
+   "n": "T1 login correto",
+   "ok": true,
+   "det": "tela=geral, menu=Silos | Produção | Telas de TV | Manutenção"
+  },
+  {
+   "n": "T6 F5 continua logado",
+   "ok": true,
+   "det": "tela=geral"
+  },
+  {
+   "n": "T7 fechar e abrir de novo continua logado",
+   "ok": true
+  },
+  {
+   "n": "T8 logout volta para login e encerra a sessão (a cópia local fica até outra pessoa entrar)",
+   "ok": true,
+   "det": "{\"lg\":true,\"sess\":null,\"db\":false}"
+  },
+  {
+   "n": "T9b quando outra pessoa entra, a cópia local da anterior é apagada",
+   "ok": true,
+   "det": "documentos do João no cache: 0"
+  },
+  {
+   "n": "T9 outro usuário não herda perfil/permissões do anterior",
+   "ok": true,
+   "det": "uid=uCARLOS perfil={\"perfil\":\"outro\",\"mods\":[\"almox\"],\"locais\":[\"a3\"],\"contar\":true,\"ativo\":true} menu=Produção | Inventário (Produção aparece só pelo Diário de bordo, que o almox já via antes)"
+  },
+  {
+   "n": "T5 sem permissão: avisa e continua no sistema",
+   "ok": true,
+   "det": "{\"view\":\"diario\",\"lg\":false,\"toast\":\"Você não possui permissão para acessar este módulo.\",\"gate\":false}"
+  },
+  {
+   "n": "T2 senha errada",
+   "ok": true,
+   "det": "{\"er\":\"Usuário ou senha incorretos.\",\"dis\":false}"
+  },
+  {
+   "n": "T3a usuário inexistente (proteção de enumeração ligada)",
+   "ok": true,
+   "det": "{\"er\":\"Usuário ou senha incorretos.\",\"dis\":false}"
+  },
+  {
+   "n": "T3b usuário inexistente (proteção desligada)",
+   "ok": true,
+   "det": "{\"er\":\"Usuário não encontrado.\",\"dis\":false}"
+  },
+  {
+   "n": "T10a sem conexão no login: mensagem clara e botão liberado",
+   "ok": true,
+   "det": "{\"er\":\"Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.\",\"dis\":false}"
+  },
+  {
+   "n": "T2b muitas tentativas: mensagem e botão liberado",
+   "ok": true,
+   "det": "{\"er\":\"Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.\",\"dis\":false}"
+  },
+  {
+   "n": "T4 autenticado sem perfil: mensagem correta, sem confundir com senha",
+   "ok": true,
+   "det": "Perfil de acesso não encontrado"
+  },
+  {
+   "n": "T10b sem internet ao abrir: fica em \"Verificando\", não expulsa nem diz \"sem perfil\"",
+   "ok": true,
+   "det": "{\"lg\":false,\"gate\":\"Verificando seu acesso…\"}"
+  },
+  {
+   "n": "T10c conexão volta: entra sozinho, sem recarregar",
+   "ok": true,
+   "det": "{\"gate\":\"\",\"nav\":\"Silos\\nProdução\\nTelas de TV\\nManutenção\"}"
+  },
+  {
+   "n": "T11 sem login não acessa tela interna nem dados",
+   "ok": true,
+   "det": "{\"lg\":true,\"db\":false,\"ordens\":0,\"view\":\"Verificando seu acesso…\\nUm instante.\"}"
+  },
+  {
+   "n": "onAuthStateChanged registrado uma única vez por carregamento",
+   "ok": true,
+   "det": "registros=1"
+  }
+ ],
+ "erros": []
+}

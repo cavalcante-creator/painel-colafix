@@ -1,0 +1,18 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs; d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+ D['rh/dados/funcoes/x']={nome:'Mecânico',epis:[{nome:'Luva',ca:'111'}],uniformes:[{nome:'Camisa',tam:'G'}]};
+ const B=await H.abrir({viewport:{width:1366,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2800); await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300);
+ await p.click('[data-act="rh-novo"]'); const dis=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.rh-form input[disabled]')].find(x=>/Colafix/.test(x.value)); return !!e; });
+ await p.fill('[data-rh-f="nome"]','Ana Souza'); await p.fill('[data-rh-f="cpf"]','52998224725'); await p.fill('[data-rh-f="funcao"]','Mecânico'); await p.click('[data-act="rh-salvar"]'); await H.dorme(600);
+ await p.click('[data-act="rh-novo"]'); await p.fill('[data-rh-f="nome"]','Pedro Alves'); await p.fill('[data-rh-f="cpf"]','11144477735'); await p.fill('[data-rh-f="funcao"]','Mecânico');
+ await p.selectOption('[data-rh-f="tipo"]','PJ'); await H.dorme(300); const temSel=await p.$('[data-rh-f="empresaSel"]'); await p.selectOption('[data-rh-f="empresaSel"]','NEXUS'); await H.dorme(200); await p.click('[data-act="rh-salvar"]'); await H.dorme(600);
+ const s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const fs=Object.values(s).filter(x=>x&&x.cpf);
+ const a=fs.find(x=>x.nome==='ANA SOUZA'), pj=fs.find(x=>x.nome==='PEDRO ALVES');
+ ok('CLT sai com empresa Colafix (campo travado); PJ escolhe Zenith/Nexus', dis&&a&&a.empresa==='COLAFIX'&&a.tipo==='CLT'&&!!temSel&&pj&&pj.empresa==='NEXUS'&&pj.tipo==='PJ', JSON.stringify({ana:a&&a.empresa,pedro:pj&&pj.empresa}));
+ await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
+ const corpo=await fr.evaluate(()=>document.body.innerText);
+ ok('Tela das fichas sem nenhuma menção a planilha', !/planilha/i.test(corpo), (corpo.match(/.{0,40}planilha.{0,40}/i)||[''])[0]);
+ const ficha=async nome=>{ await fr.evaluate(n=>{ const s=document.getElementById('select-funcionario'); s.selectedIndex=[...s.options].findIndex(o=>o.text.includes(n)); s.dispatchEvent(new Event('change')); },nome); await fr.click('#btn-gerar'); await H.dorme(700); return fr.evaluate(()=>document.getElementById('preview-wrap').innerText); };
+ const fa=await ficha('ANA'), fp=await ficha('PEDRO');
+ ok('Ficha do CLT sai com a razão social e CNPJ da Colafix; a do PJ com os da Nexus', /COLFIX INDUSTRIA E COMERCIO/.test(fa)&&/08\.813\.381\/0001-30/.test(fa)&&/NEXUS MANUTENÇÕES/.test(fp)&&/67\.927\.237\/0001-93/.test(fp), (fa.match(/COLFIX[^\n]{0,60}/)||[''])[0]+' | '+(fp.match(/NEXUS[^\n]{0,60}/)||[''])[0]);
+ console.log('erros:',B.erros.filter(x=>!/404|cdnjs/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

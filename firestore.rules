@@ -2,8 +2,8 @@ rules_version = '2';
 // Regras do banco do Painel de Operação Colafix (versão online, login por usuário e senha).
 // - Dona do painel (usuário iasmyn): tudo, inclusive criar contas e liberar acessos.
 // - Pessoas liberadas em Ajustes → Equipe e cargos: leem e gravam o operacional
-//   (o que cada uma vê é decidido pelo cargo).
-// - Cargos só de ver (Telas de TV, TV da fábrica, Calendário): leem e não gravam nada.
+//   (o que cada uma vê é decidido pelo cargo; o ajuste por pessoa pode bloquear gravação em coleções: bloqCols).
+// - Cargos só de ver (Telas de TV, TV da fábrica, Calendário, Silos só consulta, Silos e calendário): leem e não gravam nada.
 // - QR da linha, sem login: o celular (sem conta) só consegue CRIAR um chamado novo e a foto dele
 //   (não lê nada do painel). O painel da manutenção transforma o chamado em OS numerada.
 // - Conta criada e ainda não liberada: só registra o próprio pedido e o próprio nome.
@@ -21,18 +21,52 @@ service cloud.firestore {
       return logado() && provedor() != 'anonymous' && exists(caminhoAcs())
         && acs().get('ativo', true) != false && acs().get('apagado', false) != true;
     }
-    function soVer() { return acs().get('perfil', '') in ['ver', 'tv', 'cal']; }
+    function soVer() { return acs().get('perfil', '') in ['ver', 'tv', 'cal', 'silosver', 'consulta', 'tvtodas', 'rh']; }
     function le() { return dono() || liberado(); }
     function grava() { return dono() || (liberado() && !soVer()); }
+    // Ajuste por pessoa (Equipe e cargos → Ajustar acesso): coleções em que ela não pode gravar (ex.: módulo "só ver").
+    // RH: dados dos funcionários (CPF etc.) — só a dona e quem tem o módulo RH (no cargo ou como extra).
+    function rhOk() { return dono() || (liberado() && (acs().get('mods', []).hasAny(['rh']) || acs().get('extras', []).hasAny(['rh']))); }
+    function bloq(c) { return !dono() && c in acs().get('bloqCols', []); }
 
     // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
     match /{col}/{id} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis']);
-      allow write: if grava() && !(col in ['acessos', 'pedidos', 'perfis']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
     }
     match /{col}/{id}/{resto=**} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis']);
-      allow write: if grava() && !(col in ['acessos', 'pedidos', 'perfis']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
+    }
+
+    // Silos: histórico do saldo (consumo, estorno, medição). Só inclusão: ninguém altera nem apaga uma movimentação.
+    // O saldo atual fica em silos/{id} (regra geral acima: lê quem é liberado, grava quem pode gravar).
+    match /silomov/{id} {
+      allow read: if le();
+      allow create: if grava() && !bloq('silomov') && request.resource.data.porUid == request.auth.uid
+        && request.resource.data.tipo in ['consumo', 'estorno', 'medicao', 'recusado'];
+      allow update, delete: if false;
+    }
+
+    // Crachás dos funcionários (QR = só um código). O tablet da parede lê; só a dona do painel cria, desativa ou troca o código.
+    match /crachas/{id} {
+      allow read: if le();
+      allow write: if dono();
+    }
+
+    // QR da folha de produção (rancho), sem login: só CRIA o aviso de recebimento, com campos limitados.
+    // Quem é liberado lê e marca como aplicado (regra geral acima).
+    match /rancrec/{id} {
+      allow create: if (semConta() || logado()) && id.matches('r-[0-9]+-[a-z0-9]+')
+        && request.resource.data.keys().hasOnly(['rancho', 'nome', 'em', 'status', 'origem'])
+        && request.resource.data.rancho is string && request.resource.data.rancho.matches('[0-9]{4,12}')
+        && request.resource.data.nome is string && request.resource.data.nome.size() > 1 && request.resource.data.nome.size() <= 60
+        && request.resource.data.status == 'novo' && request.resource.data.origem == 'qr';
+    }
+
+    // Módulo RH: funcionários, funções (EPI/uniforme), retiradas, arquivos das fichas.
+    match /rh/{resto=**} {
+      allow read, write: if rhOk();
     }
 
     // Chamado pelo QR da linha (sem login): só cria, com os campos do chamado.

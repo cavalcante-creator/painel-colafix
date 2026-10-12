@@ -1,0 +1,28 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,280):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ d.users['tablet@painel-colafix.app']={uid:'uTAB',pass:'tab123',nome:'Tablet'}; D['perfis/uTAB']={nome:'Tablet',usuario:'tablet'}; D['acessos/uTAB']={perfil:'tablet',mods:['tablet'],locais:[],ativo:true};
+ D['ordens/5001'].rancho='123456'; D['ordens/5002'].rancho='123456';
+ D['ranchos/123456']={numero:'123456',criadoEm:new Date().toISOString(),ordens:[{num:'5001'},{num:'5002'}],itens:[{c:'MP001',d:'Cimento CP-II',um:'kg',q:500},{c:'MP002',d:'Areia fina',um:'kg',q:1200},{c:'MP003',d:'Aditivo',um:'kg',q:8}]};
+ D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true};
+ let B=await H.abrir({camera:'/tmp/folha.y4m',decodificador:true,viewport:{width:1280,height:800}}); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tablet','tab123');
+ const espera=async(f,ms)=>{ const t0=Date.now(); while(Date.now()-t0<(ms||15000)){ if(await p.evaluate(f).catch(()=>false)) return true; await H.dorme(200); } return false; };
+ const hub=await espera(()=>window.__T&&__T.S().tt.fase==='ordem',20000);
+ await p.click('[data-act="tt-hub-o"]:has-text("5001")'); await H.dorme(300);
+ await p.keyboard.type('CXANAS2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500);
+ await p.click('[data-act="tt-cf"]'); const viu=await espera(()=>__T.S().tt.fase==='rancho'&&!!__T.S().tt.rch&&!!__T.S().tt.rch.itens,8000);
+ const t1=await p.evaluate(()=>(document.querySelector('.tt')||{}).innerText||'');
+ ok('A câmera lê a folha, abre a ordem, o crachá identifica e "Conferir rancho" mostra os 3 itens', hub&&viu&&/Rancho 123456/.test(t1)&&/MP001/.test(t1)&&/MP002/.test(t1)&&/MP003/.test(t1), t1.replace(/\n/g,' | ').slice(0,200));
+ await p.click('[data-act="tt-rc-dif"][data-i="1"]'); await H.dorme(200); await p.fill('[data-rc-q="1"]','1000'); await p.fill('#tt-rc-obs','um saco rasgado'); await p.screenshot({path:'/tmp/rcconf.png'});
+ const t2=await p.evaluate(()=>(document.querySelector('.tt')||{}).innerText||'');
+ await p.dblclick('[data-act="tt-rc-salvar"]'); await espera(()=>__T.S().tt.fase==='rcok',6000);
+ const s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const c1=s['ordens/5001'].rdb||{}, c2=s['ordens/5002'].rdb||{};
+ ok('Crachá identifica quem confere (coletor)', /Conferindo: Ana Souza/.test(t2));
+ ok('Conferência gravada como no diário: entregue + conferido, falta da areia (200 kg), nome de quem conferiu', c1.ent&&c1.ent.nome==='Ana Souza'&&c1.conf&&c1.conf.falta===true&&c1.conf.itens.length===1&&/MP002/.test(c1.conf.itens[0].i)&&/200 kg/.test(c1.conf.itens[0].q)&&c1.conf.nome==='Ana Souza'&&c1.conf.obs==='um saco rasgado'&&c1.conf.rec.length===3,
+   JSON.stringify({ent:c1.ent&&c1.ent.nome,falta:c1.conf&&c1.conf.falta,itens:c1.conf&&c1.conf.itens,obs:c1.conf&&c1.conf.obs}));
+ ok('A outra ordem do rancho fica conferida junto, sem duplicar o registro', c2.conf&&c2.conf.junto==='5001'&&(s['ordens/5001'].hist||[]).filter(h=>/recebido a menos/.test(h.o)).length===1);
+ await p.click('[data-act="tt-voltar"]'); await H.dorme(400); await p.evaluate(()=>{ __T.S().tt.recente={}; });
+ await p.keyboard.type('RA-123456',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(600);
+ await p.click('[data-act="tt-hub-o"]:has-text("5001")').catch(()=>{}); await H.dorme(300);
+ const t3=await p.evaluate(()=>(document.querySelector('.tt')||{}).innerText||''); const bcf=await p.evaluate(()=>(document.querySelector('[data-act="tt-cf"]')||{}).innerText||'');
+ ok('Bipar a folha (RA-) de novo: abre a ordem e o botão do rancho mostra que já foi conferido', /ORDEM 5001/.test(t3)&&/já conferido/.test(bcf), bcf.replace(/\n/g,' '));
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

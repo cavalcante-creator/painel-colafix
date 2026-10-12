@@ -1,0 +1,15 @@
+/* SÓ PARA TESTE: desenha os mesmos comandos do jsPDF numa imagem a 8 px/mm (203 dpi) */
+(function(){ const K=8; class jsPDF{ constructor(o,u,f){ this.W=210; this.H=297; this.pages=[]; this.addPage(); this.fs=16; this.fill='#000'; this.stroke='#000'; this.tc='#000'; this.font='normal'; }
+  addPage(){ const c=document.createElement('canvas'); c.width=this.W*K; c.height=this.H*K; const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); this.pages.push(c); this.x=x; return this; }
+  rgb(a){ return Array.isArray(a)?`rgb(${a.join(',')})`:typeof a==='number'&&arguments.length===1?`rgb(${a},${a},${a})`:`rgb(${[...arguments].join(',')})`; }
+  setDrawColor(){ this.stroke=arguments.length===1?this.rgb(arguments[0],arguments[0],arguments[0]):this.rgb(...arguments); return this; } setFillColor(){ this.fill=this.rgb(...arguments); return this; } setTextColor(){ this.tc=arguments.length===1?this.rgb(arguments[0],arguments[0],arguments[0]):this.rgb(...arguments); return this; }
+  setLineDashPattern(a){ this.x.setLineDash((a||[]).map(v=>v*K)); return this; } setLineWidth(w){ this.x.lineWidth=w*K; return this; } setFont(f,s){ this.font=s||'normal'; return this; } setFontSize(n){ this.fs=n; return this; }
+  rect(x,y,w,h,st){ if(st&&st.includes('F')){ this.x.fillStyle=this.fill; this.x.fillRect(x*K,y*K,w*K,h*K); } else { this.x.strokeStyle=this.stroke; this.x.strokeRect(x*K,y*K,w*K,h*K); } return this; }
+  roundedRect(x,y,w,h,rx,ry,st){ return this.rect(x,y,w,h,st); } line(a,b,c,d){ this.x.beginPath(); this.x.moveTo(a*K,b*K); this.x.lineTo(c*K,d*K); this.x.stroke(); return this; }
+  text(t,x,y,o){ this.x.fillStyle=this.tc; this.x.font=(this.font==='bold'?'bold ':'')+(this.fs*0.3528*K)+'px sans-serif'; this.x.textAlign=o&&o.align==='center'?'center':'left'; [].concat(t).forEach((l,i)=>this.x.fillText(l,x*K,(y+i*this.fs*0.3528*1.15)*K)); return this; }
+  getTextWidth(t){ this.x.font=(this.fs*0.3528*K)+'px sans-serif'; return this.x.measureText(t).width/K; }
+  splitTextToSize(t,w){ const ws=String(t).split(' '), out=[]; let l=''; ws.forEach(p=>{ const n=l?l+' '+p:p; if(this.getTextWidth(n)>w&&l){ out.push(l); l=p; } else l=n; }); if(l) out.push(l); return out; }
+  addImage(){ return this; } setProperties(){ return this; } getImageProperties(){ return {width:300,height:80}; } getNumberOfPages(){ return this.pages.length; } setPage(){ return this; } setLineCap(){ return this; } setLineJoin(){ return this; } circle(){ return this; } ellipse(){ return this; } triangle(){ return this; } setCharSpace(){ return this; }
+  get internal(){ return {pageSize:{getWidth:()=>this.W,getHeight:()=>this.H,width:this.W,height:this.H}}; }
+  output(){ const c=this.pages[0]; const b=atob(c.toDataURL('image/png').split(',')[1]); const u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new Blob([u],{type:'image/png'}); } }
+  window.jspdf={jsPDF}; })();

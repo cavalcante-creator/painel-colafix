@@ -1,0 +1,16 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(); let B=await H.abrir(); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(3500);
+ const nav=()=>p.evaluate(()=>document.getElementById('navlist').innerText.replace(/\n/g,'|'));
+ const n0=await nav(); await p.evaluate(()=>__T.go('meumenu')); await H.dorme(400);
+ await p.uncheck('[data-mm="rh"]'); await p.uncheck('[data-mm="manut"]'); await H.dorme(800); const n1=await nav();
+ ok('Administradora esconde RH e Manutenção do próprio menu', /RH/.test(n0)&&/Manutenção/.test(n0)&&!/\bRH\b/.test(n1)&&!/Manutenção/.test(n1)&&/Meu menu/.test(n1), n1);
+ await p.evaluate(()=>__T.go('manch')); await H.dorme(300); ok('Continua podendo abrir a tela escondida (não perde acesso)', await p.evaluate(()=>__T.S().view)==='manch');
+ const banco=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv'))); await B.browser.close();
+ B=await H.abrir(); p=B.page; await H.preparar(p,banco); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(3500); const n2=await nav();
+ ok('Vale em outro aparelho (fica salvo no perfil)', !/Manutenção/.test(n2)&&!/\bRH\b/.test(n2), n2);
+ await p.evaluate(()=>__T.go('meumenu')); await H.dorme(300); await p.click('[data-act="mm-todos"]'); await H.dorme(600);
+ ok('"Mostrar todos" volta tudo', /Manutenção/.test(await nav())); await B.browser.close();
+ const C=await H.abrir(); await H.preparar(C.page,banco); await C.page.goto(H.BASE); await H.entrar(C.page,'tecnico','tec123'); await H.dorme(3000);
+ const nt=await C.page.evaluate(()=>({nav:document.getElementById('navlist').innerText,mm:__T.vo('meumenu')}));
+ ok('Outras pessoas não são afetadas e não veem "Meu menu"', /Manutenção/.test(nt.nav)&&!nt.mm&&!/Meu menu/.test(nt.nav), nt.nav.replace(/\n/g,'|'));
+ console.log('erros:',C.erros.filter(x=>!/404/.test(x))); await C.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

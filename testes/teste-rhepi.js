@@ -1,0 +1,15 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs; d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+ D['rh/dados/funcionarios/f1']={nome:'ANA SOUZA',cpf:'52998224725',funcao:'Operador',setor:'Linha 1',empresa:'COLAFIX',status:'Ativo',tipo:'CLT'};
+ D['rh/dados/funcionarios/f2']={nome:'CARLOS LIMA',cpf:'11144477735',funcao:'Soldador',setor:'Manutenção',empresa:'COLAFIX',status:'Ativo',tipo:'CLT'};
+ D['rh/dados/funcoes/x']={nome:'Operador',epis:[{nome:'Luva',ca:'111'},{nome:'Óculos',ca:'222'}],uniformes:[{nome:'Camisa',tam:'M'}]};
+ const m=new Date().toISOString().slice(0,7); D['rh/dados/retiradas/r1']={funcId:'f1',funcionario:'ANA SOUZA',cpf:'52998224725',mes:m,tipo:'EPI',item:'Luva',ca:'111',qtd:1,data:new Date().toISOString().slice(0,10)};
+ const B=await H.abrir({viewport:{width:1366,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3500);
+ const t0=await p.evaluate(()=>({v:__T.S().view,t:document.getElementById('view').innerText}));
+ ok('RH abre no Painel do RH: avisos de EPI pendente, função sem EPI e o EPI do mês', t0.v==='rhinicio'&&/2 EPI\/uniforme nunca entregue/.test(t0.t)&&/Função sem EPI cadastrado/.test(t0.t)&&/Soldador/.test(t0.t)&&/1 de 2/.test(t0.t), t0.t.replace(/\n/g,' | ').slice(0,260));
+ await p.click('.rh-at[data-go="rhepi"]'); await H.dorme(400); const t1=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Controle de EPI: mostra o que a Ana já recebeu (Luva) e o que nunca recebeu (Óculos, Camisa); Carlos sem EPI na função', /Luva/.test(t1)&&/Óculos[^\n]*nunca recebeu/.test(t1)&&/Camisa[^\n]*nunca recebeu/.test(t1)&&/Função sem EPI cadastrado/.test(t1), t1.replace(/\n/g,' | ').slice(0,260));
+ await p.click('[data-act="rh-epireg"][data-i="Óculos"]'); await H.dorme(400); const f=await p.evaluate(()=>({v:__T.S().view,fid:(document.querySelector('[data-rh-r="funcId"]')||{}).value,item:(document.querySelector('[data-rh-r="item"]')||{}).value,ca:(document.querySelector('[data-rh-r="ca"]')||{}).value}));
+ await p.click('[data-act="rh-rsalvar"]'); await H.dorme(700); await p.evaluate(()=>__T.go('rhepi')); await H.dorme(300); const t2=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('"Registrar" abre a retirada já preenchida; depois de salvar, o Óculos sai das pendências', f.v==='rhret'&&f.fid==='f1'&&f.item==='Óculos'&&f.ca==='222'&&!/Óculos[^\n]*nunca recebeu/.test(t2), JSON.stringify(f));
+ console.log('erros:',B.erros.filter(x=>!/404|cdnjs/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

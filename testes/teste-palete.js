@@ -1,0 +1,15 @@
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,250):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ d.users['tablet@painel-colafix.app']={uid:'uTAB',pass:'tab123',nome:'Tablet'}; D['perfis/uTAB']={nome:'Tablet',usuario:'tablet'}; D['acessos/uTAB']={perfil:'tablet',mods:['tablet'],locais:[],ativo:true};
+ D['ordens/5001'].total=4800; D['itens/AC3001'].palete=96; D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true};
+ const B=await H.abrir({negarCamera:true,viewport:{width:1280,height:900}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tablet','tab123'); await H.dorme(3000);
+ const bip=async c=>{ await p.keyboard.type(c,{delay:6}); await p.keyboard.press('Enter'); await H.dorme(700); };
+ await bip('OP-5001'); await bip('CXANAS2345'); await H.dorme(500); await p.click('[data-act="tt-ap"]'); await H.dorme(300);
+ const temPal=await p.evaluate(()=>(document.querySelector('.tt-pal')||{}).innerText||'');
+ ok('Com palete cadastrado no item (96 sc), o tablet mostra os botões de palete', /Paletes/.test(temPal)&&/96 sc cada/.test(temPal), temPal.replace(/\n/g,' '));
+ await p.click('[data-act="tt-pal"][data-v="1"]'); await p.click('[data-act="tt-pal"][data-v="1"]'); await p.click('[data-act="tt-kp"][data-k="1"]'); await p.click('[data-act="tt-kp"][data-k="0"]'); await H.dorme(200);
+ const tot=await p.evaluate(()=>document.querySelector('.tt-tot b').innerText); const bt=await p.evaluate(()=>document.querySelector('[data-act="tt-ap-ok"]').innerText);
+ await p.screenshot({path:'/mnt/user-data/outputs/tablet-apontar-palete.png',fullPage:true}); await p.click('[data-act="tt-ap-ok"]'); await H.dorme(1200);
+ const e=Object.values(await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs)).find(x=>x&&x.origem==='tablet');
+ ok('2 paletes + 10 avulsos = 202 sc; grava paletes, sacos por palete e avulsos (igual ao computador)', /202 sc/.test(tot)&&/Apontar 202 sc/.test(bt)&&e&&e.qtd===202&&e.pal===2&&e.porPal===96&&e.avulso===10, JSON.stringify(e&&{qtd:e.qtd,pal:e.pal,porPal:e.porPal,avulso:e.avulso}));
+ console.log('erros:',B.erros.filter(x=>!/404|negado/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
