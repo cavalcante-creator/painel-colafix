@@ -1,0 +1,35 @@
+/* Pedir ajuste: botão só da administradora; anota com a tela e o aparelho; lista; copiar para o Claude marca como enviado; feito; apagar. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut();
+  let B=await H.abrir({viewport:{width:1366,height:800}}); let p=B.page; p.on('dialog',x=>x.accept());
+  await B.page.context().grantPermissions(['clipboard-read','clipboard-write']).catch(()=>{});
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
+  await p.evaluate(()=>__T.go('programacao')); await H.dorme(400);
+  const tem=await p.evaluate(()=>!!document.getElementById('tp-ajuste'));
+  ok('Administradora tem o botão "Pedir ajuste" no topo', tem);
+  await p.click('#tp-ajuste'); await H.dorme(400); const cab=await p.evaluate(()=>document.querySelector('.mlh-box').innerText);
+  ok('Abre com a tela e o aparelho de onde foi pedido', /Programação/.test(cab)&&/computador/.test(cab), cab.slice(0,120).replace(/\n/g,' | '));
+  await p.fill('#mlh-txt','O botão Folha podia ficar maior'); await p.fill('#mlh-quem','Ana'); await p.click('[data-act="mlh-salvar"]'); await H.dorme(1500);
+  await p.fill('#mlh-txt','Segundo pedido'); await p.uncheck('#mlh-foto'); await p.click('[data-act="mlh-salvar"]'); await H.dorme(1200);
+  let s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); let xs=Object.entries(s).filter(([k])=>k.startsWith('melhorias/')).map(([k,v])=>v);
+  const l1=await p.evaluate(()=>document.querySelector('.mlh-lst').innerText);
+  ok('Anota no banco (texto, quem, tela, aparelho, aberto) e mostra na lista', xs.length===2&&xs.some(x=>x.texto==='O botão Folha podia ficar maior'&&x.quem==='Ana'&&x.tela==='programacao'&&x.aparelho==='computador'&&x.status==='aberto')&&/Segundo pedido/.test(l1)&&/Para fazer · 2/.test(await p.evaluate(()=>document.querySelector('.mlh-box').innerText)), JSON.stringify(xs.map(x=>[x.texto,x.status,x.tela])));
+  const n1=await p.evaluate(()=>document.getElementById('tp-ajn').textContent);
+  await p.evaluate(()=>{ Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:t=>{ window.__clip=t; return Promise.resolve(); }}}); });
+  await p.click('[data-act="mlh-copiar"]'); await H.dorme(800);
+  const clip=await p.evaluate(()=>window.__clip||'');
+  s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); xs=Object.entries(s).filter(([k])=>k.startsWith('melhorias/')).map(([k,v])=>Object.assign({id:k},v));
+  ok('Copiar para o Claude: texto numerado com a tela e quem pediu; os dois viram "Enviado"', /Pedidos de ajuste do painel \(2\)/.test(clip)&&/1\. \[Programação · computador\] O botão Folha podia ficar maior \(pediu: Ana\)/.test(clip)&&xs.every(x=>x.status==='enviado')&&n1==='2', clip.slice(0,200));
+  const id1=xs.find(x=>x.texto==='Segundo pedido').id.split('/')[1];
+  await p.click(`[data-act="mlh-feito"][data-id="${id1}"]`); await H.dorme(500); await p.click(`[data-act="mlh-del"][data-id="${xs.find(x=>x.texto!=='Segundo pedido').id.split('/')[1]}"]`); await H.dorme(500);
+  s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); xs=Object.entries(s).filter(([k])=>k.startsWith('melhorias/')).map(([k,v])=>v);
+  const l2=await p.evaluate(()=>document.querySelector('.mlh-box').innerText);
+  ok('"Feito" e "Apagar" funcionam; feito sai de "Para fazer"', xs.length===1&&xs[0].status==='feito'&&/Nenhum pedido para fazer/.test(l2), JSON.stringify(xs.map(x=>x.status)));
+  await p.keyboard.press('Escape'); await H.dorme(200); const fechou=await p.evaluate(()=>!document.getElementById('mlh-pnl'));
+  ok('Esc fecha', fechou);
+  const e1=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close();
+  for(const [u,pw,vp] of [['operador','ope123',{width:1366,height:800}],['tecnico','tec123',{width:390,height:844}]]){ B=await H.abrir({viewport:vp}); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,u,pw); await H.dorme(2500);
+    const t=await p.evaluate(()=>!!document.getElementById('tp-ajuste')); ok('Outros logins não veem o botão ('+u+')', !t); await B.browser.close(); }
+  ok('Nenhum erro de JavaScript', !e1.length, e1.join(' | '));
+  const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
+})().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

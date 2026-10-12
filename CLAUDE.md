@@ -57,6 +57,10 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 - **Botões de gravar só para quem pode:** `ACX_BOTOES` (js/08) liga cada `data-act` a uma ação; o `body` ganha `sem-<ação>` e `so-ver` (cargos só ver: TV, consulta…). Botão novo que grava → acrescentar o `data-act` na ação certa.
 - Celular: calendário de consulta vira lista por dia; Equipamentos mostra a lista antes do cadastro. Tempo zero aparece como "menos de 1 min". Teste: `teste-revisao.js`.
 
+## Pedir ajuste (12/10)
+- `modulos/melhorias.js`: botão no topo **só da administradora** (`Painel.dono()`); anota o pedido com tela, aparelho, quem pediu e foto pequena da tela (html2canvas, ≤400 KB) em `melhorias/{id}` (`status` aberto/enviado/feito). "Copiar para o Claude" gera o texto numerado e marca como enviado. Prefixo `mlh-` (não usar `aj-`: já é dos Ajustes). Teste: `teste-melhorias.js`.
+- **Combinado com a usuária (12/10):** ajustes pequenos podem ir **direto para a `main`** (rodar o teste da parte mexida); mudanças grandes (permissão, regra do banco, cálculo) seguem com pull request e todos os testes.
+
 ## Arquivos
 | Arquivo | Papel |
 |---|---|
@@ -77,7 +81,7 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 | `config.js` | chaves do Firebase — **não alterar** |
 | `firestore.rules` | regras (publicar no console!) |
 | `sw.js` | service worker (`VERSAO`; lista `BASE` dos arquivos guardados para uso sem internet) |
-| `modulos/` | módulos em arquivos separados (`lista.js` carrega): `rh`, `onedrive`, `backup` |
+| `modulos/` | módulos em arquivos separados (`lista.js` carrega): `rh`, `onedrive`, `backup`, `melhorias` |
 | `testes/` | testes automáticos (Firebase simulado + Chrome); `./lote.sh teste-a teste-b` roda vários |
 
 **Importante:** as partes `js/01..09` compartilham o mesmo escopo (são juntadas por `carregar.js`). Uma função de uma parte pode usar a de outra. Não transformar em `<script>` separados (quebra: funções de partes posteriores não existem durante o carregamento das anteriores).
