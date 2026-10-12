@@ -1,0 +1,34 @@
+/* RH · Ajustar férias por período: a RH diz quantos dias a pessoa já tirou antes do painel (ex.: admissão 17/05/2022). */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/dados/funcionarios/f0']={nome:'MARIA TESTE',cpf:'52998224725',tipo:'CLT',empresa:'COLAFIX',status:'Ativo',admissao:'2022-05-17',funcao:'Analista',setor:'PCP'};
+  const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept());
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+  const linha=()=>p.evaluate(()=>{ const r=[...document.querySelectorAll('.rh-tf tbody tr')].find(r=>/MARIA/.test(r.innerText)); return r?r.innerText.replace(/\s+/g,' '):''; });
+  const toast=()=>p.evaluate(()=>{ const t=document.getElementById('toast'); return t&&!t.hidden?t.innerText:''; });
+  await p.evaluate(()=>__T.go('rhferias')); await H.dorme(300); await p.click('[data-act="rh-pzfil"][data-v="todos"]'); await H.dorme(200);
+  const l0=await linha(); ok('Sem ajuste: mostra o 1º período (17/05/2022) vencido', /17\/05\/2022 a 16\/05\/2023/.test(l0)&&/vencido/i.test(l0), l0);
+  await p.click('tr:has-text("MARIA") [data-act="rh-fajabrir"]'); await H.dorme(300);
+  const nper=await p.$$eval('[data-rh-aj]',xs=>xs.map(x=>x.dataset.rhAj).join(','));
+  ok('Ajustar mostra um campo para cada período desde a admissão', nper.startsWith('2022-05-17,2023-05-17,2024-05-17,2025-05-17'), nper);
+  for(const k of ['2022-05-17','2023-05-17']) await p.click(`[data-act="rh-fajtudo"][data-p="${k}"][data-v="30"]`);
+  await p.fill('[data-rh-aj="2024-05-17"]','20'); await H.dorme(800);
+  const fal=await p.evaluate(()=>document.getElementById('rh-fajs').innerText.replace(/\s+/g,' '));
+  ok('Mostra quanto falta em cada período enquanto digita', /2024 a 16\/05\/2025.*?10 dias/.test(fal), fal.slice(0,400));
+  await p.fill('[data-rh-aj="2025-05-17"]','40'); await p.click('[data-act="rh-fajsalvar"]'); await H.dorme(300); const t1=await toast();
+  ok('Não deixa passar de 30 dias', /no máximo 30/.test(t1), t1);
+  await p.fill('[data-rh-aj="2025-05-17"]','0'); await p.click('[data-act="rh-fajsalvar"]'); await H.dorme(700); let s=await srv();
+  let ant=Object.values(s).filter(x=>x&&x.funcId==='f0'&&x.anterior);
+  ok('Grava os dias tirados antes do painel por período', ant.length===3&&ant.find(x=>x.aquisitivo==='2024-05-17').dias===20&&ant.every(x=>x.origem==='ajuste'), JSON.stringify(ant.map(x=>[x.aquisitivo,x.dias])));
+  const l1=await linha(); ok('Situação passa a ser o período de 2024 com 10 dias faltando', /17\/05\/2024 a 16\/05\/2025/.test(l1)&&/faltam 10 dias/.test(l1), l1);
+  // desfazer pela ficha da pessoa
+  await p.evaluate(()=>__T.go('rhferias')); await p.click('tr:has-text("MARIA") [data-act="rh-fajabrir"]'); await H.dorme(300);
+  await p.click('[data-act="rh-fajtudo"][data-p="2024-05-17"][data-v="30"]'); await p.click('[data-act="rh-fajtudo"][data-p="2023-05-17"][data-v="0"]'); await p.click('[data-act="rh-fajsalvar"]'); await H.dorme(700); s=await srv();
+  ant=Object.values(s).filter(x=>x&&x.funcId==='f0'&&x.anterior);
+  ok('Corrigir troca o registro (sem duplicar) e zerar apaga', ant.length===2&&!ant.find(x=>x.aquisitivo==='2023-05-17')&&ant.find(x=>x.aquisitivo==='2024-05-17').dias===30, JSON.stringify(ant.map(x=>[x.aquisitivo,x.dias])));
+  await p.click('[data-act="rh-fajabrir"]').catch(()=>{}); await H.dorme(200); await p.click('[data-act="rh-fajx"]').catch(()=>{});
+  const pz=await p.evaluate(()=>!!document.querySelector('[data-act="rh-fajabrir"]'));
+  const errs=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close(); ok('Sem erros na página', pz&&!errs.length, errs.join(' | ')); const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
+})().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

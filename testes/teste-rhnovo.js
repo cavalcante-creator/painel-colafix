@@ -27,7 +27,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
 
   // ---- Início
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
-  ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Funções e EPIs|Terceirizados'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
+  ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Funções e EPIs|Terceirizados'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
   ok('Início: 7 em atividade, 1 de férias, 1 afastado, 2 terceirizados (sem contar desligado e encerrado)', /7\s*em atividade/.test(v0)&&/1\s*de férias/.test(v0)&&/1\s*afastado/.test(v0)&&/2\s*terceirizados/.test(v0), v0.replace(/\n/g,' ').slice(0,200));
   ok('Início: fichas do mês 3 assinadas · 2 falta assinar · 4 não geradas', /3\s*assinadas e anexadas/.test(v0)&&/2\s*impressas, falta assinar/.test(v0)&&/4\s*ainda não geradas/.test(v0));
   ok('Avisos: contrato vencido, contrato vencendo e função sem EPI (com quantas pessoas)', /Vencido\s*Contrato: LIMPA TUDO LTDA\s*venceu há 2 dias/.test(v0)&&/Contrato: SEGURA VIGILÂNCIA\s*vence em 9 dias/.test(v0)&&/Função "Mecânico" sem EPI cadastrado\s*a ficha de 2 pessoas sai sem itens/.test(v0)&&!/ANTIGO/.test(v0));
@@ -117,6 +117,6 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   const C=await H.abrir({viewport:{width:1440,height:900}}); await H.preparar(C.page,d); await C.page.goto(H.BASE); await H.entrar(C.page,'iasmyn','senha123'); await H.dorme(2500);
   await C.page.evaluate(()=>__T.go('rhinicio')); await H.dorme(500);
   const dn=await C.page.evaluate(()=>({solo:document.body.classList.contains('rh-solo'),abas:[...document.querySelectorAll('#view nav.tabs .tab')].map(t=>t.innerText.trim()).join('|'),mods:document.querySelectorAll('#navlist [data-mod]').length}));
-  ok('A dona continua com a lista de módulos e as abas do RH em cima', !dn.solo&&dn.mods>2&&dn.abas==='Início|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Funções e EPIs|Terceirizados', JSON.stringify(dn));
+  ok('A dona continua com a lista de módulos e as abas do RH em cima', !dn.solo&&dn.mods>2&&dn.abas==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Funções e EPIs|Terceirizados', JSON.stringify(dn));
   await C.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?f+' FALHOU':'TODOS PASSARAM'); process.exit(f?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
