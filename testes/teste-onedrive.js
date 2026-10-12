@@ -26,7 +26,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
      return r.fulfill({status:200,contentType:'application/json',headers:cors,body:JSON.stringify({value:v})}); }
    return r.fulfill({status:404,headers:cors,body:'{}'}); });
  await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2500);
- await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(1500);
+ await p.evaluate(()=>__T.go('rhfichas')); await p.click('[data-act="rh-fvgerar"]'); await H.dorme(1500);
  const b0=await p.evaluate(()=>(document.querySelector('.banner')||{}).innerText||'');
  const [pop]=await Promise.all([p.waitForEvent('popup'),p.click('[data-act="od-con"]')]); await H.dorme(2500);
  const b1=await p.evaluate(()=>(document.querySelector('.banner')||{}).innerText||'');

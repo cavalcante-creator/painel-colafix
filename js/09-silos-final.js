@@ -337,7 +337,8 @@ function registrarModulo(m){ if(!m||!m.id||MODS.some(x=>x.id===m.id)) return fal
   try{ render(); }catch(e){} return true; }
 window.Painel={ versao:1, S, registrarModulo, render:()=>render(), rerender:()=>rerenderSeguro(), go:v=>go(v), viewOk:v=>viewOk(v), acsP:()=>acsP(), dono:()=>!!(S.acs&&S.acs.dono),
   db:()=>S.db, inscrever:(nome,mk,on)=>inscrever(nome,mk,on), esc, ic, toast:m=>toast(m), erro:e=>erro(e), hojeStr:d=>hojeStr(d), hora, dia:x=>dia(x), dm:x=>dm(x), linhas:()=>linhasOrd(),
-  nomeDe:id=>nomeDe(id), soVer:()=>(typeof soVer==='function'&&soVer()), registrarPerfil, registrarAviso };
+  nomeDe:id=>nomeDe(id), soVer:()=>(typeof soVer==='function'&&soVer()), registrarPerfil, registrarAviso,
+  modsVis:()=>modsVis().map(m=>m.id) /* módulos que a pessoa vê no menu (o RH usa para mostrar as telas na lateral) */ };
 /* avisos de módulos no "Meu dia": Painel.registrarAviso(()=>[{nivel:'crit'|'warn', titulo, texto, go:'tela'}]) */
 S.avisosMod=[];
 function registrarAviso(fn){ if(typeof fn==='function') S.avisosMod.push(fn); }

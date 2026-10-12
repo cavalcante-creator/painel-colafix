@@ -263,6 +263,42 @@
     #preview-wrap > .ficha-set:last-child > .ficha-page:last-child{page-break-after:auto;}
   }
 </style>
+<style id="visual-painel">
+/* Visual do painel (pedido de 12/10): só a tela muda; a ficha impressa continua igual. */
+@media screen{
+  html,body{background:#F5F1E8;color:#1A1A1A;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+  .app-header{display:none}
+  .app-body{max-width:none;padding:0 0 40px}
+  .card{border:0;border-radius:16px;box-shadow:0 1px 2px rgba(20,40,52,.06),0 2px 10px rgba(20,40,52,.05);padding:22px 24px;margin-bottom:16px}
+  .card h2{font-size:18px;text-transform:none;letter-spacing:0;color:#1A1A1A;font-weight:700;margin-bottom:14px}
+  #card-upload{padding:12px 18px}#card-upload h2{display:none}#card-upload .status-line{margin:0}
+  .field{min-width:0;flex:1 1 200px}
+  .field label{text-transform:none;letter-spacing:0;font-size:13px;font-weight:700;color:#1A1A1A}
+  .field select,.field input[type=month],.field input[type=file]{min-width:0;width:100%;height:46px;border:1.5px solid #E5DFD0;border-radius:10px;font-size:15px;padding:0 12px}
+  .field select:focus,.field input:focus,.gsheet-row input[type=text]:focus{outline:none;border-color:#1B5C7A;box-shadow:0 0 0 4px rgba(27,92,122,.16)}
+  .filtros-tit{margin:18px 0 12px;padding-top:16px;border-top:1px solid #ECE6D8;font-size:11.5px;font-weight:700;letter-spacing:.14em;color:#6B6558}
+  .acoes-linha{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+  .btn{height:46px;padding:0 18px;border-radius:10px;font-size:15px;font-weight:700;background:#fff;color:#143F54;border:1.5px solid #143F54}
+  .btn:hover,.btn[disabled]:hover{background:#EEF4F6}
+  .btn.primary,#btn-gerar-todos,#btn-enviar-ficha{background:#143F54;color:#fff;border-color:#143F54}
+  .btn.primary:hover,#btn-gerar-todos:hover,#btn-enviar-ficha:hover{background:#1B5C7A}
+  #btn-gerar{background:#fff;color:#143F54}#btn-gerar:hover{background:#EEF4F6}
+  .btn.secondary{background:#fff;color:#143F54;border:1.5px solid #143F54}.btn.secondary:hover{background:#EEF4F6}
+  .btn:disabled{opacity:.45}
+  .dica-imp{margin:16px 0 0!important;background:#EEF4F6;color:#143F54;border-radius:10px;padding:12px 14px;font-size:14px}
+  #card-drive{position:relative}#card-drive>h2{margin-bottom:20px;padding-right:170px}#card-drive>.actions{position:absolute;top:16px;right:22px;margin:0!important}#card-drive>.actions .btn{height:40px}#card-drive>.actions>span{display:none}
+  .drive-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:14px}
+  .upload-box,.busca-box{border:1.5px solid #E5DFD0;border-radius:14px;padding:16px 18px;background:#fff;margin:0}
+  .upload-box h3,.busca-box h3{font-size:16px;margin:0 0 12px;color:#1A1A1A}
+  .upload-box .controls{flex-direction:column;align-items:stretch;gap:12px}.upload-box .actions .btn{width:100%;justify-content:center}
+  .gsheet-row input[type=text]{height:46px;border:1.5px solid #E5DFD0;border-radius:10px;font-size:15px}
+  .upload-msg{background:none!important;border:0!important;padding:8px 0 0!important;color:#6B6558!important;font-size:13px}
+  .drive-progress{height:8px;max-width:none;background:#ECE6D8}.drive-progress-fill{background:#2F6E4F}
+  .drive-status-summary{font-size:14px}
+  #card-preview-info .meta-bar{margin-bottom:6px}
+  @media (max-width:640px){ #card-drive>h2{padding-right:0;margin-bottom:10px}#card-drive>.actions{position:static;margin-bottom:12px!important} .acoes-linha .actions .btn{flex:1 1 140px;justify-content:center} }
+}
+</style>
 </head>
 <body>
 
@@ -278,18 +314,18 @@
 
   <!-- STEP 1: dados da planilha (conectado automaticamente via Apps Script) -->
   <div class="card no-print" id="card-upload">
-    <h2>📊 1. Cadastro do RH</h2>
+    <h2>Cadastro do RH</h2>
     <div class="status-line" id="status-line">
       <span class="dot loading" id="status-dot"></span>
       <span id="status-text">Carregando o cadastro do RH…</span>
-      <button class="btn secondary" id="btn-reload" type="button" style="margin-left:auto; padding:6px 12px; font-size:12.5px; display:none;">🔄 Recarregar dados</button>
+      <button class="btn secondary" id="btn-reload" type="button" style="margin-left:auto; padding:6px 12px; font-size:12.5px; display:none;">Recarregar dados</button>
     </div>
     <div class="warnings" id="warnings-box" style="display:none;"></div>
   </div>
 
   <!-- STEP 2: controles de geração -->
   <div class="card no-print" id="card-controls" style="display:none;">
-    <h2>🖨️ 2. Gerar fichas</h2>
+    <h2>Gerar fichas</h2>
     <div class="controls">
       <div class="field">
         <label for="input-mes">Mês de referência</label>
@@ -309,14 +345,9 @@
           <option value="__TODOS__">Todos os funcionários (ativos)</option>
         </select>
       </div>
-      <div class="actions">
-        <button class="btn primary" id="btn-gerar" type="button">📄 Gerar ficha</button>
-        <button class="btn" id="btn-gerar-todos" type="button">📚 Gerar todas as fichas</button>
-        <button class="btn secondary" id="btn-imprimir" type="button" disabled>🖨️ Imprimir</button>
-        <button class="btn secondary" id="btn-salvar-pdf" type="button" disabled>💾 Salvar PDF no painel</button>
-      </div>
     </div>
-    <div class="controls filtros-todos" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+    <div class="filtros-tit">FILTROS · valem para "Gerar todas" e para "Todos os funcionários"</div>
+    <div class="controls filtros-todos">
       <div class="field">
         <label for="select-vinculo">Vínculo</label>
         <select id="select-vinculo">
@@ -351,22 +382,28 @@
         </label>
       </div>
     </div>
-    <p class="empty-hint" style="margin:14px 0 0;">Dica para impressão: na caixa de impressão do navegador, deixe <strong>orientação = Paisagem</strong>, <strong>papel = A4</strong> e <strong>margens = Padrão</strong> (ou "Nenhuma") para que cada funcionário saia em 2 páginas, frente e verso.</p>
-    <p class="empty-hint" style="margin:4px 0 0;">Os filtros acima (vínculo, empresa, setor, função e pendentes) valem para "Gerar todas as fichas" e também para "Gerar ficha" quando o funcionário estiver como "Todos os funcionários" — não mudam nada ao gerar a ficha de uma única pessoa selecionada. O filtro de pendentes usa a lista da seção "Fichas escaneadas" abaixo; clique em "Atualizar lista" lá antes, se ainda não tiver carregado o mês atual.</p>
-  </div>
+    <div class="acoes-linha"><div class="actions">
+        <button class="btn primary" id="btn-gerar" type="button">Gerar ficha</button>
+        <button class="btn" id="btn-gerar-todos" type="button">Gerar todas as fichas</button>
+        <button class="btn secondary" id="btn-imprimir" type="button" disabled>Imprimir</button>
+        <button class="btn secondary" id="btn-salvar-pdf" type="button" disabled>Salvar PDF</button>
+      </div><span class="preview-count-sombra" id="contagem-gerar"></span></div>
+    <p class="empty-hint dica-imp">Dica para impressão: na caixa de impressão do navegador, deixe <strong>orientação = Paisagem</strong>, <strong>papel = A4</strong> e <strong>margens = Padrão</strong> (ou "Nenhuma") para que cada funcionário saia em 2 páginas, frente e verso.</p>
+      </div>
 
   <!-- STEP 3: pasta do Drive para as fichas escaneadas -->
   <div class="card no-print" id="card-drive" style="display:none;">
-    <h2>🗂️ 3. Fichas escaneadas</h2>
+    <h2>Fichas escaneadas <span id="esc-mes-tit"></span></h2>
     <div class="actions" style="margin-bottom:16px;">
       <button class="btn secondary" id="btn-abrir-pasta-mes" type="button">📂 Abrir pasta do mês</button>
       <button class="btn secondary" id="btn-abrir-pasta-raiz" type="button">📁 Abrir pasta principal</button>
       <span style="width:1px; background:var(--line); align-self:stretch; margin:0 2px;"></span>
-      <button class="btn secondary" id="btn-atualizar-status-mes" type="button">🔄 Atualizar lista</button>
+      <button class="btn secondary" id="btn-atualizar-status-mes" type="button">Atualizar lista</button>
     </div>
 
-    <div class="upload-box">
-      <h3>📤 Enviar ficha escaneada</h3>
+    <div id="status-mes-drive"></div>
+    <div class="drive-cols"><div class="upload-box">
+      <h3>Enviar ficha escaneada</h3>
       <div class="controls">
         <div class="field">
           <label for="upload-funcionario">Funcionário</label>
@@ -377,33 +414,32 @@
           <input type="file" id="upload-arquivo" accept="application/pdf,image/*">
         </div>
         <div class="actions">
-          <button class="btn primary" id="btn-enviar-ficha" type="button">📤 Enviar</button>
+          <button class="btn primary" id="btn-enviar-ficha" type="button">Enviar</button>
         </div>
       </div>
-      <div class="upload-msg info" id="upload-msg">O arquivo vai para a pasta do mês de referência selecionado acima, já com o nome do funcionário e o mês (ex.: "FULANO DE TAL - Outubro 2026.pdf").</div>
+      <div class="upload-msg info" id="upload-msg">Vai para a pasta do mês com o nome do funcionário (ex.: "ANA SOUZA - Outubro 2026.pdf").</div>
     </div>
 
-    <div id="status-mes-drive"></div>
 
-    <p class="empty-hint" style="margin:16px 0 6px;">Buscar em outros meses ou pastas:</p>
+    <div class="busca-box"><h3>Buscar em outros meses ou pastas</h3>
     <div class="gsheet-row">
-      <input type="text" id="busca-drive-input" placeholder="Buscar por nome do funcionário ou do arquivo…">
-      <button class="btn primary" id="btn-buscar-drive" type="button">🔍 Buscar</button>
+      <input type="text" id="busca-drive-input" placeholder="ex.: ana souza">
+      <button class="btn primary" id="btn-buscar-drive" type="button">Buscar</button>
     </div>
     <div class="drive-search-options">
       <label><input type="checkbox" id="chk-busca-mes-atual" checked> Só no mês selecionado</label>
       <label><input type="checkbox" id="chk-busca-apenas-pdf"> Só arquivos PDF</label>
     </div>
-    <div id="resultados-busca-drive" style="margin-top:10px;"></div>
+    <div id="resultados-busca-drive" style="margin-top:10px;"></div></div></div>
   </div>
 
   <!-- STEP 4: prévia -->
   <div class="card no-print" id="card-preview-info" style="display:none;">
     <div class="meta-bar">
-      <h2 style="margin:0;">👁️ 4. Prévia antes da impressão</h2>
+      <h2 style="margin:0;">Prévia antes da impressão</h2>
       <div class="count" id="preview-count"></div>
     </div>
-    <p class="empty-hint" style="margin:0;">Confira nome, CPF, função, EPIs, uniformes e CA de cada ficha abaixo. Cada funcionário ocupa exatamente duas páginas A4 (frente = uniforme, verso = EPI), prontas para impressão frente e verso.</p>
+    <p class="empty-hint" style="margin:0;">Confira nome, CPF, função, EPIs, uniformes e CA. Cada funcionário ocupa duas páginas A4: frente = uniforme, verso = EPI.</p>
   </div>
 
 </div>
@@ -1115,6 +1151,7 @@
     }
 
     var descricoesFiltro = [];
+    if(alvoForcado){ var _af=alvoForcado; alvoForcado=null; alvo=ativos.filter(function(c){ return _af.has(norm(c.nome)); }); gerandoTodos=false; if(alvo.length>1) descricoesFiltro.push("escolhidos no painel"); }
     if(gerandoTodos){
       if(vinculoSel === "CLT" || vinculoSel === "PJ"){
         alvo = alvo.filter(function(c){ return c.tipo === vinculoSel; });
@@ -1144,6 +1181,7 @@
       }
     }
     alvo = alvo.sort(function(a,b){ return a.nome.localeCompare(b.nome,"pt-BR"); });
+    if(ordemSetor){ ordemSetor=false; alvo.sort(function(a,b){ return String(a.setor||"").localeCompare(String(b.setor||""),"pt-BR")||a.nome.localeCompare(b.nome,"pt-BR"); }); }
     if(alvo.length === 0){
       alert(descricoesFiltro.length
         ? "Nenhum funcionário ativo encontrado com esse(s) filtro(s): "+descricoesFiltro.join(", ")+"."
@@ -1189,7 +1227,8 @@
     previewCount.innerHTML = "<b>"+alvo.length+"</b> funcionário(s)"+filtroLabel+" — <b>"+(alvo.length*paginasPorFuncionario)+"</b> página(s) A4";
     btnImprimir.disabled = false;
     btnSalvarPdf.disabled = false;
-    ultimoLote = { mesSel: mesSel, tipoFicha: tipoFicha, qtd: alvo.length, filtros: descricoesFiltro.slice() };
+    ultimoLote = { mesSel: mesSel, tipoFicha: tipoFicha, qtd: alvo.length, filtros: descricoesFiltro.slice(), nomes: alvo.map(function(c){ return c.nome; }) };
+    var cg=document.getElementById("contagem-gerar"); if(cg) cg.innerHTML="<b>"+alvo.length+"</b> funcionário(s) · <b>"+(alvo.length*paginasPorFuncionario)+"</b> página(s) A4";
     cardPreviewInfo.scrollIntoView({behavior:"smooth", block:"start"});
   }
 
@@ -1280,7 +1319,8 @@
           .salvarLotePdfNoDrive(mesAno, base64, nomeArquivo);
       });
     }).then(function(res){
-      previewCount.innerHTML = textoOriginal + ' — ✅ PDF salvo no Drive: <a href="'+esc(res.url)+'" target="_blank" rel="noopener">'+esc(res.nome)+'</a>';
+      avisarImpressas();
+      previewCount.innerHTML = textoOriginal + ' — ✅ PDF salvo: <a href="'+esc(res.url)+'" target="_blank" rel="noopener">'+esc(res.nome)+'</a>';
       btnSalvarPdf.disabled = false; btnImprimir.disabled = false;
     }).catch(function(err){
       previewCount.innerHTML = textoOriginal;
@@ -1448,7 +1488,7 @@
         btnAtualizarStatusMes.disabled = false;
         statusMesDrive.innerHTML = '<div class="empty-hint">Erro ao consultar a pasta: ' + esc(err && err.message ? err.message : String(err)) + '</div>';
       })
-      .listarArquivosDoMes(mesAno);
+      .listarEscaneadasDoMes(mesAno);
   }
 
   function renderStatusMes(arquivos, mesAno){
@@ -1562,6 +1602,43 @@
   // Carrega os dados assim que o sistema abre — a planilha já está
   // conectada (o script roda dentro dela), então não precisa de link
   // nem upload.
+  // ---------------------------------------------------------------
+  // Ponte com a tela "Fichas do mês" do painel (12/10):
+  // o painel escolhe quem gerar, pede a prévia de uma ficha e fica
+  // sabendo quando as fichas foram impressas ou salvas em PDF.
+  // ---------------------------------------------------------------
+  var alvoForcado = null, ordemSetor = false;
+  function avisarImpressas(){
+    try{ var A=window.parent&&window.parent.RHAPI; if(!A||!A.fichasImpressas||!ultimoLote||!ultimoLote.nomes) return;
+      var ms=ultimoLote.mesSel; A.fichasImpressas(ms.yyyy+"-"+pad2(ms.mm), ultimoLote.nomes.slice()); }catch(e){ console.warn(e); }
+  }
+  window.addEventListener("beforeprint", function(){ if(previewWrap.querySelector(".ficha-page")) avisarImpressas(); });
+  window.FICHAS = {
+    pronto: function(){ return !!DB.loaded; },
+    recarregar: function(){ carregarDadosDoServidor(); },
+    /* o: {mes:"AAAA-MM", nomes:[...], porSetor:true, imprimir:true} */
+    preparar: function(o){ o=o||{};
+      if(o.mes && inputMes.value!==o.mes){ inputMes.value=o.mes; atualizarStatusMes(); }
+      var nomes=(o.nomes||[]).map(norm);
+      if(nomes.length===1){ var c=DB.colaboradores.find(function(x){ return norm(x.nome)===nomes[0]; }); if(c) selectFuncionario.value=c.nome; }
+      else selectFuncionario.value="__TODOS__";
+      if(nomes.length) alvoForcado=new Set(nomes);
+      ordemSetor=!!o.porSetor;
+      gerar(false);
+      alvoForcado=null; ordemSetor=false;
+      if(o.imprimir && previewWrap.querySelector(".ficha-page")) setTimeout(function(){ window.print(); },400);
+      return !!previewWrap.querySelector(".ficha-page");
+    },
+    /* frente (uniforme) da ficha de uma pessoa, para a prévia ao lado da lista */
+    previa: function(nome, mes){ if(!DB.loaded) return null;
+      var c=DB.colaboradores.find(function(x){ return norm(x.nome)===norm(nome); }); if(!c) return null;
+      var p=String(mes||"").split("-"); var ms={ yyyy:parseInt(p[0],10), mm:parseInt(p[1],10) }; if(!ms.yyyy||!ms.mm) return null;
+      var set=gerarFichaFuncionario(c, ms, "AMBAS"); var pg=set.querySelector(".ficha-page"); if(!pg) return null;
+      var css=Array.prototype.map.call(document.querySelectorAll("style"), function(st){ return st.id==="visual-painel"?"":st.textContent; }).join("\n");
+      return { css: css, html: pg.outerHTML };
+    }
+  };
+
   carregarDadosDoServidor();
 
 })();

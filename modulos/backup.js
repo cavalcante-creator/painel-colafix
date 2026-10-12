@@ -6,7 +6,7 @@
   const COLECOES=['config','ordens','entregas','entregasarq','previsoes','itens','paradas','ranchos','rancrec','diario','alxfila','medicoes','cargas','premix','silos','silomov',
     'chamados','chamfotos','pecasmov','pecafotos','crachas','conferencias','auditorias','recebimentos','pmxfichas','pmxrec','pmxbaixas','pcpbase','pcpsnap','pcpvendas',
     'ritplano','ritfech','sistema','perfis','acessos','pedidos','_arquivos','_arquivos_p','pedmat','exemplo'];
-  const SUB={'rh':{docs:['config'],sub:{'rh/dados':['funcionarios','funcoes','retiradas','terceiros','presenca'],'rh/arquivos':['lista','partes']}}};
+  const SUB={'rh':{docs:['config'],sub:{'rh/dados':['funcionarios','funcoes','retiradas','terceiros','presenca','fichasmes','modelos','docsgerados','ferias'],'rh/arquivos':['lista','partes']}}};
   const NAO_IMPORTA=['acessos','pedidos'];
   const B={st:'',prog:'',ult:null,imp:null};
   const fs=()=>window.claude&&window.claude._fs&&window.claude._fs();
