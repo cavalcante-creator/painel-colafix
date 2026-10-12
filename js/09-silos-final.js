@@ -15,7 +15,7 @@ function dbDiaProd(dia){ return dbEntrega()?dbProxUtil(dia):dia; }
 function diaSemana(d){ return ['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(d+'T12:00:00').getDay()]; }
 /* aviso no topo do diário: qual produção está sendo entregue */
 { const _vd=vDiario; vDiario=function(){ const h=_vd.apply(this,arguments); const D=S.dbo; if(D.modo==='monitor') return h; const dia=D.dia||hojeStr(), p=dbDiaProd(dia);
-  const txt=dbEntrega()?`<b>Entrega ${dia===hojeStr()?'de hoje':'de '+diaSemana(dia)+' '+dm(dia)}:</b> ordens de produção de <b>${diaSemana(p)}, ${dm(p)}</b>${dia===hojeStr()?' (e as atrasadas)':''}`:`<b>Dia da produção:</b> ${diaSemana(dia)}, ${dm(dia)}`;
+  const txt=dbEntrega()?`${dia===hojeStr()?'<b>Hoje</b> o almox separa e entrega':'Em <b>'+diaSemana(dia)+' '+dm(dia)+'</b> o almox separa e entrega'} os ranchos das ordens de <b>${diaSemana(p)}, ${dm(p)}</b>${dia===hojeStr()?' (e as atrasadas)':''}`:`<b>Dia da produção:</b> ${diaSemana(dia)}, ${dm(dia)}`;
   return `<div class="banner db-ent" style="background:var(--teal-wash);color:var(--teal-strong);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span>${ic('cal',16,2)} ${txt}</span><span class="db-entb" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><button class="lnk" data-act="db-entrega">${dbEntrega()?'Ver pelo dia da produção':'Ver pelo dia da entrega'}</button></span></div>`+h; }; }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="db-entrega"]'); if(!b) return; S.dbo.entrega=!dbEntrega(); render(); });
 /* abrir um rancho (QR da folha, coletor RA-, busca): vai para o dia certo da entrega */

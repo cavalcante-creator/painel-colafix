@@ -52,6 +52,11 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 - Etapas do rancho ficam em `ordens.rdb` (`sep`, `ent`, `conf`, `fim`) e são gravadas por `dbSalvar`. A ação de permissão é **"rancho"** (não "programar").
 - **Celular do almox** (cargo `almoxcel`, tela `mantotem` em modo entrega): folha (QR/RA-/nº) → separado → crachá de quem recebe → "Recebi o rancho". Grava `rdb.ent` com `entreguePor` e `recebidoPor`. Teste: `teste-almoxcel.js`.
 
+## Permissões e botões (revisão de 12/10)
+- **Padrão de ações por cargo:** `ACX_CARGO` (js/08). "Produção (consulta)" (`producao`): vê tudo, abre chamado, registra parada e marca o rancho; **não** programa, não aponta, não mede, não atende. O painel da administradora grava sozinho os `bloqCols` dessas pessoas (as regras do banco já usam `bloqCols`; não precisa publicar regra). Ajuste por pessoa continua vencendo.
+- **Botões de gravar só para quem pode:** `ACX_BOTOES` (js/08) liga cada `data-act` a uma ação; o `body` ganha `sem-<ação>` e `so-ver` (cargos só ver: TV, consulta…). Botão novo que grava → acrescentar o `data-act` na ação certa.
+- Celular: calendário de consulta vira lista por dia; Equipamentos mostra a lista antes do cadastro. Tempo zero aparece como "menos de 1 min". Teste: `teste-revisao.js`.
+
 ## Arquivos
 | Arquivo | Papel |
 |---|---|

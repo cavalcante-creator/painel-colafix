@@ -1,5 +1,6 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,260):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs; const ago=m=>new Date(Date.now()-m*60000).toISOString();
+ D['acessos/uOPE'].perfil='outro'; /* cargo sem padrão de ações: o teste é dos ajustes por pessoa (o cargo Produção (consulta) tem padrão próprio, ver teste-revisao.js) */
  D['paradas/p1']={linha:'Linha 1',motivo:'Outros',inicio:ago(100),fim:ago(90)};
  D['chamados/os-00001']={numero:1,linha:'Linha 2',defeito:'Compressor',impacto:'nao',nome:'Ana',status:'Aberta',criado:ago(30)};
  D['silos/c1']={saldoKg:6000,medidoKg:6000,medidoEm:ago(10),atualizadoEm:ago(10),origem:'medicao'};
@@ -19,9 +20,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Para as regras do banco: coleções bloqueadas calculadas certo (ordens liberadas para marcar etapas do rancho)', ['previsoes','itens','medicoes','cargas','premix'].every(c=>a.bloqCols.includes(c))&&!a.bloqCols.includes('ordens')&&!a.bloqCols.includes('entregas')&&!a.bloqCols.includes('chamados')&&!a.bloqCols.includes('silos'), JSON.stringify(a.bloqCols));
  await p.evaluate(()=>{ __T.S().acs.ed=null; __T.go('acessos'); }); await H.dorme(300);
  const selo=await p.evaluate(()=>/ajustado/.test((document.querySelector('[data-act="acs-editar"][data-id="uOPE"]')||{}).innerText||''));
- await p.selectOption('select[data-eq-cargo="uOPE"]','linha'); await H.dorme(700); await p.selectOption('select[data-eq-cargo="uOPE"]','producao'); await H.dorme(900);
+ await p.selectOption('select[data-eq-cargo="uOPE"]','linha'); await H.dorme(700); await p.selectOption('select[data-eq-cargo="uOPE"]','almoxpmx'); await H.dorme(900);
  s=await srv(p); a=s.docs['acessos/uOPE'];
- ok('Cartão mostra "ajustado" e trocar o cargo não apaga os ajustes', selo&&a.perfil==='producao'&&JSON.stringify(a.telas)==='["manch"]'&&a.acoes.programar===false, a.perfil+' · '+JSON.stringify(a.telas));
+ ok('Cartão mostra "ajustado" e trocar o cargo não apaga os ajustes', selo&&a.perfil==='almoxpmx'&&JSON.stringify(a.telas)==='["manch"]'&&a.acoes.programar===false, a.perfil+' · '+JSON.stringify(a.telas));
  // técnico: manutenção só ver, mas pode concluir
  await p.click('[data-act="acs-editar"][data-id="uTEC"]'); await H.dorme(400);
  await p.click('[data-act="acx-mod"][data-id="uTEC"][data-k="manut"][data-v="ver"]'); await H.dorme(150); await p.check('[data-acx-acao="concluir"][data-id="uTEC"]'); await H.dorme(150);

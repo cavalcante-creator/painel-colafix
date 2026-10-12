@@ -1233,7 +1233,7 @@ function vCalendario(){
   const semLab=()=>{ const a=new Date(C.ini+'T12:00:00'), b=new Date(addDias(C.ini,nd-1)+'T12:00:00'); return a.getDate()+(a.getMonth()!==b.getMonth()?' de '+a.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''):'')+' a '+b.getDate()+' de '+b.toLocaleDateString('pt-BR',{month:'long'}); };
   return `${banner()}
   <div class="head"><div><div class="eyebrow">PRODUÇÃO</div><h1>Calendário</h1><div class="sub">${calRO()?'Consulta da programação — só visualização.':'Arraste a ordem para outro dia ou outra linha, ou solte em cima de outra ordem para montar a sequência de produção do dia. No celular, toque na ordem para mover.'}</div></div>
-   <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="cal-html" style="height:42px" title="Baixa um arquivo HTML da semana que abre em qualquer navegador, sem login e sem poder alterar">${ic('baixar',18,2)}Baixar calendário (HTML)</button>${repBtn()}${calRO()?'':`<button class="btn sec" data-act="fp-abrir" style="height:42px">${ic('folha',18,2)}Folhas do dia</button>`}</div></div>
+   <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="cal-html" style="height:42px" title="Baixa um arquivo HTML da semana que abre em qualquer navegador, sem login e sem poder alterar">${ic('baixar',18,2)}Baixar calendário</button>${repBtn()}${calRO()?'':`<button class="btn sec" data-act="fp-abrir" style="height:42px">${ic('folha',18,2)}Folhas do dia</button>`}</div></div>
   ${S.fp.aberto?fpPainel():''}
   ${sel?movePainel(sel):''}
   ${S.pv.f&&!calRO()?prevForm():''}
@@ -1249,7 +1249,11 @@ function vCalendario(){
   </section>
   ${C.soAtras?`<section class="card"><div class="head" style="align-items:baseline"><div class="label">ORDENS ATRASADAS (${atras.length}) · QUALQUER DATA</div><button class="lnk" data-act="c-atras">Voltar ao calendário</button></div>
    ${atras.length?L.filter(l=>atras.some(o=>o.linha===l)).map(l=>`<div style="margin-top:12px"><b style="font-size:13px">${esc(l)}</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:6px">${atras.filter(o=>o.linha===l).map(o=>calCard(o)).join('')}</div></div>`).join(''):'<div class="empty">Nenhuma ordem atrasada.</div>'}
-   <div class="sub" style="font-size:12px;margin-top:10px">Toque em uma ordem para mudar o dia ou a linha.</div></section>`:`
+   <div class="sub" style="font-size:12px;margin-top:10px">Toque em uma ordem para mudar o dia ou a linha.</div></section>`:calRO()&&window.innerWidth<700?`<div class="cal-lst">${dias.map(d=>{
+     const doDia=l=>(d===h?atras.filter(o=>o.linha===l&&(C.fech||o.status==='aberta')&&!vis.some(v=>v._id===o._id&&dataEf(v)===d)):[]).concat(vis.filter(o=>o.linha===l&&dataEf(o)===d&&!(o.status==='aberta'&&dataEf(o)<h&&dias.includes(h)))).concat(prevAtivas().filter(p=>p.linha===l&&(p.data===d||(d===h&&p.data<h)))).sort(seqCmp);
+     const ls=L.filter(l=>doDia(l).length), p=pendDia(d);
+     return `<section class="card ${d===h?'cal-hj':''}"><div class="head" style="align-items:baseline;margin-bottom:6px"><h2 style="font-size:17px">${dLab(d)}${d===h?' <span class="pill teal">hoje</span>':''}</h2>${p?`<span class="sub num" style="margin:0">${f0(p)} pendente</span>`:''}</div>
+       ${ls.length?ls.map(l=>`<div class="label" style="margin:10px 0 6px">${esc(l)}</div><div class="cal-lg">${doDia(l).map(o=>o._pv?prevCard(o,0):calCard(o,0)).join('')}</div>`).join(''):'<div class="sub" style="margin:0">Nada programado.</div>'}</section>`; }).join('')}</div>`:`
   <div class="calwrap">
    <div class="calscroll ${calRO()?'calro':''}"><div class="calgrid" style="grid-template-columns:${cols}">
     <div class="ch ch0"></div>${dias.map(d=>{ const p=pendDia(d); return `<div class="ch ${d===h?'hoje':''}">${dLab(d)}${p?`<small class="num">${f0(p)} pendente</small>`:''}</div>`; }).join('')}
@@ -1406,3 +1410,5 @@ function movePainel(o){ const C=S.cal, e=entregueDe(o); const d=C.md||dataEf(o)|
    ${(()=>{ const sib=irmasCal(o); if(sib.length<2) return ''; const i=sib.findIndex(x=>x._id===o._id); return `<span style="display:inline-flex;gap:6px;align-items:center"><span class="sub" style="margin:0;font-size:12px">Sequência ${i+1}º de ${sib.length}</span><button class="btn sec" data-act="c-seq" data-id="${esc(o._id)}" data-v="-1" ${i===0?'disabled':''} style="height:40px;padding:0 12px">↑ Antes</button><button class="btn sec" data-act="c-seq" data-id="${esc(o._id)}" data-v="1" ${i===sib.length-1?'disabled':''} style="height:40px;padding:0 12px">↓ Depois</button></span>`; })()}
    <button class="lnk" data-act="c-ver" data-id="${esc(o._id)}">Abrir na programação</button><button class="lnk" data-act="fp-ordem" data-id="${esc(o._id)}">Folha (PDF)</button></div>`:`<button class="lnk" data-act="c-ver" data-id="${esc(o._id)}">Abrir na programação</button>`}
   </section>`; }
+document.head.insertAdjacentHTML('beforeend','<style>.cal-lst .cal-lg{display:grid;gap:8px}.cal-lst .cal-hj{border:1.5px solid var(--teal)}</style>');
+{ let w0=window.innerWidth; window.addEventListener('resize',()=>{ const w=window.innerWidth; if((w<700)!==(w0<700)&&S.view==='calendario'&&typeof calRO==='function'&&calRO()) { w0=w; try{ rerenderSeguro(); }catch(e){} } else w0=w; }); }
