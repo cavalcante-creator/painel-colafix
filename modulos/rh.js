@@ -233,7 +233,7 @@
     let xs=R.func.filter(x=>(F.st==='ativos'?x.status!=='Desligado':F.st==='todos'?true:x.status===F.st)&&(!F.setor||x.setor===F.setor)&&(!F.emp||x.empresa===F.emp)&&(!F.tipo||x.tipo===F.tipo)&&(!q||norm(x.nome).includes(q)||dig(x.cpf).includes(dig(F.q)||'#')||norm(x.funcao).includes(q)));
     xs.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
     const cnt=s=>R.func.filter(x=>x.status===s).length;
-    return topo('Funcionários','Cadastro, situação e o que cada um usa.',`<button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-novo">Novo funcionário</button><button class="btn sec" data-act="rh-carga">Carga inicial</button><label class="btn sec" style="cursor:pointer">${P.ic('baixar',18,2)}Importar (Excel/CSV)<input type="file" id="rh-imp" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sec" data-act="rh-csv">Exportar</button>`)
+    return topo('Funcionários','Cadastro, situação e o que cada um usa.',`<button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-novo">Novo funcionário</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-csv">Exportar</button>`)
       +(R.carga?vCarga():'')+(R.adm&&!R.f?vAdm():'')+(R.fdesl?formDesl():'')+(R.f?formFunc():'')
       +`<div class="rh-kpi">${ST.map(s=>`<div><b class="num">${cnt(s)}</b><span>${s}</span></div>`).join('')}</div>
       <section class="card"><div class="rh-fil"><input class="txt" id="rh-q" placeholder="Buscar nome, CPF ou função" value="${esc(F.q)}">
@@ -795,13 +795,13 @@
   const partesLote=(md,xs)=>xs.map(f=>montar(md.html,valores(f,{},ferProx(f)),false,R.dg.resp)+assinaturas(f));
 
   /* ---------- Planilha de carga inicial ---------- */
-  const CARGA=[['id','Código (não mexer)'],['nome','Nome'],['cpf','CPF'],['tipo','Vínculo'],['funcao','Função'],['setor','Setor'],['admissao','Admissão'],['nascimento','Nascimento'],['salario','Salário'],['jornada','Jornada'],
+  const CARGA=[['id','Código (não mexer)'],['nome','Nome'],['cpf','CPF'],['tipo','Vínculo'],['empresa','Empresa (PJ)'],['funcao','Função'],['setor','Setor'],['admissao','Admissão'],['nascimento','Nascimento'],['salario','Salário'],['jornada','Jornada'],
     ['telefone','Telefone'],['camisa','Camisa'],['calca','Calça'],['calcado','Calçado'],['ultimaTroca','PJ: data da última troca'],['ferAte','Férias tiradas até o período que terminou em'],['exp','Experiência (prorrogado ou efetivado)']];
-  const CARGA_FIXO=['id','nome','cpf','tipo'], CARGA_DATA=['admissao','nascimento','ultimaTroca','ferAte'];
-  function cargaLinhas(){ return [CARGA.map(c=>c[1])].concat(R.func.filter(f=>f.status!=='Desligado').sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(f=>CARGA.map(([k])=>k==='id'?f._id:k==='cpf'?fCPF(f.cpf):k==='tipo'?(f.tipo==='PJ'?'PJ':'CLT'):k==='salario'?(f.salario!==''&&f.salario!=null?brl(f.salario).replace('R$ ',''):''):CARGA_DATA.includes(k)?br(f[k]||''):k==='exp'?(f.exp&&['prorrogado','efetivado'].includes(f.exp.status)?f.exp.status:''):(f[k]||'')))); }
+  const CARGA_FIXO=['id','nome','cpf','tipo','empresa'], CARGA_DATA=['admissao','nascimento','ultimaTroca','ferAte'];
+  function cargaLinhas(){ return [CARGA.map(c=>c[1])].concat(R.func.filter(f=>f.status!=='Desligado').sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(f=>CARGA.map(([k])=>k==='id'?f._id:k==='cpf'?fCPF(f.cpf):k==='tipo'?(f.tipo==='PJ'?'PJ':'CLT'):k==='empresa'?(f.tipo==='PJ'?(f.empresa||''):''):k==='salario'?(f.salario!==''&&f.salario!=null?brl(f.salario).replace('R$ ',''):''):CARGA_DATA.includes(k)?br(f[k]||''):k==='exp'?(f.exp&&['prorrogado','efetivado'].includes(f.exp.status)?f.exp.status:''):(f[k]||'')))); }
   async function cargaBaixar(){ const L=cargaLinhas(); try{ if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }catch(e){}
     if(window.XLSX&&window.XLSX.utils){ const ws=XLSX.utils.aoa_to_sheet(L); ws['!cols']=CARGA.map(([k])=>({wch:k==='id'?16:k==='nome'?32:k==='ferAte'?22:16})); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Funcionários');
-      const ins=XLSX.utils.aoa_to_sheet([['Como preencher'],['Preencha só o que falta. Datas como 10/03/2024. Salário como 2.150,00.'],['Não mude a coluna "Código". Nome, CPF e vínculo não são alterados pela planilha.'],['Férias: a data em que terminou o último período aquisitivo já tirado (ex.: 09/03/2025). Os períodos até essa data ficam como "já tirados".'],['Experiência: escreva prorrogado ou efetivado, se for o caso.'],['PJ: data da última troca. A próxima fica 3 meses depois.']]); ins['!cols']=[{wch:110}]; XLSX.utils.book_append_sheet(wb,ins,'Como preencher');
+      const ins=XLSX.utils.aoa_to_sheet([['Como preencher'],['Preencha só o que falta. Datas como 10/03/2024. Salário como 2.150,00.'],['Não mude a coluna "Código". De quem já está no painel, nome, CPF e vínculo não são alterados pela planilha.'],['Pessoa nova: escreva numa linha nova, sem código, com Nome, CPF e Vínculo (CLT ou PJ). CLT é sempre Colafix; PJ: escreva Zenith ou Nexus em Empresa (PJ).'],['Férias: a data em que terminou o último período aquisitivo já tirado (ex.: 09/03/2025). Os períodos até essa data ficam como "já tirados".'],['Experiência: escreva prorrogado ou efetivado, se for o caso.'],['PJ: data da última troca. A próxima fica 3 meses depois.']]); ins['!cols']=[{wch:110}]; XLSX.utils.book_append_sheet(wb,ins,'Como preencher');
       baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Carga-RH-Colafix.xlsx'); return; }
     baixar(new Blob(['\ufeff'+L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(';')).join('\r\n')],{type:'text/csv'}),'Carga-RH-Colafix.csv'); }
   function csvLinhas(t){ const sep=(t.split(/\r?\n/)[0].match(/;/g)||[]).length>=(t.split(/\r?\n/)[0].match(/,/g)||[]).length?';':','; const out=[]; let row=[],cel='',q=false;
@@ -817,31 +817,36 @@
     else { if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}); }
     const hi=rows.findIndex(r=>r.some(c=>norm(c)==='NOME')&&r.some(c=>norm(c)==='CPF')); if(hi<0) throw new Error('Não achei as colunas Nome e CPF. Use a planilha baixada aqui.');
     const H=rows[hi].map(norm), col={}; CARGA.forEach(([k,l])=>{ col[k]=H.indexOf(norm(l)); });
-    const linhas=[], nao=[]; let nmud=0, nfer=0;
+    const linhas=[], nao=[], cpfsNovos=new Set(); let nmud=0, nfer=0;
     rows.slice(hi+1).forEach(r=>{ const cel=k=>col[k]>=0?r[col[k]]:''; if(!String(cel('nome')||'').trim()&&!String(cel('cpf')||'').trim()) return;
-      const f=R.func.find(x=>x._id===String(cel('id')).trim())||R.func.find(x=>dig(x.cpf)&&dig(x.cpf)===dig(cel('cpf'))); if(!f){ nao.push(String(cel('nome')||cel('cpf'))); return; }
-      const up={}, mud=[], erros=[]; let ferAte='';
+      let f=R.func.find(x=>x._id===String(cel('id')).trim())||R.func.find(x=>dig(x.cpf)&&dig(x.cpf)===dig(cel('cpf'))), novo=false;
+      if(!f){ const nome=String(cel('nome')||'').trim().replace(/\s+/g,' ').toUpperCase(), cpf=dig(cel('cpf')), tipo=norm(cel('tipo'))==='PJ'?'PJ':'CLT';
+        if(!nome||!cpfOk(cpf)||cpfsNovos.has(cpf)){ nao.push((nome||'sem nome')+(!cpfOk(cpf)?' (CPF inválido)':cpfsNovos.has(cpf)?' (CPF repetido)':'')); return; } cpfsNovos.add(cpf);
+        f={_id:null,nome,cpf,tipo,empresa:empPadrao(tipo,cel('empresa')),status:'Ativo'}; novo=true; }
+      const up={}, mud=novo?['Pessoa nova ('+f.tipo+(f.tipo==='PJ'&&f.empresa?' · '+f.empresa:'')+')']:[], erros=[]; let ferAte='';
+      if(novo&&f.tipo==='PJ'&&!f.empresa) erros.push('PJ sem empresa (Zenith ou Nexus)');
       CARGA.forEach(([k,l])=>{ if(CARGA_FIXO.includes(k)) return; const raw=cel(k); if(raw==null||String(raw).trim()==='') return;
         if(CARGA_DATA.includes(k)){ const d=dataCel(raw); if(d.erro){ erros.push(l+': '+d.erro); return; } if(k==='ferAte'){ ferAte=d.v; return; } if(k==='ultimaTroca'&&f.tipo!=='PJ') return; if(d.v!==(f[k]||'')){ up[k]=d.v; mud.push(l); } return; }
         if(k==='salario'){ const n=typeof raw==='number'?raw:numBR(raw); if(n==null){ erros.push('Salário: '+raw); return; } if(n!==f.salario){ up.salario=n; mud.push(l); } return; }
         if(k==='exp'){ const s=norm(raw); const st=/PRORROG/.test(s)?'prorrogado':/EFETIV/.test(s)?'efetivado':''; if(!st){ erros.push(l+': '+raw); return; } if(f.tipo!=='PJ'&&(!f.exp||f.exp.status!==st)){ up.exp={status:st,em:agora(),porNome:eu()}; mud.push('Experiência: '+st); } return; }
         const v=String(raw).trim(); if(v!==String(f[k]||'')){ up[k]=v; mud.push(l); } });
-      if(ferAte&&f.tipo!=='PJ'){ const adm=up.admissao||f.admissao; const ps=okIso(adm)?periodos(Object.assign({},f,{admissao:adm})).filter(p=>p.completo&&p.saldo>0&&p.fim<=ferAte):[]; if(ps.length){ mud.push('Férias: '+plural(ps.length,'período tirado','períodos tirados')); nfer+=ps.length; } linhas.push({f,up,mud,erros,fer:ps}); }
-      else linhas.push({f,up,mud,erros,fer:[]});
+      if(ferAte&&f.tipo!=='PJ'){ const adm=up.admissao||f.admissao; const ps=okIso(adm)?periodos(Object.assign({},f,{admissao:adm})).filter(p=>p.completo&&p.saldo>0&&p.fim<=ferAte):[]; if(ps.length){ mud.push('Férias: '+plural(ps.length,'período tirado','períodos tirados')); nfer+=ps.length; } linhas.push({f,up,mud,erros,fer:ps,novo}); }
+      else linhas.push({f,up,mud,erros,fer:[],novo});
       nmud+=Object.keys(up).length; });
-    return {linhas:linhas.filter(o=>o.mud.length||o.erros.length),nao,nmud,nfer,lidas:linhas.length}; }
+    return {linhas:linhas.filter(o=>o.mud.length||o.erros.length),nao,nmud,nfer,lidas:linhas.length,novos:linhas.filter(o=>o.novo).length}; }
   function vCarga(){ const g=R.carga, p=g.prev;
-    return `<section class="card rh-form"><div class="head" style="align-items:baseline"><div><div class="eyebrow">CARGA INICIAL</div><h2 style="margin:2px 0 0">Completar os cadastros por planilha</h2></div><button class="lnk" data-act="rh-cargax">Fechar</button></div>
-      <div class="rh-ap"><span class="rh-apn">1</span><div><b>Baixe a planilha</b><small>Já vem com todos os funcionários. Preencha nascimento, salário, jornada, última troca do PJ, até quando já tirou férias…</small><div style="margin-top:6px"><button class="btn sec rh-sm" data-act="rh-cargabaixar">Baixar planilha (Excel)</button></div></div></div>
-      <div class="rh-ap"><span class="rh-apn">2</span><div><b>Envie a planilha preenchida</b><small>O painel mostra o que vai mudar antes de gravar. Só o que está preenchido muda; nada é apagado.</small><div style="margin-top:6px"><label class="btn sec rh-sm" style="cursor:pointer">Escolher arquivo<input type="file" id="rh-cargaf" accept=".xlsx,.xls,.csv" hidden></label></div></div></div>
-      ${p?`<div class="rh-sep"></div><div class="rh-ch"><b>${p.linhas.filter(o=>o.mud.length).length} pessoa(s) com alterações · ${p.lidas} encontrada(s) na planilha</b>${p.nao.length?`<span class="pill warn">${p.nao.length} não encontrada(s)</span>`:''}</div>
-        ${p.nao.length?`<div class="sub" style="margin:0 0 8px;font-size:12.5px">Não encontrados (confira o CPF): ${esc(p.nao.slice(0,8).join(', '))}${p.nao.length>8?'…':''}</div>`:''}
-        ${p.linhas.length?`<div class="rh-tw" style="max-height:340px;overflow:auto"><table class="rh-t"><thead><tr><th>Funcionário</th><th>O que muda</th><th>Problemas</th></tr></thead><tbody>${p.linhas.map(o=>`<tr><td><b>${esc(o.f.nome)}</b></td><td>${esc(o.mud.join(', ')||'—')}</td><td style="color:var(--crit-ink)">${esc(o.erros.join(' · '))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="sub">Nada para mudar.</div>'}
+    return `<section class="card rh-form"><div class="head" style="align-items:baseline"><div><div class="eyebrow">IMPORTAR PLANILHA</div><h2 style="margin:2px 0 0">Cadastrar e completar por planilha</h2></div><button class="lnk" data-act="rh-cargax">Fechar</button></div>
+      <div class="rh-ap"><span class="rh-apn">1</span><div><b>Baixe a planilha</b><small>Já vem com quem está no painel. Complete os dados e acrescente as pessoas novas em linhas no final (Nome, CPF e Vínculo são obrigatórios).</small><div style="margin-top:6px"><button class="btn sec rh-sm" data-act="rh-cargabaixar">Baixar planilha (Excel)</button></div></div></div>
+      <div class="rh-ap"><span class="rh-apn">2</span><div><b>Envie a planilha preenchida</b><small>O painel mostra quem é novo e o que vai mudar antes de gravar. Só o que está preenchido muda; nada é apagado.</small><div style="margin-top:6px"><label class="btn sec rh-sm" style="cursor:pointer">Escolher arquivo<input type="file" id="rh-cargaf" accept=".xlsx,.xls,.csv" hidden></label></div></div></div>
+      ${p?`<div class="rh-sep"></div><div class="rh-ch"><b>${p.novos?plural(p.novos,'pessoa nova','pessoas novas')+' · ':''}${p.linhas.filter(o=>!o.novo&&o.mud.length).length} com alterações · ${p.lidas} lida(s)</b>${p.nao.length?`<span class="pill warn">${p.nao.length} com problema</span>`:''}</div>
+        ${p.nao.length?`<div class="sub" style="margin:0 0 8px;font-size:12.5px">Não vão entrar (confira nome e CPF): ${esc(p.nao.slice(0,8).join(', '))}${p.nao.length>8?'…':''}</div>`:''}
+        ${p.linhas.length?`<div class="rh-tw" style="max-height:340px;overflow:auto"><table class="rh-t"><thead><tr><th>Funcionário</th><th>O que muda</th><th>Problemas</th></tr></thead><tbody>${p.linhas.map(o=>`<tr><td><b>${esc(o.f.nome)}</b>${o.novo?' <span class="pill teal">novo</span>':''}</td><td>${esc(o.mud.join(', ')||'—')}</td><td style="color:var(--crit-ink)">${esc(o.erros.join(' · '))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="sub">Nada para mudar.</div>'}
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn" data-act="rh-cargaok" ${p.linhas.some(o=>o.mud.length)&&!R.salv?'':'disabled'}>Gravar as alterações</button></div>`:''}</section>`; }
-  async function cargaAplicar(){ const p=R.carga.prev; let n=0, nf=0;
-    for(const o of p.linhas){ if(Object.keys(o.up).length){ await grava(COL.func+'/'+o.f._id,Object.assign({},o.up)); n++; }
+  async function cargaAplicar(){ const p=R.carga.prev; let n=0, nf=0, nn=0;
+    for(const o of p.linhas){ if(o.novo){ const nid=id(); await grava(COL.func+'/'+nid,Object.assign({nome:o.f.nome,cpf:o.f.cpf,tipo:o.f.tipo,empresa:o.f.empresa,status:'Ativo',criadoEm:agora(),criadoPor:P.S.uid||null,origem:'planilha'},o.up)); o.f._id=nid; o.f.nome=o.f.nome; nn++; }
+      else if(Object.keys(o.up).length){ await grava(COL.func+'/'+o.f._id,Object.assign({},o.up)); n++; }
       for(const per of o.fer){ await P.db().doc(COL.ferias+'/'+id()).set({funcId:o.f._id,funcionario:o.f.nome,aquisitivo:per.ini,aquisitivoFim:per.fim,dias:per.saldo,anterior:true,status:'tirada',origem:'carga',em:agora(),por:P.S.uid||null,porNome:eu()}); nf++; } }
-    return {n,nf}; }
+    return {n,nf,nn}; }
 
   /* ---------- registro do módulo ---------- */
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:vInicio}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
@@ -1068,8 +1073,8 @@
       if(a==='rh-carga'){ R.carga=R.carga?null:{prev:null}; R.f=null; R.adm=null; P.render(); return; }
       if(a==='rh-cargax'){ R.carga=null; P.render(); return; }
       if(a==='rh-cargabaixar'){ await cargaBaixar(); return; }
-      if(a==='rh-cargaok'){ if(!R.carga||!R.carga.prev) return; const np=R.carga.prev.linhas.filter(o=>o.mud.length).length; if(!confirm('Gravar as alterações de '+plural(np,'pessoa','pessoas')+'?')) return;
-        R.salv=true; P.render(); try{ const r=await cargaAplicar(); R.carga=null; P.toast(plural(r.n,'cadastro atualizado','cadastros atualizados')+(r.nf?' · '+plural(r.nf,'período de férias','períodos de férias')+' marcado(s) como já tirado(s)':'')+'.'); } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-cargaok'){ if(!R.carga||!R.carga.prev) return; const np=R.carga.prev.linhas.filter(o=>o.mud.length).length, nv=R.carga.prev.novos||0; if(!confirm('Gravar '+(nv?plural(nv,'pessoa nova','pessoas novas')+' e ':'')+'as alterações ('+plural(np,'pessoa','pessoas')+' no total)?')) return;
+        R.salv=true; P.render(); try{ const r=await cargaAplicar(); R.carga=null; P.toast((r.nn?plural(r.nn,'pessoa cadastrada','pessoas cadastradas')+' · ':'')+plural(r.n,'cadastro atualizado','cadastros atualizados')+(r.nf?' · '+plural(r.nf,'período de férias','períodos de férias')+' marcado(s) como já tirado(s)':'')+'.'); } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-pzabrir'){ R.pzv=b.dataset.v||'ferias'; P.go('rhferias'); return; }
       if(a==='rh-pzv'){ R.pzv=b.dataset.v; P.render(); return; }
       if(a==='rh-pzfil'){ R.pzfil=b.dataset.v; P.render(); return; }

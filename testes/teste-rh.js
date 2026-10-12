@@ -41,10 +41,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  const lid=arq[0].split('/').pop(); await p.goto(H.BASE+'?rhfile='+lid); await H.dorme(3500);
  const ban=await p.evaluate(()=>({v:__T.S().view,b:!!document.querySelector('[data-act="rh-arq"]')}));
  ok('Link do arquivo abre o painel na tela das fichas com o botão "Abrir arquivo"', ban.v==='rhfichas'&&ban.b, JSON.stringify(ban));
- // importar CSV
- await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); fs.writeFileSync('/tmp/func.csv','Nome;CPF;Função;Setor;Data de admissão;Empresa;Status;Tipo\nCarlos Lima;111.444.777-35;Operador de Produção;Linha 2;05/02/2023;Colafix;Ativo;CLT\nRepetida;529.982.247-25;X;Y;;;Ativo;\nInvalido;000.000.000-00;X;Y;;;Ativo;');
- await p.setInputFiles('#rh-imp','/tmp/func.csv'); await H.dorme(1200); const ti=await toast(); s=await srv(); const nf=Object.keys(s).filter(k=>k.startsWith('rh/dados/funcionarios/')).length;
- ok('Importar lista (CSV/Excel): entra o novo, ignora repetido e CPF inválido', nf===2&&/1 funcionário\(s\) importado/.test(ti)&&/1 já existiam/.test(ti)&&/1 com CPF inválido/.test(ti), ti);
+ // importar planilha (pessoa nova, já cadastrada, CPF inválido)
+ await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); fs.writeFileSync('/tmp/func.csv','Nome;CPF;Vínculo;Empresa (PJ);Função;Setor;Admissão\nCarlos Lima;111.444.777-35;CLT;;Operador de Produção;Linha 2;05/02/2023\nRepetida;529.982.247-25;;;;;\nInvalido;000.000.000-00;CLT;;X;Y;\nPedro PJ;862.883.667-57;PJ;Nexus;Eletricista;Manutenção;01/08/2024');
+ await p.click('[data-act="rh-carga"]'); await H.dorme(300); await p.setInputFiles('#rh-cargaf','/tmp/func.csv'); await H.dorme(1200);
+ const prv=await p.evaluate(()=>document.querySelector('.rh-form').innerText);
+ p.on('dialog',x=>x.accept()); await p.click('[data-act="rh-cargaok"]'); await H.dorme(1500); const ti=await toast(); s=await srv(); const fsx=Object.entries(s).filter(([k])=>k.startsWith('rh/dados/funcionarios/')).map(([k,v])=>v);
+ const car=fsx.find(x=>x.nome==='CARLOS LIMA'), pj=fsx.find(x=>x.nome==='PEDRO PJ');
+ ok('Importar planilha: cadastra os novos (CLT Colafix, PJ com empresa), não duplica quem já existe e avisa CPF inválido', fsx.length===3&&car&&car.empresa==='COLAFIX'&&car.admissao==='2023-02-05'&&car.funcao==='Operador de Produção'&&pj&&pj.tipo==='PJ'&&pj.empresa==='NEXUS'&&/2 pessoas novas/.test(prv)&&/INVALIDO \(CPF inválido\)/.test(prv)&&/2 pessoas cadastradas/.test(ti), ti+' n='+fsx.length);
  console.log('erros:',B.erros.filter(x=>!/404|cdnjs/.test(x))); await B.browser.close();
  // quem não é do RH
  const C=await H.abrir(); await H.preparar(C.page,d); await C.page.goto(H.BASE); await H.entrar(C.page,'operador','ope123'); await H.dorme(2500);

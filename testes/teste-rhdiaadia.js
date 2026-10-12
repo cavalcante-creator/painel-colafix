@@ -86,7 +86,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4), M=dias(0).slice(0,7
   // planilha de carga inicial
   await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await p.click('[data-act="rh-carga"]'); await H.dorme(300);
   const pl=await baixa('[data-act="rh-cargabaixar"]');
-  ok('Carga inicial: baixa a planilha com todos os ativos (sem a biblioteca do Excel, em CSV)', pl&&/^Carga-RH-Colafix\.(xlsx|csv)$/.test(pl.nome)&&(pl.nome.endsWith('.xlsx')||(/"Código \(não mexer\)"/.test(pl.txt)&&/ANA SOUZA/.test(pl.txt)&&!/ZECA SAIU/.test(pl.txt))), pl&&pl.nome);
+  ok('Importar planilha: baixa a planilha com todos os ativos (sem a biblioteca do Excel, em CSV)', pl&&/^Carga-RH-Colafix\.(xlsx|csv)$/.test(pl.nome)&&(pl.nome.endsWith('.xlsx')||(/"Código \(não mexer\)"/.test(pl.txt)&&/ANA SOUZA/.test(pl.txt)&&!/ZECA SAIU/.test(pl.txt))), pl&&pl.nome);
   const linhas=pl.txt.replace(/^﻿/,'').split('\r\n').map(l=>l.split(';').map(c=>c.replace(/^"|"$/g,'').replace(/""/g,'"')));
   const cab=linhas[0], ci=n=>cab.indexOf(n), set=(nome,col,v)=>{ const r=linhas.find(x=>x[ci('Nome')]===nome); r[ci(col)]=v; };
   set('CARLOS LIMA','Nascimento','15/03/1990'); set('CARLOS LIMA','Salário','2.300,50'); set('CARLOS LIMA','Férias tiradas até o período que terminou em',br(anos(-1,-41)));
