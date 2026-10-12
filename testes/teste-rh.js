@@ -4,7 +4,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const toast=()=>p.evaluate(()=>{ const t=document.getElementById('toast'); return t&&!t.hidden?t.innerText:''; });
  const e0=await p.evaluate(()=>({v:__T.S().view,nav:document.getElementById('navlist').innerText.replace(/\n/g,'|')}));
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300);
- ok('RH entra direto no Painel do RH e só tem o módulo RH no menu', e0.v==='rhinicio'&&e0.nav==='RH', JSON.stringify(e0));
+ ok('RH entra direto no Início do RH', e0.v==='rhinicio', JSON.stringify(e0));
  // cadastro
  await p.click('[data-act="rh-novo"]'); await p.fill('[data-rh-f="nome"]','Ana Souza'); await p.fill('[data-rh-f="cpf"]','123.456.789-00'); await p.click('[data-act="rh-salvar"]'); await H.dorme(300); const t1=await toast();
  await p.fill('[data-rh-f="cpf"]','529.982.247-25'); await p.fill('[data-rh-f="funcao"]','Operador de Produção'); await p.fill('[data-rh-f="setor"]','Linha 1'); await p.fill('[data-rh-f="admissao"]','2024-03-10'); await p.fill('[data-rh-f="camisa"]','M');
@@ -19,14 +19,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  await p.fill('[data-rh-it="uniformes"][data-i="0"][data-c="nome"]','Camisa'); await p.fill('[data-rh-it="uniformes"][data-i="0"][data-c="tam"]','M'); await p.click('[data-act="rh-fsalvar"]'); await H.dorme(600);
  s=await srv(); const fc=Object.values(s).find(x=>x&&x.epis);
  ok('Funções: avisa função sem EPI e salva EPIs (com CA) e uniforme', avisoFunc&&fc&&fc.nome==='Operador de Produção'&&fc.epis[0].ca==='12345'&&fc.uniformes[0].tam==='M', JSON.stringify(fc&&{n:fc.nome,e:fc.epis,u:fc.uniformes}));
- // retirada
- await p.evaluate(()=>__T.go('rhret')); await H.dorme(400); await p.click('[data-act="rh-rnovo"]'); await H.dorme(200);
- await p.selectOption('[data-rh-r="funcId"]',fun[0][0].split('/').pop()); await H.dorme(200); await p.fill('[data-rh-r="item"]','Luva de proteção'); await p.dispatchEvent('[data-rh-r="item"]','change'); await H.dorme(200);
- const caAuto=await p.$eval('[data-rh-r="ca"]',e=>e.value); await p.fill('[data-rh-r="qtd"]','2'); await p.click('[data-act="rh-rsalvar"]'); await H.dorme(600);
- s=await srv(); const rt=Object.values(s).find(x=>x&&x.item==='Luva de proteção');
- ok('Retirada: escolhe o item da função, CA preenche sozinho, salva e lista no mês', caAuto==='12345'&&rt&&rt.qtd===2&&rt.funcionario==='ANA SOUZA'&&/Luva de proteção/.test(await p.evaluate(()=>document.getElementById('view').innerText)), 'CA automático: '+caAuto);
+ // menu igual ao exemplo (12/10): Dia a dia, Controle de EPI e Retiradas saíram
+ const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
+ ok('Menu do RH igual ao exemplo, com as telas na lateral', menu==='Início|Funcionários|Fichas do mês|Documentos e contratos|Funções e EPIs|Terceirizados', menu);
+ await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(200); await p.click('[data-act="rh-fgerartela"]'); await H.dorme(400);
  // fichas (sistema original dentro do painel)
- await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
+ await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
  const st=fr?await fr.evaluate(()=>document.getElementById('status-text').textContent):'(sem iframe)';
  ok('Fichas: o sistema original abre no painel e lê o cadastro do RH (sem planilha)', /1 colaborador\(es\) ativo\(s\)/.test(st)&&/base do RH/.test(st), st);
  await fr.evaluate(()=>{ const s=document.getElementById('select-funcionario'); s.selectedIndex=[...s.options].findIndex(o=>/ANA/.test(o.text)); s.dispatchEvent(new Event('change')); }); await fr.click('#btn-gerar'); await H.dorme(800);

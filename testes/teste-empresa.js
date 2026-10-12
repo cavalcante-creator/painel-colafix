@@ -9,7 +9,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const fs=Object.values(s).filter(x=>x&&x.cpf);
  const a=fs.find(x=>x.nome==='ANA SOUZA'), pj=fs.find(x=>x.nome==='PEDRO ALVES');
  ok('CLT sai com empresa Colafix (campo travado); PJ escolhe Zenith/Nexus', dis&&a&&a.empresa==='COLAFIX'&&a.tipo==='CLT'&&!!temSel&&pj&&pj.empresa==='NEXUS'&&pj.tipo==='PJ', JSON.stringify({ana:a&&a.empresa,pedro:pj&&pj.empresa}));
- await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
+ await p.evaluate(()=>__T.go('rhfichas')); await p.click('[data-act="rh-fvgerar"]'); await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
  const corpo=await fr.evaluate(()=>document.body.innerText);
  ok('Tela das fichas sem nenhuma menção a planilha', !/planilha/i.test(corpo), (corpo.match(/.{0,40}planilha.{0,40}/i)||[''])[0]);
  const ficha=async nome=>{ await fr.evaluate(n=>{ const s=document.getElementById('select-funcionario'); s.selectedIndex=[...s.options].findIndex(o=>o.text.includes(n)); s.dispatchEvent(new Event('change')); },nome); await fr.click('#btn-gerar'); await H.dorme(700); return fr.evaluate(()=>document.getElementById('preview-wrap').innerText); };

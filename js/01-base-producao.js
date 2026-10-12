@@ -850,7 +850,7 @@ function render(){
   { const bx=S.rep&&S.rep.aberto&&document.querySelector('.rep.dbmbox'); if(bx&&S.rep.st) bx.scrollTop=S.rep.st; }
   try{ tpAtualiza(); }catch(e){ console.warn('topo',e); }
 }
-function rerenderSeguro(){ if(S.cal&&S.cal.drag) return; if(S.view==='medicao'||S.view==='ajustes') return; const a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT')&&a.closest('#view')) return; render(); }
+function rerenderSeguro(){ if(S.cal&&S.cal.drag) return; if(S.view==='medicao'||S.view==='ajustes') return; const a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'||a.isContentEditable)&&a.closest('#view')) return; render(); }
 
 // ================= ORDENS DE PRODUÇÃO =================
 const ORD_LINHAS_PADRAO=['Linha 1','Linha 2','Linha 3','Área líquida','Rejunte M1','Rejunte M2','Rejunte M3','Fixcol'];
