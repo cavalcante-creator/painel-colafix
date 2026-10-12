@@ -523,7 +523,7 @@
     let xs=clts().map(f=>({f,s:sitFer(f)})); const nAt=xs.filter(o=>['crit','warn'].includes(o.s.c)).length; if(F==='atencao') xs=xs.filter(o=>['crit','warn'].includes(o.s.c));
     xs.sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
     const venc=clts().reduce((n,f)=>n+periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim<hj).length,0), prox=ferProximas();
-    return (R.ffer?formFerias():'')
+    return (R.fajs?formAjuste():'')+(R.ffer?formFerias():'')
       +(prox.length?`<section class="card"><h2>Férias marcadas</h2><div class="rh-tw"><table class="rh-t"><thead><tr><th>Funcionário</th><th>Férias</th><th>Volta</th><th>Aviso de férias</th><th></th></tr></thead><tbody>
         ${prox.map(x=>{ const ag=x.inicio<=hj; return `<tr><td><b>${esc(x.funcionario)}</b><small style="display:block;color:var(--muted)">período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}</small></td><td class="num">${br(x.inicio)} a ${br(x.fim)} <small style="color:var(--muted)">· ${plural(+x.dias,'dia','dias')}</small>${ag?' <span class="pill ok">em férias</span>':''}</td><td class="num">${br(x.retorno)}</td>
           <td>${temAviso(x)?'<span class="pill ok">Gerado</span>':`<button class="btn rh-sm" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}</td><td class="rh-ac">${ag?'':`<button class="lnk" data-act="rh-fercanc" data-id="${x._id}" style="color:var(--crit-ink)">Desmarcar</button>`}</td></tr>`; }).join('')}</tbody></table></div></section>`:'')
@@ -533,8 +533,19 @@
         ${xs.map(({f,s})=>{ const p=s.p; return `<tr><td><b>${esc(f.nome)}</b><small>${esc([f.funcao,f.setor].filter(Boolean).join(' · '))}</small></td><td class="num">${br(f.admissao)||'—'}</td>
           <td class="num">${p?`${br(p.ini)} a ${br(p.fim)}<small>${p.completo?(p.saldo?'faltam '+plural(p.saldo,'dia','dias')+' · conceder até '+br(p.lim):'tirado'):'em aquisição · completa em '+br(p.fim)}</small>`:'—'}</td>
           <td><span class="pill ${s.c}">${esc(s.t)}</span></td>
-          <td class="rh-ac">${s.p?`<button class="btn sec rh-sm" data-act="rh-fernova" data-id="${f._id}">Marcar férias</button>`:`<button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${f._id}">Informar admissão</button>`}${s.p&&s.p.completo&&s.p.saldo?` <button class="lnk" data-act="rh-ferant" data-id="${f._id}" data-p="${s.p.ini}" title="Para férias tiradas antes de usar o painel">Já tirou</button>`:''}</td></tr>`; }).join('')}</tbody></table></div>`
+          <td class="rh-ac">${s.p?`<button class="btn sec rh-sm" data-act="rh-fernova" data-id="${f._id}">Marcar férias</button>`:`<button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${f._id}">Informar admissão</button>`}${s.p&&s.p.completo&&s.p.saldo?` <button class="lnk" data-act="rh-ferant" data-id="${f._id}" data-p="${s.p.ini}" title="Para férias tiradas antes de usar o painel">Já tirou</button>`:''}${s.p?` <button class="lnk" data-act="rh-fajabrir" data-id="${f._id}" title="Dizer quantos dias de cada período a pessoa já tirou">Ajustar</button>`:''}</td></tr>`; }).join('')}</tbody></table></div>`
         :`<div class="empty">${F==='atencao'?'Nenhum prazo de férias perto de vencer.':'Nenhum CLT em atividade.'}</div>`}</section>`; }
+  /* Ajustar períodos: a RH informa, período a período, quantos dias a pessoa já tirou antes do painel */
+  function formAjuste(){ const g=R.fajs, f=R.func.find(x=>x._id===g.funcId); if(!f) return ''; const ps=periodos(f), hj=P.hojeStr();
+    const ant=p=>p.ps.filter(x=>x.anterior).reduce((a,x)=>a+(+x.dias||0),0), noP=p=>p.usados-ant(p);
+    const val=p=>g.v[p.ini]!=null?g.v[p.ini]:String(ant(p));
+    return `<section class="card rh-form" id="rh-fajs"><div class="head" style="align-items:baseline"><h2>Ajustar as férias de ${esc(f.nome)}</h2><button class="lnk" data-act="rh-fajx">Fechar</button></div>
+      <p class="sub" style="margin:0 0 10px">Admissão em ${br(f.admissao)}. Para cada período, coloque quantos dias a pessoa <b>já tirou antes de usar o painel</b> (0 a 30). As férias marcadas aqui no painel já contam sozinhas.</p>
+      <div class="rh-tw"><table class="rh-t"><thead><tr><th>Período aquisitivo</th><th>Dar até</th><th>Marcadas no painel</th><th>Já tirou antes do painel</th><th>Faltam</th></tr></thead><tbody>
+      ${ps.map(p=>{ const max=30-noP(p), v=Math.min(max,Math.max(0,parseInt(val(p),10)||0)), falta=Math.max(0,30-noP(p)-v); return `<tr><td class="num"><b>${br(p.ini)} a ${br(p.fim)}</b>${p.completo?'':'<small>em aquisição</small>'}</td><td class="num">${br(p.lim)}${p.completo&&falta&&p.lim<hj?' <span class="pill crit">vencido</span>':''}</td><td class="num">${noP(p)?plural(noP(p),'dia','dias'):'—'}</td>
+        <td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input class="txt" type="number" min="0" max="${max}" inputmode="numeric" style="width:76px" data-rh-aj="${p.ini}" value="${esc(val(p))}">${max>0?`<button class="lnk" data-act="rh-fajtudo" data-p="${p.ini}" data-v="${max}">tirou tudo</button> <button class="lnk" data-act="rh-fajtudo" data-p="${p.ini}" data-v="0">nada</button>`:''}</div></td>
+        <td class="num"><b>${plural(falta,'dia','dias')}</b></td></tr>`; }).join('')}</tbody></table></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-fajx">Cancelar</button><button class="btn" data-act="rh-fajsalvar" ${R.salv?'disabled':''}>Salvar ajuste</button></div></section>`; }
   function formFerias(){ const g=R.ffer, f=R.func.find(x=>x._id===g.funcId); if(!f) return ''; const ps=periodos(f).filter(p=>p.saldo>0), p=ps.find(x=>x.ini===g.aquisitivo)||ps.find(x=>x.completo)||ps[0];
     if(p&&g.aquisitivo!==p.ini) g.aquisitivo=p.ini; const dias=+g.dias||0, fim=okIso(g.inicio)&&dias>0?addDias(g.inicio,dias-1):'', ret=fim?addDias(fim,1):'';
     const hist=ferDe(f).slice().sort((a,b)=>String(b.inicio||b.aquisitivo).localeCompare(String(a.inicio||a.aquisitivo)));
@@ -736,7 +747,7 @@
           ${!sf&&!e&&!pj&&!falt.length?'<div class="sub" style="margin:0">Nenhum prazo.</div>':''}</section>
         <section class="card"><h2>Fichas de EPI e uniforme</h2>${meses.map(m=>{ const s=fSit(f,m); return `<div class="rh-pd"><span>${esc(cap(mesLabel(m)))}</span><b><span class="pill ${s.c}">${esc(s.t)}</span></b></div>`; }).join('')}
           <div style="margin-top:8px"><button class="lnk" data-act="rh-fabrir">Abrir as fichas do mês</button></div></section>
-        ${f.tipo!=='PJ'?`<section class="card"><h2>Férias</h2>${fers.length?fers.slice(0,8).map(x=>`<div class="rh-dl"><div><b>${x.anterior?'Tiradas antes do painel':br(x.inicio)+' a '+br(x.fim)}</b><small>${plural(+x.dias,'dia','dias')} · período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}${x.status==='cancelada'?' · desmarcada':''}</small></div>${!x.anterior&&x.status!=='cancelada'?(temAviso(x)?'<span class="pill ok">Aviso gerado</span>':`<button class="lnk" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`):''}</div>`).join(''):'<div class="sub" style="margin:0">Nenhuma férias registrada.</div>'}</section>`:''}
+        ${f.tipo!=='PJ'?`<section class="card"><div class="rh-ch"><h2>Férias</h2>${okIso(f.admissao)?`<button class="lnk" data-act="rh-fajabrir" data-id="${f._id}" data-go-fer="1">Ajustar períodos</button>`:''}</div>${fers.length?fers.slice(0,8).map(x=>`<div class="rh-dl"><div><b>${x.anterior?'Tiradas antes do painel':br(x.inicio)+' a '+br(x.fim)}</b><small>${plural(+x.dias,'dia','dias')} · período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}${x.status==='cancelada'?' · desmarcada':''}</small></div>${!x.anterior&&x.status!=='cancelada'?(temAviso(x)?'<span class="pill ok">Aviso gerado</span>':`<button class="lnk" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`):''}</div>`).join(''):'<div class="sub" style="margin:0">Nenhuma férias registrada.</div>'}</section>`:''}
         <section class="card rh-pgw">${docsDaPessoa(f._id).replace('class="rh-docs"','class="rh-docs" style="margin:0;padding:0;border:0"')}</section></div>`; }
   function buscaPessoas(q){ q=norm(q); const d=dig(q); if(q.length<2) return []; return R.func.filter(f=>norm(f.nome).includes(q)||(d.length>=3&&dig(f.cpf).includes(d))).sort((a,b)=>(a.status==='Desligado')-(b.status==='Desligado')||a.nome.localeCompare(b.nome,'pt-BR')).slice(0,6); }
   function cartaoBusca(){ const xs=buscaPessoas(R.buscaIni);
@@ -859,6 +870,7 @@
     if(t.id==='rh-ed'||t.id==='rh-dnome') edSync();
     if(t.id==='rh-dnome'&&R.dm&&!R.dm.deslUser){ const dd=document.getElementById('rh-ddesl'); if(dd) dd.checked=modeloDesliga(R.dm); }
     if(t.dataset&&t.dataset.rhDq!=null){ const md=R.modelos.find(x=>x._id===R.dg.modeloId), q=md&&perguntasDe(md.html)[+t.dataset.rhDq]; if(q!=null) R.dg.resp[q]=t.value; clearTimeout(R._dx); R._dx=setTimeout(()=>{ const a=document.activeElement, k=a&&a.dataset&&a.dataset.rhDq, pos=a&&a.selectionStart; P.render(); if(k!=null){ const n2=document.querySelector('[data-rh-dq="'+k+'"]'); if(n2){ n2.focus(); try{ n2.setSelectionRange(pos,pos); }catch(e){} } } },400); }
+    if(t.dataset&&t.dataset.rhAj&&R.fajs){ R.fajs.v[t.dataset.rhAj]=t.value; const k=t.dataset.rhAj; clearTimeout(R._aj); R._aj=setTimeout(()=>{ P.render(); const n2=document.querySelector('[data-rh-aj="'+k+'"]'); if(n2){ n2.focus(); } },600); }
     if(t.id==='rh-ferd'&&R.ffer){ R.ffer.dias=t.value; clearTimeout(R._fd); R._fd=setTimeout(()=>{ P.render(); const n2=document.getElementById('rh-ferd'); if(n2){ n2.focus(); } },500); }
     if(t.id==='rh-pjo'&&R.fpj) R.fpj.obs=t.value;
     if(t.dataset&&t.dataset.rhDx){ R.dg.extra[t.dataset.rhDx]=t.value; clearTimeout(R._dx); R._dx=setTimeout(()=>{ const a=document.activeElement, k=a&&a.dataset&&a.dataset.rhDx, pos=a&&a.selectionStart; P.render(); if(k){ const n=document.querySelector('[data-rh-dx="'+k+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } } },400); } });
@@ -1062,6 +1074,20 @@
       if(a==='rh-pzv'){ R.pzv=b.dataset.v; P.render(); return; }
       if(a==='rh-pzfil'){ R.pzfil=b.dataset.v; P.render(); return; }
       if(a==='rh-fernova'){ R.ffer={funcId:b.dataset.id,inicio:'',dias:''}; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-fajabrir'){ R.fajs={funcId:b.dataset.id,v:{}}; R.ffer=null; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); setTimeout(()=>{ const el=document.getElementById('rh-fajs'); if(el) el.scrollIntoView({block:'start'}); },60); return; }
+      if(a==='rh-fajx'){ R.fajs=null; P.render(); return; }
+      if(a==='rh-fajtudo'){ if(R.fajs) R.fajs.v[b.dataset.p]=b.dataset.v; P.render(); return; }
+      if(a==='rh-fajsalvar'){ const g=R.fajs, f=g&&R.func.find(x=>x._id===g.funcId); if(!f||R.salv) return;
+        document.querySelectorAll('[data-rh-aj]').forEach(i=>{ g.v[i.dataset.rhAj]=i.value; });
+        const mud=[]; for(const p of periodos(f)){ if(g.v[p.ini]==null) continue; const ants=p.ps.filter(x=>x.anterior), atual=ants.reduce((a,x)=>a+(+x.dias||0),0), max=30-(p.usados-atual);
+          const n=parseInt(g.v[p.ini],10); if(String(g.v[p.ini]).trim()===''||isNaN(n)||n<0) return P.toast('Coloque um número de 0 a 30 em '+br(p.ini)+'.'); if(n>max) return P.toast('No período '+br(p.ini)+' cabem no máximo '+max+' dias (já tem '+(30-max)+' marcados no painel).');
+          if(n!==atual) mud.push({p,ants,n}); }
+        if(!mud.length){ R.fajs=null; P.render(); return P.toast('Nada mudou.'); }
+        R.salv=true; P.render();
+        try{ for(const {p,ants,n} of mud){ for(const x of ants) await P.db().doc(COL.ferias+'/'+x._id).delete();
+            if(n>0) await P.db().doc(COL.ferias+'/'+id()).set({funcId:f._id,funcionario:f.nome,aquisitivo:p.ini,aquisitivoFim:p.fim,dias:n,anterior:true,status:'tirada',origem:'ajuste',em:agora(),por:P.S.uid||null,porNome:eu()}); }
+          R.fajs=null; P.toast('Férias de '+f.nome+' ajustadas.'); }
+        catch(e){ P.erro(e); } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-ferx'){ R.ffer=null; P.render(); return; }
       if(a==='rh-ferdias'){ if(R.ffer) R.ffer.dias=b.dataset.v; P.render(); return; }
       if(a==='rh-fersalvar'){ const g=R.ffer, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const di=document.getElementById('rh-ferd'); if(di) g.dias=di.value; const ii=document.getElementById('rh-feri'); if(ii) g.inicio=ii.value;
