@@ -11,13 +11,14 @@
      rh/dados/modelos/{id}             modelos de documento (contratos, termos, declarações)
      rh/dados/docsgerados/{id}         histórico de documentos gerados (quem, quando, assinado anexado, férias, respostas)
      rh/dados/ferias/{id}              férias marcadas ou já tiradas (CLT) · troca dos PJ: ultimaTroca/trocas no cadastro
+     no cadastro também: exp {status prorrogado|efetivado|desligado}, nascimento, desligMotivo · terceirizados: docs[] {id,nome,validade,arquivo}
      rh/arquivos/lista/{id} + rh/arquivos/partes/{id_n}   PDFs e fichas escaneadas (em pedaços)
    As fichas usam o sistema original (modulos/rh-fichas.html) por uma ponte: window.RHAPI (painel → ficha: window.FICHAS). */
 (function(){ const P=window.Painel; if(!P) return;
   const R={terc:[],ft:null,tfil:'ativos',func:[],funcoes:[],cfg:{},lido:{},f:null,ff:null,filtro:{q:'',st:'ativos',setor:'',emp:'',tipo:''},salv:false,arqAbrir:null,
     fm:{},esc:{},fv:'mes',fmes:P.hojeStr().slice(0,7),ffil:{sit:'todas',q:'',setor:'',n:60},fsel:null,prev:{},
     modelos:[],docs:[],dv:'modelos',dm:null,dprev:false,dg:{funcId:'',modeloId:'',extra:{},resp:{},feriasId:'',guardar:true},dgReg:{},
-    fer:[],pzv:'ferias',pzfil:'atencao',ffer:null,fpj:null};
+    fer:[],pzv:'ferias',pzfil:'atencao',ffer:null,fpj:null,fdesl:null,tdoc:null,tdf:null};
   const COL={terc:'rh/dados/terceiros',func:'rh/dados/funcionarios',funcoes:'rh/dados/funcoes',fm:'rh/dados/fichasmes',modelos:'rh/dados/modelos',docs:'rh/dados/docsgerados',ferias:'rh/dados/ferias',lista:'rh/arquivos/lista',partes:'rh/arquivos/partes'};
   const ST=['Ativo','Férias','Afastado','Desligado'];
   /* empresas: todo CLT é Colafix; PJ é Zenith ou Nexus (ou outra) */
@@ -49,7 +50,7 @@
   const semEpi=f=>{ const fc=funcaoDe(f); return !fc||!(fc.epis||[]).length; };
 
   /* ---------- leitura ---------- */
-  function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); });
+  function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); });
     sub('func',()=>P.db().collection(COL.func).limit(3000)); sub('funcoes',()=>P.db().collection(COL.funcoes).limit(500)); sub('terc',()=>P.db().collection(COL.terc).limit(1000));
     sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300)); sub('fer',()=>P.db().collection(COL.ferias).limit(3000));
     P.inscrever('rh-fm',()=>P.db().collection(COL.fm).orderBy('mes','desc').limit(14),snap=>{ snap.docs.forEach(d=>{ R.fm[d.id]=d.data(); }); R.lido.fm=true; P.rerender(); });
@@ -87,7 +88,7 @@
     if(semEpi(f)) return {k:'semepi',t:'Função sem EPI',c:'crit',i};
     if(i) return {k:'imp',t:'Falta assinar',c:'warn',i};
     return {k:'nao',t:'Não gerada',c:'crit'}; }
-  function fResumo(m){ const xs=ativos().map(f=>({f,s:fSit(f,m)})); const c={ass:0,imp:0,nao:0}; xs.forEach(o=>{ c[o.s.k==='semepi'?(o.s.i?'imp':'nao'):o.s.k]++; }); return {xs,c,tot:xs.length}; }
+  function fResumo(m){ const xs=R.func.filter(f=>noMes(f,m)).map(f=>({f,s:fSit(f,m)})); const c={ass:0,imp:0,nao:0}; xs.forEach(o=>{ c[o.s.k==='semepi'?(o.s.i?'imp':'nao'):o.s.k]++; }); return {xs,c,tot:xs.length}; }
 
   /* ---------- ponte para o sistema de fichas (as mesmas funções que o Apps Script tinha) ---------- */
   const DIAS=d=>d?br(d):'';
@@ -98,7 +99,7 @@
   window.RHAPI={
     getDadosPlanilha: async()=>{ const [f,fu,re,cf]=await Promise.all([P.db().collection(COL.func).limit(3000).get(),P.db().collection(COL.funcoes).limit(500).get(),P.db().collection('rh/dados/retiradas').limit(5000).get(),P.db().doc('rh/config').get()]);
       const FU=f.docs.map(d=>d.data()), FC=fu.docs.map(d=>d.data()), RE=re.docs.map(d=>d.data()), C=cf.exists?cf.data():{};
-      const colab=[['Nome','CPF','Função','Setor','Data de admissão','Empresa','Status','Tipo']].concat(FU.map(x=>[x.nome,fCPF(x.cpf),x.funcao||'',x.setor||'',DIAS(x.admissao),x.empresa||'',x.status==='Desligado'?'Inativo':'Ativo',x.tipo==='PJ'?'PJ':'CLT']));
+      const colab=[['Nome','CPF','Função','Setor','Data de admissão','Empresa','Status','Tipo']].concat(FU.map(x=>[x.nome,fCPF(x.cpf),x.funcao||'',x.setor||'',DIAS(x.admissao),x.empresa||'',x.status==='Desligado'&&!(okIso(x.desligamento)&&x.desligamento.slice(0,7)>=P.hojeStr().slice(0,7))?'Inativo':'Ativo',x.tipo==='PJ'?'PJ':'CLT']));
       const cab=(p,s)=>{ const h=['Função']; for(let n=1;n<=9;n++) h.push(p+' '+n,s+' '+n); return h; };
       const linha=(nome,its,k)=>{ const r=[nome]; for(let n=0;n<9;n++){ const x=its[n]; r.push(x?x.nome:'',x?(x[k]||''):''); } return r; };
       const epi=[cab('EPI','CA')].concat(FC.map(x=>linha(x.nome,x.epis||[],'ca')));
@@ -162,6 +163,7 @@
     const porF={}; ativos().filter(f=>f.funcao&&semEpi(f)).forEach(f=>{ const k=norm(f.funcao); (porF[k]=porF[k]||{nome:f.funcao,n:0}).n++; });
     Object.values(porF).sort((a,b)=>b.n-a.n).forEach(o=>av.push({c:'warn',r:'Atenção',t:'Função "'+o.nome+'" sem EPI cadastrado',s:'a ficha de '+o.n+(o.n===1?' pessoa':' pessoas')+' sai sem itens',act:`data-act="rh-fsemepi" data-n="${esc(o.nome)}"`,l:'Resolver'}));
     avisosPrazo().forEach(a=>av.push(a));
+    tDocAvisos().forEach(({x,d,s})=>av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'Documento: '+d.nome+' · '+x.nome,s:s.t.toLowerCase()+(okIso(d.validade)?' ('+br(d.validade).slice(0,5)+')':''),act:`data-act="rh-tdoc" data-go-terc="1" data-id="${x._id}"`,l:'Abrir'}));
     const semFunc=ativos().filter(f=>!f.funcao);
     if(semFunc.length) av.push({c:'warn',r:'Atenção',t:semFunc.length+(semFunc.length===1?' funcionário sem função':' funcionários sem função'),s:'a ficha não tem itens: '+semFunc.slice(0,3).map(f=>f.nome).join(', ')+(semFunc.length>3?'…':''),act:'data-go="rhfunc"',l:'Resolver'});
     return av; }
@@ -175,7 +177,7 @@
       <div class="rh-2"><section class="card"><div class="rh-ch"><h2>Fichas de ${mesNome(m)}</h2><button class="lnk" data-act="rh-fabrir">Ver todas</button></div>
           ${!R.lido.func?'<div class="empty">Carregando…</div>':fr.tot?`${barra(fr.c,fr.tot)}<div class="rh-fn"><div><b class="num ok">${fr.c.ass}</b><span>assinadas e anexadas</span></div><div><b class="num warn">${fr.c.imp}</b><span>impressas, falta assinar</span></div><div><b class="num crit">${fr.c.nao}</b><span>ainda não geradas</span></div></div>`:'<div class="empty">Nenhum funcionário em atividade.</div>'}</section>
         <section class="card"><h2>Avisos</h2>${av.length?av.map(a=>`<div class="rh-av"><span class="pill ${a.c==='crit'?'crit':'warn'}">${esc(a.r)}</span><div><b>${esc(a.t)}</b><small>${esc(a.s)}</small></div><button class="lnk" ${a.act}>${a.l}</button></div>`).join(''):'<div class="empty">Nada pendente. Tudo em dia.</div>'}</section></div>
-      <section class="card"><h2>Atalhos</h2><div class="rh-ats">${at('','Gerar fichas do mês','todas de uma vez, em PDF','data-act="rh-fgerartela"')}${at('','Anexar fichas assinadas','foto ou PDF escaneado','data-act="rh-fanexar"')}${at('','Novo funcionário','cadastro e função','data-act="rh-novo" data-go-func="1"')}${at('rhterc','Terceirizados','prazo dos contratos')}</div></section>`; }
+      ${cartaoAniv()}<section class="card"><h2>Atalhos</h2><div class="rh-ats">${at('','Gerar fichas do mês','todas de uma vez, em PDF','data-act="rh-fgerartela"')}${at('','Anexar fichas assinadas','foto ou PDF escaneado','data-act="rh-fanexar"')}${at('','Novo funcionário','cadastro e função','data-act="rh-novo" data-go-func="1"')}${at('rhterc','Terceirizados','prazo dos contratos')}</div></section>`; }
 
   /* ---------- Fichas do mês ---------- */
   function vFichas(){ const m=R.fmes, hoje=P.hojeStr().slice(0,7); escCarregar(m);
@@ -229,7 +231,7 @@
     xs.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
     const cnt=s=>R.func.filter(x=>x.status===s).length;
     return topo('Funcionários','Cadastro, situação e o que cada um usa.',`<button class="btn" data-act="rh-novo">${P.ic('mais',18,2.4)}Novo funcionário</button><label class="btn sec" style="cursor:pointer">${P.ic('baixar',18,2)}Importar (Excel/CSV)<input type="file" id="rh-imp" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sec" data-act="rh-csv">Exportar</button>`)
-      +(R.f?formFunc():'')
+      +(R.fdesl?formDesl():'')+(R.f?formFunc():'')
       +`<div class="rh-kpi">${ST.map(s=>`<div><b class="num">${cnt(s)}</b><span>${s}</span></div>`).join('')}</div>
       <section class="card"><div class="rh-fil"><input class="txt" id="rh-q" placeholder="Buscar nome, CPF ou função" value="${esc(F.q)}">
         <select class="txt" data-rh-fil="st"><option value="ativos" ${F.st==='ativos'?'selected':''}>Em atividade</option>${ST.map(s=>`<option ${F.st===s?'selected':''}>${s}</option>`).join('')}<option value="todos" ${F.st==='todos'?'selected':''}>Todos</option></select>
@@ -238,7 +240,7 @@
         <select class="txt" data-rh-fil="tipo"><option value="">CLT e PJ</option>${opts(['CLT','PJ'],F.tipo)}</select></div>
       ${!R.lido.func?'<div class="empty">Carregando…</div>':xs.length?`<div class="rh-tw"><table class="rh-t"><thead><tr><th>Nome</th><th>CPF</th><th>Função</th><th>Setor</th><th>Empresa</th><th>Admissão</th><th>Situação</th><th></th></tr></thead><tbody>
         ${xs.map(x=>`<tr><td><b>${esc(x.nome)}</b>${x.tipo==='PJ'?' <span class="pill neu">PJ</span>':''}</td><td class="num">${esc(fCPF(x.cpf))}</td><td>${esc(x.funcao||'')}</td><td>${esc(x.setor||'')}</td><td>${esc(empNome(x.empresa))}</td><td class="num">${br(x.admissao)}</td>
-          <td><span class="pill ${corSt(x.status)}">${esc(x.status||'')}</span>${x.status==='Desligado'&&x.desligamento?`<small style="display:block;color:var(--muted)">${br(x.desligamento)}</small>`:''}</td><td><button class="lnk" data-act="rh-ed" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>
+          <td><span class="pill ${corSt(x.status)}">${esc(x.status||'')}</span>${x.status==='Desligado'&&x.desligamento?`<small style="display:block;color:var(--muted)">${br(x.desligamento)}${x.desligMotivo?' · '+esc(x.desligMotivo):''}</small>`:x.desligAgendado&&okIso(x.desligamento)?`<small style="display:block;color:var(--crit-ink)">sai em ${br(x.desligamento)}</small>`:expInfo(x)?`<small style="display:block;color:var(--muted)">em experiência</small>`:''}</td><td><button class="lnk" data-act="rh-ed" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>
         <div class="sub" style="margin:8px 0 0">${xs.length} funcionário(s)</div>`:'<div class="empty">Nenhum funcionário com esses filtros.</div>'}</section>`; }
   function formFunc(){ const f=R.f, fs=R.funcoes.map(x=>x.nome).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const i=(k,l,t,ex)=>`<label><span class="label">${l}</span><input class="txt" data-rh-f="${k}" type="${t||'text'}" value="${esc(f[k]==null?'':f[k])}" ${ex||''}></label>`;
@@ -250,15 +252,16 @@
         ${(f.tipo||'CLT')==='CLT'?`<label><span class="label">Empresa</span><input class="txt" value="Colafix (todo CLT)" disabled></label>`
           :`<label><span class="label">Empresa (PJ) *</span><select class="txt" data-rh-f="empresaSel">${EMP_PJ.map(([k,n])=>`<option value="${k}" ${(f.empresaSel||f.empresa)===k?'selected':''}>${n}</option>`).join('')}<option value="OUTRA" ${f.empresaSel==='OUTRA'||(f.empresa&&!EMP_PJ.some(x=>x[0]===f.empresa)&&f.empresa!=='COLAFIX')?'selected':''}>Outra…</option></select></label>
              ${f.empresaSel==='OUTRA'||(!f.empresaSel&&f.empresa&&!EMP_PJ.some(x=>x[0]===f.empresa)&&f.empresa!=='COLAFIX')?`<label><span class="label">Nome da outra empresa *</span><input class="txt" data-rh-f="empresaOutra" value="${esc(f.empresaOutra||(EMP_PJ.some(x=>x[0]===f.empresa)||f.empresa==='COLAFIX'?'':f.empresa||''))}"></label>`:''}`}
-        ${i('admissao','Admissão','date')}
+        ${i('admissao','Admissão','date')}${i('nascimento','Nascimento','date')}
         <label><span class="label">Situação</span><select class="txt" data-rh-f="status">${opts(ST,f.status||'Ativo')}</select></label>
-        ${f.status==='Desligado'?i('desligamento','Data do desligamento','date'):''}
+        ${f.status==='Desligado'?i('desligamento','Data do desligamento','date')+`<label><span class="label">Motivo do desligamento</span><input class="txt" data-rh-f="desligMotivo" list="rh-motivos2" value="${esc(f.desligMotivo||'')}"><datalist id="rh-motivos2">${MOTIVOS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label>`:''}
         ${i('telefone','Telefone','tel')}${i('camisa','Tamanho da camisa')}${i('calca','Tamanho da calça')}${i('calcado','Número do calçado')}
         <label><span class="label">Salário (para os contratos)</span><input class="txt" data-rh-f="salario" inputmode="decimal" placeholder="R$ 0,00" value="${esc(f.salario!=null&&f.salario!==''?brl(f.salario):'')}"></label>${i('jornada','Jornada (para os contratos)','text','placeholder="ex.: 44 horas semanais"')}</div>
       <label style="display:block;margin-top:10px"><span class="label">Observações</span><textarea class="txt" data-rh-f="obs" rows="2">${esc(f.obs||'')}</textarea></label>
+      ${f.desligAgendado&&okIso(f.desligamento)&&f.status!=='Desligado'?`<div class="banner" style="background:var(--crit-tint);color:var(--crit-ink);margin:12px 0 0;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Desligamento marcado para <b>${br(f.desligamento)}</b>${f.desligMotivo?' · '+esc(f.desligMotivo):''}. Até lá continua ativo.</span><button class="lnk" data-act="rh-desagx" data-id="${f._id}">Cancelar desligamento</button></div>`:''}
       ${f._id?docsDaPessoa(f._id):''}
       ${f.alteradoEm?`<div class="sub" style="margin:8px 0 0;font-size:12px">Última alteração: ${new Date(f.alteradoEm).toLocaleString('pt-BR')}${f.alteradoNome?' · '+esc(f.alteradoNome):''}</div>`:''}
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-fx">Cancelar</button><button class="btn" data-act="rh-salvar" ${R.salv?'disabled':''}>${R.salv?'Salvando…':'Salvar'}</button></div></section>`; }
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap">${f._id&&f.status!=='Desligado'&&!f.desligAgendado?`<button class="lnk" data-act="rh-desl" data-id="${f._id}" style="color:var(--crit-ink)">Desligar…</button>`:'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="rh-fx">Cancelar</button><button class="btn" data-act="rh-salvar" ${R.salv?'disabled':''}>${R.salv?'Salvando…':'Salvar'}</button></div></div></section>`; }
   function docsDaPessoa(fid){ const xs=R.docs.filter(d=>d.funcId===fid);
     return `<div class="rh-docs"><div class="rh-ch"><span class="label">DOCUMENTOS</span><button class="lnk" data-act="rh-dgpara" data-id="${fid}">Gerar documento</button></div>
       ${xs.length?xs.slice(0,8).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>gerado em ${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' por '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join(''):'<div class="sub" style="margin:4px 0 0">Nenhum documento gerado ainda.</div>'}</div>`; }
@@ -299,13 +302,13 @@
   function vTerc(){ const F=R.tfil; let xs=R.terc.filter(x=>F==='todos'?true:F==='ativos'?x.status!=='Encerrado':F==='aviso'?['crit','warn'].includes(tSit(x).c):x.status==='Encerrado');
     xs=xs.map(x=>({x,s:tSit(x)})).sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||String(a.x.nome).localeCompare(String(b.x.nome),'pt-BR'));
     const nAv=tAvisos().length;
-    return topo('Terceirizados','Prestadores de serviço e o prazo de cada contrato. Avisa no Meu dia quando estiver perto de vencer.',`<button class="btn" data-act="rh-tnovo">${P.ic('mais',18,2.4)}Novo terceirizado</button>`)
-      +(R.ft?formTerc():'')
+    return topo('Terceirizados','Prestadores de serviço, o prazo de cada contrato e os documentos (certidões, ASO, NR, seguro). Avisa no Meu dia quando estiver perto de vencer.',`<button class="btn" data-act="rh-tnovo">${P.ic('mais',18,2.4)}Novo terceirizado</button>`)
+      +(R.tdoc?painelDocsTerc():'')+(R.ft?formTerc():'')
       +`<section class="card"><div class="seg" style="margin-bottom:12px">${[['ativos','Ativos'],['aviso','Vencendo ou vencidos'+(nAv?' ('+nAv+')':'')],['encerrados','Encerrados'],['todos','Todos']].map(([k,l])=>`<button data-act="rh-tfil" data-v="${k}" aria-pressed="${F===k}">${l}</button>`).join('')}</div>
       ${!R.lido.terc?'<div class="empty">Carregando…</div>':xs.length?`<div class="rh-tw"><table class="rh-t"><thead><tr><th>Nome</th><th>Empresa</th><th>Serviço</th><th>Início</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead><tbody>
         ${xs.map(({x,s})=>`<tr><td><b>${esc(x.nome)}</b>${x.telefone?`<small style="display:block;color:var(--muted)">${esc(x.telefone)}</small>`:''}</td><td>${esc(x.empresa||'')}${x.cnpj?`<small style="display:block;color:var(--muted)">${esc(x.cnpj)}</small>`:''}</td><td>${esc(x.servico||'')}${x.setor?`<small style="display:block;color:var(--muted)">${esc(x.setor)}</small>`:''}</td>
-          <td class="num">${br(x.inicio)}</td><td class="num"><b>${br(x.fim)}</b>${(x.renovacoes||[]).length?`<small style="display:block;color:var(--muted)">${x.renovacoes.length} renovação(ões)</small>`:''}</td><td><span class="pill ${s.c}">${esc(s.t)}</span></td>
-          <td style="white-space:nowrap">${x.status!=='Encerrado'?`<button class="lnk" data-act="rh-tren" data-id="${x._id}">Renovar</button> · `:''}<button class="lnk" data-act="rh-ted" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum terceirizado aqui.</div>'}</section>`; }
+          <td class="num">${br(x.inicio)}</td><td class="num"><b>${br(x.fim)}</b>${(x.renovacoes||[]).length?`<small style="display:block;color:var(--muted)">${x.renovacoes.length} renovação(ões)</small>`:''}</td><td><span class="pill ${s.c}">${esc(s.t)}</span><div style="margin-top:4px">${tDocResumo(x)}</div></td>
+          <td style="white-space:nowrap">${x.status!=='Encerrado'?`<button class="lnk" data-act="rh-tren" data-id="${x._id}">Renovar</button> · `:''}<button class="lnk" data-act="rh-tdoc" data-id="${x._id}">Documentos${tDocs(x).length?' ('+tDocs(x).length+')':''}</button> · <button class="lnk" data-act="rh-ted" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhum terceirizado aqui.</div>'}</section>`; }
   function formTerc(){ const f=R.ft; const i=(k,l,t,ex)=>`<label><span class="label">${l}</span><input class="txt" data-rh-t="${k}" type="${t||'text'}" value="${esc(f[k]==null?'':f[k])}" ${ex||''}></label>`;
     return `<section class="card rh-form"><div class="head" style="align-items:baseline"><h2>${f.renovar?'Renovar contrato de '+esc(f.nome):f._id?'Editar terceirizado':'Novo terceirizado'}</h2><button class="lnk" data-act="rh-tfx">Fechar</button></div>
       ${f.renovar?`<div class="sub" style="margin:0 0 10px">Vencimento atual: <b>${br(f.fimAnterior)}</b>. Informe o novo vencimento.</div><div class="rh-g">${i('fim','Novo vencimento *','date')}${i('obsRen','Observação da renovação')}</div>`
@@ -322,7 +325,7 @@
   const CAMPOS=[['NOME','Nome'],['CPF','CPF'],['FUNCAO','Função'],['SETOR','Setor'],['ADMISSAO','Admissão'],['VINCULO','Vínculo'],['EMPRESA','Empresa'],['CNPJ','CNPJ'],
     ['SALARIO','Salário'],['SALARIO_EXTENSO','Salário por extenso'],['JORNADA','Jornada'],['TELEFONE','Telefone'],['CIDADE','Cidade'],['DATA_HOJE','Data de hoje'],
     ['FERIAS_INICIO','Início das férias'],['FERIAS_FIM','Fim das férias'],['FERIAS_DIAS','Dias de férias'],['FERIAS_RETORNO','Volta das férias'],['PERIODO_AQUISITIVO','Período aquisitivo'],
-    ['ULTIMA_TROCA','Última troca (PJ)'],['PROXIMA_TROCA','Próxima troca (PJ)']];
+    ['ULTIMA_TROCA','Última troca (PJ)'],['PROXIMA_TROCA','Próxima troca (PJ)'],['EXP_FIM_1','Fim da 1ª etapa (experiência)'],['EXP_FIM_2','Fim da experiência'],['DESLIGAMENTO','Data do desligamento']];
   const CAMPOS_FER=['FERIAS_INICIO','FERIAS_FIM','FERIAS_DIAS','FERIAS_RETORNO','PERIODO_AQUISITIVO'];
   const CAMPO_NOME=k=>(CAMPOS.find(x=>x[0]===k)||[k,k])[1];
   /* o que pode faltar no cadastro (preenche na hora de gerar) */
@@ -348,7 +351,8 @@
       EMPRESA:e?e.nome:empNome(f.empresa),CNPJ:e?e.cnpj:'',SALARIO:sal!=null?brl(sal):'',SALARIO_EXTENSO:sal!=null?extenso(sal):'',JORNADA:g('jornada')||'',TELEFONE:g('telefone')||'',
       CIDADE:R.cfg.cidade||'Gravataí',DATA_HOJE:dataExt(),
       FERIAS_INICIO:fer?br(fer.inicio):'',FERIAS_FIM:fer?br(fer.fim):'',FERIAS_DIAS:fer?String(fer.dias):'',FERIAS_RETORNO:fer?br(fer.retorno):'',PERIODO_AQUISITIVO:fer?br(fer.aquisitivo)+' a '+br(fer.aquisitivoFim):'',
-      ULTIMA_TROCA:pb?br(pb):'',PROXIMA_TROCA:pb?br(addMeses(pb,3)):''}; }
+      ULTIMA_TROCA:pb?br(pb):'',PROXIMA_TROCA:pb?br(addMeses(pb,3)):'',EXP_FIM_1:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim1(f)):'',EXP_FIM_2:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim2(f)):'',
+      DESLIGAMENTO:okIso(f.desligamento)?br(f.desligamento):okIso(R.dg.deslData)?br(R.dg.deslData):''}; }
   const EX_FER={inicio:'2026-11-03',fim:'2026-11-22',dias:20,retorno:'2026-11-23',aquisitivo:'2025-03-10',aquisitivoFim:'2026-03-09'};
   const EXEMPLO={nome:'MARIA DA SILVA',cpf:'00000000000',funcao:'Operadora de produção',setor:'Linha 1',admissao:'2024-03-10',tipo:'CLT',empresa:'COLAFIX',salario:2150,jornada:'44 horas semanais',telefone:'(51) 90000-0000'};
   const tkHTML=k=>`<span class="rh-tk" contenteditable="false" data-k="${k}">${esc(CAMPO_NOME(k))}</span>`;
@@ -398,13 +402,14 @@
       +`<div class="rh-dg"><section class="card rh-dlist">${!R.lido.modelos?'<div class="empty">Carregando…</div>':ms.length?ms.map(x=>`<button class="rh-dm ${dm&&dm._id===x._id?'sel':''}" data-act="rh-ded" data-id="${x._id}"><b>${esc(x.nome)}</b><small>${esc(valeNome(x.vale))}${x.alteradoEm?' · atualizado em '+dmIso(x.alteradoEm):''}</small></button>`).join(''):'<div class="empty">Nenhum modelo ainda. Clique em <b>Novo modelo</b> ou importe um arquivo do Word.</div>'}</section>
       ${dm?`<section class="card rh-ded"><div class="rh-g2"><label><span class="label">Nome do modelo</span><input class="txt" id="rh-dnome" value="${esc(dm.nome||'')}" placeholder="ex.: Contrato de trabalho · CLT"></label>
           <label><span class="label">Vale para</span><select class="txt" id="rh-dvale">${VALE.map(([k,l])=>`<option value="${k}" ${(dm.vale||'TODOS')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
+        <label class="ck" style="margin-top:10px"><input type="checkbox" id="rh-ddesl" ${modeloDesliga(dm)?'checked':''}> Este documento desliga o funcionário (aviso de demissão, rescisão): ao gerar, oferece marcar como desligado</label>
         <div class="label" style="margin:12px 0 6px">Campos (toque para inserir no texto)</div><div class="rh-tks">${CAMPOS.map(([k,l])=>`<button class="rh-tkb" data-act="rh-dtk" data-k="${k}">${esc(l)}</button>`).join('')}</div>
         <div class="rh-edw"><div class="rh-tb" role="toolbar" aria-label="Formatação"><button data-act="rh-dfmt" data-v="bold" title="Negrito"><b>N</b></button><button data-act="rh-dfmt" data-v="italic" title="Itálico"><i>I</i></button><button data-act="rh-dfmt" data-v="titulo">Título</button><button data-act="rh-dfmt" data-v="clausula">Cláusula numerada</button><button data-act="rh-dfmt" data-v="pergunta" title="Algo que muda a cada documento (datas, motivo…): o painel pergunta na hora de gerar">Campo perguntado</button></div>
           <div class="rh-ed" id="rh-ed" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Texto do modelo" data-ph="Escreva o texto do documento. Para o nome, CPF, função etc., toque no campo acima. O que muda a cada vez (datas, trabalhado ou indenizado…) vai em Campo perguntado.">${paraEditor(dm.html||'')}</div></div>
         <div class="rh-dfoot">${dm._id?'<button class="lnk" data-act="rh-ddel" style="color:var(--crit-ink)">Apagar modelo</button>':'<span></span>'}<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec" data-act="rh-dprev">Ver com dados de exemplo</button><button class="btn" data-act="rh-dsalvar" ${R.salv?'disabled':''}>Salvar modelo</button></div></div></section>`
       :`<section class="card"><div class="empty">${ms.length?'Escolha um modelo ao lado para editar.':'Os modelos ficam aqui: contrato de trabalho, de experiência, termo de entrega, declarações.'}</div></section>`}</div>`
       +(R.dprev&&dm?`<div class="rh-modal" data-act="rh-dprevx"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Prévia com dados de exemplo"><div class="rh-ch"><h2>Prévia com dados de exemplo</h2><button class="lnk" data-act="rh-dprevx">Fechar</button></div><div class="rh-page">${montar(dm.html||'',valores(EXEMPLO,{},EX_FER),true)}${assinaturas(EXEMPLO)}</div></div></div>`:''); }
-  function vDocGerar(){ const G=R.dg, fs=ativos().slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')), f=fs.find(x=>x._id===G.funcId)||null;
+  function vDocGerar(){ const G=R.dg, lim=addDias(P.hojeStr(),-90), fs=R.func.filter(x=>x.status!=='Desligado'||(okIso(x.desligamento)&&x.desligamento>=lim)).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')), f=fs.find(x=>x._id===G.funcId)||null;
     const ms=R.modelos.slice().sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR')), cab=f?ms.filter(m=>valePara(m,f)):ms, lista=cab.length?cab:ms;
     if(!lista.some(m=>m._id===G.modeloId)) G.modeloId=lista[0]?lista[0]._id:'';
     const md=ms.find(m=>m._id===G.modeloId);
@@ -418,17 +423,19 @@
       :`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);margin:0 0 10px">Este modelo usa as datas das férias. Marque as férias em <button class="lnk" data-act="rh-pzabrir" data-v="ferias">Férias e prazos</button>.</div>`):'';
     const qHtml=qs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Perguntas deste documento</div>${qs.map((q,i)=>`<label class="rh-lb"><span>${esc(q)}</span><input class="txt rh-amar" data-rh-dq="${i}" ${qData(q)?'type="date"':''} value="${esc(G.resp[q]||'')}"></label>`).join('')}`:'';
     return `<div class="rh-gg"><section class="card"><h2>Para quem?</h2>
-        <label class="rh-lb"><span class="label">Funcionário</span><select class="txt" id="rh-dgf"><option value="">Escolha…</option>${fs.map(x=>`<option value="${x._id}" ${G.funcId===x._id?'selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
+        <label class="rh-lb"><span class="label">Funcionário</span><select class="txt" id="rh-dgf"><option value="">Escolha…</option>${fs.map(x=>`<option value="${x._id}" ${G.funcId===x._id?'selected':''}>${esc(x.nome)}${x.status==='Desligado'?' (desligado)':''}</option>`).join('')}</select></label>
         <label class="rh-lb"><span class="label">Modelo</span><select class="txt" id="rh-dgm">${lista.map(m=>`<option value="${m._id}" ${G.modeloId===m._id?'selected':''}>${esc(m.nome)}</option>`).join('')}</select></label>
         ${f&&cab.length<ms.length&&!cab.length?'<div class="sub" style="font-size:12.5px">Nenhum modelo marcado para o vínculo desta pessoa; mostrando todos.</div>':''}
         ${ferHtml}${qHtml}
+        ${f&&md&&modeloDesliga(md)&&f.status!=='Desligado'?(()=>{ const qd=qDeslig(qs), dt=G.deslData||(qd&&G.resp[qd])||P.hojeStr(); return `<div class="rh-sep"></div><label class="ck"><input type="checkbox" id="rh-dgdesl" ${G.desligar!==false?'checked':''}> Marcar ${esc(f.nome)} como <b>desligado</b> ao gerar${f.desligAgendado&&okIso(f.desligamento)?' (já marcado para '+br(f.desligamento)+')':''}</label>
+          ${G.desligar!==false?`<label class="rh-lb" style="margin-top:6px"><span>Data do desligamento</span><input class="txt" type="date" id="rh-dgdd" value="${esc(dt)}"></label>${dt>P.hojeStr()?'<div class="sub" style="font-size:12.5px;margin:0">Continua ativo até essa data.</div>':''}`:''}`; })():f&&f.status==='Desligado'?`<div class="sub" style="font-size:12.5px;margin:8px 0 0">Situação: <b>Desligado</b>${f.desligamento?' em '+br(f.desligamento):''}.</div>`:''}
         ${falta.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Dados que faltam no cadastro</div>${falta.map(k=>`<label class="rh-lb"><span>${LBL[k]}</span><input class="txt rh-amar" data-rh-dx="${k}" ${k==='admissao'?'type="date"':''} placeholder="${PH[k]||''}" value="${esc(G.extra[k]||'')}"></label>`).join('')}
           <label class="ck" style="margin:6px 0 4px"><input type="checkbox" id="rh-dgg" ${G.guardar?'checked':''}> Guardar no cadastro</label>`:''}
         <div class="rh-dbt"><button class="btn" data-act="rh-dgo" data-v="imprimir" ${f&&md?'':'disabled'}>Imprimir</button><button class="btn sec" data-act="rh-dgo" data-v="pdf" ${f&&md?'':'disabled'}>Salvar PDF</button><button class="btn sec" data-act="rh-dgo" data-v="word" ${f&&md?'':'disabled'}>Baixar em Word</button></div>
         <div class="sub" style="font-size:12.5px;margin:10px 0 0">Fica guardado no histórico do funcionário (quem gerou e quando). Depois de assinado, anexe a cópia escaneada aqui embaixo ou no cadastro.</div>
         ${f&&docs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:4px">Já gerados para ${esc(f.nome)}</div>${docs.slice(0,6).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}`:''}</section>
       <section class="rh-page rh-pageg" aria-label="Documento">${f&&md?docCorpo(f,md,true)+assinaturas(f):`<div class="empty">${f?'Escolha o modelo.':'Escolha o funcionário para ver o documento preenchido.'}</div>`}</section></div>`; }
-  function edSync(){ const ed=document.getElementById('rh-ed'); if(ed&&R.dm) R.dm.html=limpar(ed.innerHTML); const n=document.getElementById('rh-dnome'); if(n&&R.dm) R.dm.nome=n.value; const v=document.getElementById('rh-dvale'); if(v&&R.dm) R.dm.vale=v.value; }
+  function edSync(){ const ed=document.getElementById('rh-ed'); if(ed&&R.dm) R.dm.html=limpar(ed.innerHTML); const n=document.getElementById('rh-dnome'); if(n&&R.dm) R.dm.nome=n.value; const v=document.getElementById('rh-dvale'); if(v&&R.dm) R.dm.vale=v.value; const dd=document.getElementById('rh-ddesl'); if(dd&&R.dm&&R.dm.deslUser) R.dm.desliga=dd.checked; }
   function inserirNoEditor(html){ const ed=document.getElementById('rh-ed'); if(!ed) return; ed.focus(); const sel=getSelection();
     if(!sel.rangeCount||!ed.contains(sel.anchorNode)){ const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
     /* inserção feita à mão: o insertHTML do navegador quebra a linha antes de um campo */
@@ -455,6 +462,7 @@
   function wordDoc(f,md){ const h=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(md.nome)}</title><style>@page{size:21cm 29.7cm;margin:2.2cm 2cm}${DOC_CSS}</style></head><body>${docCorpo(f,md,false)}${assinaturas(f)}</body></html>`;
     baixar(new Blob(['﻿',h],{type:'application/msword'}),nomeArq(md.nome+' - '+f.nome)+'.doc'); }
   async function registrarDoc(f,md,acao){ const G=R.dg;
+    if(modeloDesliga(md)&&f.status!=='Desligado'&&G.desligar!==false){ const qd=qDeslig(perguntasDe(md.html)), dt=G.deslData||(qd&&G.resp[qd])||P.hojeStr(); if(okIso(dt)&&!(f.desligAgendado&&f.desligamento===dt)){ const fut=await desligar(f,dt,md.nome); P.toast(fut?f.nome+' continua ativo e sai em '+br(dt)+'.':f.nome+' marcado como desligado em '+br(dt)+'.'); } }
     if(G.guardar){ const up={}; Object.entries(G.extra).forEach(([k,v])=>{ if(v==null||v==='') return; if(k==='salario'){ const n=numBR(v); if(n!=null) up.salario=n; } else up[k]=String(v).trim(); });
       if(Object.keys(up).length){ await grava(COL.func+'/'+f._id,up); Object.assign(f,up); G.extra={}; } }
     const fe=ferSel(f), resp={}; perguntasDe(md.html).forEach(q=>{ resp[q]=String(G.resp[q]||'').trim(); });
@@ -496,14 +504,15 @@
   function avisosPrazo(){ const av=[], hj=P.hojeStr();
     clts().forEach(f=>{ const s=sitFer(f); if(s.c==='crit'||s.c==='warn') av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'Férias: '+f.nome,s:(s.d<0?'o prazo para conceder venceu em ':'conceder até ')+br(s.p.lim)+' · faltam '+plural(s.p.saldo,'dia','dias')+' de férias',act:`data-act="rh-pzabrir" data-v="ferias"`,l:'Abrir',go:'rhferias'}); });
     ferProximas().filter(x=>x.inicio>=hj&&diasAte(x.inicio)<=PZ_AVISO()&&!temAviso(x)).forEach(x=>{ const d=diasAte(x.inicio); av.push({c:'warn',r:'Atenção',t:'Aviso de férias: '+x.funcionario,s:'as férias começam '+(d===0?'hoje':'em '+br(x.inicio))+' e o aviso ainda não foi gerado',act:`data-act="rh-dgfer" data-id="${x._id}"`,l:'Gerar',go:'rhferias'}); });
+    emExp().forEach(({f,s})=>{ if(s.c==='crit'||s.c==='warn') av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'Experiência: '+f.nome,s:s.t.toLowerCase()+' ('+br(s.fim)+') · prorrogar, efetivar ou desligar',act:`data-act="rh-pzabrir" data-v="exp"`,l:'Abrir',go:'rhferias'}); });
     pjs().forEach(f=>{ const s=pjSit(f); if(s.c==='crit'||s.c==='warn') av.push({c:s.c,r:s.c==='crit'?'Atrasada':'Atenção',t:'Troca do PJ: '+f.nome,s:'próxima troca '+br(s.prox)+' · '+s.t.toLowerCase(),act:`data-act="rh-pzabrir" data-v="pj"`,l:'Abrir',go:'rhferias'}); });
     return av; }
   P.registrarAviso(()=>avisosPrazo().map(a=>({nivel:a.c,rotulo:a.r,titulo:a.t,texto:a.s,go:a.go})));
 
-  function vFerias(){ const EY='RH · FÉRIAS E PRAZOS', nf=clts().filter(f=>['crit','warn'].includes(sitFer(f).c)).length, np=pjs().filter(f=>['crit','warn'].includes(pjSit(f).c)).length;
-    const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['pj','Troca dos PJ'+(np?' · '+np:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
-    return topo('Férias e prazos',R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
-      +(!R.lido.func||!R.lido.fer?'<section class="card"><div class="empty">Carregando…</div></section>':R.pzv==='pj'?vPJ():vFeriasCLT()); }
+  function vFerias(){ const EY='RH · FÉRIAS E PRAZOS', nf=clts().filter(f=>['crit','warn'].includes(sitFer(f).c)).length, np=pjs().filter(f=>['crit','warn'].includes(pjSit(f).c)).length, ne=emExp().filter(o=>['crit','warn'].includes(o.s.c)).length;
+    const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['exp','Experiência'+(ne?' · '+ne:'')],['pj','Troca dos PJ'+(np?' · '+np:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
+    return topo('Férias e prazos',R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':R.pzv==='exp'?'Contrato de experiência 45 + 45 dias: prorrogue, efetive ou desligue. Avisa '+PZ_AVISO()+' dias antes de cada fim.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
+      +(!R.lido.func||!R.lido.fer?'<section class="card"><div class="empty">Carregando…</div></section>':R.pzv==='pj'?vPJ():R.pzv==='exp'?vExp():vFeriasCLT()); }
   function vFeriasCLT(){ const hj=P.hojeStr(), F=R.pzfil;
     let xs=clts().map(f=>({f,s:sitFer(f)})); const nAt=xs.filter(o=>['crit','warn'].includes(o.s.c)).length; if(F==='atencao') xs=xs.filter(o=>['crit','warn'].includes(o.s.c));
     xs.sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
@@ -544,6 +553,81 @@
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-pjx">Cancelar</button><button class="btn" data-act="rh-pjsalvar" ${R.salv?'disabled':''}>Registrar troca</button></div>
       ${hs.length?`<div class="rh-docs"><span class="label">TROCAS ANTERIORES</span>${hs.slice(0,8).map(t=>`<div class="rh-dl"><div><b>${br(t.data)}</b><small>${esc([t.obs,t.porNome].filter(Boolean).join(' · '))}</small></div></div>`).join('')}</div>`:''}</section>`; }
 
+  /* ---------- Contrato de experiência 45 + 45 (12/10) ----------
+     1ª etapa: 45 dias contando o dia da admissão; 2ª etapa (prorrogado): até 90 dias. A RH registra a decisão:
+     Prorrogar, Efetivar ou Desligar (exp.status no cadastro). Aviso 15 dias antes de cada fim. Quem terminou a experiência
+     há mais de 30 dias sem decisão registrada não aparece (cadastros antigos). */
+  const expFim1=f=>addDias(f.admissao,44), expFim2=f=>addDias(f.admissao,89);
+  function expInfo(f){ if(f.tipo==='PJ'||!okIso(f.admissao)||f.status==='Desligado') return null; const e=f.exp||{}; if(e.status==='efetivado'||e.status==='desligado') return null;
+    const f1=expFim1(f), f2=expFim2(f), hj=P.hojeStr(); if(f1>=addDias(hj,400)) return null;
+    if(!e.status&&f2<addDias(hj,-30)) return null; if(e.status==='prorrogado'&&f2<addDias(hj,-30)) return null;
+    const etapa=e.status==='prorrogado'?2:1, fim=etapa===1?f1:f2, d=diasAte(fim), qual=etapa===1?'1ª etapa':'Experiência';
+    if(d<0) return {etapa,f1,f2,fim,d,c:'crit',t:qual+(etapa===1?' venceu':' terminou')+' há '+plural(-d,'dia','dias'),n:0};
+    if(d<=PZ_AVISO()) return {etapa,f1,f2,fim,d,c:'warn',t:d===0?qual+' termina hoje':qual+' termina em '+plural(d,'dia','dias'),n:1};
+    return {etapa,f1,f2,fim,d,c:'ok',t:(etapa===1?'1ª etapa':'2ª etapa')+' até '+br(fim),n:2}; }
+  const emExp=()=>ativos().map(f=>({f,s:expInfo(f)})).filter(o=>o.s);
+  function vExp(){ const xs=emExp().sort((a,b)=>a.s.n-b.s.n||a.s.d-b.s.d||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
+    return (R.fdesl?formDesl():'')+`<section class="card">${xs.length?`<div class="rh-tw"><table class="rh-t rh-tf"><thead><tr><th>Funcionário</th><th>Admissão</th><th>Etapas</th><th>Situação</th><th></th></tr></thead><tbody>
+      ${xs.map(({f,s})=>`<tr><td><b>${esc(f.nome)}</b><small>${esc([f.funcao,f.setor].filter(Boolean).join(' · '))}</small></td><td class="num">${br(f.admissao)}</td>
+        <td class="num">1ª até ${br(s.f1)}<small>2ª até ${br(s.f2)}</small></td><td><span class="pill ${s.c}">${esc(s.t)}</span></td>
+        <td class="rh-ac">${s.etapa===1?`<button class="btn sec rh-sm" data-act="rh-expprorr" data-id="${f._id}">Prorrogar</button> `:''}<button class="btn sec rh-sm" data-act="rh-expefet" data-id="${f._id}">Efetivar</button> <button class="lnk" data-act="rh-desl" data-id="${f._id}" data-exp="1" style="color:var(--crit-ink)">Desligar</button></td></tr>`).join('')}</tbody></table></div>`
+      :'<div class="empty">Ninguém em contrato de experiência.</div>'}</section>`; }
+
+  /* ---------- Desligamento em um passo ----------
+     Pelo documento (modelo marcado "desliga o funcionário") ou direto (Funcionários / Experiência). Grava situação Desligado,
+     data e motivo. A pessoa continua nas fichas do mês em que saiu e some a partir do mês seguinte. */
+  const MOTIVOS=['Pedido de demissão','Demissão sem justa causa','Demissão por justa causa','Acordo entre as partes','Término do contrato de experiência','Rescisão antecipada da experiência (pelo empregador)','Rescisão antecipada da experiência (pelo empregado)','Fim do contrato (PJ)'];
+  const noMes=(x,m)=>x.status!=='Desligado'||(okIso(x.desligamento)&&x.desligamento.slice(0,7)>=m);
+  function formDesl(){ const g=R.fdesl, f=R.func.find(x=>x._id===g.funcId); if(!f) return '';
+    return `<section class="card rh-form" style="border-color:var(--crit)"><div class="head" style="align-items:baseline"><h2>Desligar ${esc(f.nome)}</h2><button class="lnk" data-act="rh-deslx">Fechar</button></div>
+      <div class="rh-g"><label><span class="label">Data do desligamento</span><input class="txt" type="date" id="rh-desd" value="${esc(g.data||P.hojeStr())}"></label>
+        <label><span class="label">Motivo</span><input class="txt" id="rh-desm" list="rh-motivos" value="${esc(g.motivo||'')}" placeholder="escolha ou escreva"><datalist id="rh-motivos">${MOTIVOS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label></div>
+      <div class="sub" style="margin:10px 0 0">Fica como <b>Desligado</b> na data (se a data for no futuro, como no aviso trabalhado, continua ativo até lá). Continua nas fichas do mês em que saiu e some a partir do mês seguinte. Para o documento (aviso, rescisão), use <b>Gerar documento</b>.</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-act="rh-dgpara" data-id="${f._id}">Gerar documento</button><div style="display:flex;gap:10px"><button class="btn sec" data-act="rh-deslx">Cancelar</button><button class="btn" data-act="rh-deslsalvar" style="background:var(--crit);border-color:var(--crit)" ${R.salv?'disabled':''}>Desligar</button></div></div></section>`; }
+  /* data no futuro (aviso trabalhado): continua ativo e vira Desligado sozinho no dia (desligAgendado) */
+  async function desligar(f,data,motivo){ const fut=data>P.hojeStr(), up=fut?{desligamento:data,desligMotivo:String(motivo||'').trim(),desligAgendado:true}:{status:'Desligado',desligamento:data,desligMotivo:String(motivo||'').trim(),desligAgendado:false};
+    if(f.exp&&f.exp.status!=='efetivado'&&expInfo(f)) up.exp=Object.assign({},f.exp,{status:'desligado',em:agora(),porNome:eu()}); else if(!f.exp&&expInfo(f)) up.exp={status:'desligado',em:agora(),porNome:eu()};
+    await grava(COL.func+'/'+f._id,up); Object.assign(f,up); return fut; }
+  const desligJa={};
+  async function aplicarDesligAgendados(){ const hj=P.hojeStr(); for(const f of R.func){ if(f.desligAgendado&&f.status!=='Desligado'&&okIso(f.desligamento)&&f.desligamento<=hj&&!desligJa[f._id]){ desligJa[f._id]=1;
+      try{ const up={status:'Desligado',desligAgendado:false}; if(expInfo(f)) up.exp=Object.assign({},f.exp||{},{status:'desligado',em:agora(),porNome:eu()}); await grava(COL.func+'/'+f._id,up); }catch(e){ console.warn('[RH] desligamento marcado',e); } } } }
+  const qDeslig=qs=>qs.find(q=>/DESLIG|ULTIMO DIA|RESCIS|TERMINO|FIM DO CONTRATO/.test(norm(q))&&qData(q));
+  const modeloDesliga=md=>!!md&&(md.desliga!=null?!!md.desliga:/DEMISS|RESCIS|DESLIG/.test(norm(md.nome)));
+
+  /* ---------- Documentos dos terceirizados (validade + arquivo) ---------- */
+  const DOC_TERC=['Certidão negativa de débitos','ASO','Treinamento NR-35','Treinamento NR-10','Treinamento NR-12','Seguro de vida','Contrato social','Ficha de EPI'];
+  const tDocs=x=>(x.docs||[]).filter(d=>!d.removido);
+  function docSit(d){ if(!okIso(d.validade)) return {c:'neu',t:'Sem validade',n:5}; const n=diasAte(d.validade);
+    if(n<0) return {c:'crit',t:'Vencido há '+plural(-n,'dia','dias'),n:0,d:n}; if(n===0) return {c:'crit',t:'Vence hoje',n:1,d:n}; if(n<=PZ_AVISO()) return {c:'warn',t:'Vence em '+plural(n,'dia','dias'),n:2,d:n}; return {c:'ok',t:'Em dia · até '+br(d.validade),n:3,d:n}; }
+  function tDocAvisos(){ const av=[]; R.terc.filter(x=>x.status!=='Encerrado').forEach(x=>tDocs(x).forEach(d=>{ const s=docSit(d); if(s.c==='crit'||s.c==='warn') av.push({x,d,s}); })); return av.sort((a,b)=>a.s.d-b.s.d); }
+  P.registrarAviso(()=>tDocAvisos().map(o=>({nivel:o.s.c,rotulo:o.s.c==='crit'?'Vencido':'Atenção',titulo:'Documento de terceirizado: '+o.x.nome,texto:o.d.nome+' · '+o.s.t.toLowerCase()+(okIso(o.d.validade)?' ('+br(o.d.validade)+')':''),go:'rhterc'})));
+  function tDocResumo(x){ const ds=tDocs(x); if(!ds.length) return ''; const ss=ds.map(docSit), v=ss.filter(s=>s.c==='crit').length, w=ss.filter(s=>s.c==='warn').length;
+    return v?`<span class="pill crit">${plural(v,'documento vencido','documentos vencidos')}</span>`:w?`<span class="pill warn">${plural(w,'documento vencendo','documentos vencendo')}</span>`:`<span class="pill ok">documentos em dia</span>`; }
+  function painelDocsTerc(){ const x=R.terc.find(y=>y._id===R.tdoc); if(!x) return ''; const ds=tDocs(x).map(d=>({d,s:docSit(d)})).sort((a,b)=>a.s.n-b.s.n||String(a.d.validade).localeCompare(String(b.d.validade)));
+    const g=R.tdf||(R.tdf={nome:'',validade:''});
+    return `<section class="card rh-form"><div class="head" style="align-items:baseline"><h2>Documentos de ${esc(x.nome)}</h2><button class="lnk" data-act="rh-tdocx">Fechar</button></div>
+      ${ds.length?ds.map(({d,s})=>`<div class="rh-dl"><div><b>${esc(d.nome)}</b><small>${okIso(d.validade)?'validade '+br(d.validade):'sem validade'}${d.porNome?' · '+esc(d.porNome):''}</small></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><span class="pill ${s.c}">${esc(s.t)}</span>${d.arquivo?`<button class="lnk" data-act="rh-tdver" data-id="${d.id}">Ver arquivo</button>`:anexar(`data-rh-tdanx="${d.id}"`,'Anexar arquivo','lnk')}<button class="lnk" data-act="rh-tdrem" data-id="${d.id}" style="color:var(--crit-ink)">Tirar</button></div></div>`).join('')
+        :'<div class="sub" style="margin:0 0 6px">Nenhum documento ainda.</div>'}
+      <div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Novo documento</div>
+      <div class="rh-g"><label><span class="label">Documento</span><input class="txt" id="rh-tdn" list="rh-tdlist" value="${esc(g.nome)}" placeholder="ex.: ASO"><datalist id="rh-tdlist">${DOC_TERC.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></label>
+        <label><span class="label">Validade</span><input class="txt" type="date" id="rh-tdv" value="${esc(g.validade)}"></label>
+        <label><span class="label">Arquivo (opcional)</span><input class="txt" type="file" id="rh-tdf" accept="application/pdf,image/*"></label></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" data-act="rh-tdadd" ${R.salv?'disabled':''}>Adicionar documento</button></div></section>`; }
+  async function guardarArqRH(pasta,nome,file){ const b64=await lerB64(file), od=OD(), mime=file.type||'application/pdf';
+    if(od){ const r=await od.enviar(pasta+'/'+nome,b64,mime); return {url:(r&&r.webUrl)||'',nome}; }
+    return {url:linkArq(await salvarArquivo({nome,mime,tipo:'documento'},b64)),nome}; }
+
+  /* ---------- Aniversários e tempo de casa ---------- */
+  function aniversarios(){ const hj=P.hojeStr(), m=hj.slice(5,7), ano=+hj.slice(0,4), xs=ativos();
+    const nasc=xs.filter(f=>okIso(f.nascimento)&&f.nascimento.slice(5,7)===m).map(f=>({f,dia:f.nascimento.slice(8,10),hoje:f.nascimento.slice(5)===hj.slice(5),idade:ano-+f.nascimento.slice(0,4)})).sort((a,b)=>a.dia.localeCompare(b.dia));
+    const casa=xs.filter(f=>okIso(f.admissao)&&f.admissao.slice(5,7)===m).map(f=>({f,dia:f.admissao.slice(8,10),hoje:f.admissao.slice(5)===hj.slice(5),anos:ano-+f.admissao.slice(0,4)})).filter(o=>o.anos===1||(o.anos>0&&o.anos%5===0)).sort((a,b)=>a.dia.localeCompare(b.dia));
+    return {nasc,casa}; }
+  function cartaoAniv(){ const {nasc,casa}=aniversarios(); if(!nasc.length&&!casa.length) return ''; const mm=MESES[+P.hojeStr().slice(5,7)-1];
+    const lin=(o,t)=>`<div class="rh-an ${o.hoje?'hoje':''}"><span class="num">${o.dia}/${P.hojeStr().slice(5,7)}</span><b>${esc(titulo(o.f.nome))}</b><small>${t}${o.hoje?' · <b>hoje</b> 🎉':''}</small></div>`;
+    return `<section class="card"><h2>Aniversários de ${mm}</h2><div class="rh-2c">${nasc.length?`<div><div class="label" style="margin-bottom:4px">ANIVERSARIANTES</div>${nasc.map(o=>lin(o,esc(o.f.setor||'')+(o.f.setor?' · ':'')+o.idade+' anos')).join('')}</div>`:''}
+      ${casa.length?`<div><div class="label" style="margin-bottom:4px">TEMPO DE CASA</div>${casa.map(o=>lin(o,plural(o.anos,'ano','anos')+' de casa')).join('')}</div>`:''}</div></section>`; }
+
   /* ---------- registro do módulo ---------- */
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:vInicio}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
     rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhfuncoes:{nome:'Funções e EPIs',mob:'Funções',render:vFuncoes}, rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>bannerTerc()+vTerc()} };
@@ -568,6 +652,7 @@
     if(t.id==='rh-q'){ const v=t.value; busca('rh-q',()=>{ R.filtro.q=v; }); }
     if(t.id==='rh-fq'){ const v=t.value; busca('rh-fq',()=>{ R.ffil.q=v; R.ffil.n=60; }); }
     if(t.id==='rh-ed'||t.id==='rh-dnome') edSync();
+    if(t.id==='rh-dnome'&&R.dm&&!R.dm.deslUser){ const dd=document.getElementById('rh-ddesl'); if(dd) dd.checked=modeloDesliga(R.dm); }
     if(t.dataset&&t.dataset.rhDq!=null){ const md=R.modelos.find(x=>x._id===R.dg.modeloId), q=md&&perguntasDe(md.html)[+t.dataset.rhDq]; if(q!=null) R.dg.resp[q]=t.value; clearTimeout(R._dx); R._dx=setTimeout(()=>{ const a=document.activeElement, k=a&&a.dataset&&a.dataset.rhDq, pos=a&&a.selectionStart; P.render(); if(k!=null){ const n2=document.querySelector('[data-rh-dq="'+k+'"]'); if(n2){ n2.focus(); try{ n2.setSelectionRange(pos,pos); }catch(e){} } } },400); }
     if(t.id==='rh-ferd'&&R.ffer){ R.ffer.dias=t.value; clearTimeout(R._fd); R._fd=setTimeout(()=>{ P.render(); const n2=document.getElementById('rh-ferd'); if(n2){ n2.focus(); } },500); }
     if(t.id==='rh-pjo'&&R.fpj) R.fpj.obs=t.value;
@@ -582,8 +667,18 @@
       if(t.dataset&&(t.dataset.rhF==='status'||t.dataset.rhF==='tipo'||t.dataset.rhF==='empresaSel')&&R.f){ Object.assign(R.f,val('[data-rh-f]')); P.render(); return; }
       if(t.id==='rh-imp'&&t.files&&t.files[0]){ await importar(t.files[0]); t.value=''; return; }
       if(t.id==='rh-dvale') { edSync(); return; }
+      if(t.id==='rh-ddesl'&&R.dm){ R.dm.deslUser=true; R.dm.desliga=t.checked; return; }
       if(t.id==='rh-dgf'){ R.dg.funcId=t.value; R.dg.extra={}; R.dg.feriasId=''; R.dg.reg=null; P.render(); return; }
       if(t.id==='rh-dgm'){ R.dg.modeloId=t.value; R.dg.reg=null; P.render(); return; }
+      if(t.id==='rh-dgdesl'){ R.dg.desligar=t.checked; P.render(); return; }
+      if(t.id==='rh-dgdd'){ R.dg.deslData=t.value; return; }
+      if(t.id==='rh-desd'&&R.fdesl){ R.fdesl.data=t.value; return; }
+      if(t.id==='rh-desm'&&R.fdesl){ R.fdesl.motivo=t.value; return; }
+      if(t.id==='rh-tdn'&&R.tdf){ R.tdf.nome=t.value; return; }
+      if(t.id==='rh-tdv'&&R.tdf){ R.tdf.validade=t.value; return; }
+      if(t.dataset&&t.dataset.rhTdanx&&t.files&&t.files[0]){ const file=t.files[0], x=R.terc.find(y=>y._id===R.tdoc); t.value=''; if(!x) return; if(file.size>15e6) return P.toast('Arquivo grande demais (máximo 15 MB).');
+        const ds=(x.docs||[]).map(d=>Object.assign({},d)), d=ds.find(y=>y.id===t.dataset.rhTdanx); if(!d) return; P.toast('Enviando…');
+        d.arquivo=await guardarArqRH('Terceirizados/'+nomeArq(x.nome),nomeArq(d.nome+' - '+x.nome)+'.'+((file.name.split('.').pop()||'pdf').toLowerCase()),file); await grava(COL.terc+'/'+x._id,{docs:ds}); P.toast('Arquivo anexado.'); return; }
       if(t.id==='rh-dgfe'){ R.dg.feriasId=t.value; R.dg.reg=null; P.render(); return; }
       if(t.id==='rh-ferp'&&R.ffer){ R.ffer.aquisitivo=t.value; P.render(); return; }
       if(t.id==='rh-feri'&&R.ffer){ R.ffer.inicio=t.value; P.render(); return; }
@@ -635,9 +730,9 @@
         else v.empresa='COLAFIX'; delete v.empresaSel; delete v.empresaOutra;
         if(String(v.salario||'').trim()){ const n=numBR(v.salario); if(n==null) return P.toast('Salário inválido. Ex.: 2.150,00'); v.salario=n; } else v.salario='';
         v.jornada=String(v.jornada||'').trim();
-        if(v.status!=='Desligado') v.desligamento=''; const iD=v._id||id(); delete v._id; R.salv=true; P.render();
+        if(v.status==='Desligado') v.desligAgendado=false; else if(!v.desligAgendado){ v.desligamento=''; v.desligMotivo=''; } const iD=v._id||id(); delete v._id; R.salv=true; P.render();
         try{ await grava(COL.func+'/'+iD,Object.assign(v,R.f._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null})); R.f=null; P.toast('Funcionário salvo.'); } finally{ R.salv=false; P.render(); } return; }
-      if(a==='rh-csv'){ const L=[['Nome','CPF','Função','Setor','Empresa','Vínculo','Admissão','Situação','Desligamento','Telefone','Camisa','Calça','Calçado']].concat(R.func.map(x=>[x.nome,fCPF(x.cpf),x.funcao,x.setor,x.empresa,x.tipo,br(x.admissao),x.status,br(x.desligamento),x.telefone,x.camisa,x.calca,x.calcado]));
+      if(a==='rh-csv'){ const L=[['Nome','CPF','Função','Setor','Empresa','Vínculo','Admissão','Situação','Desligamento','Telefone','Camisa','Calça','Calçado','Nascimento','Motivo do desligamento']].concat(R.func.map(x=>[x.nome,fCPF(x.cpf),x.funcao,x.setor,x.empresa,x.tipo,br(x.admissao),x.status,br(x.desligamento),x.telefone,x.camisa,x.calca,x.calcado,br(x.nascimento),x.desligMotivo||'']));
         const csv='﻿'+L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(';')).join('\r\n'); baixar(new Blob([csv],{type:'text/csv'}),'funcionarios.csv'); return; }
       /* funções */
       if(a==='rh-fnovo'){ R.ff={nome:b.dataset.n||'',epis:[],uniformes:[]}; P.render(); window.scrollTo(0,0); return; }
@@ -679,14 +774,34 @@
       if(a==='rh-dprevx'){ if(ev.target.closest('.rh-mbox')&&!ev.target.closest('[data-act="rh-dprevx"].lnk')) return; R.dprev=false; P.render(); return; }
       if(a==='rh-dsalvar'){ edSync(); const d=R.dm; d.nome=String(d.nome||'').trim(); if(d.nome.length<3) return P.toast('Dê um nome ao modelo.'); if(!String(d.html||'').replace(/<[^>]+>/g,'').trim()&&!/rh-tk/.test(d.html)) return P.toast('O texto do modelo está vazio.');
         if(R.modelos.some(x=>x._id!==d._id&&norm(x.nome)===norm(d.nome))) return P.toast('Já existe um modelo com esse nome.');
-        const iD=d._id||id(); R.salv=true; P.render(); try{ await grava(COL.modelos+'/'+iD,Object.assign({nome:d.nome,vale:d.vale||'TODOS',html:limpar(d.html)},d._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null})); d._id=iD; P.toast('Modelo salvo.'); } finally{ R.salv=false; P.render(); } return; }
+        const iD=d._id||id(); R.salv=true; P.render(); try{ await grava(COL.modelos+'/'+iD,Object.assign({nome:d.nome,vale:d.vale||'TODOS',html:limpar(d.html),desliga:modeloDesliga(d)},d._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null})); d._id=iD; P.toast('Modelo salvo.'); } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-ddel'){ if(!confirm('Apagar o modelo "'+R.dm.nome+'"? Os documentos já gerados continuam no histórico.')) return; await P.db().doc(COL.modelos+'/'+R.dm._id).delete(); R.dm=null; P.render(); return; }
-      if(a==='rh-dgpara'){ R.dg={funcId:b.dataset.id,modeloId:'',extra:{},resp:{},feriasId:'',guardar:true}; R.dv='gerar'; R.f=null; P.go('rhdocs'); return; }
+      if(a==='rh-dgpara'){ R.dg={funcId:b.dataset.id,modeloId:'',extra:{},resp:{},feriasId:'',guardar:true}; R.dv='gerar'; R.f=null; R.fdesl=null; P.go('rhdocs'); return; }
       if(a==='rh-dgfer'){ const x=R.fer.find(y=>y._id===b.dataset.id), f=x&&R.func.find(y=>y._id===x.funcId); if(!f) return;
         const md=R.modelos.filter(m=>valePara(m,f)).find(m=>camposDe(m.html).some(k=>CAMPOS_FER.includes(k)))||R.modelos.find(m=>/FERIAS/.test(norm(m.nome)));
         R.dg={funcId:f._id,modeloId:md?md._id:'',extra:{},resp:{},feriasId:x._id,guardar:true}; R.dv='gerar'; P.go('rhdocs');
         if(!md) setTimeout(()=>P.toast('Cadastre o modelo do aviso de férias em Documentos e contratos (use os campos de férias).'),100); return; }
       /* férias e prazos */
+      if(a==='rh-expprorr'){ const f=R.func.find(x=>x._id===b.dataset.id), s=f&&expInfo(f); if(!s) return; if(!confirm('Prorrogar a experiência de '+f.nome+' até '+br(s.f2)+'?')) return;
+        await grava(COL.func+'/'+f._id,{exp:{status:'prorrogado',em:agora(),porNome:eu()}}); P.toast('Experiência prorrogada até '+br(s.f2)+'.'); return; }
+      if(a==='rh-expefet'){ const f=R.func.find(x=>x._id===b.dataset.id); if(!f||!confirm('Efetivar '+f.nome+'? Sai da lista de experiência.')) return;
+        await grava(COL.func+'/'+f._id,{exp:{status:'efetivado',em:agora(),porNome:eu()}}); P.toast(f.nome+' efetivado.'); return; }
+      if(a==='rh-desl'){ const f=R.func.find(x=>x._id===b.dataset.id); if(!f) return; const s=expInfo(f); R.fdesl={funcId:f._id,data:P.hojeStr(),motivo:b.dataset.exp?(s&&s.d>0?'Rescisão antecipada da experiência (pelo empregador)':'Término do contrato de experiência'):''}; R.f=null; if(b.dataset.exp) P.render(); else P.go('rhfunc'); window.scrollTo(0,0); return; }
+      if(a==='rh-deslx'){ R.fdesl=null; P.render(); return; }
+      if(a==='rh-desagx'){ const f=R.func.find(x=>x._id===b.dataset.id); if(!f||!confirm('Cancelar o desligamento marcado de '+f.nome+'?')) return; await grava(COL.func+'/'+f._id,{desligAgendado:false,desligamento:'',desligMotivo:''}); if(R.f&&R.f._id===f._id) Object.assign(R.f,{desligAgendado:false,desligamento:'',desligMotivo:''}); P.toast('Desligamento cancelado.'); P.render(); return; }
+      if(a==='rh-deslsalvar'){ const g=R.fdesl, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const di=document.getElementById('rh-desd'), mi=document.getElementById('rh-desm'); if(di) g.data=di.value; if(mi) g.motivo=mi.value;
+        if(!okIso(g.data)) return P.toast('Informe a data do desligamento.'); if(okIso(f.admissao)&&g.data<f.admissao) return P.toast('A data é antes da admissão.');
+        R.salv=true; P.render(); try{ const fut=await desligar(f,g.data,g.motivo); R.fdesl=null; P.toast(fut?f.nome+' continua ativo e sai em '+br(g.data)+'.':f.nome+' desligado em '+br(g.data)+'.'); } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-tdoc'){ R.tdoc=b.dataset.id; R.tdf={nome:'',validade:''}; R.ft=null; if(b.dataset.goTerc) P.go('rhterc'); else P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-tdocx'){ R.tdoc=null; P.render(); return; }
+      if(a==='rh-tdadd'){ const x=R.terc.find(y=>y._id===R.tdoc); if(!x) return; const nm=String((document.getElementById('rh-tdn')||{}).value||'').trim(), vl=(document.getElementById('rh-tdv')||{}).value||'', fi=document.getElementById('rh-tdf'), file=fi&&fi.files&&fi.files[0];
+        if(nm.length<2) return P.toast('Escreva qual é o documento.'); if(file&&file.size>15e6) return P.toast('Arquivo grande demais (máximo 15 MB).');
+        R.salv=true; P.render(); try{ const d={id:id(),nome:nm,validade:okIso(vl)?vl:'',em:agora(),porNome:eu()};
+          if(file) d.arquivo=await guardarArqRH('Terceirizados/'+nomeArq(x.nome),nomeArq(nm+' - '+x.nome)+'.'+((file.name.split('.').pop()||'pdf').toLowerCase()),file);
+          await grava(COL.terc+'/'+x._id,{docs:(x.docs||[]).concat([d])}); R.tdf={nome:'',validade:''}; P.toast('Documento adicionado.'); } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-tdrem'){ const x=R.terc.find(y=>y._id===R.tdoc); if(!x) return; const ds=(x.docs||[]).map(d=>Object.assign({},d)), d=ds.find(y=>y.id===b.dataset.id); if(!d||!confirm('Tirar "'+d.nome+'" da lista?')) return;
+        d.removido=true; d.removidoEm=agora(); d.removidoPor=eu(); await grava(COL.terc+'/'+x._id,{docs:ds}); return; }
+      if(a==='rh-tdver'){ const x=R.terc.find(y=>y._id===R.tdoc), d=x&&tDocs(x).find(y=>y.id===b.dataset.id); if(d&&d.arquivo) await abrirUrl(d.arquivo.url); return; }
       if(a==='rh-pzabrir'){ R.pzv=b.dataset.v||'ferias'; P.go('rhferias'); return; }
       if(a==='rh-pzv'){ R.pzv=b.dataset.v; P.render(); return; }
       if(a==='rh-pzfil'){ R.pzfil=b.dataset.v; P.render(); return; }
@@ -744,11 +859,11 @@
       else { if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
         const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true}); const ws=wb.Sheets[wb.SheetNames.find(n=>/colab|funcion/i.test(n))||wb.SheetNames[0]]; rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'dd/mm/yyyy'}); }
       const hi=rows.findIndex(r=>r.some(c=>norm(c)==='NOME')&&r.some(c=>norm(c)==='CPF')); if(hi<0) return P.toast('Não achei as colunas Nome e CPF.');
-      const H=rows[hi].map(norm), c=n=>H.findIndex(h=>h===norm(n)); const iN=c('Nome'),iC=c('CPF'),iF=c('Função'),iS=c('Setor'),iA=c('Data de admissão'),iE=c('Empresa'),iSt=c('Status'),iT=c('Tipo');
+      const H=rows[hi].map(norm), c=n=>H.findIndex(h=>h===norm(n)); const iN=c('Nome'),iC=c('CPF'),iF=c('Função'),iS=c('Setor'),iA=c('Data de admissão'),iE=c('Empresa'),iSt=c('Status'),iT=c('Tipo'),iNa=[c('Nascimento'),c('Data de nascimento')].find(x=>x>=0);
       const iso=v=>{ const m=String(v||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); return m?(m[3].length===2?'20'+m[3]:m[3])+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):''; };
       let n=0,dup=0,inv=0; const ja=new Set(R.func.map(x=>dig(x.cpf)));
       for(const r of rows.slice(hi+1)){ const nome=String(r[iN]||'').trim(); if(!nome) continue; const cpf=dig(r[iC]); if(!cpfOk(cpf)){ inv++; continue; } if(ja.has(cpf)){ dup++; continue; } ja.add(cpf);
-        const st=norm(r[iSt]); await grava(COL.func+'/'+id(),{nome:nome.toUpperCase(),cpf,funcao:iF>=0?String(r[iF]||'').trim():'',setor:iS>=0?String(r[iS]||'').trim():'',admissao:iA>=0?iso(r[iA]):'',empresa:empPadrao(norm(r[iT])==='PJ'?'PJ':'CLT',iE>=0?r[iE]:''),
+        const st=norm(r[iSt]); await grava(COL.func+'/'+id(),{nome:nome.toUpperCase(),cpf,funcao:iF>=0?String(r[iF]||'').trim():'',setor:iS>=0?String(r[iS]||'').trim():'',admissao:iA>=0?iso(r[iA]):'',nascimento:iNa!=null?iso(r[iNa]):'',empresa:empPadrao(norm(r[iT])==='PJ'?'PJ':'CLT',iE>=0?r[iE]:''),
           status:st==='ATIVO'||!st?'Ativo':/DESLIG|INATIV/.test(st)?'Desligado':/AFAST/.test(st)?'Afastado':/FERIAS/.test(st)?'Férias':'Ativo',tipo:norm(r[iT])==='PJ'?'PJ':'CLT',criadoEm:agora(),criadoPor:P.S.uid||null,origem:'importação'}); n++; }
       P.toast(n+' funcionário(s) importado(s)'+(dup?' · '+dup+' já existiam':'')+(inv?' · '+inv+' com CPF inválido (ignorados)':'')+'.'); }
     catch(e){ console.warn('[RH] importar',e); P.toast('Não consegui ler o arquivo.'); } }
@@ -782,6 +897,7 @@
   .rh-ed{min-height:380px;max-height:62vh;overflow:auto;padding:22px 24px;background:#fff;color:#111;font-family:"Times New Roman",Georgia,serif;font-size:16px;line-height:1.65;outline:none}.rh-ed:empty::before{content:attr(data-ph);color:#8a8578}.rh-ed h1,.rh-ed h2,.rh-ed h3{text-align:center;font-size:17px;margin:0 0 14px}.rh-ed p{margin:0 0 10px}
   .rh-tk{display:inline-block;background:#E3ECF0;color:#143F54;border-radius:6px;padding:0 6px;font-family:"Segoe UI",system-ui,sans-serif;font-size:.82em;font-weight:700;line-height:1.5;user-select:all}
   .rh-tq{display:inline-block;background:#FFF1CC;color:#7A5410;border-radius:6px;padding:0 6px;font-family:"Segoe UI",system-ui,sans-serif;font-size:.82em;font-weight:700;line-height:1.5;user-select:all}
+  .rh-2c{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 24px}.rh-an{display:grid;grid-template-columns:50px minmax(0,1fr);column-gap:10px;padding:7px 0;border-top:1px solid var(--line)}.rh-an span{grid-row:span 2;color:var(--muted);font-weight:700}.rh-an small{color:var(--muted)}.rh-an.hoje b{color:var(--teal-strong)}
   .rh-dfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
   .rh-gg{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:16px;align-items:start}.rh-gg>.card{margin:0}.rh-sep{border-top:1px solid var(--line);margin:12px 0}
   .rh-amar{background:#FFF8E6!important;border-color:#E3B341!important;color:#1A1A1A}.rh-dbt{display:flex;flex-direction:column;gap:10px;margin-top:6px}.rh-dbt .btn{justify-content:center;width:100%}
