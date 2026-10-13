@@ -1038,3 +1038,22 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
 { const _ve=vEntrega; vEntrega=function(){ const h=_ve.apply(this,arguments); if(!h) return h; const R=S.tt.rch, o=R&&ordById(R.oid); const ps=(o&&o.rdb&&o.rdb.entp)||[];
   if(!ps.length||(o.rdb&&o.rdb.ent)) return h; const n=new Set(ps.flatMap(p=>p.itens||[])).size;
   return h.replace('<div class=""><b>Entregue</b><span>ainda não</span></div>',`<div class="" style="border-left-color:var(--warn)"><b>Entregue</b><span>em parte (${n} ${n===1?'item':'itens'})</span></div>`); }; }
+/* ===================== CELULAR DO ALMOX SEM INTERNET (13/10) ===================== */
+/* O banco guarda no próprio celular (persistência do Firestore) e envia sozinho quando a internet volta,
+   mesmo que o app seja fechado. Aqui o celular não fica preso em "Salvando…": sem internet (ou sem resposta em 6 s)
+   a gravação conta como guardada no celular, e o topo avisa quantas ainda faltam enviar. */
+const offA={pend:0};
+{ const _ou=ordUpd; ordUpd=async function(id,u,msg){ if(!(typeof ttEntrega==='function'&&ttEntrega())||!S.db) return _ou.apply(this,arguments);
+  let p; try{ p=S.db.doc('ordens/'+id).update(u); }catch(e){ erro(e); return false; }
+  offA.pend++; const fim=()=>{ offA.pend=Math.max(0,offA.pend-1); if(ttAtivo()) rerenderTt(); };
+  p.then(fim,e=>{ fim(); console.warn('[almox] gravação',e); toast('Uma gravação foi recusada pelo banco. Confira o rancho no diário.'); });
+  const r=await Promise.race([p.then(()=>'ok',()=>'erro'),new Promise(res=>setTimeout(()=>res('fila'),navigator.onLine===false?150:6000))]);
+  if(r==='erro') return false; if(r==='fila') toast('Sem internet: guardado no celular. Vai ser enviado quando a internet voltar.'); else if(msg) toast(msg);
+  return true; }; }
+{ const _ve=vEntrega; vEntrega=function(){ const h=_ve.apply(this,arguments); if(!h) return h; const sem=navigator.onLine===false;
+  if(!sem&&!offA.pend) return h;
+  const av=`<div class="off-av">${sem?'<b>Sem internet.</b> ':''}${offA.pend?`${offA.pend} ${offA.pend===1?'registro guardado':'registros guardados'} no celular, ${sem?'vão ser enviados quando a internet voltar':'enviando…'}.`:'Pode continuar: o que for registrado fica guardado no celular e é enviado depois.'}</div>`;
+  const i=h.indexOf('</div></div>',h.indexOf('tt-top')); return i<0?h:h.slice(0,i+12)+av+h.slice(i+12); }; }
+['online','offline'].forEach(t=>window.addEventListener(t,()=>{ try{ if(ttAtivo()) rerenderTt(); }catch(e){} }));
+document.head.insertAdjacentHTML('beforeend','<style id="off-css">.off-av{background:var(--warn-tint);border-left:6px solid var(--warn);border-radius:12px;padding:10px 14px;font-size:15px}</style>');
+/* ===FIM SEM INTERNET=== */
