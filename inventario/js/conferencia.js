@@ -486,6 +486,7 @@ function renderConferencia(){
               id="confMain_pal3_${item.cod}"
               oninput="updateConf('${item.cod}', this.value, 'pal3')"
               style="text-align:center;font-weight:700;font-size:15px;height:38px">
+            ${ppCampo(item.cod)}
             ${linhaSomarHTML(item.cod, 'pal3')}
           </div>` : ''}
           <div class="fld"><label>${unidAvul(item)}</label>
@@ -515,6 +516,7 @@ function renderConferencia(){
               id="confMain_pal30_${item.cod}"
               oninput="updateConf('${item.cod}', this.value, 'pal30')"
               style="text-align:center;font-weight:700;font-size:15px;height:38px">
+            ${ppCampo(item.cod)}
             ${linhaSomarHTML(item.cod, 'pal30')}
           </div>` : ''}
           <div class="fld"><label>${unidAvul(item)}</label>
@@ -672,6 +674,19 @@ function confDesfazerSoma(cod, type) {
   }
 }
 
+// Sacos por palete: vem da configuração, mas quem conta pode mudar só para esta contagem (fica salvo no item da conferência)
+function ppCampo(cod){
+  return `<div class="pp-ed" style="display:flex;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:var(--text3);white-space:nowrap" title="Sacos por palete — pode mudar só para esta contagem">1 palete = <input type="number" min="1" inputmode="numeric" data-pp="${escapeHTML(cod)}" value="${getSacsPorPal(cod)}" onchange="mudarPalete('${cod}', this.value)" style="width:52px;height:24px;padding:0 4px;font-size:11px;font-weight:700;text-align:center"> sc</div>`;
+}
+function mudarPalete(cod, val){
+  const n = parseInt(val) || 0;
+  if(!CONFERENCIAS[cod]) CONFERENCIAS[cod] = { pal3: 0, sac3: 0, total3: 0, pal30: 0, sac30: 0, total30: 0, total: 0 };
+  if(n > 0) CONFERENCIAS[cod].pp = n; else delete CONFERENCIAS[cod].pp;
+  updateConf(cod, CONFERENCIAS[cod].pal3 || 0, 'pal3');
+  const v = getSacsPorPal(cod);
+  document.querySelectorAll('[data-pp]').forEach(i => { if(i.dataset.pp === cod) i.value = v; });
+  toast('Palete de ' + cod + ': ' + v + ' ' + 'sacos nesta contagem');
+}
 function updateConf(cod, val, type) {
   IS_EDITING=true; // Melhoria 5: bloqueia polling enquanto edita
   // [FIX BUG-10] Garantir inicialização completa do objeto com todos os campos necessários
@@ -1097,7 +1112,8 @@ async function salvarConferencia() {
         motivoRasgo: c.motivoRasgo || '',
         rasgoApontadoPor: qtdRasgadaSalva > 0 ? (c.rasgoApontadoPor || nomeUsuario) : '',
         rasgoDataHora: qtdRasgadaSalva > 0 ? (c.rasgoDataHora || (dataStr+' '+horaStr)) : '',
-        confirmadoZero: !!c.confirmadoZero
+        confirmadoZero: !!c.confirmadoZero,
+        pp: spp // sacos por palete usados nesta contagem
       };
     }
   });

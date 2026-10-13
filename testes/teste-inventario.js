@@ -3,7 +3,7 @@
 const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=H.seed(); const D=d.docs;
   const it=(cod,desc,locais,grupos)=>({codigo:cod,descricao:desc,ativo:true,linhas:[],almox:{locais,grupos:grupos||['COLAFIX'],un:null,conv:null}});
-  D['itens/AC0001']=it('AC0001','ARGAMASSA AC1 20 KG',['a3','a30']); D['itens/AC0002']=it('AC0002','ARGAMASSA AC2 20 KG',['a3','a30']); D['itens/RJ0001']=it('RJ0001','REJUNTE CINZA 1 KG',['rej'],['BAUTECH']);
+  D['itens/AC0001']=Object.assign(it('AC0001','ARGAMASSA AC1 20 KG',['a3','a30']),{linhas:['Linha 1']}); D['config/geral'].paletes={'Linha 1':96}; /* múltiplo de palete da configuração */ D['itens/AC0002']=it('AC0002','ARGAMASSA AC2 20 KG',['a3','a30']); D['itens/RJ0001']=it('RJ0001','REJUNTE CINZA 1 KG',['rej'],['BAUTECH']);
   D['pcpbase/itens']={em:'2026-10-13T08:00:00.000Z',atual:{},l:{AC0001:{a3:100,a30:50,d:'ARGAMASSA AC1 20 KG'},AC0002:{a3:20,a30:0,d:'ARGAMASSA AC2 20 KG'}}};
   D['conferencias/CONF-1-1']={numero:'CONF-1-1',em:new Date(Date.now()-3600e3).toISOString(),dia:'2026-10-13',por:null,porNome:'CONFERENTE',local:'Almox 3',origem:'planilha',itens:{AC0002:{nome:'ARGAMASSA AC2 20 KG',almox3:30,almox30:0,total:30,pal3:0,sac3:30,pal30:0,sac30:0}}};
   d.users['conf@painel-colafix.app']={uid:'uCONF',pass:'conf123',nome:'Carla'}; D['perfis/uCONF']={nome:'Carla',usuario:'conf'}; D['acessos/uCONF']={perfil:'conf',mods:['almox'],locais:['a3'],contar:true,receber:true,ativo:true};
@@ -36,10 +36,14 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
 
   /* contagem → salva no banco do painel */
   await f.evaluate(()=>{ confToggleItem('AC0001'); confIniciarConferencia(); }); await H.dorme(400);
-  await f.fill('input[oninput*="\'AC0001\'"][oninput*="\'sac3\'"]','7'); await H.dorme(200);
+  await f.fill('input[oninput*="\'AC0001\'"][oninput*="\'pal3\'"]','2'); await f.fill('input[oninput*="\'AC0001\'"][oninput*="\'sac3\'"]','7'); await H.dorme(200);
+  const spp=await f.evaluate(()=>[getSacsPorPal('AC0001'),getSacsPorPal('AC0002'),fmtQty(199,'AC0001')]);
+  const ppIn=await f.$$eval('[data-pp="AC0001"]',xs=>xs.map(x=>x.value)); /* a pessoa muda o palete só nesta contagem: 100 */
+  await f.fill('[data-pp="AC0001"] >> nth=0','100'); await f.dispatchEvent('[data-pp="AC0001"] >> nth=0','change'); await H.dorme(200);
+  const ppDep=await f.$$eval('[data-pp="AC0001"]',xs=>xs.map(x=>x.value)); const tot=await f.evaluate(()=>document.getElementById('totalFisico3_AC0001').textContent);
   await f.click('#btnSalvarConf'); await H.dorme(1500);
   let ds=await docs(); const cf=Object.entries(ds).filter(([k,v])=>k.startsWith('conferencias/')&&v.origem==='programa').map(([k,v])=>v)[0];
-  ok('Contagem salva no banco do painel (conferencias) com quem contou', cf&&cf.por==='uCONF'&&cf.porNome==='Carla'&&cf.itens.AC0001&&cf.itens.AC0001.almox3===7&&cf.itens.AC0001.saldoSistema3===100&&/^\d{2}\/\d{2}\/\d{4} /.test(cf.dataHora)&&cf.em, JSON.stringify(cf).slice(0,300));
+  ok('Contagem salva no banco do painel (conferencias) com quem contou e o palete da configuração (96), que a pessoa pode mudar na contagem (2 paletes de 100 + 7 = 207)', cf&&cf.por==='uCONF'&&cf.porNome==='Carla'&&cf.itens.AC0001&&cf.itens.AC0001.almox3===207&&cf.itens.AC0001.pal3===2&&cf.itens.AC0001.pp===100&&spp[0]===96&&spp[1]===88&&ppIn[0]==='96'&&ppDep.every(v=>v==='100')&&/207/.test(tot)&&cf.itens.AC0001.saldoSistema3===100&&/^\d{2}\/\d{2}\/\d{4} /.test(cf.dataHora)&&cf.em, JSON.stringify([spp,ppIn,ppDep,tot])+' '+JSON.stringify(cf).slice(0,300));
   const hist=await f.evaluate(()=>CONF_HISTORICO.length);
   ok('A contagem aparece no histórico do programa', hist===2, hist);
 

@@ -20,6 +20,7 @@ function stCB(s){return s==='red'?'cb-red':s==='yellow'?'cb-yellow':'cb-green';}
 function stPip(s){return s==='red'?'pip-red':s==='yellow'?'pip-yellow':'pip-green';}
 function calcPaletes(sacos,sacsPorPal){const spp=88;if(!sacos||sacos<spp)return 0;return Math.floor(sacos/spp);}
 function getSacsPorPal(cod){
+  const pp = (typeof CONFERENCIAS!=='undefined' && CONFERENCIAS[cod] && +CONFERENCIAS[cod].pp) || 0; if(pp > 0) return pp; // mudado na contagem
   return 88; // Agora o múltiplo é fixo em 88 conforme solicitado
 }
 function fmtQty(sacos,cod){

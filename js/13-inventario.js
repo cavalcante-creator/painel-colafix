@@ -73,6 +73,7 @@ window.Painel.inv={
   dados(){ return {itens:alxItensTodos(),base:(S.anl&&S.anl.base&&S.anl.base.itens)||null,conferencias:S.alx.conferencias,auditorias:S.alx.auditorias,recebimentos:S.alx.recebimentos,fila:S.alx.fila,grupos:ALX_GRUPOS,itemDe}; },
   versao(){ return [S.alx.conferencias,S.alx.auditorias,S.alx.recebimentos,S.alx.fila,null,null,S.itens,S.anl&&S.anl.base&&S.anl.base.itens]; },
   nome(uid){ return uid?(nomeDe(uid)||''):''; },
+  palete(cod){ const it=itemDe(cod); return it?alxPP(it):0; },
   gravar(acao,id,d,json){ return Promise.resolve().then(()=>invGravar(acao,id,d,json)).catch(e=>{ if(Date.now()-_invErroEm>3000){ _invErroEm=Date.now(); erro(e); } throw e; }); },
   pedido(){ const x=INV.pedido; INV.pedido=null; return x; },
   sair(){ const b=document.createElement('button'); b.dataset.act='sair-conta'; b.hidden=true; document.body.appendChild(b); b.click(); b.remove(); }
