@@ -610,6 +610,8 @@ function vDiario(){ const D=S.dbo, h=hojeStr(); if(!D.dia) D.dia=h; const dia=D.
   const PD=dbPode(), pode=PD.prod, podeA=PD.alm; if(!D.modo) D.modo=PD.prod?'tabela':'fila';
   const dq=String(D.q||'').trim().toLowerCase(), dqCasa=o=>[o.num,o.ensaca,o.rancho,o.produto,o.obs].some(v=>v!=null&&String(v).toLowerCase().includes(dq));
   let xs=S.ordens.filter(o=>o.linha&&(o.status==='aberta'||o.status==='encerrada')).filter(o=>{ if(dq) return dqCasa(o); const d=dataEf(o); const k=o.status==='aberta'&&d<h?h:(o.status==='encerrada'&&o.fimEm?hojeStr(new Date(o.fimEm)):d); return k===diaP||(o.status==='aberta'&&d<=diaP&&dia===h); });
+  /* pedido de 13/10: rancho já entregue na linha num dia anterior (ordem que continua ou foi reprogramada) não volta para o diário; só fica se veio a menos e ainda falta o complemento */
+  if(!dq) xs=xs.filter(o=>{ const e=dbEt(o), v=e.ent; if(!v) return true; const iso=typeof v==='string'?v:v.em; if(!iso||hojeStr(new Date(iso))>=dia) return true; return dbMenosAberto(e); });
   if(D.linha!=='todas') xs=xs.filter(o=>o.linha===D.linha);
   if(D.pri) xs=xs.filter(o=>D.pri==='sem'?!dbPri(o):String(dbPri(o))===D.pri);
   xs.sort((a,b)=>LT.indexOf(a.linha)-LT.indexOf(b.linha)||seqCmp(a,b));
