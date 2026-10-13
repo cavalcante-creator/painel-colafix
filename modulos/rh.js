@@ -1612,7 +1612,7 @@
   async function importarWords(files){ let n=0; const ja=[], ruim=[]; try{ P.toast('Lendo '+files.length+' arquivos do Word…'); if(!window.mammoth) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
       for(const file of files){ const nome=file.name.replace(/\.docx$/i,'').replace(/_/g,' ').replace(/\s+/g,' ').trim(); if(R.modelos.some(x=>norm(x.nome)===norm(nome))){ ja.push(nome); continue; }
         try{ const r=await window.mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()}); const html=limpar(r.value||''); const txt=html.replace(/<[^>]+>/g,''); if(!txt.trim()){ ruim.push(nome); continue; }
-          const vale=/ZENITH SOLU/i.test(txt)&&!/\{EMPRESA\}/.test(txt)?'ZENITH':/\{(CNPJ_PJ|RAZAO_PJ)\}/.test(txt)?'PJ':'TODOS';
+          const semEmp=!/data-k="EMPRESA"/.test(html), vale=/ZENITH SOLU/i.test(txt)&&semEmp?'ZENITH':/NEXUS MANUTEN/i.test(txt)&&semEmp?'NEXUS':/data-k="(CNPJ_PJ|RAZAO_PJ)"/.test(html)?'PJ':/EMPREGAD[OA]|EXPERI[ÊE]NCIA/i.test(txt)?'CLT':'TODOS'; /* os campos já viraram <span data-k> */
           await grava(COL.modelos+'/'+id(),{nome,vale,html,desliga:modeloDesliga({nome}),criadoEm:agora(),criadoPor:P.S.uid||null}); n++; }
         catch(e){ console.warn('[RH] word',file.name,e); ruim.push(nome); } }
       R.dv='modelos'; P.render(); P.toast(plural(n,'modelo cadastrado','modelos cadastrados')+(ja.length?' · já existiam: '+ja.join(', '):'')+(ruim.length?' · não consegui ler: '+ruim.join(', '):'')); }
