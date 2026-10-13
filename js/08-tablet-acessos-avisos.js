@@ -954,3 +954,19 @@ document.head.insertAdjacentHTML('beforeend',`<style id="cf-css">
 .cf-av{background:var(--warn-tint);border-radius:14px;padding:14px}.cf-av b{display:block;font-size:18px}.cf-av span{display:block;margin-bottom:6px}
 </style>`);
 /* ===FIM CONFERÊNCIA NA SEPARAÇÃO=== */
+/* ===================== CÂMERA DO CELULAR DO ALMOX: SITUAÇÃO E BOTÃO (13/10) ===================== */
+/* No Android a câmera às vezes não liga sozinha (pedido de permissão que não apareceu, app instalado como atalho).
+   Mostra a situação ("Ligando a câmera…", erro) e um botão "Ligar câmera" que liga com o toque da pessoa. */
+const camE={ini:0};
+{ const _cl=ttCamLiga; ttCamLiga=function(){ if(!ttCam.stream&&!ttCam.lendo){ camE.ini=Date.now(); setTimeout(()=>{ if(ttAtivo()) rerenderTt(); },8500); } return _cl.apply(this,arguments); }; }
+function camSit(){ if(ttCam.stream) return ''; const preso=ttCam.lendo&&Date.now()-camE.ini>8000;
+  const txt=S.tt.cam==='erro'&&ttCam.erro?ttCam.erro:preso?'A câmera não ligou. Toque em "Ligar câmera" e, se o celular perguntar, toque em Permitir.':ttCam.lendo?'Ligando a câmera…':'A câmera está desligada.';
+  return `<div class="cam-sit"><p class="${S.tt.cam==='erro'||preso?'tt-err':'sub'}">${esc(txt)}</p><button class="btn tt-big" data-act="cam-liga">${ic('tela',20,2.2)}Ligar câmera</button></div>`; }
+{ const _ve=vEntrega; vEntrega=function(){ const h=_ve.apply(this,arguments); if(!h) return h; const T=S.tt, precisa=T.fase==='espera'||(T.fase==='rancho'&&!T.p&&!(T.rch&&T.rch.cfp&&cfPrecisa()));
+  if(!precisa||ttCam.stream) return h;
+  let x=h; if(ttCam.erro) x=x.replace(`<p class="tt-err">${esc(ttCam.erro)}</p>`,''); const i=x.lastIndexOf('</div>'); return x.slice(0,i)+camSit()+x.slice(i); }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cam-liga"]'); if(!b) return; S.tt.ult=Date.now();
+  if(ttCam.lendo&&Date.now()-camE.ini<8000) return; ttCam.lendo=false; S.tt.cam=''; ttCam.erro=''; ttCamDesliga(); ttCamLiga().then(()=>render()); render(); });
+setInterval(()=>{ try{ if(ttAtivo()&&ttEntrega()&&!ttCam.stream&&document.querySelector('.cam-sit')){ const p=document.querySelector('.cam-sit p'); const want=ttCam.lendo&&Date.now()-camE.ini>8000; if(want&&p&&!p.classList.contains('tt-err')) rerenderTt(); } }catch(e){} },1500);
+document.head.insertAdjacentHTML('beforeend','<style id="cam-css">.cam-sit{margin-top:6px}.cam-sit p{margin:6px 0 0;font-size:15px}</style>');
+/* ===FIM CÂMERA DO CELULAR=== */
