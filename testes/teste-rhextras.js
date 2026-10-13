@@ -63,9 +63,9 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
 
   /* 1 · ficha pelo celular */
   await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await H.dorme(200); await p.click('[data-act="rh-fview"][data-v="adm"]'); await H.dorme(300);
-  await p.click('.rh-fcel [data-act="rh-convnovo"]'); await H.dorme(300); await p.fill('#rh-convn','Diego'); await p.click('[data-act="rh-convcriar"]'); await H.dorme(700);
+  await p.click('.rh-fcel [data-act="rh-convnovo"]'); await H.dorme(300); await p.fill('#rh-convn','Diego'); await p.fill('#rh-convmsg','Oi, {NOME}! Começa segunda às 7h. Traga a carteira de trabalho.'); await p.click('[data-act="rh-convcriar"]'); await H.dorme(700);
   const link=await p.inputValue('#rh-convu'); const tok=(link.match(/c=([a-z0-9]{20})$/)||[])[1]; const temQr=await p.$$eval('.rh-convq svg',x=>x.length);
-  S=await srv(); ok('Ficha pelo celular: o RH cria o link (com QR e WhatsApp) e o convite fica guardado', !!tok&&temQr===1&&S['rh/dados/convites/'+tok]&&S['rh/dados/convites/'+tok].nome==='Diego'&&/ficha\.html\?c=/.test(link), link);
+  S=await srv(); ok('Ficha pelo celular: o RH cria o link (com QR e WhatsApp) e o convite fica guardado', !!tok&&temQr===1&&S['rh/dados/convites/'+tok]&&S['rh/dados/convites/'+tok].nome==='Diego'&&S['rh/dados/convites/'+tok].msg==='Oi, {NOME}! Começa segunda às 7h. Traga a carteira de trabalho.'&&/Oi, Diego! Começa segunda às 7h/.test(await p.evaluate(()=>document.querySelector('.rh-convm').innerText))&&(S['rh/config']||{}).convMsg&&/ficha\.html\?c=/.test(link), link);
   await p.click('[data-act="rh-convx"]'); await H.dorme(200);
   /* o celular do candidato (outro aparelho: banco copiado) */
   const B2=await H.abrir({viewport:{width:390,height:844}}); const q=B2.page; await H.preparar(q,{docs:S,users:{}});
@@ -76,7 +76,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
   await q.click('.go'); await H.dorme(400); const er1=await q.evaluate(()=>document.getElementById('er').innerText); await q.check('#ok'); await q.click('.go'); await H.dorme(1500);
   const fim=await q.evaluate(()=>document.body.innerText), S2=await q.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
   const fd=S2['rh/dados/fichascand/'+tok], ph=Object.keys(S2).filter(k=>k.startsWith('rh/dados/fichascandarq/'+tok+'-'));
-  ok('Celular: abre sem login, pede a confirmação, envia os dados e a foto do documento', /Olá, Diego!/.test(ola)&&/Marque a confirmação/.test(er1)&&/Ficha enviada/.test(fim)&&fd&&fd.cpf==='86288366757'&&fd.fotos===1&&ph.length===1&&S2[ph[0]].nome==='RG'&&S2[ph[0]].d.length>20, fim.replace(/\n/g,' | ').slice(0,200));
+  ok('Celular: abre sem login, mostra o recado do RH, pede a confirmação, envia os dados e a foto do documento', /Olá, Diego!/.test(ola)&&/RECADO DO RH\s*Oi, Diego! Começa segunda às 7h\. Traga a carteira de trabalho\./.test(ola)&&/Marque a confirmação/.test(er1)&&/Ficha enviada/.test(fim)&&fd&&fd.cpf==='86288366757'&&fd.fotos===1&&ph.length===1&&S2[ph[0]].nome==='RG'&&S2[ph[0]].d.length>20, fim.replace(/\n/g,' | ').slice(0,200));
   const e2=B2.erros.filter(x=>!/404|cdnjs/.test(x)); await B2.browser.close();
   /* chega no RH */
   await p.evaluate(s=>{ const o=JSON.parse(localStorage.getItem('__srv')); o.docs=s; localStorage.setItem('__srv',JSON.stringify(o)); window.__mockReconnect&&window.__mockReconnect(); },S2); await H.dorme(900);

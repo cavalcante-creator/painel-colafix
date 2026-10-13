@@ -38,6 +38,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:v
 .ck{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px;color:var(--ink)}
 .ck input{width:22px;height:22px;flex:none;margin:0}
 .er{color:var(--crit-ink);font-weight:700;margin-top:10px;min-height:1px}
+.recado{border-left:5px solid var(--teal)}.recado small{font-size:11.5px;font-weight:700;letter-spacing:1.5px;color:var(--teal)}.recado p{margin:6px 0 0}
 .fim{text-align:center;padding:30px 18px}
 .fim .ic{width:76px;height:76px;border-radius:38px;background:#E3F0E8;color:var(--ok);display:grid;place-items:center;margin:0 auto 12px}
 .fim h2{font-size:22px}
@@ -83,7 +84,8 @@ input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:v
     $('#ola').textContent=nome?'Olá, '+nome.charAt(0).toUpperCase()+nome.slice(1).toLowerCase()+'!':'Bem-vindo(a) à Colafix!';
     $('#sub').textContent='Preencha com calma. Leva uns 5 minutos. Seus dados vão só para o RH da Colafix.';
     const i=(id,l,ex)=>`<div><label for="${id}">${l}</label><input id="${id}" ${ex||''}></div>`;
-    M.innerHTML=`<form id="f" novalidate autocomplete="on">
+    const recado=String(cv.msg||'').replace(nome?/\{NOME\}/g:/,?\s*\{NOME\}/g,nome?nome.charAt(0).toUpperCase()+nome.slice(1).toLowerCase():'').trim();
+    M.innerHTML=`${recado?`<section class="card recado"><small>RECADO DO RH</small><p>${esc(recado).replace(/\n/g,'<br>')}</p></section>`:''}<form id="f" novalidate autocomplete="on">
       <section class="card"><h2>Seus dados</h2>${i('nome','Nome completo *','autocomplete="name" maxlength="80" required')}
         <div class="g2">${i('cpf','CPF *','inputmode="numeric" maxlength="14" placeholder="000.000.000-00"')}${i('nascimento','Data de nascimento *','type="date"')}</div>
         <div class="g2">${i('telefone','Celular (WhatsApp) *','type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="(51) 90000-0000"')}${i('email','E-mail','type="email" autocomplete="email" maxlength="80"')}</div></section>

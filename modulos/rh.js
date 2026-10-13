@@ -1149,17 +1149,22 @@
   function qrSvg(txt,px){ if(typeof qrcode!=='function') return ''; const q=qrcode(0,'M'); q.addData(txt); q.make(); const n=q.getModuleCount(); let d='';
     for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(q.isDark(r,c)) d+='M'+c+' '+r+'h1v1h-1z'; return `<svg width="${px}" height="${px}" viewBox="-2 -2 ${n+4} ${n+4}" role="img" aria-label="QR do link"><rect x="-2" y="-2" width="${n+4}" height="${n+4}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`; }
   const convAberto=x=>!x.usado&&+x.ateMs>Date.now()&&!R.fcand.some(f=>f._id===x._id);
-  const msgWa=(x)=>'Olá'+(x.nome?', '+titulo(x.nome).split(' ')[0]:'')+'! Aqui é do RH da Colafix. Preencha sua ficha de admissão pelo celular (leva uns 5 minutos) e mande as fotos dos documentos: '+linkFicha(x._id);
+  /* mensagem do link: a RH escreve (fica guardada para as próximas em rh/config.convMsg); {NOME} vira o primeiro nome */
+  const CONV_MSG='Olá, {NOME}! Aqui é do RH da Colafix. Seja bem-vindo(a)!\nPreencha sua ficha de admissão pelo celular (leva uns 5 minutos) e mande as fotos dos documentos pelo link abaixo.';
+  const msgTexto=x=>{ const n=x.nome?titulo(x.nome).split(' ')[0]:''; return String(x.msg||R.cfg.convMsg||CONV_MSG).replace(n?/\{NOME\}/g:/,?\s*\{NOME\}/g,n).trim(); };
+  const msgWa=x=>msgTexto(x)+'\n\n'+linkFicha(x._id);
   function modalConv(){ const g=R.convM; if(!g) return '';
     if(g.fase==='nome') return `<div class="rh-modal"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Ficha pelo celular" style="max-width:520px"><div class="rh-ch"><h2>Ficha pelo celular</h2><button class="lnk" data-act="rh-convx">Fechar</button></div>
       <p class="sub" style="margin:6px 0 12px">O painel cria um link. Você manda pelo WhatsApp e a pessoa preenche no celular: dados, endereço, tamanhos, banco e fotos dos documentos. Vale por ${FC_VALIDADE} dias.</p>
       <label><span class="label">Nome da pessoa (opcional, para a mensagem)</span><input class="txt" id="rh-convn" value="${esc(g.nome||'')}" placeholder="ex.: Bruna"></label>
+      <label style="display:block;margin-top:12px"><span class="label">Mensagem (vai no WhatsApp e aparece no topo da ficha) · {NOME} vira o nome da pessoa</span><textarea class="txt" id="rh-convmsg" rows="5" maxlength="700">${esc(g.msg!=null?g.msg:(R.cfg.convMsg||CONV_MSG))}</textarea></label>
+      <div class="sub" style="margin:6px 0 0;font-size:12.5px">Dá para escrever, por exemplo, o dia e o horário de começar ou o que trazer no primeiro dia. O link vai no final.</div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn sec" data-act="rh-convx">Cancelar</button><button class="btn" data-act="rh-convcriar" ${R.salv?'disabled':''}>Criar link</button></div></div></div>`;
-    const x=R.conv.find(c=>c._id===g.t)||{_id:g.t,nome:g.nome,ateMs:g.ateMs}, u=linkFicha(x._id);
+    const x=R.conv.find(c=>c._id===g.t)||{_id:g.t,nome:g.nome,ateMs:g.ateMs,msg:g.msg}, u=linkFicha(x._id);
     return `<div class="rh-modal"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Link da ficha" style="max-width:560px"><div class="rh-ch"><h2>Link pronto${x.nome?' para '+esc(titulo(x.nome).split(' ')[0]):''}</h2><button class="lnk" data-act="rh-convx">Fechar</button></div>
-      <div class="rh-convq">${qrSvg(u,180)}<div><p class="sub" style="margin:0 0 8px">Mande pelo WhatsApp ou mostre o QR para a pessoa ler com a câmera do celular.</p><input class="txt" id="rh-convu" value="${esc(u)}" readonly onfocus="this.select()">
+      <div class="rh-convq">${qrSvg(u,180)}<div><p class="sub" style="margin:0 0 8px">Mande pelo WhatsApp ou mostre o QR para a pessoa ler com a câmera do celular.</p><div class="rh-convm">${esc(msgTexto(x)).replace(/\n/g,'<br>')}</div><input class="txt" id="rh-convu" value="${esc(u)}" readonly onfocus="this.select()">
         <div class="sub" style="margin:6px 0 0;font-size:12.5px">Vale até ${new Date(+x.ateMs).toLocaleDateString('pt-BR')}. Quando chegar, aparece em Funcionários › Admissões e no Início.</div></div></div>
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn sec" data-act="rh-convcop" data-id="${x._id}">Copiar link</button><button class="btn" data-act="rh-convwa" data-id="${x._id}">Mandar no WhatsApp</button></div></div></div>`; }
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn sec" data-act="rh-convcop" data-id="${x._id}">Copiar mensagem e link</button><button class="btn" data-act="rh-convwa" data-id="${x._id}">Mandar no WhatsApp</button></div></div></div>`; }
   function cartaoFichasCel(){ const xs=R.fcand.filter(x=>!x.usada), ab=R.conv.filter(convAberto);
     return `<section class="card rh-fcel"><div class="rh-ch"><h2>Fichas pelo celular</h2><button class="btn sec rh-sm" data-act="rh-convnovo">${P.ic('mais',16,2.4)}Mandar ficha pelo celular</button></div>
       ${xs.length?xs.map(x=>`<div class="rh-dl"><div><b>${esc(x.nome||'')}</b><small>chegou em ${dmIso(x.em)}${x.fotos?' · '+plural(+x.fotos,'foto','fotos'):''}${x.telefone?' · '+esc(x.telefone):''}</small></div><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button class="lnk" data-act="rh-fcver" data-id="${x._id}">Ver</button><button class="btn rh-sm" data-act="rh-fcusar" data-id="${x._id}">Começar admissão</button></div></div>`).join('')
@@ -1306,11 +1311,12 @@
       /* ficha pelo celular */
       if(a==='rh-convnovo'){ R.convM={fase:'nome',nome:''}; P.render(); return; }
       if(a==='rh-convx'){ R.convM=null; P.render(); return; }
-      if(a==='rh-convcriar'){ const nm=String((document.getElementById('rh-convn')||{}).value||'').trim().slice(0,60), t=tokenNovo(), ateMs=Date.now()+FC_VALIDADE*864e5;
-        R.salv=true; P.render(); try{ await P.db().doc(COL.conv+'/'+t).set({nome:nm,docs:docsAdm().filter(n=>!/^ASO\b/i.test(n)),criado:agora(),ateMs,usado:false,porNome:eu(),por:P.S.uid||null}); R.convM={fase:'link',t,nome:nm,ateMs}; } finally{ R.salv=false; P.render(); } return; }
-      if(a==='rh-convver'){ const x=R.conv.find(c=>c._id===b.dataset.id); if(x) R.convM={fase:'link',t:x._id,nome:x.nome,ateMs:x.ateMs}; P.render(); return; }
-      if(a==='rh-convcop'){ try{ await navigator.clipboard.writeText(linkFicha(b.dataset.id)); P.toast('Link copiado.'); }catch(e){ const i=document.getElementById('rh-convu'); if(i){ i.focus(); i.select(); } P.toast('Copie o link selecionado.'); } return; }
-      if(a==='rh-convwa'){ const x=R.conv.find(c=>c._id===b.dataset.id)||{_id:b.dataset.id,nome:(R.convM||{}).nome}; window.open('https://wa.me/?text='+encodeURIComponent(msgWa(x)),'_blank','noopener'); return; }
+      if(a==='rh-convcriar'){ const nm=String((document.getElementById('rh-convn')||{}).value||'').trim().slice(0,60), msg=String((document.getElementById('rh-convmsg')||{}).value||'').trim().slice(0,700)||CONV_MSG, t=tokenNovo(), ateMs=Date.now()+FC_VALIDADE*864e5;
+        R.salv=true; P.render(); try{ await P.db().doc(COL.conv+'/'+t).set({nome:nm,msg,docs:docsAdm().filter(n=>!/^ASO\b/i.test(n)),criado:agora(),ateMs,usado:false,porNome:eu(),por:P.S.uid||null}); R.convM={fase:'link',t,nome:nm,ateMs,msg};
+          if(msg!==(R.cfg.convMsg||CONV_MSG)){ R.cfg.convMsg=msg; P.db().doc('rh/config').set({convMsg:msg,alteradoEm:agora()},{merge:true}).catch(()=>{}); } } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-convver'){ const x=R.conv.find(c=>c._id===b.dataset.id); if(x) R.convM={fase:'link',t:x._id,nome:x.nome,ateMs:x.ateMs,msg:x.msg}; P.render(); return; }
+      if(a==='rh-convcop'){ const x=R.conv.find(c=>c._id===b.dataset.id)||Object.assign({_id:b.dataset.id},R.convM||{}); try{ await navigator.clipboard.writeText(msgWa(x)); P.toast('Mensagem e link copiados.'); }catch(e){ const i=document.getElementById('rh-convu'); if(i){ i.focus(); i.select(); } P.toast('Copie o link selecionado.'); } return; }
+      if(a==='rh-convwa'){ const x=R.conv.find(c=>c._id===b.dataset.id)||Object.assign({_id:b.dataset.id},R.convM||{}); window.open('https://wa.me/?text='+encodeURIComponent(msgWa(x)),'_blank','noopener'); return; }
       if(a==='rh-convapag'){ if(!confirm('Cancelar este link? A pessoa não vai mais conseguir mandar a ficha.')) return; await P.db().doc(COL.conv+'/'+b.dataset.id).delete(); P.toast('Link cancelado.'); return; }
       if(a==='rh-fcver'){ R.fcv=b.dataset.id; P.render(); return; }
       if(a==='rh-fcx'){ R.fcv=null; P.render(); return; }
@@ -1624,7 +1630,7 @@
   .rh-pgr{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}.rh-pgf{display:flex;flex-direction:column;gap:2px}.rh-pgf .txt{height:36px;min-width:150px}
   .rh-devb b{display:block;margin-bottom:4px}.rh-devi{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:4px 0;border-top:1px solid rgba(122,84,16,.15)}.rh-devi:first-of-type{border-top:0}
   .rh-ferl.pass{opacity:.55}.rh-mais{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.rh-mais summary{cursor:pointer;font-weight:700;color:var(--teal-strong)}
-  .rh-convq{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center;margin-top:10px}.rh-convq svg{border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}
+  .rh-convm{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:14px;margin:0 0 8px;white-space:normal}.rh-convq{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center;margin-top:10px}.rh-convq svg{border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}
   @media (max-width:600px){ .rh-convq{grid-template-columns:minmax(0,1fr);justify-items:center} .rh-ferl{grid-template-columns:90px minmax(0,1fr)!important} .rh-ferl .pill{display:none} }
   .rh-kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.rh-kpi div{background:var(--surface);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}.rh-kpi b{font-size:30px;line-height:1.1;display:block;font-weight:800}.rh-kpi span{color:var(--muted);font-size:14px}
   .rh-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.rh-2>.card{margin:0}.rh-2+.card{margin-top:16px}
