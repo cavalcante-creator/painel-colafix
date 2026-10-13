@@ -235,3 +235,7 @@ body.jan-solo .side,body.jan-solo .top,body.jan-solo .tabs,body.jan-solo nav,bod
 body.jan-solo .main,body.jan-solo #main{margin-left:0!important}body.jan-solo #view{max-width:none!important}
 .jan-logo{display:block;height:34px;margin-bottom:6px}
 </style>`);
+/* assinatura (logo "V" da Iasmyn, icons/assinatura.png) ao lado da logo da Colafix nas telas de acompanhamento */
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ if(JAN_TELAS[S.view]){ document.querySelectorAll('#view img[alt="Colafix"]').forEach(im=>{ if(im.nextElementSibling&&im.nextElementSibling.classList.contains('assin-tela')) return;
+      const h=Math.round(im.getBoundingClientRect().height)||34; im.insertAdjacentHTML('afterend','<img class="assin-tela" src="icons/assinatura.png" alt="" style="height:'+Math.max(18,Math.round(h*0.85))+'px">'); }); } }catch(e){} return x; }; }
+document.head.insertAdjacentHTML('beforeend','<style id="assin-css">.assin-tela{width:auto;flex:0 0 auto;align-self:center;margin-left:-4px;display:inline-block;vertical-align:middle}.ltv-h .assin-tela{display:inline-block;margin:0 0 6px 8px}.ltv-h .jan-logo{display:inline-block;vertical-align:middle}@media (min-width:1200px){.mdh{flex-wrap:nowrap!important}.mdh .mdtt{min-width:0}}</style>');
