@@ -15,8 +15,11 @@ const SEL=process.argv.slice(2); (async()=>{ const {d}=seedManut(); const D=d.do
    const telas=await p.evaluate(()=>{ const S=__T.S(); const vs=Object.keys(window.__VIEWS||{}); return vs; });
    const vs=await p.evaluate(()=>{ try{ return __T.views().filter(v=>__T.vo(v)); }catch(e){ return []; } });
    for(const v of vs){ const n0=erros.length; await p.evaluate(v=>__T.go(v),v); await H.dorme(350);
-     const r=await p.evaluate(()=>{ const el=document.getElementById('view'); const t=(el&&el.innerText)||''; return {len:t.trim().length,falha:/Não foi possível mostrar|undefined|NaN|\[object Object\]/.test(t),lado:document.documentElement.scrollWidth>innerWidth+2,
+     let r=await p.evaluate(()=>{ const el=document.getElementById('view'); const t=(el&&el.innerText)||''; return {len:t.trim().length,falha:/Não foi possível mostrar|undefined|NaN|\[object Object\]/.test(t),lado:document.documentElement.scrollWidth>innerWidth+2,
         trecho:(t.match(/.{0,30}(Não foi possível mostrar|undefined|NaN|\[object Object\]).{0,30}/)||[''])[0]}; });
+     if(await p.evaluate(()=>__T.S().view==='inventario')){ /* Inventário = o programa num iframe: o conteúdo é lido dentro dele */
+       if(v!=='inventario') continue; let fr=null; for(let i=0;i<40&&!fr;i++){ await H.dorme(250); const f=p.frames().find(x=>x.url().includes('inventario/index.html')); if(f&&await f.evaluate(()=>!!window.USUARIO_LOGADO||(typeof USUARIO_LOGADO!=='undefined'&&!!USUARIO_LOGADO)).catch(()=>false)) fr=f; }
+       if(fr){ await H.dorme(800); const q=await fr.evaluate(()=>{ const t=document.body.innerText||''; return {len:t.trim().length,lado:document.documentElement.scrollWidth>innerWidth+2}; }); r.len=q.len; r.lado=q.lado; } else r.len=0; }
      const prob=[]; if(erros.length>n0) prob.push('ERRO JS: '+erros.slice(n0).join(' | ')); if(r.len<15&&v!=='mantotem') prob.push('tela vazia'); if(r.falha) prob.push('texto estranho: '+r.trecho); if(r.lado&&vp[0]<500) prob.push('rolagem lateral no celular');
      if(prob.length) rel.push(`${u} · ${vp[0]<500?'celular':'PC'} · ${v}: ${prob.join(' ; ')}`); }
    rel.push(`(ok) ${u} · ${vp[0]<500?'celular':'PC'}: ${vs.length} telas verificadas`);

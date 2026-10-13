@@ -63,6 +63,15 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 - Layout: filtros da Programação mais baixos e os botões de cada ordem numa linha embaixo do produto (≥1241px); diário cabe em 1366 (tabela fixa); calendário com barra fixa e feriado em cinza. Visão do gestor: quadro de paradas abre a Manutenção. Teste: `teste-organizacao.js`.
 - **Celular:** Programação vira cartão por ordem (≤640px); Calendário no celular é sempre a lista por dia (todos os cargos, `window.innerWidth<700`) com barra pequena (`.calm`: semana, linha em lista, "Filtros" com busca/ir para/atrasadas/sábado/encerradas) e dia de hoje destacado.
 
+## Inventário = o programa "Gestão de Almoxarifado" (pedido de 13/10, `js/13-inventario.js` + pasta `inventario/`)
+- O módulo Inventário (`almox`) tem uma tela só, `inventario`: o programa da Iasmyn **igual** (mesmo layout e funções), num iframe fixo sobre `#inv-slot` (`invSync`, como as fichas do RH). **Só a Conferência** (Contagem · Recebimento · Auditoria); as **Transferências do programa não entram** (pedido de 13/10).
+- Quem só tem o módulo `almox` (conferentes, auditor, supervisor sistema) vê o programa **em tela cheia** (`body.inv-solo`, `invSolo()`); o botão Sair do programa sai do painel. Os outros veem dentro do painel (Sair escondido). Ao sair/trocar de pessoa o iframe é fechado.
+- Os dados ficam no banco do painel, nas mesmas coleções das telas antigas: `conferencias`, `auditorias` (id = `num_cod_loc`, guarda `auditKey` do programa), `recebimentos`, `alxfila` (aberta/descartada). Itens = `itens.almox` {locais, grupos, un, conv}; saldo do sistema = `pcpbase/itens`.
+- A ponte é `inventario/js/ponte-painel.js`: troca o `fetch` da planilha/Apps Script por `window.Painel.inv` (`usuario`, `pronto`, `dados`, `versao`, `gravar`, `pedido`, `sair`) e entra sozinha com o cargo do painel (`montarPerfil`: contar/receber/auditar/verAud + locais). O que outra pessoa grava aparece em ~2,5 s.
+- Os arquivos do programa em `inventario/` são a cópia do original; mudanças lá: mínimas (`state.js`: sem o tempo de sessão no painel; `config-sheets.js`: sem chaves). O e-mail automático (Apps Script) não existe no painel.
+- Atalhos antigos `go('alxcont'|'alxconf'|'alxrec'|'alxaud')` abrem o programa na parte certa. Para voltar às telas antigas: `config/geral.invAntigo = true`.
+- A varredura lê o conteúdo dentro do iframe. Teste: `teste-inventario.js`.
+
 ## Almoxarifado / rancho
 - Etapas do rancho ficam em `ordens.rdb` (`sep`, `ent`, `conf`, `fim`) e são gravadas por `dbSalvar`. A ação de permissão é **"rancho"** (não "programar").
 - **Celular do almox** (cargo `almoxcel`, tela `mantotem` em modo entrega): folha (QR/RA-/nº) → separado → crachá de quem recebe → "Recebi o rancho". Grava `rdb.ent` com `entreguePor` e `recebidoPor`. Teste: `teste-almoxcel.js`.
@@ -89,6 +98,7 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 | `js/06-manutencao-equipe.js` · `js/07-manutencao-coletor.js` | manutenção (chamados, OS, equipamentos, preventivas, peças, QR) e coletor; equipe e cargos |
 | `js/08-tablet-acessos-avisos.js` | tablet da parede, crachás, ajuste de acesso por pessoa, avisos, gestor, TV dividida, almox |
 | `js/09-silos-final.js` | silos (saldo/consumo), leituras por perfil, API `window.Painel` e `iniciar()` |
+| `js/13-inventario.js` | Inventário = programa "Gestão de Almoxarifado" (pasta `inventario/`) num iframe; ponte `Painel.inv` |
 | `js/12-organizacao.js` | organização dos módulos (Almoxarifado, Telas, Tablet da produção) e ajustes de layout de Programação/Diário/Calendário |
 | `js/11-meu-menu.js` | "Meu menu" da administradora (esconder módulos do próprio menu; `perfis/{uid}.menuOculto`) |
 | `js/10-tablet-producao.js` | tablet: abrir a ordem pela folha (QR, `RA-`, `OP-`, nº), **apontar produção**, **pedir material** (`pedmat`) e quadro de pedidos no diário |

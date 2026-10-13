@@ -41,13 +41,14 @@ const ok = (n, cond, det) => { res.push({ n, ok: !!cond, det }); console.log((co
 
   // T5 com perfil, sem permissão de um módulo: toque numa tela de Produção
   await pg.evaluate(() => { const b = document.createElement('button'); b.dataset.go = 'programacao'; b.id = 'teste-go'; document.body.appendChild(b); });
-  await pg.click('#teste-go'); await H.dorme(300);
+  await pg.evaluate(() => document.getElementById('teste-go').click()); await H.dorme(300); /* Carlos só tem o Inventário: o programa ocupa a tela toda */
   const e5 = await pg.evaluate(() => ({ view: __T.S().view, lg: !!document.getElementById('lg'), toast: document.getElementById('toast').hidden ? '' : document.getElementById('toast').innerText, gate: !!document.querySelector('.acs-gate') }));
   ok('T5 sem permissão: avisa e continua no sistema', e5.view !== 'programacao' && !e5.lg && !e5.gate && /não possui permissão/.test(e5.toast), JSON.stringify(e5));
 
   // sair para os próximos
   await pg.evaluate(() => document.querySelector('[data-act="sair-conta"]') || (() => { const b = document.createElement('button'); b.dataset.act = 'sair-conta'; b.id = 'sx'; document.body.appendChild(b); })());
-  await pg.click('#sx'); await H.dorme(1500);
+  await pg.evaluate(() => (document.getElementById('sx') || document.querySelector('[data-act="sair-conta"]')).click()); await H.dorme(1500);
+  ok('T5b depois de sair, a tela de entrar aparece (o programa do inventário fecha)', await pg.evaluate(() => !document.body.classList.contains('inv-solo') && !!document.getElementById('lg') && document.getElementById('lg').getBoundingClientRect().width > 0 && !document.querySelector('.inv-frx')));
 
   // T2 senha errada
   await H.entrar(pg, 'joao', 'errada'); let l = await (async () => { await H.dorme(400); return pg.evaluate(() => ({ er: document.getElementById('lg-er').textContent, dis: document.querySelector('#lg .lg-go').disabled })); })();
