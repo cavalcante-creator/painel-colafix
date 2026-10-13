@@ -25,6 +25,7 @@ async function abrir(op) {
     if (u.includes('gstatic.com/firebasejs/')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('app-compat') ? MOCK : '' });
     if (u.includes('cdnjs.cloudflare.com')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('jspdf') ? fs.readFileSync(__dirname + '/jspdf-falso.js', 'utf8') : '' });
     if (u.startsWith(BASE)) { let p = decodeURIComponent(new URL(u).pathname.slice(1)) || 'index.html';
+      if (p === 'modulos/rh-epi-padrao.json' && !process.env.EPI_PADRAO) return route.fulfill({ status: 404, body: '' }); /* funções da planilha do EPI: só no teste que pede (EPI_PADRAO=1) */
       if (p === 'vazio.html') return route.fulfill({ contentType: 'text/html', body: '<html><body>vazio</body></html>' });
       if (p === 'config.js') return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(RAIZ, p), 'utf8').replace('banco: "default"', 'banco: "(default)"') });
       const f = path.join(RAIZ, p);
