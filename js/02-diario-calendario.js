@@ -186,7 +186,7 @@ function statusFolha(o){ const e=entregueDe(o); if(o.status==='aberta'){ if(o.co
 const LINK_PAINEL='https://claude.ai/artifact/DAXN22FZGyfvxgVkKaA9WB';
 function linkRancho(n){ const n2=encodeURIComponent(n); return ((window.claude&&window.claude.link)||(S.cfg&&S.cfg.linkPainel)||LINK_PAINEL)+'?rancho='+n2; }
 function desenharQR(pdf,txt,x,y,tam){ if(typeof qrcode!=='function') return; const q=qrcode(0,'M'); q.addData(txt); q.make(); const n=q.getModuleCount(), m=tam/n;
-  pdf.setFillColor(255,255,255); pdf.rect(x-1,y-1,tam+2,tam+2,'F'); pdf.setFillColor(0,0,0);
+  const qz=Math.max(1,m*4); pdf.setFillColor(255,255,255); pdf.rect(x-qz,y-qz,tam+2*qz,tam+2*qz,'F'); pdf.setFillColor(0,0,0);
   for(let r=0;r<n;r++){ let c=0; while(c<n){ if(q.isDark(r,c)){ let c2=c; while(c2+1<n&&q.isDark(r,c2+1)) c2++; pdf.rect(x+c*m,y+r*m,(c2-c+1)*m+0.02,m+0.02,'F'); c=c2+1; } else c++; } } }
 function desenharFolhaProducao(pdf,o,dia,logo){
   const ML=10,LARGURA=190,PAGE_H=297,MB=10,Y_RODAPE=PAGE_H-MB-95;
@@ -199,16 +199,22 @@ function desenharFolhaProducao(pdf,o,dia,logo){
     pdf.text(pdf.splitTextToSize(String(valor),w-4),x+3,yy+6);
   }
   let y=6;
+  /* cabeçalho (13/10): QR grande à direita, com margem branca, para o celular ler de longe; título e código de barras ao lado */
+  const QT=27, QX=ML+LARGURA-QT, QY=4;
   if(logo){ try{ const pr=pdf.getImageProperties(logo); pdf.addImage(logo,'PNG',ML,y,30,(pr.height*30)/pr.width); }catch(err){} }
-  pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text('ORDEM DE PRODUÇÃO',105,y+9,{align:'center'});
-  if(o.rancho) try{ desenharQR(pdf,linkRancho(o.rancho),184,2.5,16); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdfCode128(pdf,'RA-'+o.rancho,140,3,41,9); pdf.text('RA-'+o.rancho+' · QR: celular ou tablet · barras: coletor',160.5,15,{align:'center'});pdf.setTextColor(0,0,0); }catch(err){}
-  else try{ desenharQR(pdf,'OP-'+o.num,184,2.5,16); /* ordem sem rancho: o QR também aparece (abre a ordem no tablet) */ pdfCode128(pdf,'OP-'+o.num,140,3,41,9); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdf.text('OP-'+o.num+' · QR: tablet · barras: tablet ou coletor',160.5,15,{align:'center'});pdf.setTextColor(0,0,0); }catch(err){}
-  y+=15;
+  pdf.setFont('helvetica','bold');pdf.setFontSize(16);pdf.text('ORDEM DE PRODUÇÃO',ML+36,y+7);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Ordem '+ordem+(o.rancho?'  ·  Rancho '+o.rancho:''),ML+36,y+12.5);
+  const cod=o.rancho?'RA-'+o.rancho:'OP-'+o.num;
+  try{ desenharQR(pdf,o.rancho?linkRancho(o.rancho):cod,QX,QY,QT); }catch(err){}
+  try{ pdfCode128(pdf,cod,ML+36,y+15,62,9); }catch(err){}
+  pdf.setFontSize(6.5);pdf.setTextColor(90,90,90);pdf.text(cod+' · barras: coletor',ML+36,y+27);
+  pdf.text(o.rancho?'QR: celular ou tablet':'QR: tablet',QX+QT/2,QY+QT+3,{align:'center'});pdf.setTextColor(0,0,0);
+  y=QY+QT+5;
   pdf.setFillColor(44,62,80);pdf.rect(ML,y,LARGURA,9,'F');
   pdf.setTextColor(255,255,255);pdf.setFontSize(10.5);pdf.setFont('helvetica','bold');
   pdf.text('DATA: '+data,ML+5,y+6);pdf.text('LINHA: '+String(linha).toUpperCase(),ML+105,y+6);
-  pdf.setTextColor(0,0,0);y+=18;
-  const CH=10,GAP=4.5;
+  pdf.setTextColor(0,0,0);y+=15;
+  const CH=10,GAP=3.6;
   const pal=paleteDe(o);
   const nR=o.rancho||'';
   campo(ML,y,127,CH,'PRODUTO',produto);campo(ML+129,y,61,CH,'ORDEM',ordem);y+=CH+GAP;
@@ -218,11 +224,11 @@ function desenharFolhaProducao(pdf,o,dia,logo){
     const pF=Math.floor(pend/pal), sR=Math.round(pend%pal);
     campo(ML,y,90,CH,'RANCHO',nR);campo(ML+92,y,98,CH,'SALDO EM PALETES ('+pal+' '+uA(o)+'/pal.)',sR>0?pF+' pal. fechados + '+sR+' '+uA(o):pF+' paletes fechados');
   } else campo(ML,y,LARGURA,CH,'RANCHO',nR);
-  y+=CH+5;
+  y+=CH+4.5;
   const cols=semAcento(linha).toUpperCase().includes('AREA LIQUIDA')
     ?['HORA INICIO','HORA FIM','N PALLETS','FD','RASGADOS','PAL. DANIF.','EMBAL. ADIC.','PARADAS']
     :['HORA INICIO','HORA FIM','N PALLETS',(unidDe(o)?UNID[unidDe(o)].p.toUpperCase():'QTDE')+' (UN)','RASGADOS','PAL. DANIF.','EMBAL. ADIC.','PARADAS'];
-  const lC=LARGURA/cols.length,aC=7.5,aR=5.5;
+  const lC=LARGURA/cols.length,aC=7,aR=5.2;
   pdf.setFillColor(44,62,80);
   for(let i=0;i<cols.length;i++)pdf.rect(ML+i*lC,y,lC,aC,'F');
   pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(7);

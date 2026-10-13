@@ -23,7 +23,7 @@ async function abrir(op) {
   await ctx.route('**/*', async route => {
     const u = route.request().url();
     if (u.includes('gstatic.com/firebasejs/')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('app-compat') ? MOCK : '' });
-    if (u.includes('cdnjs.cloudflare.com')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('jspdf') ? fs.readFileSync(__dirname + '/jspdf-falso.js', 'utf8') : '' });
+    if (u.includes('cdnjs.cloudflare.com')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('jspdf') ? fs.readFileSync(process.env.JSPDF_REAL ? __dirname + '/node_modules/jspdf/dist/jspdf.umd.min.js' : __dirname + '/jspdf-falso.js', 'utf8') : '' }); /* JSPDF_REAL=1: PDF de verdade (npm i --no-save jspdf@2.5.1) */
     if (u.startsWith(BASE)) { let p = decodeURIComponent(new URL(u).pathname.slice(1)) || 'index.html';
       if (p === 'modulos/rh-epi-padrao.json' && !process.env.EPI_PADRAO) return route.fulfill({ status: 404, body: '' }); /* funções da planilha do EPI: só no teste que pede (EPI_PADRAO=1) */
       if (p === 'vazio.html') return route.fulfill({ contentType: 'text/html', body: '<html><body>vazio</body></html>' });

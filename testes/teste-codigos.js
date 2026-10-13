@@ -9,7 +9,7 @@ const PY=(...a)=>execFileSync('python3',[__dirname+'/cam.py',...a]).toString().t
  let B=await H.abrir(); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>{ const b=document.createElement('button'); b.dataset.act='fp-ordem'; b.dataset.id='5001'; b.id='fpx'; document.body.appendChild(b); });
  const [d1]=await Promise.all([p.waitForEvent('download'),p.click('#fpx')]); await d1.saveAs('/tmp/folha.png');
- const bf=PY('confere','/tmp/folha.png','140','3','41','9','RA-123456'); const qf=PY('medir','/tmp/folha.png');
+ const bf=PY('confere','/tmp/folha.png','46','21','62','9','RA-123456') /* cabeçalho de 13/10: barras embaixo do título, QR grande à direita */; const qf=PY('medir','/tmp/folha.png');
  ok('Folha de produção: código de barras RA- impresso certo + QR do rancho legível', /^OK/.test(bf)&&/rancho=123456'/.test(qf)&&!/#rancho/.test(qf), bf+' · QR '+qf);
  await p.evaluate(()=>__T.go('manequip')); await H.dorme(500);
  const [d2]=await Promise.all([p.waitForEvent('download'),p.click('[data-act="mx-eq-qrpdf"]')]); await d2.saveAs('/tmp/equips.png');
