@@ -31,6 +31,12 @@ const anos=(a,n)=>{ const d=new Date(); d.setHours(12,0,0,0); d.setFullYear(d.ge
   await p.click('[data-act="rh-setall"]').catch(()=>{}); await H.dorme(500); await p.fill('[data-rh-vaga="Expedição"]','3'); await p.dispatchEvent('[data-rh-vaga="Expedição"]','change'); await H.dorme(600);
   const s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/config']);
   ok('Vagas abertas por setor em Cadastros › Setores', s.vagas&&s.vagas['Expedição']===3&&s.vagas['Linha 1']===2, JSON.stringify(s.vagas));
+  await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(300); await p.click('.rh-hero [data-act="rh-deslnovo"]'); await H.dorme(400);
+  const v1=await p.evaluate(()=>({v:__T.S().view,t:document.querySelector('.rh-form h2').innerText}));
+  await p.selectOption('#rh-desf','b'); await H.dorme(300); const t2=await p.evaluate(()=>document.querySelector('.rh-form h2').innerText);
+  await p.fill('#rh-desd',new Date().toISOString().slice(0,10)); await p.fill('#rh-desm','Pediu demissão'); await p.click('[data-act="rh-deslsalvar"]'); await H.dorme(800);
+  const bb=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/dados/funcionarios/b']);
+  ok('Novo desligamento (Início e Funcionários): escolhe a pessoa, data e motivo, e desliga', v1.v==='rhfunc'&&/Novo desligamento/.test(v1.t)&&/Desligar BRUNO LIMA/.test(t2)&&(bb.status==='Desligado'||bb.desligAgendado)&&bb.desligMotivo==='Pediu demissão', JSON.stringify({v1,t2,st:bb.status,m:bb.desligMotivo}));
   const e=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close(); ok('Nenhum erro de JavaScript', !e.length, e.join(' | '));
   const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });
