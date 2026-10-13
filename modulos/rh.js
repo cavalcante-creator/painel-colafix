@@ -56,11 +56,11 @@
   const semEpi=f=>{ const fc=funcaoDe(f); return !fc||!(fc.epis||[]).length; };
 
   /* ---------- leitura ---------- */
-  function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); });
+  function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); if(k==='funcoes'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(funcoesPadrao,0); });
     sub('func',()=>P.db().collection(COL.func).limit(3000)); sub('funcoes',()=>P.db().collection(COL.funcoes).limit(500)); sub('terc',()=>P.db().collection(COL.terc).limit(1000));
     sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300)); sub('fer',()=>P.db().collection(COL.ferias).limit(3000));
     P.inscrever('rh-fm',()=>P.db().collection(COL.fm).orderBy('mes','desc').limit(14),snap=>{ snap.docs.forEach(d=>{ R.fm[d.id]=d.data(); }); R.lido.fm=true; P.rerender(); });
-    P.inscrever('rh-cfg',()=>P.db().collection('rh').limit(5),snap=>{ const d=snap.docs.find(x=>x.id==='config'); R.cfg=d?d.data():{}; P.rerender(); });
+    P.inscrever('rh-cfg',()=>P.db().collection('rh').limit(5),snap=>{ const d=snap.docs.find(x=>x.id==='config'); R.cfg=d?d.data():{}; R.lido.cfg=true; P.rerender(); setTimeout(funcoesPadrao,0); });
     iniciarMais(); const m=location.search.match(/[?&]rhfile=([^&]+)/); if(m){ R.arqAbrir=decodeURIComponent(m[1]); P.go('rhfichas'); } }
 
   /* ---------- arquivos (PDF e fichas escaneadas) guardados em pedaços ---------- */
@@ -345,6 +345,16 @@
         <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" data-act="rh-cfgsalvar">Salvar configurações</button></div></section>`; }
   async function setoresSalvar(xs){ const u=[...new Set(xs.map(x=>String(x||'').trim()).filter(Boolean))]; await P.db().doc('rh/config').set({setores:u,alteradoEm:agora()},{merge:true}); R.cfg.setores=u; }
   /* ---------- Funções e EPIs ---------- */
+  /* ---------- funções, EPIs e uniformes da planilha do EPI (COLFIX_Controle_EPI, 13/10) já entram sozinhos, uma vez ----------
+     modulos/rh-epi-padrao.json só tem funções, EPIs, CA, uniformes e as declarações da ficha (nada de pessoas).
+     Só acrescenta a função que ainda não existe e só preenche a declaração vazia; depois marca rh/config.funcoesPadrao. */
+  let _fpad=false;
+  async function funcoesPadrao(){ if(_fpad||!R.lido.cfg||!R.lido.funcoes||R.cfg.funcoesPadrao) return; _fpad=true;
+    try{ const r=await fetch('modulos/rh-epi-padrao.json',{cache:'no-cache'}); if(!r.ok) throw new Error('rh-epi-padrao.json '+r.status); const J=await r.json(); let n=0;
+      for(const f of (J.funcoes||[])){ if(R.funcoes.some(x=>norm(x.nome)===norm(f.nome))) continue; await grava(COL.funcoes+'/'+id(),{nome:f.nome,epis:f.epis||[],uniformes:f.uniformes||[],origem:'planilha do EPI'}); n++; }
+      const up={funcoesPadrao:agora()}; Object.keys(J.decl||{}).forEach(k=>{ if(!R.cfg[k]) up[k]=J.decl[k]; }); await grava('rh/config',up);
+      if(n) P.toast(plural(n,'função da planilha do EPI cadastrada','funções da planilha do EPI cadastradas')+' (com EPIs e uniforme).'); }
+    catch(e){ _fpad=false; console.warn('[rh] funções padrão',e); } }
   /* ---------- importar a planilha do EPI (COLFIX_Controle_EPI): abas "Base EPIs por Função" e "Base Uniformes por Função" ---------- */
   const FIMP_MAX=9; /* a ficha impressa tem 9 linhas de EPI e 9 de uniforme */
   const fimpLixo=v=>!v||/^CADASTRA/i.test(v)||/^#/.test(v);

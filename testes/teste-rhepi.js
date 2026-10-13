@@ -40,5 +40,14 @@ let XLSX; try{ XLSX=require('xlsx'); }catch(e){ console.log('FALHOU — falta a 
   await p.setInputFiles('#rh-cargaf',arq); await H.dorme(1500); const pc=await view();
   ok('Funcionários › Importar planilha lê a aba Base Colaboradores (Tipo, Empresa e Data de admissão; PJ só com CPF entra e avisa)', /PEDRO PJ/.test(pc)&&/Pessoa nova \(PJ · NEXUS\)/.test(pc)&&/ANA SOUZA/.test(pc)&&/JOSE SO CPF[^\n]*sem CNPJ, só CPF/.test(pc), pc.slice(0,600).replace(/\n/g,' | '));
   const e=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close(); ok('Nenhum erro de JavaScript', !e.length, e.join(' | '));
+  /* sem importar: as funções da planilha do EPI (modulos/rh-epi-padrao.json) entram sozinhas, uma vez, sem mexer no que já existe */
+  process.env.EPI_PADRAO='1'; const {d:d2}=seedManut(); const D2=d2.docs; Object.assign(d2.users,{'rh@painel-colafix.app':d.users['rh@painel-colafix.app']}); D2['perfis/uRH']=D['perfis/uRH']; D2['acessos/uRH']=D['acessos/uRH'];
+  D2['rh/config']={declEpi:'Texto do RH'}; D2['rh/dados/funcoes/meu']={nome:'Analista de PCP',epis:[{nome:'Botina',ca:'CA 9'}],uniformes:[]};
+  const B2=await H.abrir({viewport:{width:1366,height:900}}); const p2=B2.page; await H.preparar(p2,d2); await p2.goto(H.BASE); await H.entrar(p2,'rh','rh1234'); await H.dorme(4000);
+  const conta=async()=>{ const s2=await p2.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); return {s2,fs:Object.entries(s2).filter(([k])=>k.startsWith('rh/dados/funcoes/')).map(([,v])=>v)}; };
+  let c1=await conta(); await p2.reload(); await H.entrar(p2,'rh','rh1234').catch(()=>{}); await H.dorme(3500); const c2=await conta();
+  const man=c1.fs.find(x=>x.nome==='AUXILIAR DE MANUTENÇÃO'), meu=c1.fs.find(x=>x.nome==='Analista de PCP');
+  ok('Sem importar: as 32 funções da planilha do EPI entram sozinhas uma vez (a que já existia e a declaração escrita pelo RH não mudam)', c1.fs.length===32&&man&&man.epis.length===9&&man.epis[0].ca==='CA 39220'&&meu.epis[0].ca==='CA 9'&&c1.s2['rh/config'].funcoesPadrao&&c1.s2['rh/config'].declEpi==='Texto do RH'&&/uniformes/.test(c1.s2['rh/config'].declUniforme)&&c2.fs.length===32, JSON.stringify({n1:c1.fs.length,n2:c2.fs.length,cfg:Object.keys(c1.s2['rh/config']),man:man&&man.epis.length}));
+  await B2.browser.close();
   const fl=res.filter(x=>!x.ok).length; console.log(fl?'FALHOU ('+fl+')':'PASSOU — '+res.length+' verificações'); process.exit(fl?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });
