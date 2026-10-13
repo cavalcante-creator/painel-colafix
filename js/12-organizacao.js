@@ -182,3 +182,12 @@ document.head.insertAdjacentHTML('beforeend',`<style>
     return h.replace(/<section class="card caltool">[\s\S]*?<\/section>/,bar); }; }
 document.addEventListener('click',ev=>{ const s=ev.target.closest&&ev.target.closest('.calm details summary'); if(!s) return; ev.preventDefault(); S._calmAb=!S._calmAb; const f=document.getElementById('c-cmf'); if(f) f.hidden=!S._calmAb; });
 document.addEventListener('change',ev=>{ const t=ev.target; if(!t||t.id!=='c-linsel') return; const b=document.createElement('button'); b.dataset.act='c-linha'; b.dataset.v=t.value; b.style.display='none'; document.body.appendChild(b); b.click(); b.remove(); });
+/* ===== pedido de 13/10 (tarde): Monitor do rancho vira módulo próprio; quem é do almox não vê Telas de TV ===== */
+(function(){
+  const pmx=MODS.find(x=>x.id==='premix'); if(pmx) pmx.views=pmx.views.filter(v=>v!=='dbmon');
+  if(!MODS.some(x=>x.id==='monitor')){ const i=MODS.findIndex(x=>x.id==='premix'); MODS.splice(i<0?MODS.length:i+1,0,{id:'monitor',nome:'Monitor do rancho',ic:'tv',views:['dbmon']}); }
+  try{ if(typeof EQ_MOD!=='undefined'&&!EQ_MOD.monitor) EQ_MOD.monitor=['tv','Monitor do rancho']; }catch(e){}
+})();
+function almoxSemTv(){ const p=acsP(); if(!p||p.tudo||(S.acs&&S.acs.dono)) return false; const ms=p.mods||[]; return ms.some(m=>m==='almox'||m==='premix')&&!ms.some(m=>m==='tv'||m==='telas'); }
+{ const _mv=modsVis; modsVis=function(){ const xs=_mv.apply(this,arguments); return almoxSemTv()?xs.filter(m=>m.id!=='telas'):xs; }; }
+{ const _vo=viewOk; viewOk=function(v){ if((v==='tvapres'||v==='tvfab')&&almoxSemTv()) return false; return _vo.apply(this,arguments); }; }

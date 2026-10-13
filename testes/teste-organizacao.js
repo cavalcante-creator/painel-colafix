@@ -13,7 +13,8 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   await p.evaluate(()=>__T.go('tvapres')); await H.dorme(300); const tel=await abas();
   await p.evaluate(()=>__T.go('linhatv')); await H.dorme(300); const tab=await abas();
   ok('Produção só com Programação, Calendário e Indicadores', JSON.stringify(prod)===JSON.stringify(['programacao','calendario','indicadores']), JSON.stringify(prod));
-  ok('Almoxarifado começa pela Fila do almox, depois Diário e Monitor', alm[0]==='dbfila'&&alm[1]==='diario'&&alm[2]==='dbmon'&&alm.includes('pmxfichas')&&tf==='Fila do almox', JSON.stringify(alm)+' '+tf);
+  const mods=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod));
+  ok('Almoxarifado começa pela Fila do almox, depois Diário (Monitor virou módulo próprio, logo depois)', alm[0]==='dbfila'&&alm[1]==='diario'&&!alm.includes('dbmon')&&alm.includes('pmxfichas')&&tf==='Fila do almox'&&mods.indexOf('monitor')===mods.indexOf('premix')+1, JSON.stringify(alm)+' '+tf+' '+JSON.stringify(mods));
   ok('TV da fábrica em Telas de TV; Tela da linha e Paradas no Tablet da produção', tel.includes('tvfab')&&JSON.stringify(tab)===JSON.stringify(['linhatv','paradas']), JSON.stringify(tel)+' '+JSON.stringify(tab));
   /* quem pede a fila (Meu dia, painéis) ainda chama go('diario'): cai na Fila; a aba Diário abre o diário completo */
   await p.evaluate(()=>{ __T.go('meudia'); __T.S().dbo.modo='fila'; __T.go('diario'); }); await H.dorme(300); const v1=await p.evaluate(()=>__T.S().view);
@@ -24,8 +25,8 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   await entra('joao','joao123'); const j=await p.evaluate(()=>({d:__T.vo('diario'),f:__T.vo('dbfila'),m:__T.vo('dbmon'),tv:__T.vo('tvfab'),pa:__T.vo('paradas'),menu:[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod)}));
   ok('Produção continua vendo diário, fila, monitor e TV da fábrica (não vê mais Paradas nem o Tablet da produção)', j.d&&j.f&&j.m&&j.tv&&!j.pa&&j.menu.includes('premix')&&!j.menu.includes('tabprod'), JSON.stringify(j));
   /* almox (só Almoxarifado) vê a fila */
-  await entra('alm','alm123'); const a=await p.evaluate(()=>({f:__T.vo('dbfila'),d:__T.vo('diario'),p:__T.vo('programacao'),v:__T.S().view}));
-  ok('Almox vê a Fila e o Diário, sem a Programação', a.f&&a.d&&!a.p, JSON.stringify(a));
+  await entra('alm','alm123'); const a=await p.evaluate(()=>({f:__T.vo('dbfila'),d:__T.vo('diario'),m:__T.vo('dbmon'),p:__T.vo('programacao'),tv:__T.vo('tvapres')||__T.vo('tvfab'),v:__T.S().view,menu:[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod)}));
+  ok('Almox vê a Fila, o Diário e o módulo Monitor do rancho, sem a Programação e sem Telas de TV', a.f&&a.d&&a.m&&!a.p&&!a.tv&&a.menu.includes('monitor')&&!a.menu.includes('telas'), JSON.stringify(a));
   /* computador da linha (cargo "Tela da linha"): continua só com a tela da linha */
   await entra('linha','linha1'); const l=await p.evaluate(()=>({v:__T.S().view,ltv:__T.vo('linhatv'),menu:[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod)}));
   ok('Computador da linha continua abrindo na Tela da linha (agora no Tablet da produção)', l.ltv&&l.v==='linhatv'&&l.menu.includes('tabprod')&&!l.menu.includes('producao'), JSON.stringify(l));
