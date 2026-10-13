@@ -30,10 +30,19 @@
     const tot=Object.entries(dados.colecoes).filter(([k])=>!NAO_IMPORTA.includes(k)).reduce((a,[k,v])=>a+(v&&!v.__erro?Object.keys(v).length:0),0);
     if(prompt('Importar '+tot.toLocaleString('pt-BR')+' registros da cópia de '+new Date(dados.exportadoEm).toLocaleString('pt-BR')+' NESTE projeto?\nUse só num projeto NOVO (o que já existir com o mesmo código será substituído).\n\nPara confirmar, digite IMPORTAR')!=='IMPORTAR') return;
     const F=fs(); if(!F){ P.toast('Banco indisponível.'); return; } B.st='importando'; let n=0; P.render();
-    let ultimo=''; try{ let lote=F.batch(), noLote=0; let bytes=0; const grava=async(path,data)=>{ ultimo=path.split('/').slice(0,-1).join('/'); const tam=JSON.stringify(data||{}).length; if(noLote&&bytes+tam>6000000){ await lote.commit(); lote=F.batch(); noLote=0; bytes=0; } lote.set(F.doc(path),volta(data)); noLote++; n++; bytes+=tam; if(noLote>=400||bytes>6000000){ bytes=0; await lote.commit(); lote=F.batch(); noLote=0; B.prog=n.toLocaleString('pt-BR')+' de '+tot.toLocaleString('pt-BR')+'…'; P.render(); } };
-      for(const [c,docs] of Object.entries(dados.colecoes)){ if(NAO_IMPORTA.includes(c)||!docs||docs.__erro) continue; for(const [id,d] of Object.entries(docs)) await grava(c+'/'+id,c==='perfis'&&d&&typeof d==='object'?Object.assign({},d,{importado:true}):d); }
-      if(noLote) await lote.commit(); P.toast(n.toLocaleString('pt-BR')+' registros importados. Em Equipe e cargos, toque em "Recriar login" em cada pessoa.'); }
-    catch(e){ console.warn('[backup] importar',e); const perm=/permission|insufficient|sem-permissao/i.test((e&&(e.code||e.message))||''); P.toast(perm?'A importação parou em '+n+' registros (perto de "'+(ultimo||'')+'"): o banco recusou. Publique de novo as regras (firestore.rules) no Firebase e importe outra vez.':'A importação parou em '+n+' registros: '+(e.message||e)); }
+    /* grava em lotes (até 400 registros ou ~6 MB); se o banco recusar um lote, tenta um por um e segue, para não perder o resto */
+    let lote=[], bytes=0; const recus={}; let ok=0, primeiroErro='';
+    const envia=async()=>{ if(!lote.length) return; const xs=lote; lote=[]; bytes=0;
+      try{ const b=F.batch(); xs.forEach(([p,d])=>b.set(F.doc(p),volta(d))); await b.commit(); ok+=xs.length; }
+      catch(e){ console.warn('[backup] lote recusado, tentando um por um',e); for(const [p,d] of xs){ try{ await F.doc(p).set(volta(d)); ok++; }catch(e2){ const c=p.split('/').slice(0,-1).join('/'); recus[c]=(recus[c]||0)+1; if(!primeiroErro) primeiroErro=(e2&&(e2.code||e2.message))||'erro'; console.warn('[backup] recusado',p,e2&&e2.code); } } }
+      B.prog=(ok+Object.values(recus).reduce((a,x)=>a+x,0)).toLocaleString('pt-BR')+' de '+tot.toLocaleString('pt-BR')+'…'; P.render(); };
+    try{ for(const [c,docs] of Object.entries(dados.colecoes)){ if(NAO_IMPORTA.includes(c)||!docs||docs.__erro) continue;
+        for(const [id,d0] of Object.entries(docs)){ const d=c==='perfis'&&d0&&typeof d0==='object'?Object.assign({},d0,{importado:true}):d0, tam=JSON.stringify(d||{}).length;
+          if(lote.length&&bytes+tam>6000000) await envia(); lote.push([c+'/'+id,d]); bytes+=tam; n++; if(lote.length>=400) await envia(); } }
+      await envia(); const nr=Object.values(recus).reduce((a,x)=>a+x,0);
+      if(!nr) P.toast(ok.toLocaleString('pt-BR')+' registros importados. Em Equipe e cargos, toque em "Recriar login" em cada pessoa.');
+      else alert(ok.toLocaleString('pt-BR')+' registros importados.\n\n'+nr+' o banco recusou ('+primeiroErro+'):\n'+Object.entries(recus).map(([c,x])=>'• '+c+': '+x).join('\n')+'\n\nConfira se as regras novas (firestore.rules) estão publicadas no Firebase e importe de novo (o que já entrou não duplica).'); }
+    catch(e){ console.warn('[backup] importar',e); P.toast('A importação parou em '+n+' registros: '+(e.message||e)); }
     B.st=''; B.prog=''; P.render(); }
   function tela(){ if(!P.dono()) return '<section class="card"><div class="empty">Só a administradora.</div></section>';
     let ult=B.ult; if(!ult){ try{ ult=JSON.parse(localStorage.getItem('painel.ultimaCopia')||'null'); }catch(e){} }
