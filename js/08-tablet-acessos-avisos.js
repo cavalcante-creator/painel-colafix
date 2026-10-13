@@ -970,3 +970,28 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 setInterval(()=>{ try{ if(ttAtivo()&&ttEntrega()&&!ttCam.stream&&document.querySelector('.cam-sit')){ const p=document.querySelector('.cam-sit p'); const want=ttCam.lendo&&Date.now()-camE.ini>8000; if(want&&p&&!p.classList.contains('tt-err')) rerenderTt(); } }catch(e){} },1500);
 document.head.insertAdjacentHTML('beforeend','<style id="cam-css">.cam-sit{margin-top:6px}.cam-sit p{margin:6px 0 0;font-size:15px}</style>');
 /* ===FIM CÂMERA DO CELULAR=== */
+/* ===================== CELULAR DO ALMOX: SEM CRACHÁ, SÓ O NOME (13/10) ===================== */
+/* Quem confere e quem recebe podem seguir sem crachá: digita o nome (fica registrado como "sem crachá"). */
+const scA={k:'',erro:''};
+{ const _ok=ttSemCrachaOk; ttSemCrachaOk=function(){ try{ if(ttEntrega()) return false; }catch(e){} return _ok.apply(this,arguments); }; } /* no celular usa o campo abaixo, não o prompt */
+function scForm(k,rot){ if(scA.k!==k) return `<button class="btn sec tt-big" data-act="sc-abre" data-k="${k}">Estou sem crachá</button>`;
+  return `<div class="sc-f"><label class="tt-lab">${esc(rot)}<input class="txt tt-in" id="sc-nome" autocomplete="off" maxlength="60" placeholder="Nome e sobrenome"></label>${scA.erro?`<p class="tt-err">${esc(scA.erro)}</p>`:''}
+    <div class="tt-rod"><button class="btn sec" data-act="sc-x">Voltar</button><button class="btn" data-act="sc-ok" data-k="${k}">Continuar</button></div></div>`; }
+{ const _ve=vEntrega; vEntrega=function(){ const h=_ve.apply(this,arguments); if(!h) return h; const T=S.tt;
+  if(T.fase==='rancho'&&!T.p&&T.rch&&cfPrecisa()&&!T.rch.cfp){ const i=h.lastIndexOf('<div class="tt-rod">'); return i<0?h:h.slice(0,i)+scForm('cf','Nome de quem vai conferir')+h.slice(i); }
+  if(T.fase==='rancho'&&!T.p&&T.rch&&!cfPrecisa()&&/crachá de quem vai receber/.test(h)){ const i=h.lastIndexOf('<div class="tt-rod">'); return i<0?h:h.slice(0,i)+scForm('rec','Nome de quem vai receber')+h.slice(i); }
+  return h; }; }
+{ const _tv=ttVoltar; ttVoltar=function(){ scA.k=''; scA.erro=''; return _tv.apply(this,arguments); }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="sc-"]'); if(!b||!ttEntrega()) return; const T=S.tt, a=b.dataset.act; T.ult=Date.now();
+  if(a==='sc-abre'){ scA.k=b.dataset.k; scA.erro=''; ttCamDesliga(); render(); setTimeout(()=>{ const i=document.getElementById('sc-nome'); if(i) i.focus(); },60); return; }
+  if(a==='sc-x'){ scA.k=''; scA.erro=''; render(); return; }
+  if(a==='sc-ok'){ const n=String((document.getElementById('sc-nome')||{}).value||'').trim().replace(/\s+/g,' ');
+    if(n.length<3){ scA.erro='Escreva o nome da pessoa.'; render(); setTimeout(()=>{ const i=document.getElementById('sc-nome'); if(i) i.focus(); },60); return; }
+    const p={codigo:null,nome:n.slice(0,60),semCracha:true}; scA.k=''; scA.erro='';
+    if(b.dataset.k==='cf'){ if(T.rch&&cfPrecisa()) cfComeca(p); return; }
+    T.p=Object.assign({linha:''},p); ttCamDesliga(); render(); return; } });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.target.id==='sc-nome'){ const b=document.querySelector('[data-act="sc-ok"]'); if(b) b.click(); } });
+/* a câmera não liga enquanto a pessoa digita o nome */
+{ const _cl=ttCamLiga; ttCamLiga=function(){ if(scA.k&&ttEntrega()) return; return _cl.apply(this,arguments); }; }
+document.head.insertAdjacentHTML('beforeend','<style id="sc-css">.sc-f{background:var(--surface);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}.sc-f .tt-lab{font-weight:700}</style>');
+/* ===FIM SEM CRACHÁ=== */

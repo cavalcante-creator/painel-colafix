@@ -5,7 +5,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  D['ranchos/123456']={numero:'123456',criadoEm:new Date().toISOString(),ordens:[{num:'5001'},{num:'5002'}],itens:[{c:'MP001',d:'Cimento CP-II',um:'kg',q:500},{c:'MP002',d:'Areia fina',um:'kg',q:1200}]};
  D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true};
  D['crachas/CARL2345']={codigo:'CARL2345',nome:'Carlos Almox',linha:'*',papel:'operador',ativo:true};
- D['ordens/5003']=Object.assign({},D['ordens/5001'],{num:'5003',rancho:'777888'}); D['ranchos/777888']={numero:'777888',criadoEm:new Date().toISOString(),ordens:[{num:'5003'}],itens:[{c:'MP010',d:'Aditivo X',um:'kg',q:25},{c:'MP011',d:'Pigmento',um:'kg',q:3.5}]};
+ D['ordens/5003']=Object.assign({},D['ordens/5001'],{num:'5003',rancho:'777888'}); D['ordens/5004']=Object.assign({},D['ordens/5001'],{num:'5004',rancho:'999000'}); D['ranchos/999000']={numero:'999000',criadoEm:new Date().toISOString(),ordens:[{num:'5004'}],itens:[{c:'MP020',d:'Saco',um:'un',q:100}]};
+ D['ranchos/777888']={numero:'777888',criadoEm:new Date().toISOString(),ordens:[{num:'5003'}],itens:[{c:'MP010',d:'Aditivo X',um:'kg',q:25},{c:'MP011',d:'Pigmento',um:'kg',q:3.5}]};
  const B=await H.abrir({camera:'/tmp/folha.y4m',decodificador:true,viewport:{width:390,height:844}}); const p=B.page;
  await B.ctx.addInitScript(()=>{ const md=navigator.mediaDevices; if(md&&md.getUserMedia){ const o=md.getUserMedia.bind(md); md.getUserMedia=c=>{ window.__cam=c; return o(c); }; } });
  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'celalmox','cel123');
@@ -46,6 +47,14 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900);
  s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const sf=s['ordens/5003'].rdb&&s['ordens/5003'].rdb.sep;
  ok('Registrar com falta: grava o item que ficou sem OK como faltando', sf&&sf.falta===true&&sf.itens.length===1&&sf.itens[0].c==='MP011'&&/faltando: MP011/.test((s['ordens/5003'].hist||[]).map(x=>x.o).join(' ')), JSON.stringify(sf));
+ await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
+ await p.fill('#tt-rnum','999000'); await p.click('[data-act="tt-rnum"]'); await H.dorme(400);
+ await p.click('[data-act="sc-abre"][data-k="cf"]'); await H.dorme(200); await p.fill('#sc-nome','Pedro Silva'); await p.click('[data-act="sc-ok"]'); await H.dorme(300);
+ const ts=await tela(); ok('Sem crachá: digita o nome de quem confere e abre a lista', /Conferindo: Pedro Silva/.test(ts)&&/MP020/.test(ts), ts.replace(/\n/g,' | ').slice(0,160));
+ await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(800);
+ await p.click('[data-act="sc-abre"][data-k="rec"]'); await H.dorme(200); await p.fill('#sc-nome','Maria Souza'); await p.press('#sc-nome','Enter'); await H.dorme(300);
+ await p.dblclick('[data-act="tt-recebi"]'); await H.dorme(900); s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const r9=s['ordens/5004'].rdb||{};
+ ok('Sem crachá também para quem recebe: grava os dois nomes, sem código de crachá', r9.sep&&r9.sep.nome==='Pedro Silva'&&r9.sep.cracha===null&&r9.ent&&r9.ent.recebidoPor==='Maria Souza'&&r9.ent.cracha===null, JSON.stringify(r9).slice(0,240));
  const tent=[]; for(const v of ['diario','programacao','manch']){ await p.evaluate(v=>__T.go(v),v); await H.dorme(150); tent.push(v+'→'+await p.evaluate(()=>__T.S().view)); }
  ok('O celular do almox não abre outras telas', tent.every(x=>x.endsWith('→mantotem')), tent.join(' '));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
