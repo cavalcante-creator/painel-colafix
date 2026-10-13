@@ -188,6 +188,7 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(!t||t.id!=='c-lin
   if(!MODS.some(x=>x.id==='monitor')){ const i=MODS.findIndex(x=>x.id==='premix'); MODS.splice(i<0?MODS.length:i+1,0,{id:'monitor',nome:'Monitor do rancho',ic:'tv',views:['dbmon']}); }
   try{ if(typeof EQ_MOD!=='undefined'&&!EQ_MOD.monitor) EQ_MOD.monitor=['tv','Monitor do rancho']; }catch(e){}
 })();
-function almoxSemTv(){ const p=acsP(); if(!p||p.tudo||(S.acs&&S.acs.dono)) return false; const ms=p.mods||[]; return ms.some(m=>m==='almox'||m==='premix')&&!ms.some(m=>m==='tv'||m==='telas'); }
+/* vale também quando a administradora usa "Ver como" o cargo; não vale para cargos de TV, gestor e PCP (análise) */
+function almoxSemTv(){ const p=acsP(); if(!p||p.tudo) return false; const ms=p.mods||[]; return ms.some(m=>m==='almox'||m==='premix')&&!ms.some(m=>m==='tv'||m==='gestor'||m==='analise'); }
 { const _mv=modsVis; modsVis=function(){ const xs=_mv.apply(this,arguments); return almoxSemTv()?xs.filter(m=>m.id!=='telas'):xs; }; }
 { const _vo=viewOk; viewOk=function(v){ if((v==='tvapres'||v==='tvfab')&&almoxSemTv()) return false; return _vo.apply(this,arguments); }; }

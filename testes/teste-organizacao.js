@@ -4,6 +4,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
 (async()=>{ const {d}=H.seed(); const D=d.docs;
   d.users['linha@painel-colafix.app']={uid:'uLIN',pass:'linha1',nome:'Linha'}; D['perfis/uLIN']={nome:'Linha',usuario:'linha'}; D['acessos/uLIN']={perfil:'linha',mods:['paradas'],locais:[],ativo:true};
   d.users['alm@painel-colafix.app']={uid:'uALM',pass:'alm123',nome:'Almox'}; D['perfis/uALM']={nome:'Almox',usuario:'alm'}; D['acessos/uALM']={perfil:'outro',mods:['premix'],locais:[],ativo:true};
+  d.users['alm2@painel-colafix.app']={uid:'uALM2',pass:'alm123',nome:'Almox 2'}; D['perfis/uALM2']={nome:'Almox 2',usuario:'alm2'}; D['acessos/uALM2']={perfil:'outro',mods:['almox','premix','telas','producao'],locais:['a3'],contar:true,ativo:true};
   const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept());
   const entra=async(u,s)=>{ await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,u,s); await H.dorme(2600); };
   const abas=()=>p.evaluate(()=>[...document.querySelectorAll('.tabs .tab')].map(b=>b.dataset.go));
@@ -27,6 +28,8 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   /* almox (só Almoxarifado) vê a fila */
   await entra('alm','alm123'); const a=await p.evaluate(()=>({f:__T.vo('dbfila'),d:__T.vo('diario'),m:__T.vo('dbmon'),p:__T.vo('programacao'),tv:__T.vo('tvapres')||__T.vo('tvfab'),v:__T.S().view,menu:[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod)}));
   ok('Almox vê a Fila, o Diário e o módulo Monitor do rancho, sem a Programação e sem Telas de TV', a.f&&a.d&&a.m&&!a.p&&!a.tv&&a.menu.includes('monitor')&&!a.menu.includes('telas'), JSON.stringify(a));
+  await entra('alm2','alm123'); const a2=await p.evaluate(()=>({tv:__T.vo('tvapres'),m:__T.vo('dbmon'),menu:[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod)}));
+  ok('Almox com Telas de TV marcado no cargo também não vê Telas de TV, e tem o Monitor', !a2.tv&&a2.m&&!a2.menu.includes('telas')&&a2.menu.includes('monitor'), JSON.stringify(a2));
   /* computador da linha (cargo "Tela da linha"): continua só com a tela da linha */
   await entra('linha','linha1'); const l=await p.evaluate(()=>({v:__T.S().view,ltv:__T.vo('linhatv'),menu:[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod)}));
   ok('Computador da linha continua abrindo na Tela da linha (agora no Tablet da produção)', l.ltv&&l.v==='linhatv'&&l.menu.includes('tabprod')&&!l.menu.includes('producao'), JSON.stringify(l));
