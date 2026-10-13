@@ -4,6 +4,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  D['ordens/5001'].rancho='123456'; D['ordens/5002'].rancho='123456';
  D['ranchos/123456']={numero:'123456',criadoEm:new Date().toISOString(),ordens:[{num:'5001'},{num:'5002'}],itens:[{c:'MP001',d:'Cimento CP-II',um:'kg',q:500},{c:'MP002',d:'Areia fina',um:'kg',q:1200}]};
  D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true};
+ D['crachas/CARL2345']={codigo:'CARL2345',nome:'Carlos Almox',linha:'*',papel:'operador',ativo:true};
+ D['ordens/5003']=Object.assign({},D['ordens/5001'],{num:'5003',rancho:'777888'}); D['ranchos/777888']={numero:'777888',criadoEm:new Date().toISOString(),ordens:[{num:'5003'}],itens:[{c:'MP010',d:'Aditivo X',um:'kg',q:25},{c:'MP011',d:'Pigmento',um:'kg',q:3.5}]};
  const B=await H.abrir({camera:'/tmp/folha.y4m',decodificador:true,viewport:{width:390,height:844}}); const p=B.page;
  await B.ctx.addInitScript(()=>{ const md=navigator.mediaDevices; if(md&&md.getUserMedia){ const o=md.getUserMedia.bind(md); md.getUserMedia=c=>{ window.__cam=c; return o(c); }; } });
  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'celalmox','cel123');
@@ -14,9 +16,18 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Celular do almox abre direto em "Escaneie o QR da folha", com câmera traseira e sem botão de sair', /Entrega de rancho/.test(e0.t)&&/Escaneie o QR da folha de produção/.test(e0.t)&&!e0.x&&e0.cam==='environment', 'câmera: '+e0.cam);
  const viu=await espera(()=>__T.S().tt.fase==='rancho'&&!!__T.S().tt.rch,20000); await H.dorme(400);
  const vis=await p.evaluate(()=>getComputedStyle(document.getElementById('tt-video')).display); const t1=await tela();
- ok('A câmera lê a folha: mostra o rancho, as ordens, a situação e pede o crachá de quem recebe (com visor da câmera)', viu&&/Rancho 123456/.test(t1)&&/5001, 5002/.test(t1)&&/Marcar como separado/.test(t1)&&/crachá de quem vai receber/.test(t1)&&vis==='block', t1.replace(/\n/g,' | ').slice(0,200));
- await p.click('[data-act="tt-esep"]'); await H.dorme(700); let s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
- ok('"Marcar como separado" grava a separação nas duas ordens do rancho, pela conta do celular', s['ordens/5001'].rdb.sep&&s['ordens/5001'].rdb.sep.por==='uCEL'&&s['ordens/5002'].rdb.sep, JSON.stringify(s['ordens/5001'].rdb.sep));
+ ok('A câmera lê a folha: mostra o rancho, as ordens e pede o crachá de quem vai conferir (com visor da câmera)', viu&&/Rancho 123456/.test(t1)&&/5001, 5002/.test(t1)&&/crachá de quem vai conferir/.test(t1)&&!/Marcar como separado/.test(t1)&&vis==='block', t1.replace(/\n/g,' | ').slice(0,200));
+ await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const tc=await tela();
+ const cam1=await p.evaluate(()=>{ const v=document.getElementById('tt-video'); return !!v&&getComputedStyle(v).display!=='none'; });
+ ok('Crachá do conferente: lista com a quantidade que deveria vir e um OK por item, câmera desligada', /Conferindo: Carlos Almox/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2 conferidos/.test(tc)&&!cam1, tc.replace(/\n/g,' | ').slice(0,220));
+ await p.screenshot({path:'/mnt/user-data/outputs/celular-almox-conferencia.png'});
+ await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(300); const tf=await tela();
+ let s0=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+ ok('Concluir com item sem OK pede confirmação antes e ainda não grava', /1 item ficou sem OK/.test(tf)&&!s0['ordens/5001'].rdb, tf.replace(/\n/g,' | ').slice(0,160));
+ await p.click('[data-act="cf-nao"]'); await H.dorme(200); await p.click('[data-act="cf-ok"][data-i="1"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(900);
+ let s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const sp=s['ordens/5001'].rdb&&s['ordens/5001'].rdb.sep;
+ ok('Tudo OK: grava separado e conferido nas duas ordens, com o nome e o crachá de quem conferiu', sp&&sp.conferido&&sp.nome==='Carlos Almox'&&sp.cracha==='CARL2345'&&sp.falta===false&&sp.por==='uCEL'&&sp.rec.length===2&&s['ordens/5002'].rdb.sep&&s['ordens/5002'].rdb.sep.junto==='5001', JSON.stringify(sp));
+ const t1b=await tela(); ok('Depois da conferência segue para o crachá de quem vai receber', /crachá de quem vai receber/.test(t1b), t1b.replace(/\n/g,' | ').slice(0,160));
  await p.keyboard.type('CXANAS2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const t2=await tela();
  ok('Bipa o crachá de quem recebe: "Entregar para ANA SOUZA" com os itens e o botão "Recebi o rancho"', /Entregar para/.test(t2)&&/Ana Souza/i.test(t2)&&/MP001/.test(t2)&&/Recebi o rancho/.test(t2), t2.replace(/\n/g,' | ').slice(0,200));
  await p.screenshot({path:'/mnt/user-data/outputs/celular-almox-entrega.png'});
@@ -24,11 +35,17 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const e1=s['ordens/5001'].rdb.ent, e2=s['ordens/5002'].rdb.ent; const h=(s['ordens/5001'].hist||[]).filter(x=>/recebido por Ana Souza/.test(x.o)).length;
  ok('"Recebi o rancho": entregue na linha com quem entregou (conta) e quem recebeu (crachá), nas duas ordens, sem duplicar', e1&&e1.recebidoPor==='Ana Souza'&&e1.entreguePor==='Joana Almox'&&e1.por==='uCEL'&&e1.cracha==='ANAS2345'&&e2&&e2.recebidoPor==='Ana Souza'&&h===1&&/entregue/.test(t3), JSON.stringify(e1));
  await p.click('[data-act="tt-voltar"]'); await H.dorme(300); await p.evaluate(()=>{ __T.S().tt.recente={}; });
- await p.keyboard.type('CXANAS2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const m1=await p.evaluate(()=>__T.S().tt.msg||'');
- ok('Crachá antes da folha: orienta a escanear a folha primeiro', /folha de produção/.test(m1), m1);
  await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.fill('#tt-rnum','123456'); await p.click('[data-act="tt-rnum"]'); await H.dorme(400); const t4=await tela();
  ok('Digitar o nº do rancho também abre; rancho já entregue avisa quem recebeu', /já foi entregue/.test(t4)&&/Ana Souza/.test(t4), t4.replace(/\n/g,' | ').slice(0,160));
+ await p.evaluate(()=>{ const v=document.getElementById('tt-video'); if(v&&v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop()); __T.S().tt.cam='erro'; }); /* a câmera de teste mostra sempre a folha 123456 */
+ await p.evaluate(()=>{ __T.S().tt.recente={}; __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
+ await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(400); const tp=await tela();
+ await p.fill('#tt-rnum','777888'); await p.click('[data-act="tt-rnum"]'); await H.dorme(500); const tq=await tela();
+ ok('Crachá antes da folha: guarda o conferente e já abre a lista do rancho', /Conferente: Carlos Almox/.test(tp)&&/Conferindo: Carlos Almox/.test(tq)&&/MP010/.test(tq), tq.replace(/\n/g,' | ').slice(0,160));
+ await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900);
+ s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const sf=s['ordens/5003'].rdb&&s['ordens/5003'].rdb.sep;
+ ok('Registrar com falta: grava o item que ficou sem OK como faltando', sf&&sf.falta===true&&sf.itens.length===1&&sf.itens[0].c==='MP011'&&/faltando: MP011/.test((s['ordens/5003'].hist||[]).map(x=>x.o).join(' ')), JSON.stringify(sf));
  const tent=[]; for(const v of ['diario','programacao','manch']){ await p.evaluate(v=>__T.go(v),v); await H.dorme(150); tent.push(v+'→'+await p.evaluate(()=>__T.S().view)); }
  ok('O celular do almox não abre outras telas', tent.every(x=>x.endsWith('→mantotem')), tent.join(' '));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

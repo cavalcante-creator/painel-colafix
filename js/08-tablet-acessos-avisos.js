@@ -888,3 +888,69 @@ const ACX_BOTOES={programar:['.ogcap [data-go="ajustes"]','o-nova-abrir','o-imp-
     document.querySelectorAll('[data-act="mzl-salvar"]').forEach(b=>{ const c=b.closest('section.card'); if(c) c.classList.add('sv-cad'); }); };
   new MutationObserver(()=>{ if(!pend){ pend=true; requestAnimationFrame(aplica); } }).observe(document.body,{childList:true,subtree:true}); }
 if(typeof EQ_PRONTO_DESC!=='undefined') EQ_PRONTO_DESC.producao='Vê o Meu dia e a programação. Pode abrir chamado, registrar parada e marcar o rancho; não muda a programação nem aponta.';
+/* ===================== CELULAR DO ALMOX: CONFERÊNCIA NA SEPARAÇÃO (13/10) ===================== */
+/* Pedido de 13/10: quem separa confere o rancho pelo celular. Crachá de quem confere (antes ou depois da folha)
+   → lista com a quantidade que deveria vir e um OK por item → grava rdb.sep com quem conferiu.
+   Item sem OK ao concluir = falta (confirma antes). Depois segue a entrega na linha como já era (crachá de quem recebe). */
+const cfA={pre:null,em:0};
+function cfOrd(){ const T=S.tt, R=T.rch; return R&&ordById(R.oid); }
+function cfPrecisa(){ try{ if(!ttEntrega()) return false; const T=S.tt, R=T.rch, o=cfOrd(); if(T.fase!=='rancho'||!o||T.p) return false; if(R.cfSalvo) return false; return dbIrmas(o).some(x=>!(x.rdb&&x.rdb.sep)); }catch(e){ return false; } }
+function cfConferindo(){ const R=S.tt.rch; return cfPrecisa()&&!!(R&&R.cfp); }
+function cfCracha(txt){ const m=String(txt||'').trim().toUpperCase().match(TT_RE); if(!m) return null; const c=crDe(m[1]); return c&&c.ativo!==false?{codigo:c.codigo,nome:c.nome}:false; }
+function cfComeca(p){ const R=S.tt.rch; R.cfp=p; R.ck={}; R.cfConf=false; ttBip(); ttCamDesliga(); S.tt.ult=Date.now(); render(); }
+/* leitura: crachá de quem confere (antes da folha fica guardado 2 min; depois da folha abre a lista) */
+{ const _tl=ttLeu; ttLeu=function(txt){ if(!ttEntrega()) return _tl.apply(this,arguments); const T=S.tt, c=cfCracha(txt);
+  if(c===false){ ttMsg('Crachá não reconhecido.'); return; }
+  if(c&&T.fase==='espera'){ cfA.pre=c; cfA.em=Date.now(); ttBip(); render(); return; }
+  if(c&&cfPrecisa()){ if(T.rch.cfp) return; cfComeca(c); return; }
+  return _tl.apply(this,arguments); }; }
+{ const _tr=ttRancho; ttRancho=function(){ const r=_tr.apply(this,arguments); try{ if(cfA.pre&&Date.now()-cfA.em<120000&&cfPrecisa()){ const p=cfA.pre; cfA.pre=null; cfComeca(p); } }catch(e){} return r; }; }
+{ const _tv=ttVoltar; ttVoltar=function(){ if(S.tt.fase!=='espera') cfA.pre=null; return _tv.apply(this,arguments); }; }
+{ const _cl=ttCamLiga; ttCamLiga=function(){ if(cfConferindo()) return; return _cl.apply(this,arguments); }; }
+setInterval(()=>{ if(cfA.pre&&Date.now()-cfA.em>120000){ cfA.pre=null; if(ttAtivo()&&S.tt.fase==='espera') render(); } },5000);
+function vCfTopo(){ const nomeEu=(S.uid&&S.nomes[S.uid])||''; return `<div class="tt-top"><div><b>Conferir rancho</b><span>${esc(nomeEu)}</span></div><div class="tt-clk num" data-rtv-clk>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</div></div>`; }
+function vConferencia(){ const T=S.tt, R=T.rch, o=cfOrd(), irm=dbIrmas(o);
+  const cab=`<div class="tt-ola">Rancho <b>${esc(R.num)}</b> · ${irm.map(x=>esc(x.num)).join(', ')} · ${esc([...new Set(irm.map(x=>x.linha))].join(', '))}</div>`;
+  if(!R.cfp) return `<div class="tt tt-cel">${vCfTopo()}${cab}<div class="tt-rcq">${ic('grid',26,2)}<div><b>Escaneie o crachá de quem vai conferir</b><span>Câmera ou coletor</span></div></div>${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}
+    <div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button>${ttSemCrachaOk()?'<button class="btn sec" data-act="cf-sem">Estou sem crachá</button>':''}</div></div>`;
+  const quem=`<div class="tt-ola">Conferindo: <b>${esc(R.cfp.nome)}</b></div>`;
+  if(R.modo==='lendo'||!R.itens) return `<div class="tt tt-cel">${vCfTopo()}${cab}${quem}<p class="tt-wait">Carregando os itens do rancho…</p><div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button></div></div>`;
+  const its=R.itens, n=its.filter((x,i)=>R.ck[i]).length, falt=its.length-n;
+  const lista=its.length?`<div class="cf-l">${its.map((x,i)=>`<button class="cf-i ${R.ck[i]?'on':''}" data-act="cf-ok" data-i="${i}" aria-pressed="${!!R.ck[i]}"><span class="cf-t"><b>${esc(x.c)}</b><small>${esc(x.d||'')}</small></span><span class="cf-q num">${fQ(x.q)}<small>${esc(x.um)}</small></span><span class="cf-ok">${R.ck[i]?ic('check',22,3):''}OK</span></button>`).join('')}</div>`
+    :`<div class="tt-box"><p>Os itens deste rancho não estão no painel. Confira pelo papel e confirme.</p></div>`;
+  const conf=R.cfConf&&falt?`<div class="cf-av"><b>${falt} ${falt===1?'item ficou':'itens ficaram'} sem OK.</b><span>Vão ficar registrados como faltando.</span><div class="tt-rod"><button class="btn sec" data-act="cf-nao">Voltar e conferir</button><button class="btn" data-act="cf-salvar" data-f="1" style="background:var(--warn-ink,#8a5a00)" ${T.enviando?'disabled':''}>${T.enviando?'Salvando…':'Registrar com falta'}</button></div></div>`:'';
+  return `<div class="tt tt-cel">${vCfTopo()}${cab}${quem}${its.length?`<div class="cf-n num">${n} de ${its.length} conferidos</div>`:''}${lista}${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}
+    ${conf||`<div class="tt-rod"><button class="btn sec" data-act="tt-voltar">Cancelar</button><button class="btn" data-act="cf-salvar" style="background:var(--ok-ink)" ${T.enviando?'disabled':''}>${T.enviando?'Salvando…':'Concluir conferência'}</button></div>`}</div>`; }
+{ const _ve=vEntrega; vEntrega=function(){ if(cfPrecisa()) return vConferencia(); const h=_ve.apply(this,arguments);
+  if(h&&S.tt.fase==='espera'&&cfA.pre) return h.replace('<h1>Escaneie o QR da folha de produção</h1>',`<div class="tt-ola" style="margin-bottom:8px">Conferente: <b>${esc(cfA.pre.nome)}</b></div><h1>Agora escaneie o QR da folha de produção</h1>`);
+  if(h&&S.tt.fase==='espera') return h.replace('<p>Aponte a câmera para o QR no canto da folha.</p>','<p>Aponte a câmera para o QR no canto da folha. Pode passar o crachá de quem vai conferir antes ou depois.</p>');
+  return h; }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="cf-"]'); if(!b||b.disabled||!ttEntrega()) return; const T=S.tt, R=T.rch, a=b.dataset.act; if(!R) return; T.ult=Date.now();
+  if(a==='cf-ok'){ const i=+b.dataset.i; R.ck[i]=!R.ck[i]; R.cfConf=false; render(); return; }
+  if(a==='cf-nao'){ R.cfConf=false; render(); return; }
+  if(a==='cf-sem'){ const n=prompt('Seu nome:'); if(n&&n.trim().length>1) cfComeca({codigo:null,nome:n.trim().slice(0,60),semCracha:true}); return; }
+  if(a==='cf-salvar'){ if(!R.cfp||T.enviando) return; const o=cfOrd(); if(!o) return; const its=R.itens||[];
+    const sem=its.filter((x,i)=>!R.ck[i]); if(sem.length&&b.dataset.f!=='1'){ R.cfConf=true; render(); return; }
+    const agora=new Date().toISOString(), quem=R.cfp.nome, falta=sem.length>0;
+    const itens=sem.map(x=>({c:x.c,i:x.c+' '+(x.d||''),q:fQ(x.q)+' '+(x.um||'')}));
+    const rec=its.map((x,i)=>({c:x.c,q:+x.q||0,ok:!!R.ck[i]}));
+    T.enviando=true; T.msg=''; render(); let n=0, falhou=false;
+    for(const x of dbIrmas(o)){ const rx=Object.assign({},x.rdb||{}); if(rx.sep) continue;
+      rx.sep={em:agora,por:S.uid||null,origem:'celular',conferido:true,nome:quem,cracha:R.cfp.codigo||null,falta,itens};
+      if(x===o) rx.sep.rec=rec; else if(x!==o) rx.sep.junto=o.num;
+      const txt='Rancho '+(o.rancho||'')+' separado e conferido por '+quem+(R.cfp.codigo?' (crachá)':'')+(falta?' · faltando: '+itens.map(y=>y.c+' ('+y.q+')').join(', '):' · completo')+' (celular do almox)';
+      if(await dbSalvar(x,rx,txt,o.rancho)) n++; else falhou=true; }
+    T.enviando=false; if(!n&&falhou){ T.msg='Não foi possível salvar. Confira a internet e toque de novo.'; render(); return; }
+    R.cfSalvo=true; R.cfFalta=falta; toast(falta?'Conferência salva com falta. Agora o crachá de quem vai receber.':'Rancho conferido e separado. Agora o crachá de quem vai receber.'); render(); return; } });
+document.head.insertAdjacentHTML('beforeend',`<style id="cf-css">
+.cf-n{font-weight:700;color:var(--muted);font-size:15px}
+.cf-l{display:flex;flex-direction:column;gap:8px}
+.cf-i{display:grid;grid-template-columns:minmax(0,1fr) auto 86px;gap:10px;align-items:center;width:100%;text-align:left;background:var(--surface);border:2px solid var(--line);border-left:6px solid var(--line);border-radius:14px;padding:12px;font:inherit;color:inherit;cursor:pointer;min-height:72px}
+.cf-i.on{border-color:var(--ok);background:var(--ok-tint,#e7f3ec)}
+.cf-t{min-width:0}.cf-t b{display:block;font-size:17px}.cf-t small{display:block;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.cf-q{font-size:24px;font-weight:800;text-align:right;line-height:1.05}.cf-q small{display:block;font-size:13px;font-weight:600;color:var(--muted)}
+.cf-ok{display:flex;align-items:center;justify-content:center;gap:4px;height:52px;border-radius:12px;border:2px solid var(--line);font-weight:800;font-size:18px}
+.cf-i.on .cf-ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.cf-av{background:var(--warn-tint);border-radius:14px;padding:14px}.cf-av b{display:block;font-size:18px}.cf-av span{display:block;margin-bottom:6px}
+</style>`);
+/* ===FIM CONFERÊNCIA NA SEPARAÇÃO=== */

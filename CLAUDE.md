@@ -76,7 +76,7 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 
 ## Almoxarifado / rancho
 - Etapas do rancho ficam em `ordens.rdb` (`sep`, `ent`, `conf`, `fim`) e são gravadas por `dbSalvar`. A ação de permissão é **"rancho"** (não "programar").
-- **Celular do almox** (cargo `almoxcel`, tela `mantotem` em modo entrega): folha (QR/RA-/nº) → separado → crachá de quem recebe → "Recebi o rancho". Grava `rdb.ent` com `entreguePor` e `recebidoPor`. Teste: `teste-almoxcel.js`.
+- **Celular do almox** (cargo `almoxcel`, tela `mantotem` em modo entrega): folha (QR/RA-/nº) + **crachá de quem confere** (antes ou depois da folha; antes fica guardado 2 min, `cfA.pre`) → lista com a quantidade que deveria vir e **um OK por item** → "Concluir conferência" (item sem OK pede confirmação e vira falta) → grava `rdb.sep` {conferido, nome, cracha, falta, itens (faltas), rec} em todas as ordens do rancho sem separação (nunca sobrescreve) → segue a entrega: crachá de quem recebe → "Recebi o rancho" (`rdb.ent` com `entreguePor` e `recebidoPor`). O diário mostra na coluna Separado o nome de quem conferiu e "faltou". Bloco "CONFERÊNCIA NA SEPARAÇÃO" (prefixo `cf`) no fim do js/08 (pedido de 13/10). Teste: `teste-almoxcel.js` (gera `/tmp/folha.y4m` com um QR `?rancho=123456`; aqui usar `CHROME=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`).
 
 ## Permissões e botões (revisão de 12/10)
 - **Padrão de ações por cargo:** `ACX_CARGO` (js/08). "Produção (consulta)" (`producao`): vê tudo, abre chamado, registra parada e marca o rancho; **não** programa, não aponta, não mede, não atende. O painel da administradora grava sozinho os `bloqCols` dessas pessoas (as regras do banco já usam `bloqCols`; não precisa publicar regra). Ajuste por pessoa continua vencendo.
