@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#143F54">
+<meta name="robots" content="noindex">
+<title>Ficha de admissão · Colafix</title>
+<link rel="icon" href="icons/favicon-32.png?v=5" sizes="32x32">
+<style>
+/* Ficha de admissão pelo celular (13/10): o RH manda o link (ficha.html?c=CÓDIGO) e a pessoa preenche sem login.
+   Grava só em rh/dados/fichascand/{código} e as fotos em rh/dados/fichascandarq/{código}-{n} (as regras do banco só deixam criar). */
+:root{--ground:#F5F1E8;--surface:#FFFFFF;--ink:#1A1A1A;--muted:#6B6558;--line:#E5DFD0;--teal:#1B5C7A;--teal-strong:#143F54;--ok:#2F6047;--crit:#B4483E;--crit-ink:#8E3A33}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
+.top{background:var(--teal-strong);color:#fff;padding:22px 18px 20px}
+.top small{display:block;font-size:12px;font-weight:700;letter-spacing:2px;color:#BFD7E3}
+.top h1{margin:6px 0 2px;font-size:24px}
+.top p{margin:0;color:#D6E4EB;font-size:15px}
+main{max-width:620px;margin:0 auto;padding:14px 14px 40px}
+.card{background:var(--surface);border-radius:14px;box-shadow:0 2px 8px rgba(26,26,26,.08);padding:16px;margin-top:12px}
+.card h2{margin:0 0 4px;font-size:18px}
+.card .dica{margin:0 0 10px;color:var(--muted);font-size:14px}
+label{display:block;margin-top:10px;font-size:13px;font-weight:700;color:#4A453C}
+input,select,textarea{display:block;width:100%;margin-top:4px;height:48px;padding:0 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+textarea{height:auto;padding:10px 12px}
+input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:var(--teal)}
+.g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 10px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}
+.doc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.doc:first-of-type{border-top:0}
+.doc b{font-size:15px}.doc small{display:block;color:var(--muted);font-size:13px}
+.doc .ok{color:var(--ok);font-weight:700}
+.bt{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border-radius:10px;border:1.5px solid var(--line);background:#fff;color:var(--teal);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.bt input{display:none}
+.go{display:block;width:100%;height:54px;margin-top:16px;border:0;border-radius:12px;background:var(--teal);color:#fff;font:inherit;font-size:18px;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.6}
+.ck{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px;color:var(--ink)}
+.ck input{width:22px;height:22px;flex:none;margin:0}
+.er{color:var(--crit-ink);font-weight:700;margin-top:10px;min-height:1px}
+.fim{text-align:center;padding:30px 18px}
+.fim .ic{width:76px;height:76px;border-radius:38px;background:#E3F0E8;color:var(--ok);display:grid;place-items:center;margin:0 auto 12px}
+.fim h2{font-size:22px}
+@media (max-width:420px){ .g3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+</style>
+</head>
+<body>
+<div class="top"><small>COLAFIX · RH</small><h1 id="ola">Ficha de admissão</h1><p id="sub">Carregando…</p></div>
+<main id="m"></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+  'use strict';
+  const CFG=window.PAINEL_CONFIG||{}, $=s=>document.querySelector(s), M=$('#m');
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  const T=(location.search.match(/[?&]c=([a-z0-9]{20})\b/)||[])[1]||'';
+  const fimTela=(t,p,ok)=>{ M.innerHTML=`<section class="card fim"><div class="ic" style="${ok?'':'background:#F6E3E1;color:#8E3A33'}">${ok?'<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>':'<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 16.5v.01"/></svg>'}</div><h2>${t}</h2><p>${p}</p></section>`; $('#sub').textContent='Ficha de admissão'; };
+  if(!T){ fimTela('Link incompleto','Abra o link exatamente como o RH mandou, ou peça um novo.'); return; }
+  let fs;
+  try{ firebase.initializeApp(CFG.firebase); const BANCO=CFG.banco||'(default)';
+    if(BANCO==='(default)') fs=firebase.firestore(); else { const app=firebase.app(); const exp=app.container.getProvider('firestore').getImmediate({identifier:BANCO}); fs=new firebase.firestore.Firestore(app,exp); }
+  }catch(e){ console.warn(e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo.'); return; }
+  const ENV='ficha.enviada.'+T; let enviada=false; try{ enviada=localStorage.getItem(ENV)==='1'; }catch(e){}
+  if(enviada){ fimTela('Ficha enviada','Sua ficha já chegou no RH da Colafix. Se precisar mudar alguma coisa, fale com o RH.',true); return; }
+
+  const DOCS_PADRAO=['RG','CPF','Carteira de trabalho (CTPS)','Título de eleitor','Comprovante de residência','Certidão de nascimento ou casamento','Foto 3x4'];
+  const fotos={}; /* nome do documento → {d (base64 sem prefixo), tipo} */
+  const cpfOk=c=>{ c=String(c||'').replace(/\D/g,''); if(c.length!==11||/^(\d)\1+$/.test(c)) return false; let s=0; for(let i=0;i<9;i++) s+=+c[i]*(10-i); let d=(s*10)%11%10; if(d!==+c[9]) return false; s=0; for(let i=0;i<10;i++) s+=+c[i]*(11-i); d=(s*10)%11%10; return d===+c[10]; };
+  const mascCPF=v=>{ v=v.replace(/\D/g,'').slice(0,11); return v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'); };
+  const mascTel=v=>{ v=v.replace(/\D/g,'').slice(0,11); return v.length>10?v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3'):v.replace(/(\d{2})(\d{0,4})(\d{0,4})/,(m,a,b,c)=>'('+a+') '+b+(c?'-'+c:'')).replace(/[\s-]+$/,''); };
+
+  /* foto do documento: diminui no próprio celular (até ~850 KB) */
+  function comprimir(file){ return new Promise((ok,er)=>{ if(/pdf/i.test(file.type)){ if(file.size>600000) return er(new Error('PDF grande demais. Mande uma foto do documento.')); const r=new FileReader(); r.onload=()=>ok({d:String(r.result).split(',')[1],tipo:'application/pdf'}); r.onerror=()=>er(new Error('Não consegui ler o arquivo.')); return r.readAsDataURL(file); }
+    const u=URL.createObjectURL(file), im=new Image(); im.onload=()=>{ let lado=1600, q=0.72, d=''; for(let k=0;k<8;k++){ const e=Math.min(1,lado/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=Math.round(im.width*e); c.height=Math.round(im.height*e);
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height); d=c.toDataURL('image/jpeg',q).split(',')[1]; if(d.length<850000) break; lado*=0.8; q=Math.max(0.45,q-0.07); }
+      URL.revokeObjectURL(u); d.length<890000?ok({d,tipo:'image/jpeg'}):er(new Error('Foto grande demais. Tente de novo mais de perto.')); };
+    im.onerror=()=>{ URL.revokeObjectURL(u); er(new Error('Não consegui abrir esta foto.')); }; im.src=u; }); }
+
+  function tela(cv){ const nome=String(cv.nome||'').trim().split(/\s+/)[0]||'', docs=(Array.isArray(cv.docs)&&cv.docs.length?cv.docs:DOCS_PADRAO).filter(n=>!/^ASO\b|dados banc/i.test(n)).slice(0,14).concat(['Outro documento']);
+    $('#ola').textContent=nome?'Olá, '+nome.charAt(0).toUpperCase()+nome.slice(1).toLowerCase()+'!':'Bem-vindo(a) à Colafix!';
+    $('#sub').textContent='Preencha com calma. Leva uns 5 minutos. Seus dados vão só para o RH da Colafix.';
+    const i=(id,l,ex)=>`<div><label for="${id}">${l}</label><input id="${id}" ${ex||''}></div>`;
+    M.innerHTML=`<form id="f" novalidate autocomplete="on">
+      <section class="card"><h2>Seus dados</h2>${i('nome','Nome completo *','autocomplete="name" maxlength="80" required')}
+        <div class="g2">${i('cpf','CPF *','inputmode="numeric" maxlength="14" placeholder="000.000.000-00"')}${i('nascimento','Data de nascimento *','type="date"')}</div>
+        <div class="g2">${i('telefone','Celular (WhatsApp) *','type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="(51) 90000-0000"')}${i('email','E-mail','type="email" autocomplete="email" maxlength="80"')}</div></section>
+      <section class="card"><h2>Endereço</h2>
+        <div class="g2">${i('cep','CEP','inputmode="numeric" autocomplete="postal-code" maxlength="9"')}${i('cidade','Cidade','autocomplete="address-level2" maxlength="40" value="Gravataí"')}</div>
+        ${i('rua','Rua','autocomplete="address-line1" maxlength="80"')}<div class="g3">${i('numero','Número','inputmode="numeric" maxlength="10"')}${i('complemento','Complemento','maxlength="30"')}${i('bairro','Bairro','maxlength="40"')}</div></section>
+      <section class="card"><h2>Tamanhos</h2><p class="dica">Para o uniforme e o calçado de segurança.</p>
+        <div class="g3"><div><label for="camisa">Camisa</label><select id="camisa"><option value="">—</option>${['PP','P','M','G','GG','XG','XGG'].map(t=>`<option>${t}</option>`).join('')}</select></div>${i('calca','Calça','inputmode="numeric" maxlength="6" placeholder="ex.: 42"')}${i('calcado','Calçado','inputmode="numeric" maxlength="4" placeholder="ex.: 40"')}</div></section>
+      <section class="card"><h2>Banco (para o salário)</h2>
+        <div class="g2">${i('banco','Banco','maxlength="40" placeholder="ex.: Caixa, Nubank"')}${i('agencia','Agência','inputmode="numeric" maxlength="10"')}</div>
+        <div class="g2">${i('conta','Conta (com dígito)','maxlength="20"')}${i('pix','Chave PIX','maxlength="80"')}</div></section>
+      <section class="card"><h2>Contato de emergência</h2><div class="g2">${i('emergNome','Nome (e quem é)','maxlength="60" placeholder="ex.: Ana, mãe"')}${i('emergTel','Telefone','type="tel" inputmode="tel" maxlength="16"')}</div></section>
+      <section class="card"><h2>Fotos dos documentos</h2><p class="dica">Tire uma foto de cada documento, bem de perto e com luz. Se não tiver algum agora, pode entregar no RH.</p>
+        ${docs.map((n,k)=>`<div class="doc"><div><b>${esc(n)}</b><small id="s${k}">ainda não mandou</small></div><label class="bt">Tirar foto<input type="file" accept="image/*,application/pdf" data-doc="${esc(n)}" data-k="${k}"></label></div>`).join('')}</section>
+      <section class="card"><label for="obs">Quer avisar alguma coisa ao RH?</label><textarea id="obs" rows="3" maxlength="400"></textarea>
+        <label class="ck" style="margin-top:14px"><input type="checkbox" id="ok"> <span>Confirmo que os dados estão certos e autorizo a Colafix a usá-los na minha admissão.</span></label>
+        <div class="er" id="er" role="alert"></div><button class="go" type="submit">Enviar para o RH</button></section></form>`;
+    $('#cpf').addEventListener('input',e=>{ e.target.value=mascCPF(e.target.value); });
+    ['#telefone','#emergTel'].forEach(s=>$(s).addEventListener('input',e=>{ e.target.value=mascTel(e.target.value); }));
+    $('#cep').addEventListener('input',e=>{ const v=e.target.value.replace(/\D/g,'').slice(0,8); e.target.value=v.length>5?v.slice(0,5)+'-'+v.slice(5):v; });
+    M.addEventListener('change',async e=>{ const t=e.target; if(!t.dataset||t.dataset.doc==null||!t.files||!t.files[0]) return; const s=$('#s'+t.dataset.k); s.textContent='preparando a foto…'; s.className='';
+      try{ fotos[t.dataset.doc]=await comprimir(t.files[0]); s.textContent='✓ foto pronta'; s.className='ok'; t.parentElement.firstChild.textContent='Trocar foto'; }
+      catch(er){ delete fotos[t.dataset.doc]; s.textContent=er.message; s.style.color='#8E3A33'; } });
+    const f=$('#f'), er=$('#er'); let enviando=false, n=0; const ja=new Set();
+    f.onsubmit=async ev=>{ ev.preventDefault(); if(enviando) return; er.textContent=''; const v=k=>String(($('#'+k)||{}).value||'').trim();
+      const d={nome:v('nome').replace(/\s+/g,' '),cpf:v('cpf').replace(/\D/g,''),nascimento:v('nascimento'),telefone:v('telefone'),email:v('email'),cep:v('cep'),rua:v('rua'),numero:v('numero'),complemento:v('complemento'),bairro:v('bairro'),cidade:v('cidade'),
+        camisa:v('camisa'),calca:v('calca'),calcado:v('calcado'),banco:v('banco'),agencia:v('agencia'),conta:v('conta'),pix:v('pix'),emergNome:v('emergNome'),emergTel:v('emergTel'),obs:v('obs')};
+      if(d.nome.split(' ').length<2) return er.textContent='Escreva o nome completo.', $('#nome').focus();
+      if(!cpfOk(d.cpf)) return er.textContent='CPF inválido. Confira os números.', $('#cpf').focus();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return er.textContent='Coloque a data de nascimento.', $('#nascimento').focus();
+      if(d.telefone.replace(/\D/g,'').length<10) return er.textContent='Coloque o celular com DDD.', $('#telefone').focus();
+      if(!$('#ok').checked) return er.textContent='Marque a confirmação antes de enviar.';
+      const b=f.querySelector('.go'); enviando=true; b.disabled=true;
+      try{ const ks=Object.keys(fotos); for(const nm of ks){ if(ja.has(nm)) continue; n++; b.textContent='Enviando foto '+(ja.size+1)+' de '+ks.length+'…';
+          await fs.doc('rh/dados/fichascandarq/'+T+'-'+n).set({c:T,n,nome:nm,tipo:fotos[nm].tipo,d:fotos[nm].d,em:new Date().toISOString()}); ja.add(nm); }
+        b.textContent='Enviando os dados…'; d.fotos=ja.size; d.em=new Date().toISOString();
+        await fs.doc('rh/dados/fichascand/'+T).set(d); try{ localStorage.setItem(ENV,'1'); }catch(e){}
+        window.scrollTo(0,0); fimTela('Pronto! Ficha enviada','O RH da Colafix recebeu seus dados'+(ja.size?' e '+ja.size+(ja.size===1?' foto de documento':' fotos de documentos'):'')+'. Se faltar alguma coisa, o RH avisa você.',true); }
+      catch(e){ console.warn('ficha',e); enviando=false; b.disabled=false; b.textContent='Enviar para o RH';
+        er.textContent=e&&/permission/.test(e.code||'')?'O RH já recebeu uma ficha por este link, ou ele não vale mais. Fale com o RH.':e&&/network|unavailable/.test(e.code||'')?'Sem internet. Confira a conexão e toque em Enviar de novo.':'Não foi possível enviar agora. Tente de novo em instantes.'; } };
+  }
+
+  (async()=>{ try{ await firebase.auth().signInAnonymously(); }catch(e){ console.info('ficha sem conta',e&&e.code); }
+    try{ const g=await fs.doc('rh/dados/convites/'+T).get(); const cv=g.exists?g.data():null;
+      if(!cv||cv.usado) return fimTela('Este link não vale mais','Peça um link novo para o RH da Colafix.');
+      if(+cv.ateMs&&+cv.ateMs<Date.now()) return fimTela('Este link venceu','Peça um link novo para o RH da Colafix.');
+      tela(cv); }
+    catch(e){ console.warn('convite',e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo. Se continuar, peça um link novo para o RH.'); } })();
+})();
+</script>
+</body>
+</html>

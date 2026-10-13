@@ -1229,7 +1229,7 @@ function vCalendario(){
   const naSemana=vis.filter(o=>L.includes(o.linha)&&dataEf(o)>=C.ini&&dataEf(o)<fim).length;
   const fora=q?S.ordens.filter(o=>o.linha&&o.status!=='ignorada'&&bate(o)&&L.includes(o.linha)&&(dataEf(o)<C.ini||dataEf(o)>=fim)&&!(o.status==='aberta'&&dataEf(o)<C.ini)).sort((a,b)=>dataEf(b).localeCompare(dataEf(a))).slice(0,6):[];
   const pendDia=d=>vis.filter(o=>o.status==='aberta'&&L.includes(o.linha)&&ateIni(o)===d).reduce((a,o)=>a+Math.max(0,o.total-entregueDe(o)),0);
-  const dLab=s=>{ const d=new Date(s+'T12:00:00'); return DIAS_CAL[d.getDay()]+' <span class="num">'+dm(s)+'</span>'; };
+  const dLab=s=>{ const d=new Date(s+'T12:00:00'), fe=typeof feriadoDe==='function'?feriadoDe(s):null; return DIAS_CAL[d.getDay()]+' <span class="num">'+dm(s)+'</span>'+(fe?'<small class="cal-fer">Feriado · '+esc(fe.nome)+'</small>':''); };
   const semLab=()=>{ const a=new Date(C.ini+'T12:00:00'), b=new Date(addDias(C.ini,nd-1)+'T12:00:00'); return a.getDate()+(a.getMonth()!==b.getMonth()?' de '+a.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''):'')+' a '+b.getDate()+' de '+b.toLocaleDateString('pt-BR',{month:'long'}); };
   return `${banner()}
   <div class="head"><div><div class="eyebrow">PRODUÇÃO</div><h1>Calendário</h1><div class="sub">${calRO()?'Consulta da programação — só visualização.':'Arraste a ordem para outro dia ou outra linha, ou solte em cima de outra ordem para montar a sequência de produção do dia. No celular, toque na ordem para mover.'}</div></div>
@@ -1410,7 +1410,7 @@ function movePainel(o){ const C=S.cal, e=entregueDe(o); const d=C.md||dataEf(o)|
    ${(()=>{ const sib=irmasCal(o); if(sib.length<2) return ''; const i=sib.findIndex(x=>x._id===o._id); return `<span style="display:inline-flex;gap:6px;align-items:center"><span class="sub" style="margin:0;font-size:12px">Sequência ${i+1}º de ${sib.length}</span><button class="btn sec" data-act="c-seq" data-id="${esc(o._id)}" data-v="-1" ${i===0?'disabled':''} style="height:40px;padding:0 12px">↑ Antes</button><button class="btn sec" data-act="c-seq" data-id="${esc(o._id)}" data-v="1" ${i===sib.length-1?'disabled':''} style="height:40px;padding:0 12px">↓ Depois</button></span>`; })()}
    <button class="lnk" data-act="c-ver" data-id="${esc(o._id)}">Abrir na programação</button><button class="lnk" data-act="fp-ordem" data-id="${esc(o._id)}">Folha (PDF)</button></div>`:`<button class="lnk" data-act="c-ver" data-id="${esc(o._id)}">Abrir na programação</button>`}
   </section>`; }
-document.head.insertAdjacentHTML('beforeend','<style>.cal-lst .cal-lg{display:grid;gap:8px}.cal-lst .cal-hj{border:1.5px solid var(--teal)}</style>');
+document.head.insertAdjacentHTML('beforeend','<style>.cal-lst .cal-lg{display:grid;gap:8px}.cal-lst .cal-hj{border:1.5px solid var(--teal)}.cal-fer{display:block;font-size:11.5px;font-weight:700;color:var(--warn-ink,#7A5410)}</style>');
 { let w0=window.innerWidth; window.addEventListener('resize',()=>{ const w=window.innerWidth; if((w<700)!==(w0<700)&&S.view==='calendario'&&typeof calRO==='function'&&calRO()) { w0=w; try{ rerenderSeguro(); }catch(e){} } else w0=w; }); }
 
 /* Ajustes separados por assunto (pedido de 13/10): as seções continuam na mesma tela (o "Salvar ajustes" lê todos os campos),
