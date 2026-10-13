@@ -2,13 +2,13 @@
 
 Sistema interno de uma fábrica (PCP, produção, silos, manutenção, almoxarifado, TVs). JavaScript puro, **sem build**.
 Publicado pelo **GitHub Pages** a partir deste repositório (todo commit na `main` vai para o ar em ~1 minuto).
-Banco: **Firebase/Firestore**, banco nomeado **`default`**, plano Blaze (custo por leitura: economizar).
+Banco: **Firebase/Firestore**, projeto **`painel-colafix-2`** (desde 13/10/2026, conta Google da Iasmyn), banco padrão **`(default)`** (custo por leitura: economizar). O projeto antigo `painel-colafix` (banco `default`, sem acesso ao console) só abre com `?antigo=1`, para tirar a cópia de segurança.
 
 ## Regras de ouro
 1. **Não reescrever** nada que funciona. Mudanças pequenas e testadas.
 2. **Módulo novo = arquivo novo** em `modulos/<nome>.js` (copiar `modulos/exemplo.js`) + acrescentar o nome em `modulos/lista.js`. **Não** colocar módulo novo dentro do `index.html`.
 3. Usar só a API `window.Painel` (ver abaixo). Precisando de algo do `index.html` que a API não expõe, acrescentar à API (fim do `index.html`, bloco `API PARA MÓDULOS`) — mudança mínima.
-4. **Regras do Firestore** (`firestore.rules`): se mudar, **avisar a usuária** que ela precisa colar e publicar no console do Firebase (banco `default`). O arquivo no GitHub não vale sozinho.
+4. **Regras do Firestore** (`firestore.rules`): se mudar, **avisar a usuária** que ela precisa colar e publicar no console do Firebase (projeto `painel-colafix-2`). O arquivo no GitHub não vale sozinho.
 5. Leituras: assinar só o necessário (`limit`, filtros, ordem por data). Nunca carregar uma coleção inteira sem limite.
 6. Textos da tela em **português do Brasil**, linguagem simples (o pessoal é do chão de fábrica).
 7. Antes de terminar: rodar os testes do que foi mexido (abaixo) e dizer o resultado.
@@ -83,7 +83,7 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 | `js/10-tablet-producao.js` | tablet: abrir a ordem pela folha (QR, `RA-`, `OP-`, nº), **apontar produção**, **pedir material** (`pedmat`) e quadro de pedidos no diário |
 | `js/00-qrcode.js` | biblioteca de QR |
 | `painel-firebase.js` | login, telas sem login (QR de chamado e de rancho), adaptador do banco, PWA |
-| `config.js` | chaves do Firebase — **não alterar** |
+| `config.js` | chaves do Firebase (projeto novo + o antigo com `?antigo=1`) — **não alterar** sem a usuária pedir |
 | `firestore.rules` | regras (publicar no console!) |
 | `sw.js` | service worker (`VERSAO`; lista `BASE` dos arquivos guardados para uso sem internet) |
 | `modulos/` | módulos em arquivos separados (`lista.js` carrega): `rh`, `onedrive`, `backup`, `melhorias` |
