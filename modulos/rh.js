@@ -56,7 +56,7 @@
   const semEpi=f=>{ const fc=funcaoDe(f); return !fc||!(fc.epis||[]).length; };
 
   /* ---------- leitura ---------- */
-  function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); if(k==='funcoes'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(funcoesPadrao,0); });
+  function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); if(k==='funcoes'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(funcoesPadrao,0); if(k==='modelos'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(consertarNomesModelos,0); });
     sub('func',()=>P.db().collection(COL.func).limit(3000)); sub('funcoes',()=>P.db().collection(COL.funcoes).limit(500)); sub('terc',()=>P.db().collection(COL.terc).limit(1000));
     sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300)); sub('fer',()=>P.db().collection(COL.ferias).limit(3000));
     P.inscrever('rh-fm',()=>P.db().collection(COL.fm).orderBy('mes','desc').limit(14),snap=>{ snap.docs.forEach(d=>{ R.fm[d.id]=d.data(); }); R.lido.fm=true; P.rerender(); });
@@ -1608,9 +1608,16 @@
     }catch(e){ console.warn('[RH]',e); P.erro(e); } });
   function recarregaFichas(){ try{ if(frm) frm.contentWindow.location.reload(); }catch(e){} }
   /* modelo a partir de um arquivo do Word: {NOME}, {CPF}… no texto viram campos */
+  /* nome de arquivo que veio de um .zip aberto no Windows sem UTF-8 ("presta├º├úo" em vez de "prestação"): volta ao certo */
+  const CP437="\u00c7\u00fc\u00e9\u00e2\u00e4\u00e0\u00e5\u00e7\u00ea\u00eb\u00e8\u00ef\u00ee\u00ec\u00c4\u00c5\u00c9\u00e6\u00c6\u00f4\u00f6\u00f2\u00fb\u00f9\u00ff\u00d6\u00dc\u00a2\u00a3\u00a5\u20a7\u0192\u00e1\u00ed\u00f3\u00fa\u00f1\u00d1\u00aa\u00ba\u00bf\u2310\u00ac\u00bd\u00bc\u00a1\u00ab\u00bb\u2591\u2592\u2593\u2502\u2524\u2561\u2562\u2556\u2555\u2563\u2551\u2557\u255d\u255c\u255b\u2510\u2514\u2534\u252c\u251c\u2500\u253c\u255e\u255f\u255a\u2554\u2569\u2566\u2560\u2550\u256c\u2567\u2568\u2564\u2565\u2559\u2558\u2552\u2553\u256b\u256a\u2518\u250c\u2588\u2584\u258c\u2590\u2580\u03b1\u00df\u0393\u03c0\u03a3\u03c3\u00b5\u03c4\u03a6\u0398\u03a9\u03b4\u221e\u03c6\u03b5\u2229\u2261\u00b1\u2265\u2264\u2320\u2321\u00f7\u2248\u00b0\u2219\u00b7\u221a\u207f\u00b2\u25a0\u00a0", CP850="\u00c7\u00fc\u00e9\u00e2\u00e4\u00e0\u00e5\u00e7\u00ea\u00eb\u00e8\u00ef\u00ee\u00ec\u00c4\u00c5\u00c9\u00e6\u00c6\u00f4\u00f6\u00f2\u00fb\u00f9\u00ff\u00d6\u00dc\u00f8\u00a3\u00d8\u00d7\u0192\u00e1\u00ed\u00f3\u00fa\u00f1\u00d1\u00aa\u00ba\u00bf\u00ae\u00ac\u00bd\u00bc\u00a1\u00ab\u00bb\u2591\u2592\u2593\u2502\u2524\u00c1\u00c2\u00c0\u00a9\u2563\u2551\u2557\u255d\u00a2\u00a5\u2510\u2514\u2534\u252c\u251c\u2500\u253c\u00e3\u00c3\u255a\u2554\u2569\u2566\u2560\u2550\u256c\u00a4\u00f0\u00d0\u00ca\u00cb\u00c8\u0131\u00cd\u00ce\u00cf\u2518\u250c\u2588\u2584\u00a6\u00cc\u2580\u00d3\u00df\u00d4\u00d2\u00f5\u00d5\u00b5\u00fe\u00de\u00da\u00db\u00d9\u00fd\u00dd\u00af\u00b4\u00ad\u00b1\u2017\u00be\u00b6\u00a7\u00f7\u00b8\u00b0\u00a8\u00b7\u00b9\u00b3\u00b2\u25a0\u00a0";
+  function nomeConserta(s){ s=String(s||''); if(!/[├┬┼╔╚]/.test(s)) return s; /* o Windows usa a tabela 850 (ou a 437) */
+    for(const T of [CP850,CP437]){ try{ const b=[]; let ok=true; for(const ch of s){ const c=ch.charCodeAt(0); if(c<128){ b.push(c); continue; } const i=T.indexOf(ch); if(i<0){ ok=false; break; } b.push(128+i); }
+      if(!ok) continue; const r=new TextDecoder('utf-8',{fatal:true}).decode(new Uint8Array(b)); if(r&&r!==s) return r; }catch(e){} } return s; }
+  let _nmFeito=false;
+  async function consertarNomesModelos(){ if(_nmFeito) return; _nmFeito=true; for(const m of R.modelos){ const n=nomeConserta(m.nome); if(n!==m.nome){ try{ await grava(COL.modelos+'/'+m._id,{nome:n}); m.nome=n; }catch(e){ console.warn('[rh] nome do modelo',e); } } } P.rerender(); }
   /* vários arquivos do Word de uma vez: cada um vira um modelo, já salvo (o nome do arquivo é o nome do modelo; quem já existe com o mesmo nome fica como está) */
   async function importarWords(files){ let n=0; const ja=[], ruim=[]; try{ P.toast('Lendo '+files.length+' arquivos do Word…'); if(!window.mammoth) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
-      for(const file of files){ const nome=file.name.replace(/\.docx$/i,'').replace(/_/g,' ').replace(/\s+/g,' ').trim(); if(R.modelos.some(x=>norm(x.nome)===norm(nome))){ ja.push(nome); continue; }
+      for(const file of files){ const nome=nomeConserta(file.name.replace(/\.docx$/i,'').replace(/_/g,' ').replace(/\s+/g,' ').trim()); if(R.modelos.some(x=>norm(x.nome)===norm(nome))){ ja.push(nome); continue; }
         try{ const r=await window.mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()}); const html=limpar(r.value||''); const txt=html.replace(/<[^>]+>/g,''); if(!txt.trim()){ ruim.push(nome); continue; }
           const semEmp=!/data-k="EMPRESA"/.test(html), vale=/ZENITH SOLU/i.test(txt)&&semEmp?'ZENITH':/NEXUS MANUTEN/i.test(txt)&&semEmp?'NEXUS':/data-k="(CNPJ_PJ|RAZAO_PJ)"/.test(html)?'PJ':/EMPREGAD[OA]|EXPERI[ÊE]NCIA/i.test(txt)?'CLT':'TODOS'; /* os campos já viraram <span data-k> */
           await grava(COL.modelos+'/'+id(),{nome,vale,html,desliga:modeloDesliga({nome}),criadoEm:agora(),criadoPor:P.S.uid||null}); n++; }
@@ -1619,7 +1626,7 @@
     catch(e){ console.warn('[RH] word',e); P.toast(e.message&&/carregar/.test(e.message)?e.message:'Não consegui ler os arquivos do Word.'); } }
   async function importarWord(file){ try{ P.toast('Lendo '+file.name+'…'); if(!window.mammoth) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
       const r=await window.mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()}); const html=limpar(r.value||''); if(!html.replace(/<[^>]+>/g,'').trim()) return P.toast('O arquivo está vazio.');
-      const n=camposDe(html).length; R.dm={nome:file.name.replace(/\.docx$/i,''),vale:'TODOS',html}; R.dv='modelos'; P.render();
+      const n=camposDe(html).length; R.dm={nome:nomeConserta(file.name.replace(/\.docx$/i,'')),vale:'TODOS',html}; R.dv='modelos'; P.render();
       P.toast(n?n+' campo(s) reconhecido(s). Confira o texto e salve o modelo.':'Texto importado. Toque nos campos acima para colocar nome, CPF etc. e salve.'); }
     catch(e){ console.warn('[RH] word',e); P.toast(e.message&&/carregar/.test(e.message)?e.message:'Não consegui ler o arquivo do Word.'); } }
   /* importar a lista de funcionários uma vez (Excel ou CSV com cabeçalho: Nome, CPF, Função, Setor, Data de admissão, Empresa, Status, Tipo) */

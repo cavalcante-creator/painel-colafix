@@ -11,6 +11,7 @@ const docx=async(paras,arq)=>{ const z=new JSZip(); const x=s=>s.replace(/&/g,'&
 (async()=>{ const {d}=seedManut(); const D=d.docs;
   d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
   D['rh/config']={}; D['rh/dados/funcionarios/pj1']={nome:'ROGER TESTE',cpf:'',cnpj:'11222333000181',tipo:'PJ',empresa:'ZENITH',status:'Ativo',funcao:'Apoio',setor:'Produção',admissao:'2026-09-01'};
+  D['rh/dados/modelos/mj']={nome:'Aviso pr├®vio - presta├º├úo de servi├ºos',vale:'CLT',html:'<p>x</p>'}; /* nome estragado pelo .zip no Windows */
   D['rh/dados/modelos/ja']={nome:'Termo de ciência - uso de celular',vale:'TODOS',html:'<p>antigo</p>'};
   const a1=await docx(['NOTIFICAÇÃO RESCISÃO CONTRATO DE PRESTAÇÃO DE SERVIÇOS','A empresa {RAZAO_PJ}, inscrita no CNPJ nº {CNPJ_PJ}, NOTIFICA a ZENITH SOLUÇÕES INDUSTRIAIS LTDA, referente aos serviços de {?Serviço do contrato}, com término em {DESLIGAMENTO}.','Gravataí, {DATA_HOJE}.'],'/tmp/Notificação de rescisão - teste.docx');
   const a2=await docx(['TERMO DE CIÊNCIA','Eu, {NOME}, CNPJ {CNPJ_PJ}, contratado pela {EMPRESA}.'],'/tmp/Termo de ciência - uso de celular.docx');
@@ -18,17 +19,19 @@ const docx=async(paras,arq)=>{ const z=new JSZip(); const x=s=>s.replace(/&/g,'&
   const a3=await docx(['DECLARAÇÃO','{NOME} será admitido em {ADMISSAO}.'],'/tmp/Declaracao_Inicio_Servicos.docx');
   const a4=await docx(['CONTRATO NEXUS','NEXUS MANUTENÇÕES LTDA contrata {RAZAO_PJ}, CNPJ {CNPJ_PJ}.'],'/tmp/Contrato Nexus teste.docx');
   const a5=await docx(['AVISO PRÉVIO','{EMPRESA} avisa o EMPREGADO {NOME}, CTPS {?CTPS}.'],'/tmp/Aviso previo teste (desligamento).docx');
+  const a7=await docx(['TESTE','{NOME}'],'/tmp/Comunicado de dispensa - Notifica├º├úo.docx');
   const lib=fs.readFileSync(require.resolve('mammoth/mammoth.browser.min.js'),'utf8');
   const B=await H.abrir({viewport:{width:1366,height:900}}); const p=B.page; p.on('dialog',x=>x.accept());
   await p.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/mammoth\//,r=>r.fulfill({contentType:'text/javascript',body:lib}));
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2800);
   const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), view=()=>p.evaluate(()=>document.getElementById('view').innerText);
   await p.evaluate(()=>__T.go('rhdocs')); await H.dorme(300); await p.click('[data-act="rh-dv"][data-v="modelos"]').catch(()=>{}); await H.dorme(300);
-  await p.setInputFiles('#rh-docx',[a1,a2,a3,a4,a5,a6].map(f=>({name:require('path').basename(f),mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:fs.readFileSync(f)}))); await H.dorme(2500); const toast=await p.evaluate(()=>document.getElementById('toast').innerText);
+  await p.setInputFiles('#rh-docx',[a1,a2,a3,a4,a5,a6,a7].map(f=>({name:require('path').basename(f),mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:fs.readFileSync(f)}))); await H.dorme(2500); const toast=await p.evaluate(()=>document.getElementById('toast').innerText);
   let s=await srv(); const ms=Object.entries(s).filter(([k])=>k.startsWith('rh/dados/modelos/')).map(([,v])=>v);
   const not=ms.find(x=>/Notificação de rescisão/.test(x.nome)), dec=ms.find(x=>/Declaracao Inicio Servicos/.test(x.nome)), cel=ms.filter(x=>/celular/.test(x.nome));
-  ok('Vários arquivos do Word de uma vez: cada um vira um modelo salvo (o que já existia com o mesmo nome fica como está)', ms.length===6&&not&&dec&&cel.length===1&&cel[0].html==='<p>antigo</p>'&&/5 modelos cadastrados/.test(toast)&&/já existiam: Termo de ciência/.test(toast), toast+' '+JSON.stringify(ms.map(x=>x.nome)));
+  ok('Vários arquivos do Word de uma vez: cada um vira um modelo salvo (o que já existia com o mesmo nome fica como está)', ms.length===8&&not&&dec&&cel.length===1&&cel[0].html==='<p>antigo</p>'&&/6 modelos cadastrados/.test(toast)&&/já existiam: Termo de ciência/.test(toast), toast+' '+JSON.stringify(ms.map(x=>x.nome)));
   ok('Campos e perguntas reconhecidos; Zenith, Nexus e CLT reconhecidos pelo texto; rescisão e desligamento oferecem desligar', not&&/data-k="RAZAO_PJ"/.test(not.html)&&/data-k="CNPJ_PJ"/.test(not.html)&&/data-q="Serviço do contrato"/.test(not.html)&&not.vale==='ZENITH'&&not.desliga===true&&dec.vale==='TODOS'&&!dec.desliga&&ms.find(x=>/Nexus/.test(x.nome)).vale==='NEXUS'&&ms.find(x=>/Aviso previo/.test(x.nome)).vale==='CLT'&&ms.find(x=>/Aviso previo/.test(x.nome)).desliga===true&&ms.find(x=>/Termo PJ/.test(x.nome)).vale==='PJ', not&&JSON.stringify({vale:not.vale,desliga:not.desliga,html:not.html.slice(0,200)}));
+  ok('Nomes estragados pelo .zip no Windows voltam ao certo (o que já estava salvo e o que é importado)', ms.some(x=>x.nome==='Aviso prévio - prestação de serviços')&&ms.some(x=>x.nome==='Comunicado de dispensa - Notificação')&&!ms.some(x=>/├/.test(x.nome)), JSON.stringify(ms.map(x=>x.nome)));
   /* gerar para o PJ: {RAZAO_PJ} = 8 primeiros números do CNPJ + nome */
   await p.click('[data-act="rh-dv"][data-v="gerar"]'); await H.dorme(200); await p.selectOption('#rh-dgf','pj1'); await H.dorme(300);
   const mid=await p.evaluate(()=>{ const o=[...document.querySelectorAll('#rh-dgm option')].find(x=>/Notificação de rescisão/.test(x.textContent)); return o&&o.value; }); if(mid){ await p.selectOption('#rh-dgm',mid); await H.dorme(500); }
