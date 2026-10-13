@@ -1249,7 +1249,7 @@ function vCalendario(){
   </section>
   ${C.soAtras?`<section class="card"><div class="head" style="align-items:baseline"><div class="label">ORDENS ATRASADAS (${atras.length}) · QUALQUER DATA</div><button class="lnk" data-act="c-atras">Voltar ao calendário</button></div>
    ${atras.length?L.filter(l=>atras.some(o=>o.linha===l)).map(l=>`<div style="margin-top:12px"><b style="font-size:13px">${esc(l)}</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:6px">${atras.filter(o=>o.linha===l).map(o=>calCard(o)).join('')}</div></div>`).join(''):'<div class="empty">Nenhuma ordem atrasada.</div>'}
-   <div class="sub" style="font-size:12px;margin-top:10px">Toque em uma ordem para mudar o dia ou a linha.</div></section>`:calRO()&&window.innerWidth<700?`<div class="cal-lst">${dias.map(d=>{
+   <div class="sub" style="font-size:12px;margin-top:10px">Toque em uma ordem para mudar o dia ou a linha.</div></section>`:window.innerWidth<700?`<div class="cal-lst">${dias.map(d=>{
      const doDia=l=>(d===h?atras.filter(o=>o.linha===l&&(C.fech||o.status==='aberta')&&!vis.some(v=>v._id===o._id&&dataEf(v)===d)):[]).concat(vis.filter(o=>o.linha===l&&dataEf(o)===d&&!(o.status==='aberta'&&dataEf(o)<h&&dias.includes(h)))).concat(prevAtivas().filter(p=>p.linha===l&&(p.data===d||(d===h&&p.data<h)))).sort(seqCmp);
      const ls=L.filter(l=>doDia(l).length), p=pendDia(d);
      return `<section class="card ${d===h?'cal-hj':''}"><div class="head" style="align-items:baseline;margin-bottom:6px"><h2 style="font-size:17px">${dLab(d)}${d===h?' <span class="pill teal">hoje</span>':''}</h2>${p?`<span class="sub num" style="margin:0">${f0(p)} pendente</span>`:''}</div>

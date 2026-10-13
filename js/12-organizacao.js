@@ -105,3 +105,80 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 { const _ea=envAlmBtn; envAlmBtn=function(o){ return String(_ea.apply(this,arguments)).replace('Enviado ao almox</button>','Mandar p/ fila do almox</button>').replace('title="Marcar o rancho','title="Mandar para a Fila do almox: marca o rancho'); }; }
 /* Visão do gestor: o quadro de paradas abre a Manutenção (a tela de Paradas saiu da Produção) */
 { const _vg=vGestao; vGestao=function(){ const h=_vg.apply(this,arguments); return viewOk('paradas')?h:String(h).replace(/data-go="paradas"/g,'data-go="manch"'); }; }
+
+/* ===================== CELULAR (pedidos de 13/10 madrugada) =====================
+   Programação: cada ordem vira um cartão legível (nº e situação em cima, produto inteiro, andamento, botões embaixo).
+   Calendário: no celular sempre por dia (lista), com uma barra de filtros pequena (semana, linha, busca em "Filtros"). */
+document.head.insertAdjacentHTML('beforeend',`<style>
+@media (max-width:640px){
+  body:not(.tv) .orow{grid-template-columns:auto minmax(0,1fr) auto;gap:6px 10px;padding:12px 10px;margin:0 -6px;align-items:start}
+  body:not(.tv) .orow .od{grid-column:1;grid-row:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;align-self:center}
+  body:not(.tv) .orow .od .oseq button{display:none}
+  body:not(.tv) .orow .od small,body:not(.tv) .orow .od .est{font-size:11.5px}
+  body:not(.tv) .orow .on{grid-column:2;grid-row:1;align-self:center}
+  body:not(.tv) .orow .on b{font-size:15px}
+  body:not(.tv) .orow .os{grid-column:3;grid-row:1;align-items:flex-end;flex-direction:column;display:flex;gap:3px}
+  body:not(.tv) .orow .op{grid-column:1/-1;grid-row:2}
+  body:not(.tv) .orow .op b{display:block;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;font-size:14.5px;line-height:1.35}
+  body:not(.tv) .orow .op small{display:block;white-space:normal;line-height:1.5;margin-top:3px}
+  body:not(.tv) .orow .nr[data-l="Total"]{display:none}
+  body:not(.tv) .orow .nr[data-l="Entregue"]{grid-column:1/3;grid-row:3;text-align:left}
+  body:not(.tv) .orow .nr[data-l="Entregue"] .bar{max-width:none}
+  body:not(.tv) .orow .nr[data-l="Pendente"]{grid-column:3;grid-row:3;text-align:right}
+  body:not(.tv) .orow > .ofp{grid-column:1/-1;grid-row:4;justify-content:flex-start;gap:6px}
+  body:not(.tv) .orow .ofp .fpbtn,body:not(.tv) .orow .ofp .prisel{height:34px}
+  body:not(.tv) .orow .ofp .pmxadd span{white-space:nowrap}
+  .ogrp{flex-wrap:wrap;row-gap:4px}
+  .ofil .pf-r3{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;padding-top:8px}
+  .ofil .pf-r3 .pf-lab,.ofil .pf-r3 .pf-res,.ofil .pf-r3 > span[style*="inline-flex"]{display:none!important}
+  .ofil .pf-r1{flex-wrap:wrap}
+  .ofil .pf-r1 .seg{overflow-x:auto;max-width:100%}
+  .pg-acts .btn{height:38px}
+}
+/* calendário no celular */
+.calm{display:flex;flex-direction:column;gap:10px;padding:12px 14px}
+.calm .cm1{display:flex;align-items:center;gap:8px}
+.calm .cm1 .sem{flex:1;text-align:center;font-weight:800;font-size:15px;line-height:1.2}
+.calm .cm1 .btn{height:40px;min-width:40px;padding:0 12px}
+.calm .cm2{display:flex;gap:8px;align-items:center}
+.calm .cm2 select{flex:1;height:40px}
+.calm details summary{list-style:none;cursor:pointer;height:40px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border:1.5px solid var(--line);border-radius:10px;font-weight:700;font-size:13.5px;color:var(--teal-strong);background:var(--surface)}
+.calm details summary::-webkit-details-marker{display:none}
+.calm details[open]{flex-basis:100%}
+.calm .cmf{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.calm .cmf .chips{display:flex;gap:6px;flex-wrap:wrap}
+.calhead .btn{height:38px;padding:0 12px;font-size:13px}
+@media (max-width:700px){ .calhead .sub{display:none} .calhead > div:last-child{flex-direction:row!important;flex-wrap:nowrap!important;gap:8px!important} }
+.cal-lst{display:grid;gap:14px}
+.cal-lst > section.card{padding:0;overflow:hidden;border-radius:16px;border:1px solid var(--line)}
+.cal-lst > section.card > .head{margin:0!important;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.cal-lst > section.card > .head h2{font-size:17px!important;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cal-lst > section.cal-hj{border:2px solid var(--teal)}
+.cal-lst > section.cal-hj > .head{background:var(--teal-strong);color:#fff}
+.cal-lst > section.cal-hj > .head h2,.cal-lst > section.cal-hj > .head .sub{color:#fff!important}
+.cal-lst > section.card > .label,.cal-lst > section.card > .sub{margin-left:16px!important;margin-right:16px!important}
+.cal-lst > section.card > .label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--teal-strong)}
+.cal-lst > section.card > .label::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--teal)}
+.cal-lst .cal-lg{padding:0 12px 4px}
+.cal-lst .cal-lg:last-child{padding-bottom:14px}
+.cal-lst > section.card > .sub:last-child{padding-bottom:14px}
+.cal-lst .ccard{font-size:14px;padding:10px 12px;border-radius:12px;border-left:5px solid var(--teal)}
+.cal-lst .ccard.st-ok{border-left-color:var(--ok)} .cal-lst .ccard.st-warn{border-left-color:var(--warn)} .cal-lst .ccard.st-crit{border-left-color:var(--crit)}
+.cal-lst .ccard small{font-size:12.5px}
+.cal-lst .cal-fer{color:inherit;opacity:.85}
+</style>`);
+{ const _vc2=vCalendario; vCalendario=function(){ let h=_vc2.apply(this,arguments);
+    h=h.replace('<div class="head"><div><div class="eyebrow">PRODUÇÃO</div><h1>Calendário','<div class="head calhead"><div><div class="eyebrow">PRODUÇÃO</div><h1>Calendário');
+    if(window.innerWidth>=700||S.cal.soAtras) return h;
+    const C=S.cal, LT=linhasOrd(), sem=(h.match(/<span class="sem num">([^<]*)<\/span>/)||[])[1]||'', esf=s=>String(s).replace(/"/g,'&quot;');
+    const mais=[C.busca?1:0,C.soAtras?1:0,C.sab?1:0,C.fech?1:0].reduce((a,b)=>a+b,0);
+    const bar=`<section class="card calm">
+      <div class="cm1"><button class="btn sec" data-act="c-sem" data-v="-7" aria-label="Semana anterior">‹</button><span class="sem num">${sem}</span><button class="btn sec" data-act="c-sem" data-v="7" aria-label="Próxima semana">›</button><button class="btn ${C.ini===segundaStr(new Date())?'':'sec'}" data-act="c-hoje">Hoje</button></div>
+      <div class="cm2"><select class="txt" id="c-linsel" aria-label="Linha"><option value="todas">Todas as linhas</option>${LT.map(l=>`<option value="${esf(l)}" ${C.linha===l?'selected':''}>${esc(l)}</option>`).join('')}</select>
+        <details ${C.busca?'open':''}><summary>Filtros${mais?' · '+mais:''}</summary></details></div>
+      <div class="cmf" ${C.busca||S._calmAb?'':'hidden'} id="c-cmf"><input class="txt" id="c-busca" type="search" placeholder="Nº da ordem, código ou produto" value="${esc(C.busca||'')}" aria-label="Buscar ordem">
+        <label class="sub" style="margin:0;display:flex;align-items:center;gap:8px;font-size:13px">Ir para <input type="date" class="txt" id="c-data" value="${esc(C.ini)}" style="flex:1"></label>
+        <div class="chips"><button class="chip" data-act="c-atras" aria-pressed="${!!C.soAtras}">Atrasadas</button><button class="chip" data-act="c-sab" aria-pressed="${!!C.sab}">Sábado</button><button class="chip" data-act="c-fech" aria-pressed="${!!C.fech}">Encerradas</button></div></div></section>`;
+    return h.replace(/<section class="card caltool">[\s\S]*?<\/section>/,bar); }; }
+document.addEventListener('click',ev=>{ const s=ev.target.closest&&ev.target.closest('.calm details summary'); if(!s) return; ev.preventDefault(); S._calmAb=!S._calmAb; const f=document.getElementById('c-cmf'); if(f) f.hidden=!S._calmAb; });
+document.addEventListener('change',ev=>{ const t=ev.target; if(!t||t.id!=='c-linsel') return; const b=document.createElement('button'); b.dataset.act='c-linha'; b.dataset.v=t.value; b.style.display='none'; document.body.appendChild(b); b.click(); b.remove(); });
