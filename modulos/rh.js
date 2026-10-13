@@ -345,16 +345,54 @@
         <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" data-act="rh-cfgsalvar">Salvar configurações</button></div></section>`; }
   async function setoresSalvar(xs){ const u=[...new Set(xs.map(x=>String(x||'').trim()).filter(Boolean))]; await P.db().doc('rh/config').set({setores:u,alteradoEm:agora()},{merge:true}); R.cfg.setores=u; }
   /* ---------- Funções e EPIs ---------- */
+  /* ---------- importar a planilha do EPI (COLFIX_Controle_EPI): abas "Base EPIs por Função" e "Base Uniformes por Função" ---------- */
+  const FIMP_MAX=9; /* a ficha impressa tem 9 linhas de EPI e 9 de uniforme */
+  const fimpLixo=v=>!v||/^CADASTRA/i.test(v)||/^#/.test(v);
+  function fimpAba(rows,ehEpi){ const hi=rows.findIndex(r=>norm(r[0])==='FUNCAO'); if(hi<0) return null; const H=rows[hi].map(norm), out={};
+    const pares=[]; H.forEach((h,i)=>{ if(/^(EPI|UNIFORME)\s*\d+$/.test(h)){ const prox=H[i+1]||''; pares.push([i,/^(CA|TAMANHO)\b/.test(prox)?i+1:-1]); } });
+    rows.slice(hi+1).forEach(r=>{ const nome=String(r[0]||'').trim().replace(/\s+/g,' ').toUpperCase(); if(!nome||fimpLixo(nome)) return; const its=(out[norm(nome)]=out[norm(nome)]||{nome,its:[]}).its;
+      pares.forEach(([a,b])=>{ const n=String(r[a]||'').trim().replace(/\s+/g,' '); if(fimpLixo(n)) return; const x=b>=0?String(r[b]||'').trim():''; if(its.some(e=>norm(e.nome)===norm(n))) return; its.push(ehEpi?{nome:n,ca:fimpLixo(x)?'':x}:{nome:n,tam:fimpLixo(x)?'':x}); }); });
+    return out; }
+  async function fimpLer(file){ if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); const aba=re=>{ const n=wb.SheetNames.find(x=>re.test(norm(x))); return n?XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''}):null; };
+    const re=aba(/EPI.*FUNC/), ru=aba(/UNIFORME.*FUNC/); if(!re&&!ru) throw new Error('Não achei as abas "Base EPIs por Função" e "Base Uniformes por Função".');
+    const E=(re&&fimpAba(re,true))||{}, U=(ru&&fimpAba(ru,false))||{}; const ks=[...new Set([...Object.keys(E),...Object.keys(U)])].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const linhas=ks.map(k=>{ const ex=R.funcoes.find(x=>norm(x.nome)===k); const nome=(E[k]||U[k]).nome;
+      const junta=(novos,velhos,c)=>novos.map(n=>{ const v=(velhos||[]).find(o=>norm(o.nome)===norm(n.nome)); return n[c]||!v?n:Object.assign({},n,{[c]:v[c]||''}); }); /* tamanho/CA que já estava no painel fica */
+      const epis=E[k]?junta(E[k].its,ex&&ex.epis,'ca'):((ex&&ex.epis)||[]), uni=U[k]?junta(U[k].its,ex&&ex.uniformes,'tam'):((ex&&ex.uniformes)||[]);
+      const corta=[...epis.slice(FIMP_MAX).map(e=>e.nome),...uni.slice(FIMP_MAX).map(e=>e.nome)];
+      const d={epis:epis.slice(0,FIMP_MAX),uniformes:uni.slice(0,FIMP_MAX)}; const igual=ex&&JSON.stringify((ex.epis||[]).map(e=>[e.nome,e.ca||'']))===JSON.stringify(d.epis.map(e=>[e.nome,e.ca||'']))&&JSON.stringify((ex.uniformes||[]).map(e=>[e.nome,e.tam||'']))===JSON.stringify(d.uniformes.map(e=>[e.nome,e.tam||'']));
+      return {id:ex?ex._id:null,nome:ex?ex.nome:nome,novo:!ex,igual,d,corta}; });
+    let decl={}; const fm=aba(/FICHA/); if(fm) fm.slice(0,15).forEach(r=>r.forEach(c=>{ if(typeof c==='string'&&c.length>200){ if(/uniforme/i.test(c)&&!decl.declUniforme) decl.declUniforme=c.trim(); else if(/EPI/i.test(c)&&!decl.declEpi) decl.declEpi=c.trim(); } }));
+    Object.keys(decl).forEach(k=>{ if(R.cfg[k]) delete decl[k]; }); /* declaração que o RH já escreveu no painel não muda */
+    const colab=wb.SheetNames.some(x=>/COLABORADOR/.test(norm(x)));
+    return {linhas,decl,colab,arq:file.name}; }
+  function vFimp(){ const g=R.fimp; if(!g) return ''; const nv=g.linhas.filter(o=>o.novo), mu=g.linhas.filter(o=>!o.novo&&!o.igual), ig=g.linhas.filter(o=>o.igual), ct=g.linhas.filter(o=>o.corta.length);
+    const item=o=>`<div class="row" style="grid-template-columns:minmax(0,1fr) auto;align-items:start"><div><b>${esc(o.nome)}</b> ${o.novo?'<span class="pill ok">nova</span>':o.igual?'<span class="pill neu">sem mudança</span>':'<span class="pill warn">atualiza</span>'}
+      <small style="display:block;color:var(--muted)">EPI: ${o.d.epis.map(e=>esc(e.nome)+(e.ca?' ('+esc(e.ca)+')':'')).join(', ')||'—'}</small><small style="display:block;color:var(--muted)">Uniforme: ${o.d.uniformes.map(e=>esc(e.nome)).join(', ')||'—'}</small>
+      ${o.corta.length?`<small style="display:block;color:var(--crit-ink)">Não cabe na ficha (máximo ${FIMP_MAX}): ${o.corta.map(esc).join(', ')}</small>`:''}</div></div>`;
+    return `<section class="card" style="border:1.5px solid var(--teal)"><div class="head" style="align-items:baseline"><h2>Importar planilha do EPI</h2><button class="lnk" data-act="rh-fimpx">Fechar</button></div>
+      <div class="sub" style="margin-top:4px">${esc(g.arq)} · ${plural(nv.length,'função nova','funções novas')} · ${plural(mu.length,'atualizada','atualizadas')} · ${ig.length} sem mudança${g.decl.declEpi||g.decl.declUniforme?' · declarações da ficha':''}. Nada foi gravado ainda.</div>
+      ${ct.length?`<div class="banner" style="background:var(--crit-tint);color:var(--crit-ink);margin-top:10px">${plural(ct.length,'função tem','funções têm')} mais de ${FIMP_MAX} itens: a ficha impressa só tem ${FIMP_MAX} linhas, então os itens em vermelho ficam de fora.</div>`:''}
+      ${g.colab?'<div class="sub" style="margin-top:8px">A planilha também tem a aba <b>Base Colaboradores</b>: para trazer as pessoas, use <b>Funcionários › Importar planilha</b> com este mesmo arquivo.</div>':''}
+      <div style="margin-top:10px;max-height:420px;overflow:auto">${[...nv,...mu,...ig].map(item).join('')}</div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-fimpx">Cancelar</button><button class="btn" data-act="rh-fimpok" ${(nv.length||mu.length||g.decl.declEpi||g.decl.declUniforme)&&!g.salvando?'':'disabled'}>${g.salvando?'Gravando…':'Gravar '+(nv.length+mu.length)+' funç'+(nv.length+mu.length===1?'ão':'ões')}</button></div></section>`; }
+  async function fimpGravar(){ const g=R.fimp; if(!g||g.salvando) return; g.salvando=true; P.render(); let n=0;
+    try{ for(const o of g.linhas){ if(o.igual) continue; await grava(COL.funcoes+'/'+(o.id||id()),{nome:o.nome,epis:o.d.epis,uniformes:o.d.uniformes}); n++; }
+      if(g.decl.declEpi||g.decl.declUniforme) await grava('rh/config',Object.assign({},g.decl));
+      P.toast(plural(n,'função gravada','funções gravadas')+'.'); R.fimp=null; }
+    catch(e){ P.erro(e); g.salvando=false; } P.render(); }
   function vFuncoes(){ const ff=R.ff, semCad=unicos('funcao').filter(n=>!R.funcoes.some(x=>norm(x.nome)===norm(n)));
     const lin=(arr,k,ph)=>{ const xs=(arr||[]).concat([{}]).slice(0,9); return xs.map((x,i)=>`<div class="rh-it"><input class="txt" data-rh-it="${k}" data-i="${i}" data-c="nome" placeholder="${k==='epis'?'EPI':'Peça do uniforme'} ${i+1}" value="${esc(x.nome||'')}"><input class="txt" data-rh-it="${k}" data-i="${i}" data-c="${k==='epis'?'ca':'tam'}" placeholder="${ph}" value="${esc(x[k==='epis'?'ca':'tam']||'')}" style="max-width:150px"></div>`).join(''); };
-    return topo('Cadastros do RH','Funções (com EPIs e uniforme), setores e configurações do RH.',cadSeg()+`<button class="btn" data-act="rh-fnovo">${P.ic('mais',18,2.4)}Nova função</button>`)
+    return topo('Cadastros do RH','Funções (com EPIs e uniforme), setores e configurações do RH.',cadSeg()+`<label class="btn sec" style="cursor:pointer">${P.ic('folha',18,2)}Importar planilha do EPI<input type="file" id="rh-fimpf" accept=".xlsx,.xls" hidden></label><button class="btn" data-act="rh-fnovo">${P.ic('mais',18,2.4)}Nova função</button>`)
+      +vFimp()
       +(semCad.length?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink)">Funções usadas por funcionários e ainda sem EPI/uniforme: ${semCad.map(n=>`<button class="lnk" data-act="rh-fnovo" data-n="${esc(n)}">${esc(n)}</button>`).join(', ')}</div>`:'')
       +(ff?`<section class="card rh-form"><div class="head" style="align-items:baseline"><h2>${ff._id?'Editar':'Nova'} função</h2><button class="lnk" data-act="rh-ffx">Fechar</button></div>
         <label><span class="label">Nome da função *</span><input class="txt" data-rh-ff="nome" value="${esc(ff.nome||'')}"></label>
         <div class="two" style="gap:16px;margin-top:12px;align-items:start"><div><div class="label" style="margin-bottom:6px">EPIs (com CA)</div>${lin(ff.epis,'epis','CA')}</div><div><div class="label" style="margin-bottom:6px">Uniforme (com tamanho)</div>${lin(ff.uniformes,'uniformes','Tamanho')}</div></div>
         <div style="display:flex;justify-content:space-between;gap:10px;margin-top:12px">${ff._id?'<button class="lnk" data-act="rh-fdel" style="color:var(--crit-ink)">Apagar função</button>':'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="rh-ffx">Cancelar</button><button class="btn" data-act="rh-fsalvar">Salvar</button></div></div></section>`:'')
       +`<section class="card">${R.funcoes.length?R.funcoes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(x=>`<div class="row" style="grid-template-columns:minmax(0,1fr) auto;align-items:start"><div><b>${esc(x.nome)}</b>
-          <small style="display:block;color:var(--muted)">EPI: ${(x.epis||[]).map(e=>esc(e.nome)+(e.ca?' (CA '+esc(e.ca)+')':'')).join(', ')||'—'}</small><small style="display:block;color:var(--muted)">Uniforme: ${(x.uniformes||[]).map(e=>esc(e.nome)+(e.tam?' ('+esc(e.tam)+')':'')).join(', ')||'—'}</small></div>
+          <small style="display:block;color:var(--muted)">EPI: ${(x.epis||[]).map(e=>esc(e.nome)+(e.ca?' ('+(/^CA\b/i.test(e.ca)?'':'CA ')+esc(e.ca)+')':'')).join(', ')||'—'}</small><small style="display:block;color:var(--muted)">Uniforme: ${(x.uniformes||[]).map(e=>esc(e.nome)+(e.tam?' ('+esc(e.tam)+')':'')).join(', ')||'—'}</small></div>
           <button class="lnk" data-act="rh-fed" data-id="${x._id}">Editar</button></div>`).join(''):'<div class="empty">Nenhuma função cadastrada.</div>'}</section>`
       +`<section class="card"><div class="label">TEXTOS DAS FICHAS</div><div class="sub" style="margin:4px 0 10px">Declarações impressas nas fichas. Em branco = texto padrão do sistema.</div>
         <label><span class="label">Declaração do uniforme</span><textarea class="txt" id="rh-du" rows="4">${esc(R.cfg.declUniforme||'')}</textarea></label>
@@ -984,18 +1022,20 @@
     let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/); if(m){ const y=m[3].length===2?'20'+m[3]:m[3], r=y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); const d=new Date(r+'T12:00:00Z'); if(!isNaN(d)&&isoD(d)===r) return {v:r}; return {erro:s}; }
     m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m) return {v:s}; if(/^\d{5}$/.test(s)){ const d=new Date(Date.UTC(1899,11,30+(+s),12)); return {v:isoD(d)}; } return {erro:s}; }
   async function cargaLer(file){ let rows; if(/\.csv$/i.test(file.name)) rows=csvLinhas(await file.text());
-    else { if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}); }
+    else { if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); const abas=wb.SheetNames.map(n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''})); rows=abas.find(rs=>rs.slice(0,15).some(r=>r.some(c=>norm(c)==='NOME')&&r.some(c=>norm(c)==='CPF')))||abas[0]; }
     const hi=rows.findIndex(r=>r.some(c=>norm(c)==='NOME')&&r.some(c=>norm(c)==='CPF')); if(hi<0) throw new Error('Não achei as colunas Nome e CPF. Use a planilha baixada aqui.');
     const H=rows[hi].map(norm), col={}; CARGA.forEach(([k,l])=>{ col[k]=H.indexOf(norm(l)); });
+    /* planilha do EPI (aba Base Colaboradores): Tipo = vínculo, Empresa, Data de admissão */ const alt={tipo:['TIPO'],empresa:['EMPRESA'],admissao:['DATA DE ADMISSAO']}; Object.keys(alt).forEach(k=>{ if(col[k]<0) col[k]=H.findIndex(h=>alt[k].includes(h)); });
     const linhas=[], nao=[], cpfsNovos=new Set(); let nmud=0, nfer=0;
     rows.slice(hi+1).forEach(r=>{ const cel=k=>col[k]>=0?r[col[k]]:''; if(!String(cel('nome')||'').trim()&&!String(cel('cpf')||'').trim()) return;
       const cnpjCel=dig(cel('cnpj'))||(dig(cel('cpf')).length===14?dig(cel('cpf')):'');
       let f=R.func.find(x=>x._id===String(cel('id')).trim())||R.func.find(x=>dig(x.cpf)&&dig(x.cpf)===dig(cel('cpf')))||(cnpjCel?R.func.find(x=>dig(x.cnpj)&&dig(x.cnpj)===cnpjCel):null), novo=false;
       if(!f){ const nome=String(cel('nome')||'').trim().replace(/\s+/g,' ').toUpperCase(), tipo=norm(cel('tipo'))==='PJ'?'PJ':'CLT', cpf=tipo==='PJ'&&dig(cel('cpf')).length===14?'':dig(cel('cpf'));
-        const docOk=tipo==='PJ'?cnpjOk(cnpjCel):cpfOk(cpf), chave=tipo==='PJ'?'J'+cnpjCel:'F'+cpf, rot=tipo==='PJ'?'CNPJ':'CPF';
+        const pjCpf=tipo==='PJ'&&!cnpjCel&&cpfOk(cpf); /* PJ que veio só com CPF (sem CNPJ na planilha): entra e o RH completa o CNPJ depois */
+        const docOk=tipo==='PJ'?(cnpjOk(cnpjCel)||pjCpf):cpfOk(cpf), chave=tipo==='PJ'&&!pjCpf?'J'+cnpjCel:'F'+cpf, rot=tipo==='PJ'?'CNPJ':'CPF';
         if(!nome||!docOk||cpfsNovos.has(chave)){ nao.push((nome||'sem nome')+(!docOk?' ('+rot+' inválido)':' ('+rot+' repetido)')); return; } cpfsNovos.add(chave);
         f={_id:null,nome,cpf:tipo==='PJ'&&!cpfOk(cpf)?'':cpf,cnpj:tipo==='PJ'?cnpjCel:'',tipo,empresa:empPadrao(tipo,cel('empresa')),status:'Ativo'}; novo=true; }
-      const up={}, mud=novo?['Pessoa nova ('+f.tipo+(f.tipo==='PJ'&&f.empresa?' · '+f.empresa:'')+')']:[], erros=[]; let ferAte='';
+      const up={}, mud=novo?['Pessoa nova ('+f.tipo+(f.tipo==='PJ'&&f.empresa?' · '+f.empresa:'')+')'+(f.tipo==='PJ'&&!f.cnpj?' — sem CNPJ, só CPF':'')]:[], erros=[]; let ferAte='';
       if(!novo&&f.tipo==='PJ'&&cnpjCel&&cnpjCel!==dig(f.cnpj)){ if(cnpjOk(cnpjCel)){ up.cnpj=cnpjCel; mud.push('CNPJ'); } else erros.push('CNPJ inválido'); }
       if(novo&&f.tipo==='PJ'&&!f.empresa) erros.push('PJ sem empresa (Zenith ou Nexus)');
       CARGA.forEach(([k,l])=>{ if(CARGA_FIXO.includes(k)) return; const raw=cel(k); if(raw==null||String(raw).trim()==='') return;
@@ -1241,6 +1281,7 @@
       if(t.dataset&&t.dataset.rhLf){ const s2=new Set(R.dg.sel||[]); if(t.checked) s2.add(t.dataset.rhLf); else s2.delete(t.dataset.rhLf); R.dg.sel=[...s2]; P.render(); return; }
       if(t.dataset&&t.dataset.rhAdmdoc!=null&&R.adm){ const f=R.func.find(x=>x._id===R.adm.id); if(!f) return; const nm=t.dataset.rhAdmdoc, xs=(f.admEntregues||[]).filter(x=>x.nome!==nm);
         if(t.checked) xs.push({nome:nm,em:agora(),porNome:eu()}); f.admEntregues=xs; P.render(); await grava(COL.func+'/'+f._id,{admEntregues:xs}); return; }
+      if(t.id==='rh-fimpf'&&t.files&&t.files[0]){ const file=t.files[0]; t.value=''; try{ P.toast('Lendo a planilha…'); R.fimp=await fimpLer(file); P.render(); window.scrollTo(0,0); }catch(e){ P.toast(e.message||'Não consegui ler a planilha.'); } return; }
       if(t.id==='rh-cargaf'&&t.files&&t.files[0]){ const file=t.files[0]; t.value=''; try{ P.toast('Lendo a planilha…'); R.carga.prev=await cargaLer(file); P.render(); }catch(e){ P.toast(e.message||'Não consegui ler a planilha.'); } return; }
       if(t.id==='rh-dgdesl'){ R.dg.desligar=t.checked; P.render(); return; }
       if(t.id==='rh-dgdd'){ R.dg.deslData=t.value; return; }
@@ -1380,6 +1421,8 @@
       if(a==='rh-fnovo'){ R.ff={nome:b.dataset.n||'',epis:[],uniformes:[]}; P.render(); window.scrollTo(0,0); return; }
       if(a==='rh-fed'){ R.ff=JSON.parse(JSON.stringify(R.funcoes.find(x=>x._id===b.dataset.id))); P.render(); window.scrollTo(0,0); return; }
       if(a==='rh-ffx'){ R.ff=null; P.render(); return; }
+      if(a==='rh-fimpx'){ R.fimp=null; P.render(); return; }
+      if(a==='rh-fimpok'){ await fimpGravar(); return; }
       if(a==='rh-fsalvar'){ const nome=String((document.querySelector('[data-rh-ff="nome"]')||{}).value||'').trim(); if(nome.length<2) return P.toast('Escreva o nome da função.');
         if(R.funcoes.some(x=>x._id!==R.ff._id&&norm(x.nome)===norm(nome))) return P.toast('Essa função já existe.');
         const it=lerItens(); if(it.epis.length>9||it.uniformes.length>9) return P.toast('No máximo 9 itens de cada.'); const iD=R.ff._id||id();
