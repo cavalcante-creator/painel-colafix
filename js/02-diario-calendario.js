@@ -202,7 +202,7 @@ function desenharFolhaProducao(pdf,o,dia,logo){
   if(logo){ try{ const pr=pdf.getImageProperties(logo); pdf.addImage(logo,'PNG',ML,y,30,(pr.height*30)/pr.width); }catch(err){} }
   pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text('ORDEM DE PRODUÇÃO',105,y+9,{align:'center'});
   if(o.rancho) try{ desenharQR(pdf,linkRancho(o.rancho),184,2.5,16); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdfCode128(pdf,'RA-'+o.rancho,140,3,41,9); pdf.text('RA-'+o.rancho+' · QR: celular ou tablet · barras: coletor',160.5,15,{align:'center'});pdf.setTextColor(0,0,0); }catch(err){}
-  else try{ pdfCode128(pdf,'OP-'+o.num,140,3,41,9); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdf.text('OP-'+o.num+' · barras: tablet ou coletor',160.5,15,{align:'center'});pdf.setTextColor(0,0,0); }catch(err){}
+  else try{ desenharQR(pdf,'OP-'+o.num,184,2.5,16); /* ordem sem rancho: o QR também aparece (abre a ordem no tablet) */ pdfCode128(pdf,'OP-'+o.num,140,3,41,9); pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(90,90,90);pdf.text('OP-'+o.num+' · QR: tablet · barras: tablet ou coletor',160.5,15,{align:'center'});pdf.setTextColor(0,0,0); }catch(err){}
   y+=15;
   pdf.setFillColor(44,62,80);pdf.rect(ML,y,LARGURA,9,'F');
   pdf.setTextColor(255,255,255);pdf.setFontSize(10.5);pdf.setFont('helvetica','bold');
