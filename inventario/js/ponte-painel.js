@@ -127,7 +127,7 @@
   }
   window.addEventListener('load',function(){
     // sacos por palete = o múltiplo da configuração do painel (cadastro do item, Ajustes › paletes por produto/linha); sem nada, 88
-    getSacsPorPal=function(cod){ var n=+P.palete(cod); return n>0?n:88; };
+    getSacsPorPal=function(cod){ var c=CONFERENCIAS[cod], m=c&&+c.pp; if(m>0) return m; /* mudado na contagem */ var n=+P.palete(cod); return n>0?n:88; };
     calcPaletes=function(sacos,spp){ spp=+spp||88; if(!sacos||sacos<spp) return 0; return Math.floor(sacos/spp); };
     // sair do programa = sair do painel (só para quem entra só no Inventário; dentro do painel o botão some)
     var _lo=logout; logout=function(forced){ var u=P.usuario(); if(!(u&&u.solo)) return;
