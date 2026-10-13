@@ -1,0 +1,5 @@
+testes/node_modules/
+testes/package.json
+testes/package-lock.json
+testes/__pycache__/
+testes/resultado-totem.json
