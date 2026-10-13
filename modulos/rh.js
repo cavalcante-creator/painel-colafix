@@ -255,7 +255,10 @@
     let xs=R.func.filter(x=>(F.st==='ativos'?x.status!=='Desligado':F.st==='todos'?true:x.status===F.st)&&(!F.setor||x.setor===F.setor)&&(!F.emp||x.empresa===F.emp)&&(!F.tipo||x.tipo===F.tipo)&&(!q||norm(x.nome).includes(q)||dig(x.cpf).includes(dig(F.q)||'#')||(x.cnpj&&dig(x.cnpj).includes(dig(F.q)||'#'))||norm(x.funcao).includes(q)));
     xs.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
     const cnt=s=>R.func.filter(x=>x.status===s).length;
-    return topo('Funcionários','Cadastro, situação e o que cada um usa.',`<button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-csv">Exportar</button>`)
+    const fseg=`<div class="seg" role="group" aria-label="Como ver">${[['lista','Lista'],['setor','Por setor'],['adm','Admissões']].map(([k,l])=>`<button data-act="rh-fview" data-v="${k}" aria-pressed="${(R.fview||'lista')===k}">${l}</button>`).join('')}</div>`;
+    if(R.fview==='setor'||R.fview==='adm') return topo('Funcionários',R.fview==='adm'?'Quem está entrando e em que etapa: documentos, contrato e ficha, experiência.':'Quem é quem: as pessoas de cada setor.',fseg+`<button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button>`)
+      +(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':R.fview==='adm'?vQuadroAdm():vOrg());
+    return topo('Funcionários','Cadastro, situação e o que cada um usa.',fseg+`<button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-csv">Exportar</button>`)
       +(R.carga?vCarga():'')+(R.adm&&!R.f?vAdm():'')+(R.fdesl?formDesl():'')+(R.f?formFunc():'')
       +`<div class="rh-kpi">${ST.map(s=>`<div><b class="num">${cnt(s)}</b><span>${s}</span></div>`).join('')}</div>
       <section class="card"><div class="rh-fil"><input class="txt" id="rh-q" placeholder="Buscar nome, CPF, CNPJ ou função" value="${esc(F.q)}">
@@ -301,7 +304,7 @@
     return topo('Cadastros do RH','Os setores aparecem para escolher no cadastro do funcionário, nos filtros e nas fichas por setor.',cadSeg())
       +(fora.length?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span>Setores usados nos cadastros e ainda não cadastrados: <b>${esc(fora.join(', '))}</b></span><button class="btn sec rh-sm" data-act="rh-setall">Cadastrar todos</button></div>`:'')
       +`<section class="card"><div class="rh-ch"><h2>Setores (${cad.length})</h2></div><div style="display:flex;gap:10px;margin:6px 0 14px;flex-wrap:wrap"><input class="txt" id="rh-setn" placeholder="Nome do setor (ex.: Linha 1, Expedição)" style="max-width:360px"><button class="btn" data-act="rh-setadd">${P.ic('mais',18,2.4)}Cadastrar setor</button></div>
-        ${cad.length?cad.map(n=>{ const q=qt(n); return `<div class="row" style="grid-template-columns:minmax(0,1fr) auto auto;align-items:center"><b>${esc(n)}</b><span class="sub" style="margin:0">${plural(q,'pessoa','pessoas')}</span>${q?'<span></span>':`<button class="lnk" data-act="rh-setdel" data-v="${esc(n)}" style="color:var(--crit-ink)">Tirar</button>`}</div>`; }).join(''):'<div class="empty">Nenhum setor cadastrado ainda.</div>'}</section>`; }
+        ${cad.length?cad.map(n=>{ const q=qt(n); return `<div class="row" style="grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center"><b>${esc(n)}</b><span class="sub" style="margin:0">${plural(q,'pessoa','pessoas')}</span><label class="sub" style="margin:0;display:flex;gap:6px;align-items:center;font-size:13px">vagas abertas <input class="txt" type="number" min="0" max="50" data-rh-vaga="${esc(n)}" value="${esc(vagas()[n]||'')}" style="width:70px;height:36px"></label>${q?'<span></span>':`<button class="lnk" data-act="rh-setdel" data-v="${esc(n)}" style="color:var(--crit-ink)">Tirar</button>`}</div>`; }).join(''):'<div class="empty">Nenhum setor cadastrado ainda.</div>'}</section>`; }
   function vCfgRH(){ const c=R.cfg, m=FDESDE();
     return topo('Cadastros do RH','Valem para todo o RH.',cadSeg())
       +`<section class="card rh-form"><div class="rh-g">
@@ -527,6 +530,7 @@
   const PZ_AVISO=()=>+R.cfg.prazoAviso>0?+R.cfg.prazoAviso:15;
   const isoD=dt=>dt.toISOString().slice(0,10), dU=s=>new Date(s+'T12:00:00Z');
   const addDias=(s,n)=>{ const d=dU(s); d.setUTCDate(d.getUTCDate()+n); return isoD(d); };
+  const diasEntre=(a,b)=>Math.round((dU(b)-dU(a))/864e5);
   const addMeses=(s,n)=>{ const [y,m,d]=s.split('-').map(Number); const ult=new Date(Date.UTC(y,m-1+n+1,0,12)).getUTCDate(); return isoD(new Date(Date.UTC(y,m-1+n,Math.min(d,ult),12))); };
   const okIso=s=>/^\d{4}-\d{2}-\d{2}$/.test(String(s||''));
   const ferDe=f=>R.fer.filter(x=>x.funcId===f._id&&x.status!=='cancelada');
@@ -558,9 +562,30 @@
   P.registrarAviso(()=>avisosPrazo().map(a=>({nivel:a.c,rotulo:a.r,titulo:a.t,texto:a.s,go:a.go})));
 
   function vFerias(){ const EY='RH · FÉRIAS E PRAZOS', nf=clts().filter(f=>['crit','warn'].includes(sitFer(f).c)).length, np=pjs().filter(f=>['crit','warn'].includes(pjSit(f).c)).length, ne=emExp().filter(o=>['crit','warn'].includes(o.s.c)).length;
-    const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['exp','Experiência'+(ne?' · '+ne:'')],['pj','Troca dos PJ'+(np?' · '+np:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
-    return topo('Férias e prazos',R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':R.pzv==='exp'?'Contrato de experiência 45 + 45 dias: prorrogue, efetive ou desligue. Avisa '+PZ_AVISO()+' dias antes de cada fim.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
-      +(!R.lido.func||!R.lido.fer?'<section class="card"><div class="empty">Carregando…</div></section>':R.pzv==='pj'?vPJ():R.pzv==='exp'?vExp():vFeriasCLT()); }
+    const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['mapa','Mapa do ano'],['exp','Experiência'+(ne?' · '+ne:'')],['pj','Troca dos PJ'+(np?' · '+np:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
+    return topo('Férias e prazos',R.pzv==='mapa'?'Férias de todo mundo no ano, por setor: avisa quando duas pessoas do mesmo setor saem juntas.':R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':R.pzv==='exp'?'Contrato de experiência 45 + 45 dias: prorrogue, efetive ou desligue. Avisa '+PZ_AVISO()+' dias antes de cada fim.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
+      +(!R.lido.func||!R.lido.fer?'<section class="card"><div class="empty">Carregando…</div></section>':R.pzv==='pj'?vPJ():R.pzv==='exp'?vExp():R.pzv==='mapa'?vMapaFer():vFeriasCLT()); }
+  /* Mapa de férias do ano (pedido de 13/10) */
+  function vMapaFer(){ const Y=R.mapAno||+P.hojeStr().slice(0,4), ini=Y+'-01-01', fim=Y+'-12-31', nd=diasEntre(ini,fim)+1, pc=d=>(Math.max(0,Math.min(nd,diasEntre(ini,d)))/nd*100);
+    const setores=[...new Set(ativos().map(f=>f.setor||'Sem setor'))].sort((a,b)=>a.localeCompare(b,'pt-BR')), fil=R.mapSet&&setores.includes(R.mapSet)?R.mapSet:'';
+    const pessoas=ativos().filter(f=>!fil||(f.setor||'Sem setor')===fil).sort((a,b)=>(a.setor||'').localeCompare(b.setor||'','pt-BR')||a.nome.localeCompare(b.nome,'pt-BR'));
+    const barras={}, juntos=[];
+    pessoas.forEach(f=>{ barras[f._id]=f.tipo==='PJ'?[]:ferDe(f).filter(x=>!x.anterior&&okIso(x.inicio)&&x.inicio<=fim&&x.fim>=ini).map(x=>({x,conf:false})); });
+    setores.forEach(st=>{ const ps=pessoas.filter(f=>(f.setor||'Sem setor')===st); for(let i=0;i<ps.length;i++) for(let j=i+1;j<ps.length;j++) (barras[ps[i]._id]||[]).forEach(a=>(barras[ps[j]._id]||[]).forEach(b=>{ if(a.x.inicio<=b.x.fim&&b.x.inicio<=a.x.fim){ a.conf=b.conf=true; juntos.push(st+': '+titulo(ps[i].nome).split(' ')[0]+' e '+titulo(ps[j].nome).split(' ')[0]+' ('+br(a.x.inicio>b.x.inicio?a.x.inicio:b.x.inicio).slice(0,5)+')'); } })); });
+    const linha=f=>{ let h='';
+      if(f.tipo==='PJ'){ const ts=(f.trocas||[]).map(t=>t.data).filter(d=>okIso(d)&&d>=ini&&d<=fim); const s=pjSit(f); let p=s.prox; for(let k=0;p&&k<8&&p<=fim;k++,p=addMeses(p,3)) if(p>=ini&&p>P.hojeStr()) ts.push(p);
+        h=ts.map(d=>`<i class="rh-mpj" style="left:${pc(d).toFixed(2)}%" title="Troca do PJ ${br(d)}"></i>`).join(''); }
+      else { h=barras[f._id].map(o=>`<i class="rh-mb ${o.conf?'conf':''} ${o.x.inicio<=P.hojeStr()&&o.x.fim<P.hojeStr()?'foi':''}" style="left:${pc(o.x.inicio).toFixed(2)}%;width:${Math.max(0.6,pc(addDias(o.x.fim,1))-pc(o.x.inicio)).toFixed(2)}%" title="${esc(titulo(f.nome))}: ${br(o.x.inicio)} a ${br(o.x.fim)} (${plural(+o.x.dias,'dia','dias')})"></i>`).join('')
+        +periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim>=ini&&p.lim<=fim).map(p=>`<i class="rh-mlim" style="left:${pc(p.lim).toFixed(2)}%" title="Último dia para dar as férias do período ${br(p.ini)} a ${br(p.fim)}: ${br(p.lim)} · faltam ${plural(p.saldo,'dia','dias')}"></i>`).join(''); }
+      return `<div class="rh-mr"><button class="rh-nm" data-act="rh-pess" data-id="${f._id}">${esc(titulo(f.nome))}${f.tipo==='PJ'?' <small>PJ</small>':''}</button><div class="rh-mt">${h}</div></div>`; };
+    const hj=P.hojeStr(), hojePos=hj.slice(0,4)==String(Y)?`<i class="rh-mhj" style="left:${pc(hj).toFixed(2)}%" title="Hoje"></i>`:'';
+    return `<section class="card"><div class="rh-chips" style="margin-bottom:12px"><button class="btn sec rh-sm" data-act="rh-mapano" data-v="-1">‹ ${Y-1}</button><b style="font-size:18px">${Y}</b><button class="btn sec rh-sm" data-act="rh-mapano" data-v="1">${Y+1} ›</button>
+        <span style="width:12px"></span><button class="rh-chip2" data-act="rh-mapset" data-v="" aria-pressed="${!fil}">Todos os setores</button>${setores.map(st=>`<button class="rh-chip2" data-act="rh-mapset" data-v="${esc(st)}" aria-pressed="${fil===st}">${esc(st)}</button>`).join('')}</div>
+      ${juntos.length?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink)"><b>Saem juntos no mesmo setor:</b> ${esc([...new Set(juntos)].join(' · '))}</div>`:''}
+      <div class="rh-mapa"><div class="rh-mr rh-mh"><span></span><div class="rh-mt">${MESES.map(m=>`<span>${m.slice(0,3)}</span>`).join('')}</div></div>
+        ${pessoas.length?setores.filter(st=>!fil||st===fil).map(st=>{ const ps=pessoas.filter(f=>(f.setor||'Sem setor')===st); return ps.length?`<div class="rh-ms">${esc(st)}</div>${ps.map(linha).join('')}`:''; }).join(''):'<div class="empty">Ninguém em atividade.</div>'}
+        <div class="rh-mhjw">${hojePos}</div></div>
+      <div class="rh-ml"><span><i class="rh-mb" style="position:static;display:inline-block;width:18px"></i> Férias</span><span><i class="rh-mb conf" style="position:static;display:inline-block;width:18px"></i> Saem juntos no mesmo setor</span><span><i class="rh-mlim" style="position:static;display:inline-block"></i> Último dia para dar as férias</span><span><i class="rh-mpj" style="position:static;display:inline-block"></i> Troca do PJ</span><span class="sub" style="margin:0 0 0 auto">Toque no nome para abrir o perfil · passe o mouse na barra para ver as datas</span></div></section>`; }
   function vFeriasCLT(){ const hj=P.hojeStr(), F=R.pzfil;
     let xs=clts().map(f=>({f,s:sitFer(f)})); const nAt=xs.filter(o=>['crit','warn'].includes(o.s.c)).length; if(F==='atencao') xs=xs.filter(o=>['crit','warn'].includes(o.s.c));
     xs.sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
@@ -715,7 +740,8 @@
     return it.sort((a,b)=>a.data.localeCompare(b.data)||a.t.localeCompare(b.t)); }
   function agendaJanela(){ const hj=P.hojeStr(), ate=addDias(hj,R.agDias), xs=agendaItens();
     return {atras:xs.filter(x=>x.data<hj&&(x.c==='crit'||x.c==='warn')),prox:xs.filter(x=>x.data>=hj&&x.data<=ate)}; }
-  function vAgenda(){ const EY='RH · AGENDA', seg=`<div class="seg" role="group" aria-label="Agenda">${[['agenda','Agenda'],['rel','Relatório do mês']].map(([k,l])=>`<button data-act="rh-agv" data-v="${k}" aria-pressed="${R.agv===k}">${l}</button>`).join('')}</div>`;
+  function vAgenda(){ const EY='RH · AGENDA', seg=`<div class="seg" role="group" aria-label="Agenda">${[['agenda','Agenda'],['rel','Relatório do mês'],['ind','Indicadores']].map(([k,l])=>`<button data-act="rh-agv" data-v="${k}" aria-pressed="${R.agv===k}">${l}</button>`).join('')}</div>`;
+    if(R.agv==='ind') return topo('Indicadores do RH','Pessoas na Colafix nos últimos 12 meses: quadro, entradas e saídas, tempo de casa, experiência e o que está em dia.',seg+`<button class="btn sec" data-act="rh-indimp">Imprimir / PDF</button>`,EY)+(R.lido.func?vIndicadores():'<section class="card"><div class="empty">Carregando…</div></section>');
     if(R.agv==='rel') return topo('Relatório do mês','Admissões, desligamentos, férias e experiência do mês, pronto para mandar para a contabilidade.',seg,EY)+vRelatorio();
     if(!R.lido.func) return topo('Agenda','',seg,EY)+'<section class="card"><div class="empty">Carregando…</div></section>';
     const {atras,prox}=agendaJanela(), hj=P.hojeStr();
@@ -733,6 +759,32 @@
       L.push('BEGIN:VEVENT','UID:rh-'+x.uid+'@painel-colafix','DTSTAMP:'+st,'DTSTART;VALUE=DATE:'+ini,'DTEND;VALUE=DATE:'+fim,'SUMMARY:'+e((sem?'':'RH · ')+x.t),'DESCRIPTION:'+e([TIPO_AG[x.tipo],x.s,'Painel de Operação Colafix · RH'].filter(Boolean).join(' · ')),'TRANSP:TRANSPARENT');
       if(!sem) L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+e(x.t),'TRIGGER:-PT15H','END:VALARM'); L.push('END:VEVENT'); });
     L.push('END:VCALENDAR'); return L.map(dobra).join('\r\n')+'\r\n'; }
+
+  /* ---------- Indicadores do RH (pedido de 13/10) ---------- */
+  function indDados(){ const hj=P.hojeStr(), ini=addDias(addMeses(hj,-12),1), at=ativos();
+    const saiuAte=(f,d)=>okIso(f.desligamento)&&f.desligamento<=d&&(f.status==='Desligado'||(f.desligAgendado&&f.desligamento<=hj));
+    const noQuadro=d=>R.func.filter(f=>(!okIso(f.admissao)||f.admissao<=d)&&!saiuAte(f,d)&&(f.status!=='Desligado'||okIso(f.desligamento))).length;
+    const meses=[...Array(12)].map((_,i)=>{ const m=mesMais(hj.slice(0,7),i-11), fimM=m===hj.slice(0,7)?hj:addDias(addMeses(m+'-01',1),-1); return {m,n:noQuadro(fimM)}; });
+    const ent=R.func.filter(f=>okIso(f.admissao)&&f.admissao>=ini&&f.admissao<=hj), sai=R.func.filter(f=>f.status==='Desligado'&&okIso(f.desligamento)&&f.desligamento>=ini&&f.desligamento<=hj);
+    const media=meses.reduce((a,x)=>a+x.n,0)/12||1, rot=Math.round(((ent.length+sai.length)/2)/media*1000)/10;
+    const tempos=at.filter(f=>okIso(f.admissao)).map(f=>diasEntre(f.admissao,hj)/365.25), tm=tempos.length?Math.round(tempos.reduce((a,x)=>a+x,0)/tempos.length*10)/10:0, mx=tempos.length?Math.floor(Math.max(...tempos)):0;
+    const expFeitas=R.func.filter(f=>f.tipo!=='PJ'&&okIso(f.admissao)&&f.admissao>=addDias(ini,-90)&&expFim2(f)<=hj||(f.exp&&['efetivado','desligado'].includes(f.exp.status)&&String(f.exp.em||'').slice(0,10)>=ini));
+    const efet=expFeitas.filter(f=>!(f.status==='Desligado'&&okIso(f.desligamento)&&f.desligamento<=expFim2(f))&&!(f.exp&&f.exp.status==='desligado')).length;
+    const motivos={}; sai.forEach(f=>{ const k=f.desligMotivo||'Sem motivo informado'; motivos[k]=(motivos[k]||0)+1; });
+    const fv=clts().filter(f=>sitFer(f).c==='crit').length, mF=fichasMesIni(), fr=mF<=hj.slice(0,7)?fResumo(mF):null;
+    return {at,clt:at.filter(f=>f.tipo!=='PJ').length,pj:at.filter(f=>f.tipo==='PJ').length,meses,ent,sai,rot,tm,mx,expN:expFeitas.length,efet,motivos:Object.entries(motivos).sort((a,b)=>b[1]-a[1]),fv,fr,mF,tdoc:tDocAvisos().length+tAvisos().length}; }
+  function vIndicadores(){ const D=indDados(), mx=Math.max(1,...D.meses.map(x=>x.n));
+    const k=(n,l,s,c)=>`<div class="rh-k"><b class="num" ${c?`style="color:${c}"`:''}>${n}</b><span>${l}</span>${s?`<small>${s}</small>`:''}</div>`;
+    return `<div class="rh-kpi rh-kpi2 rh-kpi5">${k(D.at.length,'no quadro',D.clt+' CLT · '+D.pj+' PJ')}${k(String(D.rot).replace('.',',')+'%','rotatividade',D.ent.length+' entradas · '+D.sai.length+' saídas')}${k(String(D.tm).replace('.',',')+' anos','tempo médio de casa',D.mx?'mais antigo: '+plural(D.mx,'ano','anos'):'')}${k(D.expN?D.efet+' de '+D.expN:'—','efetivados na experiência',D.expN-D.efet?plural(D.expN-D.efet,'saiu','saíram')+' antes dos 90 dias':'')}${k(D.fv,'férias vencidas',D.fv?'risco de pagar em dobro':'sem risco de pagar em dobro',D.fv?'var(--crit-ink)':'var(--ok-ink,#2F6047)')}</div>
+      <div class="rh-dash"><section class="card"><h2>Pessoas no quadro, mês a mês</h2><div class="rh-col">${D.meses.map((x,i)=>`<div title="${esc(cap(mesLabel(x.m)))}: ${x.n}"><span class="num">${x.n}</span><i style="height:${Math.max(3,x.n/mx*100).toFixed(1)}%;${i===11?'background:var(--teal-strong)':''}"></i><small>${MESES[+x.m.slice(5)-1].slice(0,3)}</small></div>`).join('')}</div></section>
+        <div style="display:flex;flex-direction:column;gap:16px"><section class="card"><h2>Por que as pessoas saíram</h2>${barras(D.motivos,D.sai.length,'Ninguém saiu nos últimos 12 meses.')}</section>
+          <section class="card"><h2>Em dia</h2><div class="rh-pfl">${D.fr?`<div><span>Fichas de EPI de ${mesNome(D.mF)} assinadas</span><b>${D.fr.c.ass} de ${D.fr.tot}</b></div>`:`<div><span>Fichas de EPI</span><small>começam em ${mesNome(D.mF)}</small></div>`}<div><span>Férias vencidas</span><b>${D.fv}</b></div><div><span>Terceirizados vencendo (contrato ou documento)</span><b>${D.tdoc}</b></div></div></section></div></div>`; }
+  function indHtml(){ const D=indDados(), L=(a,b)=>`<tr><td>${esc(a)}</td><td style="text-align:right"><b>${esc(b)}</b></td></tr>`;
+    return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Indicadores do RH</title><style>@page{size:A4;margin:16mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}h2{font-size:12pt;margin:18px 0 6px;color:#143F54}table{width:100%;border-collapse:collapse}td{padding:5px 6px;border-bottom:1px solid #ddd}.sub{color:#666}.b{display:inline-block;height:10px;background:#1B5C7A;border-radius:0 3px 3px 0}</style></head><body>
+      <h1>Indicadores do RH</h1><div class="sub">${esc(EMP_DOC.COLAFIX.nome)} · últimos 12 meses · gerado em ${br(P.hojeStr())}</div>
+      <h2>Resumo</h2><table>${L('No quadro',D.at.length+' ('+D.clt+' CLT · '+D.pj+' PJ)')}${L('Entradas / saídas',D.ent.length+' / '+D.sai.length)}${L('Rotatividade',String(D.rot).replace('.',',')+'%')}${L('Tempo médio de casa',String(D.tm).replace('.',',')+' anos')}${L('Efetivados na experiência',D.expN?D.efet+' de '+D.expN:'—')}${L('Férias vencidas',D.fv)}</table>
+      <h2>Quadro mês a mês</h2><table>${D.meses.map(x=>`<tr><td style="width:120px">${esc(cap(mesLabel(x.m)))}</td><td><span class="b" style="width:${Math.round(x.n/Math.max(1,...D.meses.map(y=>y.n))*300)}px"></span> ${x.n}</td></tr>`).join('')}</table>
+      <h2>Por que as pessoas saíram</h2>${D.motivos.length?`<table>${D.motivos.map(([m,n])=>L(m,n)).join('')}</table>`:'<div class="sub">Ninguém saiu nos últimos 12 meses.</div>'}</body></html>`; }
 
   /* ---------- Relatório do mês ---------- */
   function relDados(m){ const ini=m+'-01', fim=addDias(addMeses(ini,1),-1), em=s=>okIso(s)&&s>=ini&&s<=fim;
@@ -767,34 +819,72 @@
   /* ---------- Ficha completa da pessoa ---------- */
   function tempoDe(iso){ const hj=P.hojeStr(); let a=+hj.slice(0,4)-+iso.slice(0,4), m=+hj.slice(5,7)-+iso.slice(5,7); if(hj.slice(8)<iso.slice(8)) m--; if(m<0){ a--; m+=12; } return {a,m}; }
   const tempoTxt=iso=>{ const t=tempoDe(iso); return [t.a?plural(t.a,'ano','anos'):'',t.m?plural(t.m,'mês','meses'):''].filter(Boolean).join(' e ')||'menos de 1 mês'; };
+  /* Perfil da pessoa (pedido de 13/10): cartão com os dados, a história na empresa e férias, EPIs e documentos ao lado */
+  const iniciais=n=>{ const p=String(n||'').trim().split(/\s+/).filter(w=>!['DA','DE','DO','DAS','DOS','E'].includes(w.toUpperCase())); return ((p[0]||'')[0]||'')+(p.length>1?(p[p.length-1][0]||''):''); };
+  function historia(f){ const ev=[], add=(d,t,s,c)=>{ if(okIso(String(d||'').slice(0,10))) ev.push({d:String(d).slice(0,10),t,s:s||'',c:c||'teal'}); };
+    if(okIso(f.admissao)){ const lista=docsAdm(), fe=admFeitos(f).filter(n=>lista.includes(n)).length; add(f.admissao,'Admissão',[f.funcao,f.setor].filter(Boolean).join(' · ')+(f.admRoteiro?' · '+fe+' de '+lista.length+' documentos entregues':''),'ink'); }
+    const ex=f.exp||{}; if(ex.status==='prorrogado') add(ex.em,'Experiência prorrogada','2ª etapa até '+br(expFim2(f)),'purple'); if(ex.status==='efetivado') add(ex.em,titulo(f.nome).split(' ')[0]+' foi efetivado(a)','fim do contrato de experiência','ok');
+    ferDe(f).filter(x=>!x.anterior&&okIso(x.inicio)).forEach(x=>add(x.inicio,(x.inicio>P.hojeStr()?'Férias marcadas · ':'Férias · ')+plural(+x.dias,'dia','dias'),br(x.inicio)+' a '+br(x.fim)+(temAviso(x)?' · aviso de férias gerado':' · aviso de férias ainda não gerado'),'teal'));
+    (f.trocas||[]).forEach(x=>add(x.data,'Troca do PJ',x.obs||'','purple'));
+    R.docs.filter(d=>d.funcId===f._id).forEach(d=>add(d.em,d.modelo||'Documento',d.assinado?'gerado e assinado':'gerado','teal'));
+    Object.keys(R.fm).forEach(m=>{ const a=((R.fm[m]||{}).assinadas||{})[f._id]; if(a) add(okIso(String(a.em||'').slice(0,10))?a.em:m+'-01','Ficha de EPI de '+mesNome(m)+' assinada','escaneada e guardada','ok'); });
+    if(okIso(f.desligamento)&&(f.status==='Desligado'||f.desligAgendado)) add(f.desligamento,f.status==='Desligado'?'Desligamento':'Desligamento marcado',f.desligMotivo||'','crit');
+    return ev.sort((a,b)=>b.d.localeCompare(a.d)); }
   function vPessoa(){ const f=R.func.find(x=>x._id===R.pess); if(!f) return '<section class="card"><div class="empty">Funcionário não encontrado.</div></section>';
-    const linha=(l,v)=>v?`<div class="rh-pd"><span>${l}</span><b>${v}</b></div>`:'';
-    const sf=f.tipo!=='PJ'?sitFer(f):null, e=expInfo(f), pj=f.tipo==='PJ'?pjSit(f):null, hj=P.hojeStr();
-    const fers=ferDe(f).slice().sort((a,b)=>String(b.inicio||b.aquisitivo).localeCompare(String(a.inicio||a.aquisitivo)));
-    const meses=[0,1,2,3,4,5].map(k=>mesMais(hj.slice(0,7),-k)).filter(m=>!okIso(f.admissao)||m>=f.admissao.slice(0,7));
-    const falt=admFaltam(f);
-    return `<div class="head"><div><div class="eyebrow">RH · FUNCIONÁRIO</div><h1>${esc(f.nome)}</h1><div class="sub">${esc([f.funcao,f.setor,f.tipo==='PJ'?'PJ · '+empNome(f.empresa):'CLT · Colafix'].filter(Boolean).join(' · '))}</div></div>
-        <div class="rh-acoes"><button class="btn sec" data-act="rh-pessx">‹ Funcionários</button><button class="btn sec" data-act="rh-ed" data-id="${f._id}">Editar</button><button class="btn sec" data-act="rh-dgpara" data-id="${f._id}">Gerar documento</button>${f.tipo!=='PJ'&&f.status!=='Desligado'&&sf&&sf.p?`<button class="btn sec" data-act="rh-fernova" data-id="${f._id}" data-go-fer="1">Marcar férias</button>`:''}</div></div>
-      <div class="rh-pg"><section class="card"><div class="rh-ch"><h2>Dados</h2><span class="pill ${corSt(f.status)}">${esc(f.status||'')}</span></div>
-          ${linha(docRot(f),esc(docF(f)))}${linha('Admissão',okIso(f.admissao)?br(f.admissao)+' · '+tempoTxt(f.admissao)+' de casa':'')}${linha('Nascimento',okIso(f.nascimento)?br(f.nascimento)+' · '+tempoDe(f.nascimento).a+' anos':'')}
-          ${linha('Telefone',esc(f.telefone||''))}${linha('Salário',f.salario!==''&&f.salario!=null?esc(brl(f.salario)):'')}${linha('Jornada',esc(f.jornada||''))}
-          ${linha('Uniforme',esc([f.camisa?'camisa '+f.camisa:'',f.calca?'calça '+f.calca:'',f.calcado?'calçado '+f.calcado:''].filter(Boolean).join(' · ')))}
-          ${f.status==='Desligado'?linha('Desligamento',br(f.desligamento)+(f.desligMotivo?' · '+esc(f.desligMotivo):'')):f.desligAgendado?linha('Sai em',br(f.desligamento)+(f.desligMotivo?' · '+esc(f.desligMotivo):'')):''}
-          ${f.obs?`<div class="sub" style="margin:8px 0 0">${esc(f.obs)}</div>`:''}</section>
-        <section class="card"><h2>Prazos</h2>
-          ${sf?`<div class="rh-pd"><span>Férias</span><b><span class="pill ${sf.c}">${esc(sf.t)}</span></b></div>${sf.p?`<div class="sub" style="margin:-2px 0 8px;font-size:12.5px">período ${br(sf.p.ini)} a ${br(sf.p.fim)} · ${sf.p.completo?(sf.p.saldo?'faltam '+plural(sf.p.saldo,'dia','dias')+' · conceder até '+br(sf.p.lim):'tirado'):'em aquisição'}</div>`:''}`:''}
-          ${e?`<div class="rh-pd"><span>Experiência</span><b><span class="pill ${e.c}">${esc(e.t)}</span></b></div><div class="sub" style="margin:-2px 0 8px;font-size:12.5px">1ª etapa até ${br(e.f1)} · 2ª até ${br(e.f2)}</div>`:f.exp&&f.exp.status==='efetivado'?linha('Experiência','efetivado'):''}
-          ${pj?`<div class="rh-pd"><span>Troca do PJ</span><b><span class="pill ${pj.c}">${esc(pj.t)}</span></b></div>${pj.prox?`<div class="sub" style="margin:-2px 0 8px;font-size:12.5px">próxima troca ${br(pj.prox)}</div>`:''}`:''}
-          ${falt.length?`<div class="rh-pd"><span>Admissão</span><b><span class="pill warn">${plural(falt.length,'documento faltando','documentos faltando')}</span></b></div><div class="sub" style="margin:-2px 0 8px;font-size:12.5px">${esc(falt.join(', '))} · <button class="lnk" data-act="rh-admabrir" data-id="${f._id}">abrir a admissão</button></div>`:''}
-          ${!sf&&!e&&!pj&&!falt.length?'<div class="sub" style="margin:0">Nenhum prazo.</div>':''}</section>
-        <section class="card"><h2>Fichas de EPI e uniforme</h2>${meses.map(m=>{ const s=fSit(f,m); return `<div class="rh-pd"><span>${esc(cap(mesLabel(m)))}</span><b><span class="pill ${s.c}">${esc(s.t)}</span></b></div>`; }).join('')}
-          <div style="margin-top:8px"><button class="lnk" data-act="rh-fabrir">Abrir as fichas do mês</button></div></section>
-        ${f.tipo!=='PJ'?`<section class="card"><div class="rh-ch"><h2>Férias</h2>${okIso(f.admissao)?`<button class="lnk" data-act="rh-fajabrir" data-id="${f._id}" data-go-fer="1">Ajustar períodos</button>`:''}</div>${fers.length?fers.slice(0,8).map(x=>`<div class="rh-dl"><div><b>${x.anterior?'Tiradas antes do painel':br(x.inicio)+' a '+br(x.fim)}</b><small>${plural(+x.dias,'dia','dias')} · período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}${x.status==='cancelada'?' · desmarcada':''}</small></div>${!x.anterior&&x.status!=='cancelada'?(temAviso(x)?'<span class="pill ok">Aviso gerado</span>':`<button class="lnk" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`):''}</div>`).join(''):'<div class="sub" style="margin:0">Nenhuma férias registrada.</div>'}</section>`:''}
-        <section class="card rh-pgw">${docsDaPessoa(f._id).replace('class="rh-docs"','class="rh-docs" style="margin:0;padding:0;border:0"')}</section></div>`; }
+    const linha=(l,v)=>v?`<dt>${l}</dt><dd>${v}</dd>`:'';
+    const sf=f.tipo!=='PJ'?sitFer(f):null, e=expInfo(f), pj=f.tipo==='PJ'?pjSit(f):null, hj=P.hojeStr(), m=hj.slice(0,7);
+    const falt=admFaltam(f), ev=historia(f), fc=R.funcoes.find(x=>norm(x.nome)===norm(f.funcao)), fs=fSit(f,fichasMesIni());
+    const idade=okIso(f.nascimento)?tempoDe(f.nascimento).a:null, cor={teal:'var(--teal)',ok:'var(--ok)',purple:'#5B3FA6',crit:'var(--crit)',ink:'var(--teal-strong)'};
+    const chips=[`<span class="pill ${corSt(f.status)}">${esc(f.status||'')}</span>`,`<span class="pill neu">${f.tipo==='PJ'?'PJ · '+esc(empNome(f.empresa)||''):'CLT · Colafix'}</span>`,e?`<span class="pill warn">em experiência</span>`:f.exp&&f.exp.status==='efetivado'?'<span class="pill ok">efetivado(a)</span>':''].join('');
+    const p=sf&&sf.p, usados=p?30-p.saldo:0;
+    return `<div class="head"><div><div class="eyebrow">RH · FUNCIONÁRIO</div><h1>${esc(f.nome)}</h1><div class="sub">${esc([f.funcao,f.setor].filter(Boolean).join(' · '))}</div></div>
+        <div class="rh-acoes"><button class="btn sec" data-act="rh-pessx">‹ Funcionários</button></div></div>
+      <div class="rh-pf"><aside class="card rh-pfa"><span class="rh-av2">${esc(iniciais(f.nome).toUpperCase())}</span><b class="rh-pfn">${esc(titulo(f.nome))}</b><div class="rh-pfc">${chips}</div>
+          ${okIso(f.admissao)?`<div class="rh-pft"><b>${esc(tempoTxt(f.admissao))}</b><span>de casa · desde ${br(f.admissao)}</span></div>`:''}
+          <dl class="rh-pfd">${linha(docRot(f),esc(docF(f)))}${linha('Telefone',esc(f.telefone||''))}${linha('Aniversário',okIso(f.nascimento)?br(f.nascimento).slice(0,5)+' · '+idade+' anos':'')}${linha('Salário',f.salario!==''&&f.salario!=null?esc(brl(f.salario)):'')}${linha('Jornada',esc(f.jornada||''))}
+            ${linha('Tamanhos',esc([f.camisa?'camisa '+f.camisa:'',f.calca?'calça '+f.calca:'',f.calcado?'calçado '+f.calcado:''].filter(Boolean).join(' · ')))}${f.status==='Desligado'?linha('Saiu em',br(f.desligamento)):f.desligAgendado?linha('Sai em',br(f.desligamento)):''}</dl>
+          ${f.obs?`<div class="sub" style="margin:0;font-size:13px;text-align:left">${esc(f.obs)}</div>`:''}
+          <div class="rh-pfb"><button class="btn" data-act="rh-dgpara" data-id="${f._id}">Gerar documento</button><button class="btn sec" data-act="rh-ed" data-id="${f._id}">Editar cadastro</button></div></aside>
+        <section class="card rh-pfh"><div class="eyebrow">A HISTÓRIA ${f.tipo==='PJ'?'DO PJ':'NA COLAFIX'}</div>
+          ${falt.length?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);margin:12px 0 0">Admissão: falta ${esc(falt.join(', '))} · <button class="lnk" data-act="rh-admabrir" data-id="${f._id}">abrir a admissão</button></div>`:''}
+          ${ev.length?`<div class="rh-tl">${ev.slice(0,14).map((x,i)=>`<div class="rh-tli"><b class="num">${br(x.d)}</b><span class="rh-tld"><i style="background:${cor[x.c]||cor.teal}"></i>${i<Math.min(ev.length,14)-1?'<em></em>':''}</span><div><b>${esc(x.t)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</div></div>`).join('')}</div>`:'<div class="empty">Ainda nada registrado.</div>'}</section>
+        <div class="rh-pfr">
+          ${sf?`<section class="card"><div class="rh-ch"><h2>Férias</h2><span class="pill ${sf.c}">${esc(p&&p.completo&&p.saldo?'faltam '+plural(p.saldo,'dia','dias'):sf.t)}</span></div>
+            ${p?`<div class="rh-bt" style="margin:12px 0 6px" title="${usados} de 30 dias"><i style="width:${(usados/30*100).toFixed(1)}%"></i></div><div class="sub" style="margin:0;font-size:13px">Período ${br(p.ini)} a ${br(p.fim)}${p.completo?' · dar até '+br(p.lim):' · em aquisição'}</div>`:''}
+            <div class="rh-pfb" style="margin-top:12px">${p&&f.status!=='Desligado'?`<button class="btn sec" data-act="rh-fernova" data-id="${f._id}" data-go-fer="1">Marcar férias</button>`:''}${okIso(f.admissao)?`<button class="lnk" data-act="rh-fajabrir" data-id="${f._id}" data-go-fer="1">Ajustar períodos</button>`:''}</div></section>`:''}
+          ${pj?`<section class="card"><div class="rh-ch"><h2>Troca do PJ</h2><span class="pill ${pj.c}">${esc(pj.t)}</span></div>${pj.prox?`<div class="sub" style="margin:8px 0 0">Próxima troca: <b>${br(pj.prox)}</b></div>`:''}<div style="margin-top:10px"><button class="lnk" data-act="rh-pzabrir" data-v="pj">Abrir a troca dos PJ</button></div></section>`:''}
+          ${e?`<section class="card"><div class="rh-ch"><h2>Experiência</h2><span class="pill ${e.c}">${esc(e.t)}</span></div><div class="sub" style="margin:8px 0 0">1ª etapa até ${br(e.f1)} · 2ª até ${br(e.f2)}</div><div class="rh-pfb" style="margin-top:10px">${e.etapa===1?`<button class="btn sec rh-sm" data-act="rh-expprorr" data-id="${f._id}">Prorrogar</button>`:''}<button class="btn sec rh-sm" data-act="rh-expefet" data-id="${f._id}">Efetivar</button></div></section>`:''}
+          <section class="card"><div class="rh-ch"><h2>EPI e uniforme</h2><span class="pill ${fs.c}">${esc(fs.t)}</span></div>
+            ${fc&&((fc.epis||[]).length||(fc.uniformes||[]).length)?`<div class="rh-pfl">${(fc.epis||[]).map(x=>`<div><span>${esc(x.nome)}</span><small>${x.ca?'CA '+esc(x.ca):''}</small></div>`).join('')}${(fc.uniformes||[]).map(x=>`<div><span>${esc(x.nome)}</span><small>uniforme</small></div>`).join('')}</div>`:`<div class="sub" style="margin:8px 0 0">${f.funcao?'A função "'+esc(f.funcao)+'" ainda não tem EPIs cadastrados.':'Sem função no cadastro.'}</div>`}
+            <div style="margin-top:8px"><button class="lnk" data-act="rh-fabrir">Abrir as fichas do mês</button></div></section>
+          <section class="card">${docsDaPessoa(f._id).replace('class="rh-docs"','class="rh-docs" style="margin:0;padding:0;border:0"')}</section></div></div>`; }
   function buscaPessoas(q){ q=norm(q); const d=dig(q); if(q.length<2) return []; return R.func.filter(f=>norm(f.nome).includes(q)||(d.length>=3&&(dig(f.cpf).includes(d)||(f.cnpj&&dig(f.cnpj).includes(d))))).sort((a,b)=>(a.status==='Desligado')-(b.status==='Desligado')||a.nome.localeCompare(b.nome,'pt-BR')).slice(0,6); }
   function cartaoBusca(){ const xs=buscaPessoas(R.buscaIni);
     return `<section class="card rh-bus"><label class="rh-busl"><span class="label">BUSCAR FUNCIONÁRIO</span><input class="txt" id="rh-bus" placeholder="nome, CPF ou CNPJ" value="${esc(R.buscaIni)}" autocomplete="off"></label>
       ${R.buscaIni.length>=2?(xs.length?`<div class="rh-busr">${xs.map(f=>`<button class="rh-busi" data-act="rh-pess" data-id="${f._id}"><b>${esc(f.nome)}</b><small>${esc([f.funcao,f.setor,f.status==='Desligado'?'desligado':''].filter(Boolean).join(' · '))}</small></button>`).join('')}</div>`:'<div class="sub" style="margin:8px 0 0">Ninguém com esse nome ou CPF.</div>'):''}</section>`; }
+
+  /* ---------- Quadro de admissões e Quem é quem (pedido de 13/10) ---------- */
+  function vQuadroAdm(){ const hj=P.hojeStr(), m=fichasMesIni(), lim=addDias(hj,-120), recentes=ativos().filter(f=>f.admRoteiro&&(!okIso(f.admissao)||f.admissao>=lim));
+    const contr=f=>R.docs.some(d=>d.funcId===f._id), ficha=f=>['imp','ass'].includes(fSit(f,m).k);
+    const docs=recentes.filter(f=>admFaltam(f).length), papel=recentes.filter(f=>!admFaltam(f).length&&(!contr(f)||!ficha(f)));
+    const exp=clts().map(f=>({f,e:expInfo(f)})).filter(o=>o.e).sort((a,b)=>a.e.fim.localeCompare(b.e.fim));
+    const efet=R.func.filter(f=>f.exp&&f.exp.status==='efetivado'&&String(f.exp.em||'').slice(0,10)>=addDias(hj,-30)).sort((a,b)=>String(b.exp.em).localeCompare(String(a.exp.em)));
+    const nome=f=>`<button class="rh-nm" data-act="rh-pess" data-id="${f._id}">${esc(titulo(f.nome))}</button><small>${esc([f.funcao,f.setor].filter(Boolean).join(' · ')||'sem função')}</small>`;
+    const col=(t,n,corpo,cls)=>`<section class="rh-kc ${cls||''}"><div class="rh-kh"><b>${t}</b><span>${n}</span></div>${corpo||'<div class="sub" style="margin:4px 0 0;font-size:12.5px">Ninguém nesta etapa.</div>'}</section>`;
+    return `<div class="rh-kb">${col('Documentos',docs.length,docs.map(f=>{ const L=docsAdm(), fe=admFeitos(f).filter(n=>L.includes(n)).length, fl=admFaltam(f); return `<article class="rh-kcard">${nome(f)}<div class="rh-bt" style="height:8px;margin:10px 0 6px"><i style="width:${(fe/L.length*100).toFixed(0)}%"></i></div><small>${fe} de ${L.length} · falta ${esc(fl.slice(0,2).join(', '))}${fl.length>2?'…':''}</small><button class="btn sec rh-sm" data-act="rh-admabrir" data-id="${f._id}">Abrir</button></article>`; }).join(''))}
+      ${col('Contrato e ficha',papel.length,papel.map(f=>`<article class="rh-kcard">${nome(f)}<small>${contr(f)?'contrato gerado':'falta o contrato'} · ${ficha(f)?'ficha gerada':'falta a ficha de '+mesNome(m)}</small><div class="rh-pfb">${contr(f)?'':`<button class="btn sec rh-sm" data-act="rh-admcontr" data-id="${f._id}">Gerar contrato</button>`}${ficha(f)?'':`<button class="btn sec rh-sm" data-act="rh-fger" data-id="${f._id}">Gerar ficha</button>`}</div></article>`).join(''))}
+      ${col('Experiência',exp.length,exp.map(({f,e})=>`<article class="rh-kcard">${nome(f)}<span class="pill ${e.c}" style="align-self:flex-start;margin-top:8px">${esc(e.t)}</span><div class="rh-pfb" style="margin-top:8px">${e.etapa===1?`<button class="btn rh-sm" data-act="rh-expprorr" data-id="${f._id}">Prorrogar</button>`:''}<button class="btn sec rh-sm" data-act="rh-expefet" data-id="${f._id}">Efetivar</button></div></article>`).join(''))}
+      ${col('Efetivados (30 dias)',efet.length,efet.map(f=>`<article class="rh-kcard">${nome(f)}<small>efetivado(a) em ${br(String(f.exp.em).slice(0,10))}</small></article>`).join(''),'ok')}</div>`; }
+  const vagas=()=>R.cfg.vagas&&typeof R.cfg.vagas==='object'?R.cfg.vagas:{};
+  function vOrg(){ const at=ativos(), grupos={}; at.forEach(f=>{ const k=f.setor||'Sem setor'; (grupos[k]=grupos[k]||[]).push(f); });
+    const ks=[...new Set(Object.keys(grupos).concat(setoresCad().filter(n=>+vagas()[n]>0)))].sort((a,b)=>(grupos[b]||[]).length-(grupos[a]||[]).length||a.localeCompare(b,'pt-BR'));
+    const sel=R.orgSet&&ks.includes(R.orgSet)?R.orgSet:ks[0];
+    const av=(f,cls)=>`<span class="rh-av3 ${cls||''}" title="${esc(titulo(f.nome))}">${esc(iniciais(f.nome).toUpperCase())}</span>`;
+    const ps=(grupos[sel]||[]).slice().sort((a,b)=>String(a.admissao||'9').localeCompare(String(b.admissao||'9'))), nv=+vagas()[sel]||0;
+    return `<div class="rh-org">${ks.map(k=>{ const xs=grupos[k]||[], pj=xs.filter(f=>f.tipo==='PJ').length, ex=xs.filter(f=>expInfo(f)).length, v=+vagas()[k]||0;
+        return `<button class="card rh-orgc" data-act="rh-orgset" data-v="${esc(k)}" aria-pressed="${k===sel}"><div class="rh-ch"><b>${esc(k)}</b><span class="num">${xs.length}</span></div><small>${xs.length-pj} CLT${pj?' · '+pj+' PJ':''}${ex?' · '+ex+' em experiência':''}${v?' · '+plural(v,'vaga','vagas'):''}</small><div class="rh-avs">${xs.slice(0,5).map(f=>av(f)).join('')}${xs.length>5?`<span class="rh-av3 mais">+${xs.length-5}</span>`:''}</div></button>`; }).join('')}</div>
+      <section class="card"><div class="rh-ch"><h2>${esc(sel||'')}</h2><span class="sub" style="margin:0">toque no nome para abrir o perfil · vagas em Cadastros › Setores</span></div>
+        <div class="rh-orgp">${ps.map(f=>{ const e=expInfo(f); return `<button class="rh-orgi ${e?'exp':''}" data-act="rh-pess" data-id="${f._id}">${av(f,e?'exp':'')}<span><b>${esc(titulo(f.nome))}</b><small>${esc(f.funcao||'sem função')} · ${e?'em experiência':okIso(f.admissao)?esc(tempoTxt(f.admissao)):'sem admissão'}${f.tipo==='PJ'?' · PJ':''}</small></span></button>`; }).join('')}${[...Array(nv)].map(()=>'<div class="rh-orgv">vaga aberta</div>').join('')}</div></section>`; }
 
   /* ---------- Admissão em um passo ---------- */
   const DOCS_ADM_PADRAO=['RG','CPF','Carteira de trabalho (CTPS)','Título de eleitor','Comprovante de residência','Certidão de nascimento ou casamento','Foto 3x4','Dados bancários','ASO admissional'];
@@ -931,6 +1021,7 @@
   document.addEventListener('change',async ev=>{ const t=ev.target;
     try{
       if(t.dataset&&t.dataset.rhFil){ R.filtro[t.dataset.rhFil]=t.value; P.render(); return; }
+      if(t.dataset&&t.dataset.rhVaga!=null){ const v=Object.assign({},vagas()), n=Math.max(0,Math.min(50,parseInt(t.value,10)||0)); if(n) v[t.dataset.rhVaga]=n; else delete v[t.dataset.rhVaga]; try{ await P.db().doc('rh/config').set({vagas:v,alteradoEm:agora()},{merge:true}); R.cfg.vagas=v; P.toast('Vagas salvas.'); }catch(e){ P.erro(e); } return; }
       if(t.dataset&&(t.dataset.rhF==='status'||t.dataset.rhF==='tipo'||t.dataset.rhF==='empresaSel')&&R.f){ Object.assign(R.f,val('[data-rh-f]')); P.render(); return; }
       if(t.id==='rh-imp'&&t.files&&t.files[0]){ await importar(t.files[0]); t.value=''; return; }
       if(t.id==='rh-dvale') { edSync(); return; }
@@ -1086,11 +1177,16 @@
         d.removido=true; d.removidoEm=agora(); d.removidoPor=eu(); await grava(COL.terc+'/'+x._id,{docs:ds}); return; }
       if(a==='rh-tdver'){ const x=R.terc.find(y=>y._id===R.tdoc), d=x&&tDocs(x).find(y=>y.id===b.dataset.id); if(d&&d.arquivo) await abrirUrl(d.arquivo.url); return; }
       /* agenda e relatório */
+      if(a==='rh-fview'){ R.fview=b.dataset.v; R.pess=null; P.render(); return; }
+      if(a==='rh-orgset'){ R.orgSet=b.dataset.v; P.render(); return; }
+      if(a==='rh-mapano'){ R.mapAno=(R.mapAno||+P.hojeStr().slice(0,4))+(+b.dataset.v); P.render(); return; }
+      if(a==='rh-mapset'){ R.mapSet=b.dataset.v; P.render(); return; }
       if(a==='rh-agv'){ R.agv=b.dataset.v; P.render(); return; }
       if(a==='rh-agrel'){ R.agv='rel'; R.relMes=P.hojeStr().slice(0,7); P.go('rhagenda'); return; }
       if(a==='rh-agdias'){ R.agDias=+b.dataset.v||30; P.render(); return; }
       if(a==='rh-ics'){ const xs=agendaJanela().prox; if(!xs.length) return; baixar(new Blob([icsTexto(xs)],{type:'text/calendar'}),'Agenda-RH-Colafix.ics'); P.toast(plural(xs.length,'compromisso','compromissos')+' no arquivo. Abra o arquivo para mandar para o Outlook.'); return; }
       if(a==='rh-relmes'){ R.relMes=mesMais(R.relMes,+b.dataset.v); P.render(); return; }
+      if(a==='rh-indimp'){ imprimirDoc(indHtml()); return; }
       if(a==='rh-relimp'){ imprimirDoc(relHtml(R.relMes)); return; }
       if(a==='rh-relxls'){ await relExcel(R.relMes); return; }
       /* ficha da pessoa */
@@ -1212,6 +1308,33 @@
   .rh-acoes{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .rh-kpi2 .rh-k{background:var(--surface);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);border:0;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px}.rh-kpi2 .rh-k:hover{outline:2px solid var(--teal-wash)}.rh-kpi2 .rh-k b{font-size:34px;line-height:1.05;font-weight:800}.rh-kpi2 .rh-k span{font-weight:600}.rh-kpi2 .rh-k small{color:var(--muted);font-size:12.5px}
   .rh-dash{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;margin-bottom:16px}.rh-dash .card{margin:0}.rh-bars{display:flex;flex-direction:column;gap:9px;margin-top:8px}.rh-bl{display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr) 34px;gap:10px;align-items:center;font-size:13.5px}.rh-bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rh-bt{height:14px;background:var(--surface-2,#efe9dc);border-radius:4px;overflow:hidden}.rh-bt i{display:block;height:100%;background:var(--teal);border-radius:0 4px 4px 0}.rh-bl b{text-align:right}
+.rh-pf{display:grid;grid-template-columns:290px minmax(0,1fr) 340px;gap:16px;align-items:start}.rh-pf .card{margin:0}.rh-pfr{display:flex;flex-direction:column;gap:16px}
+  .rh-pfa{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}.rh-av2{width:96px;height:96px;border-radius:48px;background:var(--teal-strong);color:#fff;display:grid;place-items:center;font-size:34px;font-weight:800}
+  .rh-pfn{font-size:20px}.rh-pfc{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}.rh-pft{width:100%;box-sizing:border-box;background:var(--ground);border-radius:12px;padding:12px}.rh-pft b{display:block;font-size:22px;color:var(--teal-strong)}.rh-pft span{font-size:12.5px;color:var(--muted)}
+  .rh-pfd{width:100%;margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 10px;text-align:left;font-size:13.5px}.rh-pfd dt{color:var(--muted)}.rh-pfd dd{margin:0;overflow-wrap:anywhere}
+  .rh-pfb{display:flex;gap:8px;flex-wrap:wrap;width:100%}.rh-pfa .rh-pfb{flex-direction:column}.rh-pfa .rh-pfb .btn{width:100%}
+  .rh-tl{margin-top:14px}.rh-tli{display:grid;grid-template-columns:86px 18px minmax(0,1fr);gap:12px;min-height:64px}.rh-tli>b{font-size:12.5px;color:var(--muted);text-align:right;padding-top:1px}.rh-tld{display:flex;flex-direction:column;align-items:center}.rh-tld i{width:14px;height:14px;border-radius:7px;flex:none}.rh-tld em{flex:1;width:2px;background:var(--line)}.rh-tli>div b{display:block;font-size:14.5px}.rh-tli>div small{display:block;color:var(--muted);font-size:12.5px;padding-bottom:12px}
+  .rh-pfl{display:flex;flex-direction:column;gap:7px;margin-top:10px;font-size:13.5px}.rh-pfl div{display:flex;justify-content:space-between;gap:10px}.rh-pfl small{color:var(--muted)}
+  @media (max-width:1150px){ .rh-pf{grid-template-columns:minmax(0,1fr)} }
+.rh-mapa{position:relative;overflow-x:auto}.rh-mr{display:grid;grid-template-columns:190px minmax(560px,1fr);align-items:center;min-height:34px}.rh-mr .rh-nm{text-align:left;font-size:13.5px}.rh-mr .rh-nm small{color:var(--muted);font-weight:600}
+  .rh-mt{position:relative;height:26px;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/12 - 1px),var(--line) calc(100%/12 - 1px),var(--line) calc(100%/12))}
+  .rh-mh .rh-mt{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));background:none;height:auto;font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase}.rh-mh{border-bottom:1px solid var(--line);padding-bottom:6px}
+  .rh-ms{font-size:11.5px;font-weight:700;letter-spacing:1.5px;color:var(--teal-strong);text-transform:uppercase;margin:12px 0 2px}
+  .rh-mb{position:absolute;top:5px;height:16px;border-radius:4px;background:var(--teal)}.rh-mb.foi{opacity:.45}.rh-mb.conf{background:var(--warn)}
+  .rh-mlim{position:absolute;top:7px;width:12px;height:12px;border-radius:6px;background:var(--crit);transform:translateX(-6px)}.rh-mpj{position:absolute;top:2px;width:3px;height:22px;background:#5B3FA6}
+  .rh-mhjw{position:absolute;left:190px;right:0;top:0;bottom:0;pointer-events:none}.rh-mhj{position:absolute;top:0;bottom:0;width:2px;background:var(--crit);opacity:.5}
+  .rh-ml{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:14px;font-size:12.5px;color:var(--muted)}.rh-ml span{display:flex;gap:6px;align-items:center}.rh-ml .rh-mb{height:10px}
+.rh-kb{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}.rh-kc{background:#EFE9DC;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:200px}.rh-kc.ok{background:var(--ok-tint,#E3F0E8)}
+  .rh-kh{display:flex;justify-content:space-between;font-size:15px}.rh-kh span{color:var(--muted)}.rh-kcard{background:var(--surface);border-radius:12px;padding:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:2px}.rh-kcard .rh-nm{text-align:left;font-size:15px}.rh-kcard small{color:var(--muted);font-size:12.5px}.rh-kcard>.btn{margin-top:8px;align-self:flex-start}
+  .rh-org{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:16px}.rh-orgc{margin:0;text-align:left;font:inherit;color:inherit;cursor:pointer;border:2px solid transparent;display:flex;flex-direction:column;gap:6px}.rh-orgc[aria-pressed="true"]{border-color:var(--teal)}.rh-orgc small{color:var(--muted);font-size:12.5px}
+  .rh-avs{display:flex;margin-top:4px}.rh-av3{width:34px;height:34px;border-radius:17px;background:#EAF2F6;color:var(--teal-strong);display:grid;place-items:center;font-weight:800;font-size:12px;border:2px solid var(--surface);flex:none}.rh-avs .rh-av3+.rh-av3{margin-left:-8px}.rh-av3.mais{background:var(--teal-strong);color:#fff}.rh-av3.exp{background:var(--warn);color:#fff}
+  .rh-orgp{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:12px}.rh-orgi{display:flex;gap:10px;align-items:center;text-align:left;background:var(--ground);border:0;border-radius:12px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer}.rh-orgi.exp{background:var(--warn-tint)}.rh-orgi b{display:block;font-size:14px}.rh-orgi small{color:var(--muted);font-size:12px}
+  .rh-orgv{border:2px dashed var(--line);border-radius:12px;display:grid;place-items:center;min-height:56px;color:var(--muted);font-size:13px}
+  @media (max-width:980px){ .rh-kb{grid-template-columns:repeat(2,minmax(0,1fr))} } @media (max-width:600px){ .rh-kb{grid-template-columns:minmax(0,1fr)} }
+.rh-kpi.rh-kpi5{grid-template-columns:repeat(5,minmax(0,1fr))}.rh-kpi5 .rh-k{cursor:default}
+  .rh-col{display:flex;gap:8px;align-items:stretch;height:230px;margin-top:12px}.rh-col>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}.rh-col span{font-size:11.5px;color:var(--ink-2,#4A453C)}.rh-col i{width:100%;background:var(--teal);border-radius:4px 4px 0 0;display:block}.rh-col small{font-size:11px;color:var(--muted)}
+  @media (max-width:900px){ .rh-kpi.rh-kpi5{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .rh-acoes{max-width:100%;min-width:0}.rh-acoes .seg{max-width:100%;overflow-x:auto}
   .rh-kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.rh-kpi div{background:var(--surface);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}.rh-kpi b{font-size:30px;line-height:1.1;display:block;font-weight:800}.rh-kpi span{color:var(--muted);font-size:14px}
   .rh-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.rh-2>.card{margin:0}.rh-2+.card{margin-top:16px}
   .card h2{font-size:17px;margin:0 0 12px}.rh-ch{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}.rh-ch h2{margin:0}

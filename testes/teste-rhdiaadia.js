@@ -48,7 +48,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4), M=dias(0).slice(0,7
   // busca e ficha da pessoa
   await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(200); await p.fill('#rh-bus','mari'); await H.dorme(700);
   await p.click('.rh-busi:has-text("MARIA COSTA")'); await H.dorme(400); const fi=await view();
-  ok('Busca no Início abre a ficha completa: dados, prazos, fichas, férias e documentos', /RH · FUNCIONÁRIO\s*MARIA COSTA/.test(fi)&&/4 anos e 11 meses de casa/.test(fi)&&/Salário\s*R\$ 2\.150,00/.test(fi)&&/Prazos/.test(fi)&&/Fichas de EPI e uniforme/.test(fi)&&new RegExp(br(dias(4))+' a '+br(dias(13))).test(fi)&&/DOCUMENTOS/.test(fi), fi.replace(/\n/g,' | ').slice(0,260));
+  ok('Busca no Início abre o perfil: dados, história na empresa, férias, EPI e documentos', /RH · FUNCIONÁRIO\s*MARIA COSTA/.test(fi)&&/4 anos e 11 meses\s*de casa/.test(fi)&&/Salário\s*R\$ 2\.150,00/.test(fi)&&/A HISTÓRIA NA COLAFIX[\s\S]*Admissão/.test(fi)&&/EPI e uniforme/.test(fi)&&new RegExp(br(dias(4))+' a '+br(dias(13))).test(fi)&&/DOCUMENTOS/.test(fi), fi.replace(/\n/g,' | ').slice(0,260));
   await p.click('[data-act="rh-pessx"]'); await H.dorme(200); await p.click('.rh-nm:has-text("ANA SOUZA")'); await H.dorme(300); const fa=await view();
   ok('Na lista de Funcionários, o nome abre a ficha (com a experiência)', /RH · FUNCIONÁRIO\s*ANA SOUZA/.test(fa)&&/Experiência[\s\S]*1ª etapa termina em/.test(fa), fa.slice(0,120));
 
