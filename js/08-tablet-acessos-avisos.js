@@ -995,3 +995,46 @@ document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.tar
 { const _cl=ttCamLiga; ttCamLiga=function(){ if(scA.k&&ttEntrega()) return; return _cl.apply(this,arguments); }; }
 document.head.insertAdjacentHTML('beforeend','<style id="sc-css">.sc-f{background:var(--surface);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}.sc-f .tt-lab{font-weight:700}</style>');
 /* ===FIM SEM CRACHÁ=== */
+/* ===================== ENTREGA EM PARTES (13/10) ===================== */
+/* No celular do almox, depois do crachá de quem recebe: "Entregar só uma parte" → marca os itens que foram (ex.: só os paletes).
+   Grava rdb.entp [{em,por,itens:[códigos],recebidoPor,cracha,entreguePor}] em todas as ordens do rancho. O rancho continua
+   "falta entregar" (sem rdb.ent) até sair o resto; quando todos os itens já foram, vira entregue (rdb.ent, parcial:true). */
+const epA={on:false,sel:{}};
+function epFeitos(o){ const m={}; ((o&&o.rdb&&o.rdb.entp)||[]).forEach(p=>(p.itens||[]).forEach(c=>{ if(!m[c]) m[c]=p; })); return m; }
+function epTxt(o){ const ps=(o&&o.rdb&&o.rdb.entp)||[]; if(!ps.length||(o.rdb&&o.rdb.ent)) return ''; const n=new Set(ps.flatMap(p=>p.itens||[])).size;
+  return `<div class="dbfsep" style="background:var(--warn-tint)">◐ Entregue em parte: ${n} ${n===1?'item':'itens'} · ${esc(ps.map(p=>hora(p.em)+' '+(p.recebidoPor||'')).join(' · '))} · <b>falta o resto</b></div>`; }
+function epCel(o,pode,late){ const ps=(o&&o.rdb&&o.rdb.entp)||[]; if(!ps.length||(o.rdb&&o.rdb.ent)) return ''; if(pode===undefined) return true;
+  const n=new Set(ps.flatMap(p=>p.itens||[])).size, ult=ps[ps.length-1];
+  return `<td class="dbc ${late?'lt':''}" title="Entregue em parte"><b class="num">${hora(ult.em)}</b><small>em parte (${n} ${n===1?'item':'itens'})</small><small>${esc(ult.recebidoPor||'')}</small>${pode?`<button class="dbb ${late?'lt':''}" data-act="db-mark" data-id="${esc(o._id)}" data-k="ent">Entregue tudo</button>`:''}</td>`; }
+{ const _ve=vEntrega; vEntrega=function(){ const h=_ve.apply(this,arguments); if(!h) return h; const T=S.tt, R=T.rch, o=R&&ordById(R.oid);
+  if(T.fase!=='rancho'||!T.p||!o||!R.itens||!R.itens.length||(o.rdb&&o.rdb.ent&&!R.refazer)) { return h; }
+  const feitos=epFeitos(o);
+  if(!epA.on){ const ja=Object.keys(feitos).length; const info=ja?`<p class="sub" style="margin:6px 0 0">Já foram em parte: ${R.itens.filter(x=>feitos[x.c]).map(x=>esc(x.c)).join(', ')}</p>`:'';
+    return h.replace('<button class="btn sec tt-big" data-act="tt-econf">','<button class="btn sec tt-big" data-act="ep-abre">Entregar só uma parte</button>'+info+'<button class="btn sec tt-big" data-act="tt-econf">'); }
+  const its=R.itens.map((x,i)=>{ const f=feitos[x.c]; return `<button class="cf-i ${f||epA.sel[i]?'on':''}" data-act="ep-it" data-i="${i}" ${f?'disabled':''}><span class="cf-t"><b>${esc(x.c)}</b><small>${esc(x.d||'')}${f?' · já entregue '+hora(f.em):''}</small></span><span class="cf-q num">${fQ(x.q)}<small>${esc(x.um)}</small></span><span class="cf-ok">${f||epA.sel[i]?ic('check',22,3):''}Foi</span></button>`; }).join('');
+  const n=Object.values(epA.sel).filter(Boolean).length;
+  const corpo=`<div class="tt-box tt-rec" style="text-align:left"><p style="margin:0">Entregar para <b>${esc(T.p.nome)}</b></p><h1 style="font-size:22px">O que foi entregue agora?</h1><div class="cf-l">${its}</div>${T.msg?`<p class="tt-err">${esc(T.msg)}</p>`:''}
+    <button class="btn tt-big" data-act="ep-salvar" style="background:var(--ok-ink)" ${n&&!T.enviando?'':'disabled'}>${T.enviando?'Salvando…':'Entregar '+n+' '+(n===1?'item':'itens')}</button><div class="tt-rod"><button class="btn sec" data-act="ep-x">Voltar</button></div></div>`;
+  const i=h.indexOf('<div class="tt-box tt-rec">'); return i<0?h:h.slice(0,i)+corpo+'</div>'; }; }
+{ const _tv=ttVoltar; ttVoltar=function(){ epA.on=false; epA.sel={}; return _tv.apply(this,arguments); }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="ep-"]'); if(!b||b.disabled||!ttEntrega()) return; const T=S.tt, R=T.rch, a=b.dataset.act; if(!R) return; T.ult=Date.now();
+  if(a==='ep-abre'){ epA.on=true; epA.sel={}; render(); return; }
+  if(a==='ep-x'){ epA.on=false; epA.sel={}; render(); return; }
+  if(a==='ep-it'){ const i=+b.dataset.i; epA.sel[i]=!epA.sel[i]; render(); return; }
+  if(a==='ep-salvar'){ const o=ordById(R.oid); if(!o||!T.p||T.enviando) return; const feitos=epFeitos(o);
+    const novos=R.itens.filter((x,i)=>epA.sel[i]&&!feitos[x.c]).map(x=>x.c); if(!novos.length) return;
+    const tudo=R.itens.every(x=>feitos[x.c]||novos.includes(x.c)); const agora=new Date().toISOString(), eu=(S.uid&&S.nomes[S.uid])||'';
+    const parte={em:agora,por:S.uid||null,itens:novos,recebidoPor:T.p.nome,cracha:T.p.codigo||null,entreguePor:eu,origem:'celular'};
+    T.enviando=true; T.msg=''; render(); let n=0, falhou=false;
+    for(const x of dbIrmas(o)){ const rx=Object.assign({},x.rdb||{}); if(rx.ent&&!R.refazer) continue; if(!rx.sep) rx.sep={em:agora,por:S.uid||null,origem:'celular'};
+      rx.entp=[...(rx.entp||[]),parte];
+      if(tudo) rx.ent={em:agora,por:S.uid||null,nome:T.p.nome,recebidoPor:T.p.nome,cracha:T.p.codigo||null,entreguePor:eu,origem:'celular',parcial:true};
+      const txt='Rancho '+(o.rancho||'')+(tudo?' entregue (última parte: ':' entregue em parte (')+novos.join(', ')+') por '+eu+', recebido por '+T.p.nome;
+      if(await dbSalvar(x,rx,txt,o.rancho)) n++; else falhou=true; }
+    T.enviando=false; if(!n&&falhou){ T.msg='Não foi possível salvar. Confira a internet e toque de novo.'; render(); return; }
+    epA.on=false; epA.sel={}; if(tudo){ T.rch.falta=false; T.fase='rcok'; T.ult=Date.now(); render(); return; }
+    toast('Entrega em parte registrada. O rancho continua na fila até sair o resto.'); ttVoltar(); return; } });
+/* ===FIM ENTREGA EM PARTES=== */
+{ const _ve=vEntrega; vEntrega=function(){ const h=_ve.apply(this,arguments); if(!h) return h; const R=S.tt.rch, o=R&&ordById(R.oid); const ps=(o&&o.rdb&&o.rdb.entp)||[];
+  if(!ps.length||(o.rdb&&o.rdb.ent)) return h; const n=new Set(ps.flatMap(p=>p.itens||[])).size;
+  return h.replace('<div class=""><b>Entregue</b><span>ainda não</span></div>',`<div class="" style="border-left-color:var(--warn)"><b>Entregue</b><span>em parte (${n} ${n===1?'item':'itens'})</span></div>`); }; }

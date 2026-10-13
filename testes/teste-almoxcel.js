@@ -39,7 +39,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.fill('#tt-rnum','123456'); await p.click('[data-act="tt-rnum"]'); await H.dorme(400); const t4=await tela();
  ok('Digitar o nº do rancho também abre; rancho já entregue avisa quem recebeu', /já foi entregue/.test(t4)&&/Ana Souza/.test(t4), t4.replace(/\n/g,' | ').slice(0,160));
- await p.evaluate(()=>{ const v=document.getElementById('tt-video'); if(v&&v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop()); __T.S().tt.cam='erro'; }); /* a câmera de teste mostra sempre a folha 123456 */
+ await p.evaluate(()=>{ const v=document.getElementById('tt-video'); if(v&&v.srcObject){ v.srcObject.getTracks().forEach(t=>t.stop()); v.srcObject=null; } __T.S().tt.cam='erro'; }); await H.dorme(1500); /* a câmera de teste mostra sempre a folha 123456 (espera a última leitura em andamento) */
  await p.evaluate(()=>{ __T.S().tt.recente={}; __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(400); const tp=await tela();
  await p.fill('#tt-rnum','777888'); await p.click('[data-act="tt-rnum"]'); await H.dorme(500); const tq=await tela();

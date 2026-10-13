@@ -1,0 +1,30 @@
+/* Celular do almox: entrega em partes (pedido de 13/10: "entreguei só os paletes") */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const ok=(n,c,d)=>console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,260):''));
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ d.users['celalmox@painel-colafix.app']={uid:'uCEL',pass:'cel123',nome:'Joana Almox'}; D['perfis/uCEL']={nome:'Joana Almox',usuario:'celalmox'}; D['acessos/uCEL']={perfil:'almoxcel',mods:['almoxcel'],locais:[],ativo:true};
+ const sep={em:new Date().toISOString(),por:'uCEL',conferido:true,nome:'Carlos'};
+ D['ordens/5001'].rancho='123456'; D['ordens/5002'].rancho='123456'; D['ordens/5001'].rdb={sep}; D['ordens/5002'].rdb={sep};
+ D['ranchos/123456']={numero:'123456',criadoEm:new Date().toISOString(),ordens:[{num:'5001'},{num:'5002'}],itens:[{c:'PAL01',d:'Palete',um:'un',q:12},{c:'MP001',d:'Cimento',um:'kg',q:500},{c:'MP002',d:'Areia',um:'kg',q:1200}]};
+ D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true};
+ const B=await H.abrir({viewport:{width:390,height:844}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'celalmox','cel123');
+ await p.waitForFunction(()=>window.__T&&__T.S().view==='mantotem',null,{timeout:12000}); await H.dorme(800);
+ const tela=()=>p.evaluate(()=>(document.querySelector('.tt')||{}).innerText||''); const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+ const abre=async()=>{ await p.evaluate(()=>{ __T.S().tt.recente={}; }); await p.fill('#tt-rnum','123456'); await p.click('[data-act="tt-rnum"]'); await H.dorme(400); await p.keyboard.type('CXANAS2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(400); };
+ await abre(); await p.click('[data-act="ep-abre"]'); await H.dorme(200); const t1=await tela();
+ ok('"Entregar só uma parte" mostra os itens do rancho para marcar', /O que foi entregue agora/.test(t1)&&/PAL01/.test(t1)&&/MP002/.test(t1), t1.replace(/\n/g,' | ').slice(0,200));
+ await p.click('[data-act="ep-it"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="ep-salvar"]'); await H.dorme(900);
+ let s=await srv(); const r1=s['ordens/5001'].rdb, r2=s['ordens/5002'].rdb;
+ ok('Só os paletes: grava a parte nas duas ordens e o rancho continua sem "entregue"', r1.entp&&r1.entp.length===1&&r1.entp[0].itens.join()==='PAL01'&&r1.entp[0].recebidoPor==='Ana Souza'&&!r1.ent&&r2.entp&&!r2.ent, JSON.stringify(r1).slice(0,240));
+ await abre(); const t2=await tela(); ok('Ao abrir de novo, avisa o que já foi', /Já foram em parte: PAL01/.test(t2)&&/em parte \(1 item\)/.test(t2), t2.replace(/\n/g,' | ').slice(0,220));
+ await p.click('[data-act="ep-abre"]'); await H.dorme(200); const dis=await p.evaluate(()=>document.querySelector('[data-act="ep-it"][data-i="0"]').disabled);
+ await p.click('[data-act="ep-it"][data-i="1"]'); await p.click('[data-act="ep-it"][data-i="2"]'); await H.dorme(150); await p.click('[data-act="ep-salvar"]'); await H.dorme(900);
+ s=await srv(); const r3=s['ordens/5001'].rdb;
+ ok('Com o resto entregue, o rancho vira entregue (as duas partes ficam guardadas)', dis&&r3.ent&&r3.ent.parcial&&r3.entp.length===2&&s['ordens/5002'].rdb.ent, JSON.stringify(r3).slice(0,240));
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close();
+ /* diário (dona): parte entregue aparece como "em parte" */
+ const {d:d2}=seedManut(); d2.docs['ordens/5001'].rancho='123456'; d2.docs['ordens/5001'].data=new Date().toISOString().slice(0,10); d2.docs['ordens/5001'].rdb={sep,entp:[{em:new Date().toISOString(),itens:['PAL01'],recebidoPor:'Ana Souza'}]}; d2.docs['ranchos/123456']=D['ranchos/123456'];
+ const B2=await H.abrir(); const q=B2.page; await H.preparar(q,d2); await q.goto(H.BASE); await H.entrar(q,'iasmyn','senha123'); await q.waitForFunction(()=>window.__T&&__T.S().ordens&&__T.S().ordens.length,null,{timeout:15000}); await H.dorme(500);
+ await q.evaluate(()=>__T.go('diario')); await H.dorme(500); const td=await q.evaluate(()=>document.getElementById('view').innerText);
+ await q.evaluate(()=>__T.go('dbfila')); await H.dorme(500); const tf=await q.evaluate(()=>document.getElementById('view').innerText);
+ ok('Diário mostra "em parte" e a fila continua com o rancho, avisando o que falta', /em parte \(1 item\)/.test(td)&&/Entregue em parte/.test(tf)&&/123456/.test(tf), td.match(/.{0,60}em parte.{0,40}/)+' || '+(tf.match(/Entregue em parte.{0,60}/)||[''])[0]);
+ console.log('erros:',B2.erros.filter(x=>!/404/.test(x))); await B2.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
