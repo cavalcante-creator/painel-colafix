@@ -192,26 +192,46 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(!t||t.id!=='c-lin
 function almoxSemTv(){ const p=acsP(); if(!p||p.tudo) return false; const ms=p.mods||[]; return ms.some(m=>m==='almox'||m==='premix')&&!ms.some(m=>m==='tv'||m==='gestor'||m==='analise'); }
 { const _mv=modsVis; modsVis=function(){ const xs=_mv.apply(this,arguments); return almoxSemTv()?xs.filter(m=>m.id!=='telas'):xs; }; }
 { const _vo=viewOk; viewOk=function(v){ if((v==='tvapres'||v==='tvfab')&&almoxSemTv()) return false; return _vo.apply(this,arguments); }; }
-/* ===== pedido de 13/10 (fim da tarde): Monitor do rancho numa janela separada, para arrastar para a segunda tela ===== */
-const JAN_MON=/[?&]janela=monitor\b/.test(location.search);
-function janMonAbrir(){ const u=location.href.split(/[?#]/)[0]+'?janela=monitor';
-  const w=window.open(u,'colafixMonitor','popup=yes,width='+Math.min(1600,screen.availWidth||1280)+',height='+Math.min(900,screen.availHeight||800));
+/* ===== pedidos de 13/10 (fim da tarde): telas numa janela separada, para arrastar para a segunda tela, e a logo nas telas ===== */
+/* Telas que abrem em outra janela: monitor do rancho, TV da fábrica, apresentação, painel da manutenção e tela da linha.
+   ?janela=<tela> abre a janela sem menu e sem cabeçalho, presa na tela (mesmo login). */
+const JAN_TELAS={dbmon:'Monitor do rancho',tvfab:'TV da fábrica',tvapres:'Apresentação',manmon:'Painel da manutenção',linhatv:'Tela da linha'};
+const JAN_V=(()=>{ const m=location.search.match(/[?&]janela=([a-z]+)/); if(!m) return ''; return m[1]==='monitor'?'dbmon':(JAN_TELAS[m[1]]?m[1]:''); })();
+const JAN_MON=!!JAN_V;
+function janAbrir(v){ const u=location.href.split(/[?#]/)[0]+'?janela='+(v==='dbmon'?'monitor':v);
+  const w=window.open(u,'colafix_'+v,'popup=yes,width='+Math.min(1600,screen.availWidth||1280)+',height='+Math.min(900,screen.availHeight||800));
   if(!w){ toast('O navegador bloqueou a janela. Libere as janelas (pop-up) para este site e tente de novo.'); return; } try{ w.focus(); }catch(e){} }
-/* botão no cabeçalho do monitor (só na janela principal) */
-{ const _dm=dbMonitor; dbMonitor=function(){ let h=_dm.apply(this,arguments); if(JAN_MON) return h.replace(/<button class="mdsair"[^>]*>✕<\/button>/,'<button class="mdsair" data-act="jan-tela" title="Tela cheia">⛶</button>');
-  return h.replace('<button class="mdsair" data-act="db-modo"','<button class="btn sec mdjan" data-act="jan-mon" title="Abre o monitor numa janela separada, para arrastar para a outra tela">⧉ Abrir em outra janela</button><button class="mdsair" data-act="db-modo"'); }; }
-document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="jan-mon"],[data-act="jan-tela"]'); if(!b) return;
-  if(b.dataset.act==='jan-mon'){ janMonAbrir(); return; }
+function janLogo(){ return (document.querySelector('.brand img')||{}).src||''; }
+/* botão "Abrir em outra janela": no canto da tela (computador), menos na própria janela */
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ const v=S.view; let b=document.getElementById('jan-bt');
+    const quer=!JAN_MON&&JAN_TELAS[v]&&window.innerWidth>=900&&!document.body.classList.contains('tv')&&!document.fullscreenElement;
+    if(quer){ if(!b){ b=document.createElement('button'); b.id='jan-bt'; b.className='btn sec'; b.type='button'; document.body.appendChild(b); } b.dataset.v=v; b.innerHTML='⧉ Abrir em outra janela'; b.title='Abre '+JAN_TELAS[v].toLowerCase()+' numa janela separada, para arrastar para a outra tela'; }
+    else if(b) b.remove();
+    /* logo nas telas que ainda não tinham */
+    const lg=janLogo(); if(lg){ if(v==='manmon'){ const h=document.querySelector('#view .mdh'); if(h&&!h.querySelector('.mdlogo')) h.insertAdjacentHTML('afterbegin','<img class="mdlogo" src="'+lg+'" alt="Colafix">'); }
+      if(v==='linhatv'){ const h=document.querySelector('#view .ltv-h > div'); if(h&&!h.querySelector('.jan-logo')) h.insertAdjacentHTML('afterbegin','<img class="jan-logo" src="'+lg+'" alt="Colafix">'); } }
+  }catch(e){} return x; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('#jan-bt,[data-act="jan-tela"]'); if(!b) return;
+  if(b.id==='jan-bt'){ janAbrir(b.dataset.v); return; }
   try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} });
 if(JAN_MON){
-  /* a janela do monitor não mexe na tela que a janela principal abre ao recarregar */
+  /* a janela não mexe na tela que a janela principal abre ao recarregar */
   let ant=null; try{ ant=localStorage.getItem('colafix.monitor'); }catch(e){}
-  document.title='Monitor do rancho · Colafix';
-  const tenta=(n)=>{ if(S.acs&&S.acs.pronto&&acsP()){ if(!viewOk('dbmon')){ toast('Você não tem acesso ao monitor do rancho.'); return; } go('dbmon'); try{ if(ant===null) localStorage.removeItem('colafix.monitor'); else localStorage.setItem('colafix.monitor',ant); }catch(e){} return; } if(n<240) setTimeout(()=>tenta(n+1),500); };
+  document.title=JAN_TELAS[JAN_V]+' · Colafix';
+  const tenta=(n)=>{ if(S.acs&&S.acs.pronto&&acsP()){ if(!viewOk(JAN_V)){ toast('Você não tem acesso a esta tela.'); return; } go(JAN_V); try{ if(ant===null) localStorage.removeItem('colafix.monitor'); else localStorage.setItem('colafix.monitor',ant); }catch(e){} return; } if(n<240) setTimeout(()=>tenta(n+1),500); };
   setTimeout(()=>tenta(0),300);
-  /* fica sempre no monitor, em tela limpa (sem menu e sem cabeçalho) */
-  { const _go=go; go=function(v){ if(v!=='dbmon'&&S.view==='dbmon') return; return _go.apply(this,arguments); }; }
-  { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ document.body.classList.toggle('dbmon',S.view==='dbmon'); document.body.classList.add('jan-mon'); }catch(e){} return x; }; }
+  /* fica sempre na mesma tela, sem menu e sem cabeçalho */
+  { const _go=go; go=function(v){ if(v!==JAN_V&&S.view===JAN_V) return; return _go.apply(this,arguments); }; }
+  { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ document.body.classList.toggle('dbmon',S.view==='dbmon'); document.body.classList.add('jan-mon','jan-solo'); }catch(e){} return x; }; }
+  { const _dm=dbMonitor; dbMonitor=function(){ return _dm.apply(this,arguments).replace(/<button class="mdsair"[^>]*>✕<\/button>/,'<button class="mdsair" data-act="jan-tela" title="Tela cheia">⛶</button>'); }; }
   document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') ev.stopImmediatePropagation(); },true);
+  /* botão de tela cheia no canto, para as telas que não têm */
+  setInterval(()=>{ try{ if(S.view===JAN_V&&JAN_V!=='dbmon'&&!document.getElementById('jan-fs')){ const b=document.createElement('button'); b.id='jan-fs'; b.dataset.act='jan-tela'; b.className='btn sec'; b.title='Tela cheia'; b.textContent='⛶'; document.body.appendChild(b); } }catch(e){} },1000);
 }
-document.head.insertAdjacentHTML('beforeend','<style id="janmon-css">.mdjan{height:40px;margin-right:10px;white-space:nowrap}body.jan-mon .mdjan{display:none}@media (max-width:900px){.mdjan{display:none}}</style>');
+document.head.insertAdjacentHTML('beforeend',`<style id="janmon-css">
+#jan-bt{position:fixed;right:18px;bottom:18px;z-index:60;height:42px;box-shadow:0 4px 14px rgba(0,0,0,.15);white-space:nowrap}
+#jan-fs{position:fixed;right:12px;bottom:12px;z-index:60;width:44px;height:44px;padding:0;font-size:20px;opacity:.55}#jan-fs:hover{opacity:1}
+body.jan-solo .side,body.jan-solo .top,body.jan-solo .tabs,body.jan-solo nav,body.jan-solo .banner,body.jan-solo #tp-mais{display:none!important}
+body.jan-solo .main,body.jan-solo #main{margin-left:0!important}body.jan-solo #view{max-width:none!important}
+.jan-logo{display:block;height:34px;margin-bottom:6px}
+</style>`);
