@@ -26,7 +26,7 @@
   /* empresas: todo CLT é Colafix; PJ é Zenith ou Nexus (ou outra) */
   const EMP_PJ=[['ZENITH','Zenith'],['NEXUS','Nexus']], EMP_NOME={COLAFIX:'Colafix',ZENITH:'Zenith',NEXUS:'Nexus'};
   /* razão social e CNPJ para os documentos — os mesmos de EMPRESAS_CONHECIDAS em modulos/rh-fichas.html */
-  const EMP_DOC={COLAFIX:{nome:'COLFIX INDUSTRIA E COMERCIO LTDA - EPP',cnpj:'08.813.381/0001-30'},ZENITH:{nome:'ZENITH SOLUÇÕES INDUSTRIAIS LTDA',cnpj:'62.944.495/0001-93'},NEXUS:{nome:'NEXUS MANUTENÇÕES LTDA',cnpj:'67.927.237/0001-93'}};
+  const EMP_DOC={COLAFIX:{nome:'COLFIX INDUSTRIA E COMERCIO LTDA - EPP',cnpj:'08.813.381/0001-30'},ZENITH:{nome:'ZENITH SOLUÇÕES INDUSTRIAIS LTDA',cnpj:'62.944.495/0001-64'} /* 13/10: o certo é -64 (o -93 da planilha não é um CNPJ válido) */,NEXUS:{nome:'NEXUS MANUTENÇÕES LTDA',cnpj:'67.927.237/0001-93'}};
   const empNome=e=>EMP_NOME[e]||e||'';
   const empPadrao=(tipo,txt)=>{ if(tipo!=='PJ') return 'COLAFIX'; const n=String(txt||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase(); return /ZENITH/.test(n)?'ZENITH':/NEXUS/.test(n)?'NEXUS':n.trim(); };
   const esc=P.esc, eu=()=>(P.S.uid&&P.S.nomes&&P.S.nomes[P.S.uid])||'', agora=()=>new Date().toISOString();
@@ -448,7 +448,7 @@
 
   /* ---------- Documentos e contratos ---------- */
   /* campos que o modelo pode usar; no texto ficam como {NOME}, {CPF}... */
-  const CAMPOS=[['NOME','Nome'],['CPF','CPF'],['FUNCAO','Função'],['SETOR','Setor'],['ADMISSAO','Admissão'],['VINCULO','Vínculo'],['EMPRESA','Empresa'],['CNPJ','CNPJ da empresa'],['CNPJ_PJ','CNPJ do PJ'],
+  const CAMPOS=[['NOME','Nome'],['CPF','CPF'],['FUNCAO','Função'],['SETOR','Setor'],['ADMISSAO','Admissão'],['VINCULO','Vínculo'],['EMPRESA','Empresa'],['CNPJ','CNPJ da empresa'],['CNPJ_PJ','CNPJ do PJ'],['RAZAO_PJ','Razão social do PJ (MEI)'],
     ['SALARIO','Salário'],['SALARIO_EXTENSO','Salário por extenso'],['JORNADA','Jornada'],['TELEFONE','Telefone'],['CIDADE','Cidade'],['DATA_HOJE','Data de hoje'],
     ['FERIAS_INICIO','Início das férias'],['FERIAS_FIM','Fim das férias'],['FERIAS_DIAS','Dias de férias'],['FERIAS_RETORNO','Volta das férias'],['PERIODO_AQUISITIVO','Período aquisitivo'],
     ['ULTIMA_TROCA','Última troca (PJ)'],['PROXIMA_TROCA','Próxima troca (PJ)'],['EXP_FIM_1','Fim da 1ª etapa (experiência)'],['EXP_FIM_2','Fim da experiência'],['DESLIGAMENTO','Data do desligamento'],
@@ -475,7 +475,7 @@
   const dataExt=d=>{ d=d||new Date(); return d.getDate()+' de '+MESES[d.getMonth()]+' de '+d.getFullYear(); };
   function valores(f,ex,fer){ ex=ex||{}; const g=k=>ex[k]!=null&&ex[k]!==''?ex[k]:f[k]; const e=EMP_DOC[f.tipo==='PJ'?f.empresa:'COLAFIX'], sal=numBR(g('salario')), pb=f.tipo==='PJ'?pjBase(f):'';
     return Object.assign(ocVals(f),{NOME:f.nome||'',CPF:fCPF(f.cpf),NASCIMENTO:br(f.nascimento),ENDERECO:[f.endereco,f.cep?'CEP '+f.cep:''].filter(Boolean).join(' · '),FUNCAO:g('funcao')||'',SETOR:g('setor')||'',ADMISSAO:br(g('admissao')),VINCULO:f.tipo==='PJ'?'PJ':'CLT',
-      EMPRESA:e?e.nome:empNome(f.empresa),CNPJ:e?e.cnpj:'',CNPJ_PJ:f.tipo==='PJ'&&f.cnpj?fCNPJ(f.cnpj):'',SALARIO:sal!=null?brl(sal):'',SALARIO_EXTENSO:sal!=null?extenso(sal):'',JORNADA:g('jornada')||'',TELEFONE:g('telefone')||'',
+      EMPRESA:e?e.nome:empNome(f.empresa),CNPJ:e?e.cnpj:'',CNPJ_PJ:f.tipo==='PJ'&&f.cnpj?fCNPJ(f.cnpj):'',RAZAO_PJ:f.tipo==='PJ'&&f.cnpj?fCNPJ(f.cnpj).slice(0,10)+' '+(f.nome||''):(f.nome||''), /* MEI: 8 primeiros números do CNPJ + nome */SALARIO:sal!=null?brl(sal):'',SALARIO_EXTENSO:sal!=null?extenso(sal):'',JORNADA:g('jornada')||'',TELEFONE:g('telefone')||'',
       CIDADE:R.cfg.cidade||'Cachoeirinha',DATA_HOJE:dataExt(),
       FERIAS_INICIO:fer?br(fer.inicio):'',FERIAS_FIM:fer?br(fer.fim):'',FERIAS_DIAS:fer?String(fer.dias):'',FERIAS_RETORNO:fer?br(fer.retorno):'',PERIODO_AQUISITIVO:fer?br(fer.aquisitivo)+' a '+br(fer.aquisitivoFim):'',
       ULTIMA_TROCA:pb?br(pb):'',PROXIMA_TROCA:pb?br(addMeses(pb,3)):'',EXP_FIM_1:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim1(f)):'',EXP_FIM_2:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim2(f)):'',
@@ -526,7 +526,7 @@
     const seg2=`<div class="seg" role="group" aria-label="Para quem">${[['','Uma pessoa'],['1','Várias pessoas']].map(([k,l])=>`<button data-act="rh-dlote" data-v="${k}" aria-pressed="${!!R.dg.lote===!!k}">${l}</button>`).join('')}</div>`;
     if(R.dv==='gerar') return topo(R.dg.lote?'Gerar para várias pessoas':'Gerar contrato','',seg2+seg,EY)+(R.dg.lote?vDocLote():vDocGerar());
     const ms=R.modelos.slice().sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR')), dm=R.dm;
-    return topo('Modelos de documento','Cadastre o padrão uma vez. Os campos entre chaves são preenchidos com os dados do funcionário.',seg+`<label class="btn sec" style="cursor:pointer">Importar do Word (.docx)<input type="file" id="rh-docx" accept=".docx" hidden></label><button class="btn" data-act="rh-dnovo">Novo modelo</button>`,EY)
+    return topo('Modelos de documento','Cadastre o padrão uma vez. Os campos entre chaves são preenchidos com os dados do funcionário.',seg+`<label class="btn sec" style="cursor:pointer">Importar do Word (.docx)<input type="file" id="rh-docx" accept=".docx" multiple hidden></label><button class="btn" data-act="rh-dnovo">Novo modelo</button>`,EY)
       +`<div class="rh-dg"><section class="card rh-dlist">${!R.lido.modelos?'<div class="empty">Carregando…</div>':ms.length?ms.map(x=>`<button class="rh-dm ${dm&&dm._id===x._id?'sel':''}" data-act="rh-ded" data-id="${x._id}"><b>${esc(x.nome)}</b><small>${esc(valeNome(x.vale))}${x.alteradoEm?' · atualizado em '+dmIso(x.alteradoEm):''}</small></button>`).join(''):'<div class="empty">Nenhum modelo ainda. Clique em <b>Novo modelo</b> ou importe um arquivo do Word.</div>'}</section>
       ${dm?`<section class="card rh-ded"><div class="rh-g2"><label><span class="label">Nome do modelo</span><input class="txt" id="rh-dnome" value="${esc(dm.nome||'')}" placeholder="ex.: Contrato de trabalho · CLT"></label>
           <label><span class="label">Vale para</span><select class="txt" id="rh-dvale">${VALE.map(([k,l])=>`<option value="${k}" ${(dm.vale||'TODOS')===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
@@ -1307,7 +1307,7 @@
       if(t.id==='rh-feri'&&R.ffer){ R.ffer.inicio=t.value; P.render(); return; }
       if(t.id==='rh-pjd'&&R.fpj){ R.fpj.data=t.value; P.render(); return; }
       if(t.id==='rh-dgg'){ R.dg.guardar=t.checked; return; }
-      if(t.id==='rh-docx'&&t.files&&t.files[0]){ const file=t.files[0]; t.value=''; await importarWord(file); return; }
+      if(t.id==='rh-docx'&&t.files&&t.files[0]){ const fs=[...t.files]; t.value=''; if(fs.length>1) await importarWords(fs); else await importarWord(fs[0]); return; }
       if(t.dataset&&t.dataset.rhAnx&&t.files&&t.files[0]){ const file=t.files[0], f=R.func.find(x=>x._id===t.dataset.rhAnx); t.value=''; if(!f) return;
         if(file.size>15e6) return P.toast('Arquivo grande demais (máximo 15 MB).'); P.toast('Enviando a ficha de '+f.nome+'…');
         const ext=(file.name.split('.').pop()||'pdf').toLowerCase(); await window.RHAPI.salvarFichaEscaneada(R.fmes,f.nome,await lerB64(file),file.type||'application/pdf',ext);
@@ -1608,6 +1608,15 @@
     }catch(e){ console.warn('[RH]',e); P.erro(e); } });
   function recarregaFichas(){ try{ if(frm) frm.contentWindow.location.reload(); }catch(e){} }
   /* modelo a partir de um arquivo do Word: {NOME}, {CPF}… no texto viram campos */
+  /* vários arquivos do Word de uma vez: cada um vira um modelo, já salvo (o nome do arquivo é o nome do modelo; quem já existe com o mesmo nome fica como está) */
+  async function importarWords(files){ let n=0; const ja=[], ruim=[]; try{ P.toast('Lendo '+files.length+' arquivos do Word…'); if(!window.mammoth) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+      for(const file of files){ const nome=file.name.replace(/\.docx$/i,'').replace(/_/g,' ').replace(/\s+/g,' ').trim(); if(R.modelos.some(x=>norm(x.nome)===norm(nome))){ ja.push(nome); continue; }
+        try{ const r=await window.mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()}); const html=limpar(r.value||''); const txt=html.replace(/<[^>]+>/g,''); if(!txt.trim()){ ruim.push(nome); continue; }
+          const semEmp=!/data-k="EMPRESA"/.test(html), vale=/ZENITH SOLU/i.test(txt)&&semEmp?'ZENITH':/NEXUS MANUTEN/i.test(txt)&&semEmp?'NEXUS':/data-k="(CNPJ_PJ|RAZAO_PJ)"/.test(html)?'PJ':/EMPREGAD[OA]|EXPERI[ÊE]NCIA/i.test(txt)?'CLT':'TODOS'; /* os campos já viraram <span data-k> */
+          await grava(COL.modelos+'/'+id(),{nome,vale,html,desliga:modeloDesliga({nome}),criadoEm:agora(),criadoPor:P.S.uid||null}); n++; }
+        catch(e){ console.warn('[RH] word',file.name,e); ruim.push(nome); } }
+      R.dv='modelos'; P.render(); P.toast(plural(n,'modelo cadastrado','modelos cadastrados')+(ja.length?' · já existiam: '+ja.join(', '):'')+(ruim.length?' · não consegui ler: '+ruim.join(', '):'')); }
+    catch(e){ console.warn('[RH] word',e); P.toast(e.message&&/carregar/.test(e.message)?e.message:'Não consegui ler os arquivos do Word.'); } }
   async function importarWord(file){ try{ P.toast('Lendo '+file.name+'…'); if(!window.mammoth) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
       const r=await window.mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()}); const html=limpar(r.value||''); if(!html.replace(/<[^>]+>/g,'').trim()) return P.toast('O arquivo está vazio.');
       const n=camposDe(html).length; R.dm={nome:file.name.replace(/\.docx$/i,''),vale:'TODOS',html}; R.dv='modelos'; P.render();
