@@ -1037,6 +1037,7 @@ async function iniciar(){
   S.db=db; S.dbOk=true;
   db.doc('sistema/importacao').onSnapshot(s=>{ S.sisImp=s.exists?s.data():null; rerenderSeguro(); },()=>{});
   db.doc('config/geral').onSnapshot(s=>{ if(s.exists){ const c=s.data(); S.cfg=Object.assign(JSON.parse(JSON.stringify(CFG_PADRAO)),c); rerenderSeguro(); } },()=>{});
+  db.doc('config/feriados').onSnapshot(s=>{ S.ferCal=s.exists?s.data():{}; if(S.anl) S.anl._c=null; rerenderSeguro(); },()=>{}); /* calendário de feriados (RH + produção) */
   assinaPorPerfil(db); setInterval(()=>assinaPorPerfil(db),400); /* cada login carrega só o que usa (cota grátis do Firebase) */
   render();
 }

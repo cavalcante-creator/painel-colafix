@@ -69,6 +69,33 @@ service cloud.firestore {
       allow read, write: if rhOk();
     }
 
+    // Ficha de admissão pelo celular (ficha.html?c=CÓDIGO, sem login): o RH cria o convite (código de 20 letras e números);
+    // a pessoa só lê o próprio convite e só CRIA a ficha e as fotos, uma vez, enquanto o convite vale. Não lê nada do RH.
+    match /rh/dados/convites/{t} {
+      allow get: if true;
+    }
+    match /rh/dados/fichascand/{t} {
+      allow create: if (semConta() || logado()) && t.matches('[a-z0-9]{20}')
+        && exists(/databases/$(database)/documents/rh/dados/convites/$(t))
+        && get(/databases/$(database)/documents/rh/dados/convites/$(t)).data.get('usado', false) != true
+        && request.time.toMillis() < get(/databases/$(database)/documents/rh/dados/convites/$(t)).data.get('ateMs', 0)
+        && request.resource.data.keys().hasOnly(['nome', 'cpf', 'nascimento', 'telefone', 'email', 'cep', 'rua', 'numero', 'complemento', 'bairro', 'cidade',
+             'camisa', 'calca', 'calcado', 'banco', 'agencia', 'conta', 'pix', 'emergNome', 'emergTel', 'obs', 'fotos', 'em'])
+        && request.resource.data.nome is string && request.resource.data.nome.size() >= 3 && request.resource.data.nome.size() <= 80
+        && request.resource.data.cpf is string && request.resource.data.cpf.matches('[0-9]{11}')
+        && request.resource.data.get('obs', '') is string && request.resource.data.get('obs', '').size() <= 400;
+    }
+    match /rh/dados/fichascandarq/{id} {
+      allow create: if (semConta() || logado())
+        && request.resource.data.keys().hasOnly(['c', 'n', 'nome', 'tipo', 'd', 'em'])
+        && request.resource.data.c is string && request.resource.data.c.matches('[a-z0-9]{20}')
+        && id.matches(request.resource.data.c + '-[0-9]{1,2}')
+        && exists(/databases/$(database)/documents/rh/dados/convites/$(request.resource.data.c))
+        && !exists(/databases/$(database)/documents/rh/dados/fichascand/$(request.resource.data.c))
+        && request.resource.data.nome is string && request.resource.data.nome.size() <= 60
+        && request.resource.data.d is string && request.resource.data.d.size() < 900000;
+    }
+
     // Chamado pelo QR da linha (sem login): só cria, com os campos do chamado.
     match /chamados/{id} {
       allow create: if semConta() && id.matches('q-[a-z0-9]+')
@@ -86,6 +113,11 @@ service cloud.firestore {
       allow create: if semConta() && id.matches('f-[a-z0-9]+')
         && request.resource.data.keys().hasOnly(['d', 'em', 'origem']) && request.resource.data.d is string
         && request.resource.data.d.size() < 760000;
+    }
+
+    // Calendário de feriados (RH + produção): todos os liberados leem (regra geral); o RH também grava.
+    match /config/feriados {
+      allow write: if rhOk();
     }
 
     // Lista de equipamentos da manutenção: o formulário do QR mostra os da linha.

@@ -61,7 +61,7 @@
     sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300)); sub('fer',()=>P.db().collection(COL.ferias).limit(3000));
     P.inscrever('rh-fm',()=>P.db().collection(COL.fm).orderBy('mes','desc').limit(14),snap=>{ snap.docs.forEach(d=>{ R.fm[d.id]=d.data(); }); R.lido.fm=true; P.rerender(); });
     P.inscrever('rh-cfg',()=>P.db().collection('rh').limit(5),snap=>{ const d=snap.docs.find(x=>x.id==='config'); R.cfg=d?d.data():{}; P.rerender(); });
-    const m=location.search.match(/[?&]rhfile=([^&]+)/); if(m){ R.arqAbrir=decodeURIComponent(m[1]); P.go('rhfichas'); } }
+    iniciarMais(); const m=location.search.match(/[?&]rhfile=([^&]+)/); if(m){ R.arqAbrir=decodeURIComponent(m[1]); P.go('rhfichas'); } }
 
   /* ---------- arquivos (PDF e fichas escaneadas) guardados em pedaços ---------- */
   const PEDACO=900000;
@@ -173,6 +173,7 @@
     tDocAvisos().forEach(({x,d,s})=>av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'Documento: '+d.nome+' · '+x.nome,s:s.t.toLowerCase()+(okIso(d.validade)?' ('+br(d.validade).slice(0,5)+')':''),act:`data-act="rh-tdoc" data-go-terc="1" data-id="${x._id}"`,l:'Abrir'}));
     const semFunc=ativos().filter(f=>!f.funcao);
     if(semFunc.length) av.push({c:'warn',r:'Atenção',t:semFunc.length+(semFunc.length===1?' funcionário sem função':' funcionários sem função'),s:'a ficha não tem itens: '+semFunc.slice(0,3).map(f=>f.nome).join(', ')+(semFunc.length>3?'…':''),act:'data-go="rhfunc"',l:'Resolver'});
+    avisosMais().forEach(a=>av.unshift(a));
     return av; }
   function barra(c,tot){ const p=n=>tot?(n/tot*100).toFixed(2):0; return `<div class="rh-bar" role="img" aria-label="${c.ass} assinadas, ${c.imp} falta assinar, ${c.nao} não geradas"><i class="ok" style="width:${p(c.ass)}%"></i><i class="warn" style="width:${p(c.imp)}%"></i></div>`; }
   const SVG={bolo:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0M12 12V8M12 5.5c.8-.8 1-1.7.5-2.5-.6.8-1.6 1.2-1.6 2.1 0 .6.5 1 1.1 1z"/></svg>',
@@ -180,6 +181,7 @@
     entra:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M4 12h11M11 8l4 4-4 4"/></svg>',
     praia:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21V9M4 9a8 8 0 0 1 16 0zM3 21h18"/></svg>',
     lupa2:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+    cel:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18h2"/></svg>',
     alerta:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17.5v.01"/></svg>'};
   /* Início em painel (13/10, 2ª versão): faixa de boas-vindas com o resumo do dia, números com gráfico pequeno, a semana, quem merece atenção hoje, avisos e gráficos */
   function barras(xs,tot,vazio){ if(!xs.length) return `<div class="sub" style="margin:0">${vazio||'Sem dados ainda.'}</div>`; const mx=Math.max(1,...xs.map(x=>x[1]));
@@ -199,9 +201,9 @@
     const av3=(f,cls)=>`<span class="rh-av3 ${cls||''}" title="${esc(titulo(f.nome))}">${esc(iniciais(f.nome).toUpperCase())}</span>`;
     const spark=`<div class="rh-spk" aria-hidden="true">${ind.meses.map((x,i)=>{ const mx=Math.max(1,...ind.meses.map(y=>y.n)), mn=Math.min(...ind.meses.map(y=>y.n)); return `<i style="height:${(18+((x.n-mn)/Math.max(1,mx-mn))*82).toFixed(0)}%${i===11?';background:var(--teal-strong)':''}" title="${esc(cap(mesLabel(x.m)))}: ${x.n}"></i>`; }).join('')}</div>`;
     const tile=(ic,cor,n,l,sub,extra,go)=>`<button class="rh-tile" ${go||''}><span class="rh-tic" style="background:${cor[0]};color:${cor[1]}">${ic}</span><span class="rh-tn num">${n}</span><span class="rh-tl2">${l}</span>${sub?`<small>${sub}</small>`:''}${extra||''}</button>`;
-    const TC={ferias:['#EAF2F6','#143F54'],exp:['#FBF4E6','#7A5410'],pj:['#EDE8F7','#402C78'],aniv:['#F6E3E1','#8E3A33'],casa:['#E3F0E8','#2F6047'],contrato:['#F5F1E8','#4A453C'],doc:['#F5F1E8','#4A453C'],desl:['#F6E3E1','#8E3A33']};
+    const TC={feriado:['#E3F0E8','#2F6047'],ferias:['#EAF2F6','#143F54'],exp:['#FBF4E6','#7A5410'],pj:['#EDE8F7','#402C78'],aniv:['#F6E3E1','#8E3A33'],casa:['#E3F0E8','#2F6047'],contrato:['#F5F1E8','#4A453C'],doc:['#F5F1E8','#4A453C'],desl:['#F6E3E1','#8E3A33']};
     const dia=d=>{ const xs=daSemana.filter(x=>x.data===d), dd=dU(d); return `<div class="rh-wd ${d===hj?'hj':''}"><div class="rh-wdh"><b>${d===hj?'Hoje':DIA_CURTO[dd.getUTCDay()]}</b><span class="num">${String(dd.getUTCDate()).padStart(2,'0')}/${d.slice(5,7)}</span></div>
-      ${xs.slice(0,3).map(x=>{ const c=TC[x.tipo]||TC.doc; return `<button class="rh-wc" ${x.act} style="background:${c[0]};color:${c[1]}" title="${esc(x.t+(x.s?' · '+x.s:''))}"><b>${esc(TIPO_AG[x.tipo]||'')}</b>${esc(x.t.replace(/^(Prazo para dar as férias de|Começam as férias de|Volta das férias de|Fim da 1ª etapa da experiência de|Fim da experiência de|Troca do PJ|Aniversário de|Último dia de|Fim do contrato de)\s*/,''))}</button>`; }).join('')}${xs.length>3?`<button class="lnk" data-go="rhagenda" style="font-size:12px">+${xs.length-3}</button>`:''}${xs.length?'':'<span class="rh-wv">—</span>'}</div>`; };
+      ${xs.slice(0,3).map(x=>{ const c=TC[x.tipo]||TC.doc; return `<button class="rh-wc" ${x.act} style="background:${c[0]};color:${c[1]}" title="${esc(x.t+(x.s?' · '+x.s:''))}"><b>${esc(TIPO_AG[x.tipo]||'')}</b>${esc(x.t.replace(/^(Prazo para dar as férias de|Começam as férias de|Volta das férias de|Fim da 1ª etapa da experiência de|Fim da experiência de|Troca do PJ|Aniversário de|Último dia de|Fim do contrato de|Feriado:)\s*/,''))}</button>`; }).join('')}${xs.length>3?`<button class="lnk" data-go="rhagenda" style="font-size:12px">+${xs.length-3}</button>`:''}${xs.length?'':'<span class="rh-wv">—</span>'}</div>`; };
     const porSet={}; at.forEach(f=>{ const k=f.setor||'Sem setor'; porSet[k]=(porSet[k]||0)+1; }); let setores=Object.entries(porSet).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'pt-BR'));
     if(setores.length>7){ const resto=setores.slice(6).reduce((a,x)=>a+x[1],0); setores=setores.slice(0,6).concat([['Outros setores',resto]]); }
     const faixas=[['Menos de 1 ano',0,1],['1 a 2 anos',1,3],['3 a 4 anos',3,5],['5 a 9 anos',5,10],['10 anos ou mais',10,99]], casa=faixas.map(([l,a,b])=>[l,at.filter(f=>okIso(f.admissao)&&tempoDe(f.admissao).a>=a&&tempoDe(f.admissao).a<b).length]).filter(x=>x[1]);
@@ -228,7 +230,7 @@
           <div class="rh-stkl"><span><i></i>CLT · ${nCLT}</span><span><i class="pj"></i>PJ · ${nPJ}</span></div>
           <h2 style="margin-top:18px">Por setor</h2>${barras(setores,at.length,'Cadastre os setores.')}
           <h2 style="margin-top:18px">Tempo de casa</h2>${barras(casa,at.length,'Sem datas de admissão.')}</section></div>
-      ${cartaoAniv()}<section class="card"><h2>Atalhos</h2><div class="rh-ats2">${atl(P.ic('mais',20,2.2),'Nova admissão','cadastro, documentos, contrato e ficha','data-act="rh-admnova"')}${atl(P.ic('folha',20,2),'Gerar documento','contratos, avisos e termos','data-go="rhdocs"')}${atl(P.ic('calendario',20,2),'Mapa de férias','o ano de todo mundo','data-act="rh-pzabrir" data-v="mapa"')}${atl(P.ic('grafico',20,2),'Indicadores','para a diretoria','data-act="rh-agind"')}${atl(P.ic('lista',20,2),'Relatório do mês','para a contabilidade','data-act="rh-agrel"')}${atl(SVG.gente,'Terceirizados',plural(tAt,'contrato ativo','contratos ativos')+(tV?' · '+tV+' vencendo':''),'data-go="rhterc"')}</div></section>`; }
+      ${cartaoPerg()}${cartaoAniv()}<section class="card"><h2>Atalhos</h2><div class="rh-ats2">${atl(P.ic('mais',20,2.2),'Nova admissão','cadastro, documentos, contrato e ficha','data-act="rh-admnova"')}${atl(P.ic('folha',20,2),'Gerar documento','contratos, avisos e termos','data-go="rhdocs"')}${atl(SVG.cel,'Ficha pelo celular','a pessoa preenche e manda os documentos','data-act="rh-convnovo"')}${atl(P.ic('calendario',20,2),'Mapa de férias','o ano de todo mundo','data-act="rh-pzabrir" data-v="mapa"')}${atl(P.ic('grafico',20,2),'Indicadores','para a diretoria','data-act="rh-agind"')}${atl(P.ic('lista',20,2),'Relatório do mês','para a contabilidade','data-act="rh-agrel"')}${atl(SVG.gente,'Terceirizados',plural(tAt,'contrato ativo','contratos ativos')+(tV?' · '+tV+' vencendo':''),'data-go="rhterc"')}</div></section>`; }
 
   /* ---------- Fichas do mês ---------- */
   function vFichas(){ if(!R.fmes||R.fmes<FDESDE()) R.fmes=fichasMesIni(); const m=R.fmes, hoje=fichasMesIni(); escCarregar(m);
@@ -283,7 +285,7 @@
     const cnt=s=>R.func.filter(x=>x.status===s).length;
     const fseg=`<div class="seg" role="group" aria-label="Como ver">${[['lista','Lista'],['setor','Por setor'],['adm','Admissões']].map(([k,l])=>`<button data-act="rh-fview" data-v="${k}" aria-pressed="${(R.fview||'lista')===k}">${l}</button>`).join('')}</div>`;
     if(R.fview==='setor'||R.fview==='adm') return topo('Funcionários',R.fview==='adm'?'Quem está entrando e em que etapa: documentos, contrato e ficha, experiência.':'Quem é quem: as pessoas de cada setor.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button>`)
-      +(R.fdesl?formDesl():'')+(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':R.fview==='adm'?vQuadroAdm():vOrg());
+      +(R.fdesl?formDesl():'')+(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':R.fview==='adm'?cartaoFichasCel()+vQuadroAdm():vOrg());
     return topo('Funcionários','Cadastro, situação e o que cada um usa.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-csv">Exportar</button>`)
       +(R.carga?vCarga():'')+(R.adm&&!R.f?vAdm():'')+(R.fdesl?formDesl():'')+(R.f?formFunc():'')
       +`<div class="rh-kpi">${ST.map(s=>`<div><b class="num">${cnt(s)}</b><span>${s}</span></div>`).join('')}</div>
@@ -311,6 +313,8 @@
         ${f.status==='Desligado'?i('desligamento','Data do desligamento','date')+`<label><span class="label">Motivo do desligamento</span><input class="txt" data-rh-f="desligMotivo" list="rh-motivos2" value="${esc(f.desligMotivo||'')}"><datalist id="rh-motivos2">${MOTIVOS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label>`:''}
         ${i('telefone','Telefone','tel')}${i('camisa','Tamanho da camisa')}${i('calca','Tamanho da calça')}${i('calcado','Número do calçado')}
         <label><span class="label">Salário (para os contratos)</span><input class="txt" data-rh-f="salario" inputmode="decimal" placeholder="R$ 0,00" value="${esc(f.salario!=null&&f.salario!==''?brl(f.salario):'')}"></label>${i('jornada','Jornada (para os contratos)','text','placeholder="ex.: 44 horas semanais"')}</div>
+      <details class="rh-mais" ${['endereco','cep','email','banco','agencia','conta','pix','emergencia'].some(k=>f[k])?'open':''}><summary>Endereço, banco e contato de emergência</summary><div class="rh-g" style="margin-top:8px">${i('endereco','Endereço (rua, nº, bairro, cidade)')}${i('cep','CEP','text','inputmode="numeric" maxlength="9"')}${i('email','E-mail','email')}
+        ${i('banco','Banco')}${i('agencia','Agência','text','inputmode="numeric"')}${i('conta','Conta','text','inputmode="numeric"')}${i('pix','Chave PIX')}${i('emergencia','Contato de emergência (nome e telefone)')}</div></details>
       <label style="display:block;margin-top:10px"><span class="label">Observações</span><textarea class="txt" data-rh-f="obs" rows="2">${esc(f.obs||'')}</textarea></label>
       ${f.desligAgendado&&okIso(f.desligamento)&&f.status!=='Desligado'?`<div class="banner" style="background:var(--crit-tint);color:var(--crit-ink);margin:12px 0 0;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Desligamento marcado para <b>${br(f.desligamento)}</b>${f.desligMotivo?' · '+esc(f.desligMotivo):''}. Até lá continua ativo.</span><button class="lnk" data-act="rh-desagx" data-id="${f._id}">Cancelar desligamento</button></div>`:''}
       ${f._id?docsDaPessoa(f._id):''}
@@ -321,11 +325,11 @@
       ${xs.length?xs.slice(0,8).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>gerado em ${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' por '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join(''):'<div class="sub" style="margin:4px 0 0">Nenhum documento gerado ainda.</div>'}</div>`; }
 
   /* ---------- Cadastros do RH (pedido de 13/10): funções e EPIs, setores, configurações ---------- */
-  const cadSeg=()=>`<div class="seg" role="group" aria-label="Cadastros">${[['funcoes','Funções e EPIs'],['setores','Setores'],['config','Configurações']].map(([k,l])=>`<button data-act="rh-cad" data-v="${k}" aria-pressed="${R.cad===k}">${l}</button>`).join('')}</div>`;
+  const cadSeg=()=>`<div class="seg" role="group" aria-label="Cadastros">${[['funcoes','Funções e EPIs'],['setores','Setores'],['feriados','Feriados'],['config','Configurações']].map(([k,l])=>`<button data-act="rh-cad" data-v="${k}" aria-pressed="${R.cad===k}">${l}</button>`).join('')}</div>`;
   const setoresCad=()=>(Array.isArray(R.cfg.setores)?R.cfg.setores:[]).slice().sort((a,b)=>a.localeCompare(b,'pt-BR'));
   const FDESDE=()=>/^\d{4}-\d{2}$/.test(R.cfg.fichasDesde||'')?R.cfg.fichasDesde:'2026-11';
   const fichasMesIni=()=>{ const h=P.hojeStr().slice(0,7), d=FDESDE(); return h<d?d:h; };
-  function vCadastros(){ if(R.cad==='setores') return vSetores(); if(R.cad==='config') return vCfgRH(); return vFuncoes(); }
+  function vCadastros(){ if(R.cad==='feriados') return vFeriados(); if(R.cad==='setores') return vSetores(); if(R.cad==='config') return vCfgRH(); return vFuncoes(); }
   function vSetores(){ const cad=setoresCad(), usados=unicos('setor'), fora=usados.filter(n=>!cad.some(c=>norm(c)===norm(n))), qt=n=>R.func.filter(f=>f.status!=='Desligado'&&norm(f.setor)===norm(n)).length;
     return topo('Cadastros do RH','Os setores aparecem para escolher no cadastro do funcionário, nos filtros e nas fichas por setor.',cadSeg())
       +(fora.length?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span>Setores usados nos cadastros e ainda não cadastrados: <b>${esc(fora.join(', '))}</b></span><button class="btn sec rh-sm" data-act="rh-setall">Cadastrar todos</button></div>`:'')
@@ -399,7 +403,8 @@
   const CAMPOS=[['NOME','Nome'],['CPF','CPF'],['FUNCAO','Função'],['SETOR','Setor'],['ADMISSAO','Admissão'],['VINCULO','Vínculo'],['EMPRESA','Empresa'],['CNPJ','CNPJ da empresa'],['CNPJ_PJ','CNPJ do PJ'],
     ['SALARIO','Salário'],['SALARIO_EXTENSO','Salário por extenso'],['JORNADA','Jornada'],['TELEFONE','Telefone'],['CIDADE','Cidade'],['DATA_HOJE','Data de hoje'],
     ['FERIAS_INICIO','Início das férias'],['FERIAS_FIM','Fim das férias'],['FERIAS_DIAS','Dias de férias'],['FERIAS_RETORNO','Volta das férias'],['PERIODO_AQUISITIVO','Período aquisitivo'],
-    ['ULTIMA_TROCA','Última troca (PJ)'],['PROXIMA_TROCA','Próxima troca (PJ)'],['EXP_FIM_1','Fim da 1ª etapa (experiência)'],['EXP_FIM_2','Fim da experiência'],['DESLIGAMENTO','Data do desligamento']];
+    ['ULTIMA_TROCA','Última troca (PJ)'],['PROXIMA_TROCA','Próxima troca (PJ)'],['EXP_FIM_1','Fim da 1ª etapa (experiência)'],['EXP_FIM_2','Fim da experiência'],['DESLIGAMENTO','Data do desligamento'],
+    ['NASCIMENTO','Nascimento'],['ENDERECO','Endereço'],['OCORRENCIA_DATA','Data da ocorrência'],['OCORRENCIA_TIPO','Tipo da ocorrência'],['OCORRENCIA_MOTIVO','Motivo da ocorrência'],['OCORRENCIA_TESTEMUNHAS','Testemunhas da ocorrência'],['SUSPENSAO_DIAS','Dias de suspensão']];
   const CAMPOS_FER=['FERIAS_INICIO','FERIAS_FIM','FERIAS_DIAS','FERIAS_RETORNO','PERIODO_AQUISITIVO'];
   const CAMPO_NOME=k=>(CAMPOS.find(x=>x[0]===k)||[k,k])[1];
   /* o que pode faltar no cadastro (preenche na hora de gerar) */
@@ -421,14 +426,14 @@
     if(r) p.push(inteiroExt(r)+(r%1e6===0?' de reais':r===1?' real':' reais')); if(c) p.push(ate999(c)+(c===1?' centavo':' centavos')); return p.join(' e ')||'zero real'; }
   const dataExt=d=>{ d=d||new Date(); return d.getDate()+' de '+MESES[d.getMonth()]+' de '+d.getFullYear(); };
   function valores(f,ex,fer){ ex=ex||{}; const g=k=>ex[k]!=null&&ex[k]!==''?ex[k]:f[k]; const e=EMP_DOC[f.tipo==='PJ'?f.empresa:'COLAFIX'], sal=numBR(g('salario')), pb=f.tipo==='PJ'?pjBase(f):'';
-    return {NOME:f.nome||'',CPF:fCPF(f.cpf),FUNCAO:g('funcao')||'',SETOR:g('setor')||'',ADMISSAO:br(g('admissao')),VINCULO:f.tipo==='PJ'?'PJ':'CLT',
+    return Object.assign(ocVals(f),{NOME:f.nome||'',CPF:fCPF(f.cpf),NASCIMENTO:br(f.nascimento),ENDERECO:[f.endereco,f.cep?'CEP '+f.cep:''].filter(Boolean).join(' · '),FUNCAO:g('funcao')||'',SETOR:g('setor')||'',ADMISSAO:br(g('admissao')),VINCULO:f.tipo==='PJ'?'PJ':'CLT',
       EMPRESA:e?e.nome:empNome(f.empresa),CNPJ:e?e.cnpj:'',CNPJ_PJ:f.tipo==='PJ'&&f.cnpj?fCNPJ(f.cnpj):'',SALARIO:sal!=null?brl(sal):'',SALARIO_EXTENSO:sal!=null?extenso(sal):'',JORNADA:g('jornada')||'',TELEFONE:g('telefone')||'',
       CIDADE:R.cfg.cidade||'Gravataí',DATA_HOJE:dataExt(),
       FERIAS_INICIO:fer?br(fer.inicio):'',FERIAS_FIM:fer?br(fer.fim):'',FERIAS_DIAS:fer?String(fer.dias):'',FERIAS_RETORNO:fer?br(fer.retorno):'',PERIODO_AQUISITIVO:fer?br(fer.aquisitivo)+' a '+br(fer.aquisitivoFim):'',
       ULTIMA_TROCA:pb?br(pb):'',PROXIMA_TROCA:pb?br(addMeses(pb,3)):'',EXP_FIM_1:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim1(f)):'',EXP_FIM_2:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim2(f)):'',
-      DESLIGAMENTO:okIso(f.desligamento)?br(f.desligamento):okIso(R.dg.deslData)?br(R.dg.deslData):''}; }
+      DESLIGAMENTO:okIso(f.desligamento)?br(f.desligamento):okIso(R.dg.deslData)?br(R.dg.deslData):''}); }
   const EX_FER={inicio:'2026-11-03',fim:'2026-11-22',dias:20,retorno:'2026-11-23',aquisitivo:'2025-03-10',aquisitivoFim:'2026-03-09'};
-  const EXEMPLO={nome:'MARIA DA SILVA',cpf:'00000000000',funcao:'Operadora de produção',setor:'Linha 1',admissao:'2024-03-10',tipo:'CLT',empresa:'COLAFIX',salario:2150,jornada:'44 horas semanais',telefone:'(51) 90000-0000'};
+  const EXEMPLO={nome:'MARIA DA SILVA',cpf:'00000000000',nascimento:'1990-04-12',endereco:'Rua das Flores, 120 · Centro · Gravataí',funcao:'Operadora de produção',setor:'Linha 1',admissao:'2024-03-10',tipo:'CLT',empresa:'COLAFIX',salario:2150,jornada:'44 horas semanais',telefone:'(51) 90000-0000'};
   const tkHTML=k=>`<span class="rh-tk" contenteditable="false" data-k="${k}">${esc(CAMPO_NOME(k))}</span>`;
   /* campo perguntado: no Word {?Data de início das férias}; o painel pergunta na hora de gerar */
   const tqHTML=q=>`<span class="rh-tq" contenteditable="false" data-q="${esc(q)}">? ${esc(q)}</span>`;
@@ -544,7 +549,7 @@
       if(Object.keys(up).length){ await grava(COL.func+'/'+f._id,up); Object.assign(f,up); G.extra={}; } }
     const fe=ferSel(f), resp={}; perguntasDe(md.html).forEach(q=>{ resp[q]=String(G.resp[q]||'').trim(); });
     const chave=f._id+'|'+md._id+'|'+JSON.stringify([valores(f,G.extra,fe),resp]); if(G.reg===chave) return; G.reg=chave;
-    await P.db().doc(COL.docs+'/'+id()).set(Object.assign({funcId:f._id,funcionario:f.nome,modeloId:md._id,modelo:md.nome,acao,em:agora(),por:P.S.uid||null,porNome:eu()},fe?{feriasId:fe._id}:{},Object.keys(resp).length?{respostas:resp}:{})); }
+    await P.db().doc(COL.docs+'/'+id()).set(Object.assign({funcId:f._id,funcionario:f.nome,modeloId:md._id,modelo:md.nome,acao,em:agora(),por:P.S.uid||null,porNome:eu()},fe?{feriasId:fe._id}:{},G.ocId?{ocId:G.ocId}:{},Object.keys(resp).length?{respostas:resp}:{})); }
 
   /* ---------- Férias e prazos (12/10, pedido da RH) ----------
      CLT: períodos de férias contados da admissão (12 meses para adquirir, mais 12 para conceder). As férias podem ser
@@ -647,7 +652,7 @@
         <label><span class="label">Início das férias</span><input class="txt" type="date" id="rh-feri" value="${esc(g.inicio||'')}"></label>
         <label><span class="label">Quantos dias</span><input class="txt" type="number" min="1" max="${p.saldo}" id="rh-ferd" inputmode="numeric" value="${esc(g.dias||'')}"></label></div>
         <div class="rh-chips" style="margin:10px 0 0">${[10,15,20,30].filter(n=>n<=p.saldo).map(n=>`<button class="rh-chip2" data-act="rh-ferdias" data-v="${n}" aria-pressed="${dias===n}">${n} dias</button>`).join('')}${p.saldo<30&&![10,15,20].includes(p.saldo)?`<button class="rh-chip2" data-act="rh-ferdias" data-v="${p.saldo}" aria-pressed="${dias===p.saldo}">O que falta: ${p.saldo} dias</button>`:''}</div>
-        <div class="sub" style="margin:10px 0 0">${fim?`Termina em <b>${br(fim)}</b> e volta ao trabalho em <b>${br(ret)}</b>.`:'Escolha o início e quantos dias.'}${!p.completo?' Este período ainda não se completou ('+br(p.fim)+').':''}</div>
+        <div class="sub" style="margin:10px 0 0">${fim?`Termina em <b>${br(fim)}</b> e volta ao trabalho em <b>${br(ret)}</b>.`:'Escolha o início e quantos dias.'}${!p.completo?' Este período ainda não se completou ('+br(p.fim)+').':''}</div>${ferInicioAviso(g.inicio)}
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn sec" data-act="rh-ferx">Cancelar</button><button class="btn" data-act="rh-fersalvar" ${R.salv?'disabled':''}>Marcar férias</button></div>`
       :'<div class="empty">Nenhum período com dias de férias em aberto.</div>'}
       ${hist.length?`<div class="rh-docs"><span class="label">JÁ MARCADAS OU TIRADAS</span>${hist.slice(0,8).map(x=>`<div class="rh-dl"><div><b>${x.anterior?'Tiradas antes do painel':br(x.inicio)+' a '+br(x.fim)}</b><small>${plural(+x.dias,'dia','dias')} · período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}${x.porNome?' · '+esc(x.porNome):''}</small></div>${x.anterior?'':temAviso(x)?'<span class="pill ok">Aviso gerado</span>':`<button class="lnk" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}</div>`).join('')}</div>`:''}</section>`; }
@@ -695,7 +700,7 @@
         <div class="sub" style="margin:10px 0 0">Depois de escolher, coloque a data e o motivo. Dá para gerar o aviso ou a rescisão na hora.</div></section>`; }
     return `<section class="card rh-form" style="border-color:var(--crit)"><div class="head" style="align-items:baseline"><h2>Desligar ${esc(f.nome)}</h2><button class="lnk" data-act="rh-deslx">Fechar</button></div>
       <div class="rh-g"><label><span class="label">Data do desligamento</span><input class="txt" type="date" id="rh-desd" value="${esc(g.data||P.hojeStr())}"></label>
-        <label style="grid-column:span 2"><span class="label">Motivo</span><input class="txt" id="rh-desm" list="rh-motivos" value="${esc(g.motivo||'')}" placeholder="escolha ou escreva"><datalist id="rh-motivos">${MOTIVOS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label></div>
+        <label style="grid-column:span 2"><span class="label">Motivo</span><input class="txt" id="rh-desm" list="rh-motivos" value="${esc(g.motivo||'')}" placeholder="escolha ou escreva"><datalist id="rh-motivos">${MOTIVOS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label></div>${deslDevolver(f)}
       <div class="sub" style="margin:10px 0 0">Fica como <b>Desligado</b> na data (se a data for no futuro, como no aviso trabalhado, continua ativo até lá). Continua nas fichas do mês em que saiu e some a partir do mês seguinte. Para o documento (aviso, rescisão), use <b>Gerar documento</b>.</div>
       <div style="display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-act="rh-dgpara" data-id="${f._id}">Gerar documento</button><div style="display:flex;gap:10px"><button class="btn sec" data-act="rh-deslx">Cancelar</button><button class="btn" data-act="rh-deslsalvar" style="background:var(--crit);border-color:var(--crit)" ${R.salv?'disabled':''}>Desligar</button></div></div></section>`; }
   /* data no futuro (aviso trabalhado): continua ativo e vira Desligado sozinho no dia (desligAgendado) */
@@ -749,7 +754,7 @@
   const naData=(y,md)=>{ if(md==='02-29'&&!bissexto(y)) md='02-28'; return y+'-'+md; };
   function proxAniv(iso){ const hj=P.hojeStr(), y=+hj.slice(0,4), md=iso.slice(5); let d=naData(y,md); if(d<hj) d=naData(y+1,md); return d; }
   const DIA_CURTO=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  const TIPO_AG={ferias:'Férias',exp:'Experiência',pj:'Troca do PJ',contrato:'Contrato',doc:'Documento',aniv:'Aniversário',casa:'Tempo de casa',desl:'Desligamento',adm:'Admissão'};
+  const TIPO_AG={feriado:'Feriado',ferias:'Férias',exp:'Experiência',pj:'Troca do PJ',contrato:'Contrato',doc:'Documento',aniv:'Aniversário',casa:'Tempo de casa',desl:'Desligamento',adm:'Admissão'};
 
   /* ---------- Agenda ---------- */
   function agendaItens(){ const it=[], add=(data,tipo,t,s,c,act,uid)=>{ if(okIso(data)) it.push({data,tipo,t,s:s||'',c:c||'neu',act:act||'',uid}); };
@@ -767,6 +772,7 @@
       add(x.retorno,'ferias','Volta das férias de '+x.funcionario,'','neu',pz('ferias'),'ferr-'+x._id); });
     R.terc.filter(x=>x.status!=='Encerrado').forEach(x=>{ const s=tSit(x); if(x.fim) add(x.fim,'contrato','Fim do contrato de '+x.nome,x.empresa||'',s.c==='ok'?'neu':s.c,`data-act="rh-ted" data-go-terc="1" data-id="${x._id}"`,'terc-'+x._id+'-'+x.fim);
       tDocs(x).forEach(d=>{ const ds=docSit(d); if(okIso(d.validade)) add(d.validade,'doc','Vence '+d.nome+' de '+x.nome,'terceirizado',ds.c==='ok'?'neu':ds.c,`data-act="rh-tdoc" data-go-terc="1" data-id="${x._id}"`,'tdoc-'+x._id+'-'+d.id); }); });
+    { const y0=+P.hojeStr().slice(0,4); [y0,y0+1].forEach(y=>ferAno(y).forEach(x=>add(x.data,'feriado','Feriado: '+x.nome,ferTipoNome(x.tipo),'neu','data-act="rh-cad" data-go-cad="1" data-v="feriados"','fer-'+x.data))); }
     return it.sort((a,b)=>a.data.localeCompare(b.data)||a.t.localeCompare(b.t)); }
   function agendaJanela(){ const hj=P.hojeStr(), ate=addDias(hj,R.agDias), xs=agendaItens();
     return {atras:xs.filter(x=>x.data<hj&&(x.c==='crit'||x.c==='warn')),prox:xs.filter(x=>x.data>=hj&&x.data<=ate)}; }
@@ -858,6 +864,8 @@
     (f.trocas||[]).forEach(x=>add(x.data,'Troca do PJ',x.obs||'','purple'));
     R.docs.filter(d=>d.funcId===f._id).forEach(d=>add(d.em,d.modelo||'Documento',d.assinado?'gerado e assinado':'gerado','teal'));
     Object.keys(R.fm).forEach(m=>{ const a=((R.fm[m]||{}).assinadas||{})[f._id]; if(a) add(okIso(String(a.em||'').slice(0,10))?a.em:m+'-01','Ficha de EPI de '+mesNome(m)+' assinada','escaneada e guardada','ok'); });
+    ocDe(f._id).forEach(x=>add(x.data,x.tipo+(x.dias?' · '+plural(+x.dias,'dia','dias'):''),x.motivo||'',ocCor(x.tipo)==='ok'?'ok':ocCor(x.tipo)==='neu'?'teal':'crit'));
+    empDe(f._id).forEach(x=>{ add(x.desde||x.em,'Recebeu: '+empTxt(x),'item emprestado','purple'); if(x.devolvido) add(x.devolvido,'Devolveu: '+empTxt(x),'','ok'); });
     if(okIso(f.desligamento)&&(f.status==='Desligado'||f.desligAgendado)) add(f.desligamento,f.status==='Desligado'?'Desligamento':'Desligamento marcado',f.desligMotivo||'','crit');
     return ev.sort((a,b)=>b.d.localeCompare(a.d)); }
   function vPessoa(){ const f=R.func.find(x=>x._id===R.pess); if(!f) return '<section class="card"><div class="empty">Funcionário não encontrado.</div></section>';
@@ -871,7 +879,7 @@
         <div class="rh-acoes"><button class="btn sec" data-act="rh-pessx">‹ Funcionários</button></div></div>
       <div class="rh-pf"><aside class="card rh-pfa"><span class="rh-av2">${esc(iniciais(f.nome).toUpperCase())}</span><b class="rh-pfn">${esc(titulo(f.nome))}</b><div class="rh-pfc">${chips}</div>
           ${okIso(f.admissao)?`<div class="rh-pft"><b>${esc(tempoTxt(f.admissao))}</b><span>de casa · desde ${br(f.admissao)}</span></div>`:''}
-          <dl class="rh-pfd">${linha(docRot(f),esc(docF(f)))}${linha('Telefone',esc(f.telefone||''))}${linha('Aniversário',okIso(f.nascimento)?br(f.nascimento).slice(0,5)+' · '+idade+' anos':'')}${linha('Salário',f.salario!==''&&f.salario!=null?esc(brl(f.salario)):'')}${linha('Jornada',esc(f.jornada||''))}
+          <dl class="rh-pfd">${linha(docRot(f),esc(docF(f)))}${linha('Telefone',esc(f.telefone||''))}${linha('Aniversário',okIso(f.nascimento)?br(f.nascimento).slice(0,5)+' · '+idade+' anos':'')}${linha('Salário',f.salario!==''&&f.salario!=null?esc(brl(f.salario)):'')}${linha('Jornada',esc(f.jornada||''))}${linha('Endereço',esc([f.endereco,f.cep?'CEP '+f.cep:''].filter(Boolean).join(' · ')))}${linha('Banco',esc([f.banco,f.agencia?'ag. '+f.agencia:'',f.conta?'conta '+f.conta:'',f.pix?'PIX '+f.pix:''].filter(Boolean).join(' · ')))}${linha('Emergência',esc(f.emergencia||''))}
             ${linha('Tamanhos',esc([f.camisa?'camisa '+f.camisa:'',f.calca?'calça '+f.calca:'',f.calcado?'calçado '+f.calcado:''].filter(Boolean).join(' · ')))}${f.status==='Desligado'?linha('Saiu em',br(f.desligamento)):f.desligAgendado?linha('Sai em',br(f.desligamento)):''}</dl>
           ${f.obs?`<div class="sub" style="margin:0;font-size:13px;text-align:left">${esc(f.obs)}</div>`:''}
           <div class="rh-pfb"><button class="btn" data-act="rh-dgpara" data-id="${f._id}">Gerar documento</button><button class="btn sec" data-act="rh-ed" data-id="${f._id}">Editar cadastro</button></div></aside>
@@ -887,7 +895,7 @@
           <section class="card"><div class="rh-ch"><h2>EPI e uniforme</h2><span class="pill ${fs.c}">${esc(fs.t)}</span></div>
             ${fc&&((fc.epis||[]).length||(fc.uniformes||[]).length)?`<div class="rh-pfl">${(fc.epis||[]).map(x=>`<div><span>${esc(x.nome)}</span><small>${x.ca?'CA '+esc(x.ca):''}</small></div>`).join('')}${(fc.uniformes||[]).map(x=>`<div><span>${esc(x.nome)}</span><small>uniforme</small></div>`).join('')}</div>`:`<div class="sub" style="margin:8px 0 0">${f.funcao?'A função "'+esc(f.funcao)+'" ainda não tem EPIs cadastrados.':'Sem função no cadastro.'}</div>`}
             <div style="margin-top:8px"><button class="lnk" data-act="rh-fabrir">Abrir as fichas do mês</button></div></section>
-          <section class="card">${docsDaPessoa(f._id).replace('class="rh-docs"','class="rh-docs" style="margin:0;padding:0;border:0"')}</section></div></div>`; }
+          ${cartaoEmp(f)}${cartaoOc(f)}<section class="card">${docsDaPessoa(f._id).replace('class="rh-docs"','class="rh-docs" style="margin:0;padding:0;border:0"')}</section></div></div>`; }
   function buscaPessoas(q){ q=norm(q); const d=dig(q); if(q.length<2) return []; return R.func.filter(f=>norm(f.nome).includes(q)||(d.length>=3&&(dig(f.cpf).includes(d)||(f.cnpj&&dig(f.cnpj).includes(d))))).sort((a,b)=>(a.status==='Desligado')-(b.status==='Desligado')||a.nome.localeCompare(b.nome,'pt-BR')).slice(0,6); }
   function cartaoBusca(){ const xs=buscaPessoas(R.buscaIni);
     return `<section class="card rh-bus"><label class="rh-busl"><span class="label">BUSCAR FUNCIONÁRIO</span><input class="txt" id="rh-bus" placeholder="nome, CPF ou CNPJ" value="${esc(R.buscaIni)}" autocomplete="off"></label>
@@ -1013,10 +1021,172 @@
       for(const per of o.fer){ await P.db().doc(COL.ferias+'/'+id()).set({funcId:o.f._id,funcionario:o.f.nome,aquisitivo:per.ini,aquisitivoFim:per.fim,dias:per.saldo,anterior:true,status:'tirada',origem:'carga',em:agora(),por:P.S.uid||null,porNome:eu()}); nf++; } }
     return {n,nf,nn}; }
 
+  /* ===================== MAIS IDEIAS DO RH (13/10) =====================
+     Ocorrências e advertências · itens emprestados · perguntas rápidas no Início · feriados · ficha de admissão pelo celular */
+  Object.assign(COL,{oc:'rh/dados/ocorrencias',emp:'rh/dados/emprestimos',conv:'rh/dados/convites',fcand:'rh/dados/fichascand',fcarq:'rh/dados/fichascandarq'});
+  Object.assign(R,{oc:[],emp:[],fcand:[],conv:[],foc:null,femp:null,perg:null,convM:null,ferAno:+P.hojeStr().slice(0,4)});
+  function iniciarMais(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); });
+    sub('oc',()=>P.db().collection(COL.oc).orderBy('data','desc').limit(1000)); sub('emp',()=>P.db().collection(COL.emp).limit(1000));
+    sub('fcand',()=>P.db().collection(COL.fcand).orderBy('em','desc').limit(30)); sub('conv',()=>P.db().collection(COL.conv).orderBy('criado','desc').limit(40)); }
+
+  /* ---------- Ocorrências e advertências (só o RH vê) ---------- */
+  const OC_TIPOS=['Ocorrência (só anotação)','Advertência verbal','Advertência escrita','Suspensão','Elogio'];
+  const ocDe=fid=>R.oc.filter(x=>x.funcId===fid&&!x.removido).sort((a,b)=>String(b.data).localeCompare(String(a.data)));
+  const ocCor=t=>/SUSPENS/.test(norm(t))?'crit':/ADVERT/.test(norm(t))?'warn':/ELOGIO/.test(norm(t))?'ok':'neu';
+  const ocPedeDoc=t=>/ADVERT|SUSPENS/.test(norm(t));
+  function ocVals(f){ const x=!f._id?{data:'2026-11-05',tipo:'Advertência escrita',motivo:'Chegou atrasado três vezes na semana sem avisar.',testemunhas:'João da Silva',dias:''}:(R.oc.find(o=>o._id===R.dg.ocId&&o.funcId===f._id)||ocDe(f._id)[0]||null);
+    return {OCORRENCIA_DATA:x?br(x.data):'',OCORRENCIA_TIPO:x?x.tipo||'':'',OCORRENCIA_MOTIVO:x?x.motivo||'':'',OCORRENCIA_TESTEMUNHAS:x?x.testemunhas||'':'',SUSPENSAO_DIAS:x&&x.dias?String(x.dias):''}; }
+  function cartaoOc(f){ const xs=ocDe(f._id), g=R.foc&&R.foc.funcId===f._id?R.foc:null;
+    return `<section class="card rh-occ"><div class="rh-ch"><h2>Ocorrências</h2><span class="sub" style="margin:0;font-size:12px">só o RH vê</span></div>
+      ${xs.length?xs.slice(0,6).map(x=>{ const gd=R.docs.some(d=>d.ocId===x._id); return `<div class="rh-dl"><div><b><span class="pill ${ocCor(x.tipo)}" style="margin-right:6px">${esc(x.tipo)}</span>${br(x.data)}</b><small>${esc(x.motivo||'')}${x.dias?' · '+plural(+x.dias,'dia','dias'):''}${x.testemunhas?' · testemunha: '+esc(x.testemunhas):''}${gd?' · documento gerado':''}</small></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end">${ocPedeDoc(x.tipo)?`<button class="lnk" data-act="rh-ocdoc" data-id="${x._id}">${gd?'Gerar de novo':'Gerar documento'}</button>`:''}<button class="lnk" data-act="rh-ocrem" data-id="${x._id}" style="color:var(--crit-ink)">Tirar</button></div></div>`; }).join('')+(xs.length>6?`<div class="sub" style="margin:6px 0 0;font-size:12.5px">e mais ${xs.length-6} na história</div>`:'')
+        :(g?'':'<div class="sub" style="margin:6px 0 0">Nenhuma ocorrência.</div>')}
+      ${g?`<div class="rh-sep"></div><div class="rh-g"><label><span class="label">Data</span><input class="txt" type="date" id="rh-ocd" value="${esc(g.data)}"></label>
+          <label><span class="label">Tipo</span><select class="txt" id="rh-oct">${OC_TIPOS.map(t=>`<option ${g.tipo===t?'selected':''}>${t}</option>`).join('')}</select></label>
+          <label><span class="label">Dias (se for suspensão)</span><input class="txt" type="number" min="1" max="30" id="rh-ocn" value="${esc(g.dias||'')}"></label></div>
+        <label style="display:block;margin-top:10px"><span class="label">O que aconteceu</span><textarea class="txt" id="rh-ocm" rows="3">${esc(g.motivo||'')}</textarea></label>
+        <label style="display:block;margin-top:10px"><span class="label">Testemunhas</span><input class="txt" id="rh-ocw" value="${esc(g.testemunhas||'')}" placeholder="nome de quem viu (opcional)"></label>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px"><button class="btn sec rh-sm" data-act="rh-ocx">Cancelar</button><button class="btn rh-sm" data-act="rh-ocsalvar" ${R.salv?'disabled':''}>Salvar ocorrência</button></div>`
+        :`<div style="margin-top:10px"><button class="btn sec rh-sm" data-act="rh-ocnova" data-id="${f._id}">Registrar ocorrência</button></div>`}</section>`; }
+
+  /* ---------- Itens emprestados (armário, chave, rádio…): lembrete no desligamento ---------- */
+  const EMP_ITENS=['Armário','Chave','Rádio','Ferramenta','Celular da empresa','Crachá','Cartão de acesso','Notebook'];
+  const empDe=fid=>R.emp.filter(x=>x.funcId===fid&&!x.removido).sort((a,b)=>String(b.desde||b.em).localeCompare(String(a.desde||a.em)));
+  const empPend=fid=>empDe(fid).filter(x=>!x.devolvido);
+  const empTxt=x=>x.item+(x.obs?' ('+x.obs+')':'');
+  function cartaoEmp(f){ const xs=empDe(f._id), pend=xs.filter(x=>!x.devolvido), dev=xs.filter(x=>x.devolvido), g=R.femp&&R.femp.funcId===f._id?R.femp:null;
+    return `<section class="card rh-empc"><div class="rh-ch"><h2>Itens emprestados</h2>${pend.length?`<span class="pill warn">${plural(pend.length,'item','itens')} com a pessoa</span>`:''}</div>
+      ${pend.map(x=>`<div class="rh-dl"><div><b>${esc(empTxt(x))}</b><small>desde ${br(String(x.desde||x.em).slice(0,10))}</small></div><button class="lnk" data-act="rh-empdev" data-id="${x._id}">Devolveu</button></div>`).join('')}
+      ${!pend.length&&!g?'<div class="sub" style="margin:6px 0 0">Nada com a pessoa.</div>':''}
+      ${dev.length?`<details><summary class="sub" style="margin:8px 0 0;font-size:12.5px;cursor:pointer">${plural(dev.length,'item devolvido','itens devolvidos')}</summary>${dev.map(x=>`<div class="sub" style="margin:4px 0 0;font-size:12.5px">${esc(empTxt(x))} · devolvido em ${br(x.devolvido)}</div>`).join('')}</details>`:''}
+      ${g?`<div class="rh-sep"></div><div class="rh-g"><label><span class="label">Item</span><input class="txt" id="rh-empi" list="rh-empl" value="${esc(g.item||'')}" placeholder="ex.: Armário"><datalist id="rh-empl">${EMP_ITENS.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></label>
+          <label><span class="label">Qual (número, patrimônio)</span><input class="txt" id="rh-empo" value="${esc(g.obs||'')}" placeholder="ex.: nº 12"></label>
+          <label><span class="label">Desde</span><input class="txt" type="date" id="rh-empd" value="${esc(g.desde)}"></label></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px"><button class="btn sec rh-sm" data-act="rh-empx">Cancelar</button><button class="btn rh-sm" data-act="rh-empsalvar" ${R.salv?'disabled':''}>Salvar</button></div>`
+        :`<div style="margin-top:10px"><button class="btn sec rh-sm" data-act="rh-empnovo" data-id="${f._id}">Emprestar item</button></div>`}</section>`; }
+  /* no desligamento: o que a pessoa precisa devolver */
+  function deslDevolver(f){ const xs=empPend(f._id); if(!xs.length) return '';
+    return `<div class="banner rh-devb" style="background:var(--warn-tint);color:var(--warn-ink);margin:12px 0 0"><b>Antes de sair, precisa devolver:</b>${xs.map(x=>`<div class="rh-devi"><span>${esc(empTxt(x))}</span><button class="lnk" data-act="rh-empdev" data-id="${x._id}">Devolveu</button></div>`).join('')}</div>`; }
+  function avisosMais(){ const av=[], hj=P.hojeStr();
+    R.func.filter(f=>(f.status==='Desligado'&&okIso(f.desligamento)&&f.desligamento>=addDias(hj,-120))||(f.desligAgendado&&okIso(f.desligamento)&&f.desligamento<=addDias(hj,PZ_AVISO()))).forEach(f=>{ const xs=empPend(f._id); if(!xs.length) return; const saiu=f.status==='Desligado';
+      av.push({c:saiu?'crit':'warn',r:'Devolver',t:'Itens com '+f.nome,s:(saiu?'saiu em ':'sai em ')+br(f.desligamento).slice(0,5)+' · '+xs.map(empTxt).join(', '),act:`data-act="rh-pess" data-id="${f._id}"`,l:'Abrir'}); });
+    R.fcand.filter(x=>!x.usada).forEach(x=>av.push({c:'warn',r:'Nova',t:'Ficha preenchida pelo celular: '+(x.nome||''),s:'chegou em '+dmIso(x.em)+(x.fotos?' · '+plural(+x.fotos,'foto','fotos')+' de documentos':''),act:`data-act="rh-fcver" data-id="${x._id}"`,l:'Ver'}));
+    return av; }
+
+  /* ---------- Feriados (nacionais calculados pelo painel + os cadastrados aqui; valem para o RH e para a produção) ---------- */
+  const FER_TIPOS=[['municipal','Municipal (Gravataí)'],['empresa','Ponte / folga da empresa'],['estadual','Estadual'],['outro','Outro']];
+  const ferTipoNome=t=>({nacional:'Nacional',estadual:'Estadual',municipal:'Municipal',empresa:'Ponte da empresa',outro:'Outro'})[t]||'Feriado';
+  const ferAno=y=>P.feriadosAno?P.feriadosAno(y):[], feriadoDe=iso=>P.feriadoDe?P.feriadoDe(iso):null;
+  async function ferSalvar(up){ const c=Object.assign({lista:[],tirados:[]},P.ferCal?P.ferCal():{}); Object.assign(c,up);
+    await P.db().doc('config/feriados').set({lista:c.lista,tirados:c.tirados,alteradoEm:agora(),alteradoNome:eu()},{merge:true}); }
+  function vFeriados(){ const y=R.ferAno, xs=ferAno(y), C=P.ferCal?P.ferCal():{}, tir=(C.tirados||[]).filter(d=>d.slice(0,4)===String(y)), nac=(P.ferNac?P.ferNac(y):[]).filter(x=>tir.includes(x.data));
+    const calc=new Set((P.ferNac?P.ferNac(y):[]).map(x=>x.data)), sug=(P.ferSug?P.ferSug(y):[]).filter(s=>!xs.some(x=>x.data===s.data)), hj=P.hojeStr();
+    return topo('Cadastros do RH','Feriados e folgas da empresa. Valem para o RH (agenda, férias) e para a programação da produção (dias úteis).',cadSeg())
+      +`<section class="card"><div class="rh-ch"><div style="display:flex;gap:10px;align-items:center"><button class="btn sec rh-sm" data-act="rh-feran" data-v="-1" aria-label="Ano anterior">‹</button><h2 style="margin:0" class="num">${y}</h2><button class="btn sec rh-sm" data-act="rh-feran" data-v="1" aria-label="Próximo ano">›</button></div><span class="sub" style="margin:0">${plural(xs.length,'feriado','feriados')}</span></div>
+        <div style="margin-top:10px">${xs.map(x=>{ const d=dU(x.data); return `<div class="row rh-ferl ${x.data<hj?'pass':''}" style="grid-template-columns:110px minmax(0,1fr) auto auto;align-items:center"><span class="num"><b>${br(x.data).slice(0,5)}</b> <small style="color:var(--muted)">${DIA_CURTO[d.getUTCDay()]}</small></span><b>${esc(x.nome)}</b><span class="pill ${x.tipo==='nacional'?'teal':x.tipo==='empresa'?'warn':'neu'}">${esc(ferTipoNome(x.tipo))}</span><button class="lnk" data-act="rh-ferrem" data-v="${x.data}" style="color:var(--crit-ink)">${calc.has(x.data)?'A fábrica trabalha':'Tirar'}</button></div>`; }).join('')}</div>
+        ${nac.length?`<div class="sub" style="margin:12px 0 0;font-size:13px">A fábrica trabalha em: ${nac.map(x=>`${esc(x.nome)} (${br(x.data).slice(0,5)}) <button class="lnk" data-act="rh-fervolta" data-v="${x.data}">voltar a ser feriado</button>`).join(' · ')}</div>`:''}
+        ${sug.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">MUITAS EMPRESAS FOLGAM (incluir se a Colafix folgar)</div><div class="rh-chips" style="margin:0">${sug.map(s=>`<button class="rh-chip2" data-act="rh-fersug" data-v="${s.data}" data-n="${esc(s.nome)}">+ ${esc(s.nome)} · ${br(s.data).slice(0,5)}</button>`).join('')}</div>`:''}
+        <div class="rh-sep"></div><div class="label" style="margin-bottom:6px">NOVO FERIADO OU PONTE</div>
+        <div class="rh-g"><label><span class="label">Data</span><input class="txt" type="date" id="rh-fhd"></label><label><span class="label">Nome</span><input class="txt" id="rh-fhn" placeholder="ex.: Aniversário de Gravataí, ponte de Natal"></label>
+          <label><span class="label">Tipo</span><select class="txt" id="rh-fht">${FER_TIPOS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></label></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn" data-act="rh-feradd">${P.ic('mais',18,2.4)}Incluir</button></div>
+        <div class="sub" style="margin:10px 0 0;font-size:12.5px">Os nacionais o painel já sabe sozinho (incluindo Sexta-feira Santa). Cadastre aqui os de Gravataí e as pontes da empresa.</div></section>`; }
+  /* CLT, art. 134 §3º: as férias não podem começar nos 2 dias antes de feriado ou do domingo (repouso semanal) */
+  function ferInicioAviso(d){ if(!okIso(d)) return ''; const ms=[]; [1,2].forEach(k=>{ const x=addDias(d,k), w=dU(x).getUTCDay(), fe=feriadoDe(x); if(w===0) ms.push('domingo '+br(x).slice(0,5)); if(fe) ms.push(fe.nome+' '+br(x).slice(0,5)); });
+    return ms.length?`<div class="banner" style="background:var(--crit-tint);color:var(--crit-ink);margin:10px 0 0"><b>Atenção:</b> pela CLT, as férias não podem começar nos 2 dias antes de feriado ou do domingo (${esc(ms.join(', '))}). Escolha outro dia de início.</div>`:''; }
+
+  /* ---------- Perguntas rápidas (Início): um toque e sai a lista, pronta para imprimir ou mandar ---------- */
+  const PERG=[['aniv','Quem faz aniversário em…'],['setor','Quem é do setor…'],['exp','Quem está em experiência?'],['ferias','Quem sai de férias nos próximos 30 dias?'],['ferv','Quem tem férias para tirar?'],['casa','Quem faz aniversário de casa este ano?'],
+    ['semnasc','Quem não tem data de nascimento?'],['incomp','Quem está com o cadastro incompleto?'],['pj','Quando é a troca de cada PJ?'],['emp','Quem está com item emprestado?'],['oc','Quem teve ocorrência este ano?']];
+  const nomeT=f=>titulo(f&&f.nome||'');
+  function pergDados(){ const g=R.perg, k=g.k, hj=P.hojeStr(), ano=+hj.slice(0,4), at=ativos(), por=(a,b)=>a.nome.localeCompare(b.nome,'pt-BR'), fun=id=>R.func.find(f=>f._id===id)||{nome:'',_id:id};
+    if(k==='aniv'){ const m=g.mes||hj.slice(5,7), xs=at.filter(f=>okIso(f.nascimento)&&f.nascimento.slice(5,7)===m).sort((a,b)=>a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)));
+      return {t:'Aniversariantes de '+MESES[+m-1],cols:['Dia','Nome','Setor','Faz'],rows:xs.map(f=>[f.nascimento.slice(8)+'/'+m,nomeT(f),f.setor||'',(ano-+f.nascimento.slice(0,4))+' anos']),ids:xs.map(f=>f._id),nc:1,sem:at.filter(f=>!okIso(f.nascimento)).length}; }
+    if(k==='setor'){ const ss=[...new Set(at.map(f=>f.setor||'Sem setor'))].sort((a,b)=>a.localeCompare(b,'pt-BR')), s=ss.includes(g.setor)?g.setor:ss[0]||''; g.setor=s; const xs=at.filter(f=>(f.setor||'Sem setor')===s).sort(por);
+      return {t:'Setor '+s,cols:['Nome','Função','Vínculo','Tempo de casa'],rows:xs.map(f=>[nomeT(f),f.funcao||'',f.tipo==='PJ'?'PJ · '+empNome(f.empresa):'CLT',okIso(f.admissao)?tempoTxt(f.admissao):'']),ids:xs.map(f=>f._id),nc:0,setores:ss}; }
+    if(k==='exp'){ const xs=clts().map(f=>({f,e:expInfo(f)})).filter(o=>o.e).sort((a,b)=>a.e.fim.localeCompare(b.e.fim));
+      return {t:'Em experiência',cols:['Nome','Setor','Admissão','Fim da 1ª etapa','Fim da experiência','Situação'],rows:xs.map(({f,e})=>[nomeT(f),f.setor||'',br(f.admissao),br(e.f1),br(e.f2),e.t]),ids:xs.map(o=>o.f._id),nc:0}; }
+    if(k==='ferias'){ const lim=addDias(hj,30), xs=R.fer.filter(x=>!x.anterior&&x.status!=='cancelada'&&okIso(x.inicio)&&x.fim>=hj&&x.inicio<=lim).sort((a,b)=>a.inicio.localeCompare(b.inicio));
+      return {t:'Férias nos próximos 30 dias',cols:['Nome','Setor','Início','Fim','Volta','Dias'],rows:xs.map(x=>{ const f=fun(x.funcId); return [nomeT(f.nome?f:{nome:x.funcionario}),f.setor||'',br(x.inicio)+(x.inicio<=hj?' (já começou)':''),br(x.fim),br(x.retorno||addDias(x.fim,1)),String(x.dias)]; }),ids:xs.map(x=>x.funcId),nc:0}; }
+    if(k==='ferv'){ const xs=clts().map(f=>({f,s:sitFer(f)})).filter(o=>o.s.p&&o.s.p.completo&&o.s.p.saldo>0).sort((a,b)=>a.s.p.lim.localeCompare(b.s.p.lim));
+      return {t:'Férias para tirar',cols:['Nome','Setor','Período','Dar até','Faltam','Situação'],rows:xs.map(({f,s})=>[nomeT(f),f.setor||'',br(s.p.ini)+' a '+br(s.p.fim),br(s.p.lim),plural(s.p.saldo,'dia','dias'),s.t]),ids:xs.map(o=>o.f._id),nc:0}; }
+    if(k==='casa'){ const xs=at.filter(f=>okIso(f.admissao)).map(f=>({f,a:ano-+f.admissao.slice(0,4)})).filter(o=>o.a===1||(o.a>0&&o.a%5===0)).sort((a,b)=>a.f.admissao.slice(5).localeCompare(b.f.admissao.slice(5)));
+      return {t:'Aniversário de casa em '+ano+' (1, 5, 10… anos)',cols:['Dia','Nome','Setor','Completa'],rows:xs.map(({f,a})=>[br(f.admissao).slice(0,5),nomeT(f),f.setor||'',plural(a,'ano','anos')]),ids:xs.map(o=>o.f._id),nc:1}; }
+    if(k==='semnasc'){ const xs=at.filter(f=>!okIso(f.nascimento)).sort(por); return {t:'Sem data de nascimento',cols:['Nome','Setor','Função'],rows:xs.map(f=>[nomeT(f),f.setor||'',f.funcao||'']),ids:xs.map(f=>f._id),nc:0,ed:1}; }
+    if(k==='incomp'){ const falta=f=>[!okIso(f.nascimento)&&'nascimento',!f.funcao&&'função',!f.setor&&'setor',!f.telefone&&'telefone',!okIso(f.admissao)&&'admissão',f.tipo!=='PJ'&&(f.salario===''||f.salario==null)&&'salário'].filter(Boolean);
+      const xs=at.map(f=>({f,x:falta(f)})).filter(o=>o.x.length).sort((a,b)=>b.x.length-a.x.length||por(a.f,b.f));
+      return {t:'Cadastro incompleto',cols:['Nome','Setor','Falta'],rows:xs.map(({f,x})=>[nomeT(f),f.setor||'',x.join(', ')]),ids:xs.map(o=>o.f._id),nc:0,ed:1}; }
+    if(k==='pj'){ const xs=pjs().map(f=>({f,s:pjSit(f)})).sort((a,b)=>String(a.s.prox||'9').localeCompare(String(b.s.prox||'9')));
+      return {t:'Troca dos PJ',cols:['Nome','Empresa','Última troca','Próxima troca','Situação'],rows:xs.map(({f,s})=>[nomeT(f),empNome(f.empresa),okIso(f.ultimaTroca)?br(f.ultimaTroca):'—',s.prox?br(s.prox):'—',s.t]),ids:xs.map(o=>o.f._id),nc:0}; }
+    if(k==='emp'){ const xs=R.emp.filter(x=>!x.removido&&!x.devolvido).map(x=>({x,f:fun(x.funcId)})).sort((a,b)=>String(a.f.nome).localeCompare(String(b.f.nome),'pt-BR'));
+      return {t:'Itens emprestados',cols:['Nome','Item','Desde','Situação'],rows:xs.map(({x,f})=>[nomeT(f),empTxt(x),br(String(x.desde||x.em).slice(0,10)),f.status==='Desligado'?'saiu, falta devolver':f.desligAgendado?'vai sair em '+br(f.desligamento):'trabalhando']),ids:xs.map(o=>o.f._id),nc:0}; }
+    if(k==='oc'){ const xs=R.oc.filter(x=>!x.removido&&String(x.data).slice(0,4)===String(ano)).sort((a,b)=>String(b.data).localeCompare(String(a.data)));
+      return {t:'Ocorrências em '+ano,cols:['Nome','Data','Tipo','O que aconteceu'],rows:xs.map(x=>{ const f=fun(x.funcId); return [nomeT(f.nome?f:{nome:x.funcionario}),br(x.data),x.tipo,x.motivo||'']; }),ids:xs.map(x=>x.funcId),nc:0}; }
+    return {t:'',cols:[],rows:[],ids:[]}; }
+  const pergTexto=D=>D.t+'\n'+D.rows.map(r=>'• '+r.filter(Boolean).join(' · ')).join('\n')+(D.rows.length?'':'\n(ninguém)');
+  function pergHtml(D){ return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(D.t)}</title><style>@page{size:A4;margin:16mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}table{width:100%;border-collapse:collapse;margin-top:12px}th{text-align:left;font-size:9pt;color:#555;border-bottom:2px solid #143F54;padding:5px 6px}td{padding:5px 6px;border-bottom:1px solid #ddd}.sub{color:#666}</style></head><body>
+    <h1>${esc(D.t)}</h1><div class="sub">${esc(EMP_DOC.COLAFIX.nome)} · ${plural(D.rows.length,'pessoa','pessoas')} · ${br(P.hojeStr())}</div>
+    <table><thead><tr>${D.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${D.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`; }
+  function cartaoPerg(){ const g=R.perg;
+    const chips=`<div class="rh-pgc">${PERG.map(([k,l])=>`<button class="rh-chip2 rh-pgb" data-act="rh-perg" data-v="${k}" aria-pressed="${!!g&&g.k===k}">${esc(l)}</button>`).join('')}</div>`;
+    if(!g) return `<section class="card rh-perg"><div class="rh-ch"><h2>Perguntas rápidas</h2><span class="sub" style="margin:0;font-size:12.5px">um toque e sai a lista, pronta para imprimir ou mandar</span></div>${chips}</section>`;
+    const D=pergDados();
+    const filtro=g.k==='aniv'?`<label class="rh-pgf"><span class="label">Mês</span><select class="txt" id="rh-pgm">${MESES.map((n,i)=>{ const v=String(i+1).padStart(2,'0'); return `<option value="${v}" ${(g.mes||P.hojeStr().slice(5,7))===v?'selected':''}>${cap(n)}</option>`; }).join('')}</select></label>`
+      :g.k==='setor'?`<label class="rh-pgf"><span class="label">Setor</span><select class="txt" id="rh-pgs">${(D.setores||[]).map(s=>`<option ${s===g.setor?'selected':''}>${esc(s)}</option>`).join('')}</select></label>`:'';
+    return `<section class="card rh-perg"><div class="rh-ch"><h2>Perguntas rápidas</h2><button class="lnk" data-act="rh-pergx">Fechar a lista</button></div>${chips}
+      <div class="rh-pgr"><div class="rh-ch" style="flex-wrap:wrap;gap:10px"><div><b style="font-size:17px">${esc(D.t)}</b> <span class="pill neu">${plural(D.rows.length,'pessoa','pessoas')}</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">${filtro}<button class="btn sec rh-sm" data-act="rh-pgimp">Imprimir</button><button class="btn sec rh-sm" data-act="rh-pgcop">Copiar</button><button class="btn sec rh-sm" data-act="rh-pgwa">WhatsApp</button></div></div>
+        ${D.rows.length?`<div class="rh-tw"><table class="rh-t"><thead><tr>${D.cols.map(c=>`<th>${esc(c)}</th>`).join('')}${D.ed?'<th></th>':''}</tr></thead><tbody>${D.rows.map((r,i)=>`<tr>${r.map((c,j)=>`<td${j===D.nc?'':' class="'+(/^\d{2}\/\d{2}/.test(c)?'num':'')+'"'}>${j===D.nc&&D.ids[i]?`<button class="rh-nm" data-act="rh-pess" data-id="${D.ids[i]}">${esc(c)}</button>`:esc(c)}</td>`).join('')}${D.ed?`<td><button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${D.ids[i]}">Completar</button></td>`:''}</tr>`).join('')}</tbody></table></div>`
+          :'<div class="sub" style="margin:8px 0 0">Ninguém.</div>'}
+        ${D.sem?`<div class="sub" style="margin:8px 0 0;font-size:12.5px">${plural(D.sem,'pessoa sem','pessoas sem')} data de nascimento no cadastro.</div>`:''}</div></section>`; }
+
+  /* ---------- Ficha de admissão pelo celular ----------
+     O RH cria um link (convite) e manda por WhatsApp; o candidato preenche em ficha.html, sem login, e manda as fotos dos documentos.
+     Chega aqui em "Fichas pelo celular"; "Começar admissão" preenche o cadastro, guarda as fotos e marca os documentos entregues. */
+  const FC_VALIDADE=15;
+  const tokenNovo=()=>{ const a=new Uint8Array(20), c='abcdefghijklmnopqrstuvwxyz0123456789'; (window.crypto||window.msCrypto).getRandomValues(a); return Array.from(a,x=>c[x%36]).join(''); };
+  const linkFicha=t=>location.origin+location.pathname.replace(/[^/]*$/,'')+'ficha.html?c='+t;
+  function qrSvg(txt,px){ if(typeof qrcode!=='function') return ''; const q=qrcode(0,'M'); q.addData(txt); q.make(); const n=q.getModuleCount(); let d='';
+    for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(q.isDark(r,c)) d+='M'+c+' '+r+'h1v1h-1z'; return `<svg width="${px}" height="${px}" viewBox="-2 -2 ${n+4} ${n+4}" role="img" aria-label="QR do link"><rect x="-2" y="-2" width="${n+4}" height="${n+4}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`; }
+  const convAberto=x=>!x.usado&&+x.ateMs>Date.now()&&!R.fcand.some(f=>f._id===x._id);
+  const msgWa=(x)=>'Olá'+(x.nome?', '+titulo(x.nome).split(' ')[0]:'')+'! Aqui é do RH da Colafix. Preencha sua ficha de admissão pelo celular (leva uns 5 minutos) e mande as fotos dos documentos: '+linkFicha(x._id);
+  function modalConv(){ const g=R.convM; if(!g) return '';
+    if(g.fase==='nome') return `<div class="rh-modal"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Ficha pelo celular" style="max-width:520px"><div class="rh-ch"><h2>Ficha pelo celular</h2><button class="lnk" data-act="rh-convx">Fechar</button></div>
+      <p class="sub" style="margin:6px 0 12px">O painel cria um link. Você manda pelo WhatsApp e a pessoa preenche no celular: dados, endereço, tamanhos, banco e fotos dos documentos. Vale por ${FC_VALIDADE} dias.</p>
+      <label><span class="label">Nome da pessoa (opcional, para a mensagem)</span><input class="txt" id="rh-convn" value="${esc(g.nome||'')}" placeholder="ex.: Bruna"></label>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn sec" data-act="rh-convx">Cancelar</button><button class="btn" data-act="rh-convcriar" ${R.salv?'disabled':''}>Criar link</button></div></div></div>`;
+    const x=R.conv.find(c=>c._id===g.t)||{_id:g.t,nome:g.nome,ateMs:g.ateMs}, u=linkFicha(x._id);
+    return `<div class="rh-modal"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Link da ficha" style="max-width:560px"><div class="rh-ch"><h2>Link pronto${x.nome?' para '+esc(titulo(x.nome).split(' ')[0]):''}</h2><button class="lnk" data-act="rh-convx">Fechar</button></div>
+      <div class="rh-convq">${qrSvg(u,180)}<div><p class="sub" style="margin:0 0 8px">Mande pelo WhatsApp ou mostre o QR para a pessoa ler com a câmera do celular.</p><input class="txt" id="rh-convu" value="${esc(u)}" readonly onfocus="this.select()">
+        <div class="sub" style="margin:6px 0 0;font-size:12.5px">Vale até ${new Date(+x.ateMs).toLocaleDateString('pt-BR')}. Quando chegar, aparece em Funcionários › Admissões e no Início.</div></div></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn sec" data-act="rh-convcop" data-id="${x._id}">Copiar link</button><button class="btn" data-act="rh-convwa" data-id="${x._id}">Mandar no WhatsApp</button></div></div></div>`; }
+  function cartaoFichasCel(){ const xs=R.fcand.filter(x=>!x.usada), ab=R.conv.filter(convAberto);
+    return `<section class="card rh-fcel"><div class="rh-ch"><h2>Fichas pelo celular</h2><button class="btn sec rh-sm" data-act="rh-convnovo">${P.ic('mais',16,2.4)}Mandar ficha pelo celular</button></div>
+      ${xs.length?xs.map(x=>`<div class="rh-dl"><div><b>${esc(x.nome||'')}</b><small>chegou em ${dmIso(x.em)}${x.fotos?' · '+plural(+x.fotos,'foto','fotos'):''}${x.telefone?' · '+esc(x.telefone):''}</small></div><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button class="lnk" data-act="rh-fcver" data-id="${x._id}">Ver</button><button class="btn rh-sm" data-act="rh-fcusar" data-id="${x._id}">Começar admissão</button></div></div>`).join('')
+        :'<div class="sub" style="margin:6px 0 0">Nenhuma ficha nova.</div>'}
+      ${ab.length?`<div class="label" style="margin:12px 0 4px">ESPERANDO A PESSOA PREENCHER</div>${ab.map(x=>`<div class="rh-dl"><div><b>${esc(x.nome?titulo(x.nome):'Link sem nome')}</b><small>criado em ${dmIso(x.criado)} · vale até ${new Date(+x.ateMs).toLocaleDateString('pt-BR').slice(0,5)}</small></div><div style="display:flex;gap:12px"><button class="lnk" data-act="rh-convver" data-id="${x._id}">Ver link</button><button class="lnk" data-act="rh-convapag" data-id="${x._id}" style="color:var(--crit-ink)">Cancelar</button></div></div>`).join('')}`:''}</section>`; }
+  const FC_CAMPOS=[['nome','Nome'],['cpf','CPF'],['nascimento','Nascimento'],['telefone','Telefone'],['email','E-mail'],['cep','CEP'],['rua','Rua'],['numero','Número'],['complemento','Complemento'],['bairro','Bairro'],['cidade','Cidade'],
+    ['camisa','Camisa'],['calca','Calça'],['calcado','Calçado'],['banco','Banco'],['agencia','Agência'],['conta','Conta'],['pix','Chave PIX'],['emergNome','Contato de emergência'],['emergTel','Telefone de emergência'],['obs','Observação']];
+  const fcEndereco=x=>[[x.rua,x.numero].filter(Boolean).join(', ')+(x.complemento?' - '+x.complemento:''),x.bairro,x.cidade].filter(Boolean).join(' · ');
+  function modalFicha(){ const x=R.fcand.find(c=>c._id===R.fcv); if(!x) return '';
+    return `<div class="rh-modal"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Ficha recebida" style="max-width:640px"><div class="rh-ch"><h2>Ficha de ${esc(x.nome||'')}</h2><button class="lnk" data-act="rh-fcx">Fechar</button></div>
+      <dl class="rh-pfd" style="margin-top:10px">${FC_CAMPOS.filter(([k])=>x[k]).map(([k,l])=>`<dt>${l}</dt><dd>${esc(k==='nascimento'?br(x[k]):k==='cpf'?fCPF(x[k]):x[k])}</dd>`).join('')}</dl>
+      <div class="sub" style="margin:10px 0 0">${x.fotos?plural(+x.fotos,'foto de documento','fotos de documentos')+' — ficam guardadas no cadastro quando você começar a admissão.':'Sem fotos de documentos.'}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="lnk" data-act="rh-fcapag" data-id="${x._id}" style="color:var(--crit-ink)">Apagar esta ficha</button><button class="btn" data-act="rh-fcusar" data-id="${x._id}">Começar admissão</button></div></div></div>`; }
+  async function fichaCandFinalizar(funcId,t,base){ const f=Object.assign({_id:funcId},R.func.find(x=>x._id===funcId)||{},base||{}); let n=0;
+    const sn=await P.db().collection(COL.fcarq).where('c','==',t).limit(40).get(), ent=(f.admEntregues||[]).slice(), od=OD();
+    for(const d of sn.docs){ const a=d.data(); if(!a.d) continue; const ext=/pdf/.test(a.tipo||'')?'pdf':'jpg', nome=nomeArq((a.nome||'Documento')+' - '+(f.nome||''))+'.'+ext;
+      const r=od?await od.enviar('Admissões/'+nomeArq(f.nome||'')+'/'+nome,a.d,a.tipo||'image/jpeg'):null, url=r?(r.webUrl||''):linkArq(await salvarArquivo({nome,mime:a.tipo||'image/jpeg',tipo:'documento'},a.d));
+      const nm=a.nome||'Documento', i=ent.findIndex(e=>e.nome===nm); const it={nome:nm,em:agora(),porNome:'pelo celular',url}; if(i>=0) ent[i]=Object.assign({},ent[i],{url}); else ent.push(it); n++;
+      await P.db().doc(COL.fcarq+'/'+d.id).delete(); }
+    await grava(COL.func+'/'+funcId,{admEntregues:ent,fichaCel:t}); f.admEntregues=ent;
+    await P.db().doc(COL.fcand+'/'+t).set({usada:true,funcId,usadaEm:agora(),usadaPor:eu()},{merge:true}); try{ await P.db().doc(COL.conv+'/'+t).delete(); }catch(e){}
+    return n; }
+
   /* ---------- registro do módulo ---------- */
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:vInicio}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
     rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros}, rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>vTerc()} };
-  Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r(); }; });
+  Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r()+modalConv()+modalFicha(); }; });
   P.registrarModulo({ id:'rh', nome:'RH', ic:'equipe', telas:TELAS, iniciar });
   P.registrarPerfil('rh',{ nome:'RH (funcionários, fichas, documentos, terceirizados)', mods:['rh'], soVer:true, pos:2, desc:'Só o módulo RH: funcionários, fichas de EPI e uniforme do mês, documentos e contratos, funções e EPIs e terceirizados. Não vê nem muda nada da fábrica.' });
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
@@ -1051,6 +1221,8 @@
   document.addEventListener('change',async ev=>{ const t=ev.target;
     try{
       if(t.dataset&&t.dataset.rhFil){ R.filtro[t.dataset.rhFil]=t.value; P.render(); return; }
+      if(t.id==='rh-pgm'&&R.perg){ R.perg.mes=t.value; P.render(); return; }
+      if(t.id==='rh-pgs'&&R.perg){ R.perg.setor=t.value; P.render(); return; }
       if(t.id==='rh-desf'&&R.fdesl){ R.fdesl.funcId=t.value; P.render(); return; }
       if(t.dataset&&t.dataset.rhVaga!=null){ const v=Object.assign({},vagas()), n=Math.max(0,Math.min(50,parseInt(t.value,10)||0)); if(n) v[t.dataset.rhVaga]=n; else delete v[t.dataset.rhVaga]; try{ await P.db().doc('rh/config').set({vagas:v,alteradoEm:agora()},{merge:true}); R.cfg.vagas=v; P.toast('Vagas salvas.'); }catch(e){ P.erro(e); } return; }
       if(t.dataset&&(t.dataset.rhF==='status'||t.dataset.rhF==='tipo'||t.dataset.rhF==='empresaSel')&&R.f){ Object.assign(R.f,val('[data-rh-f]')); P.render(); return; }
@@ -1094,6 +1266,63 @@
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rh-"],[data-act^="od-"]'); if(!b) return; const a=b.dataset.act;
     if(a==='rh-fsel'&&ev.target.closest('button,label,input,a')) return;
     try{
+      /* ocorrências */
+      if(a==='rh-ocnova'){ R.foc={funcId:b.dataset.id,data:P.hojeStr(),tipo:'Advertência verbal'}; P.render(); return; }
+      if(a==='rh-ocx'){ R.foc=null; P.render(); return; }
+      if(a==='rh-ocsalvar'){ const g=R.foc, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const v=k=>{ const e=document.getElementById(k); return e?e.value:''; };
+        Object.assign(g,{data:v('rh-ocd'),tipo:v('rh-oct'),dias:v('rh-ocn'),motivo:String(v('rh-ocm')).trim(),testemunhas:String(v('rh-ocw')).trim()});
+        if(!okIso(g.data)) return P.toast('Informe a data.'); if(g.motivo.length<3) return P.toast('Escreva o que aconteceu.');
+        const dias=/SUSPENS/.test(norm(g.tipo))?Math.max(0,Math.round(+g.dias||0)):0; if(/SUSPENS/.test(norm(g.tipo))&&!dias) return P.toast('Informe quantos dias de suspensão.');
+        R.salv=true; P.render(); const nid=id();
+        try{ await P.db().doc(COL.oc+'/'+nid).set({funcId:f._id,funcionario:f.nome,data:g.data,tipo:g.tipo,motivo:g.motivo.slice(0,900),testemunhas:g.testemunhas.slice(0,200),dias:dias||'',em:agora(),por:P.S.uid||null,porNome:eu()});
+          R.foc=null; P.toast(ocPedeDoc(g.tipo)?'Ocorrência salva. Toque em "Gerar documento" para imprimir.':'Ocorrência salva.'); } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-ocrem'){ const x=R.oc.find(o=>o._id===b.dataset.id); if(!x||!confirm('Tirar esta ocorrência do histórico?')) return; await grava(COL.oc+'/'+x._id,{removido:true}); P.toast('Ocorrência tirada.'); return; }
+      if(a==='rh-ocdoc'){ const x=R.oc.find(o=>o._id===b.dataset.id); if(!x) return; const re=/SUSPENS/.test(norm(x.tipo))?/SUSPENS/:/ADVERT/, md=R.modelos.find(m=>re.test(norm(m.nome)))||R.modelos.find(m=>/ADVERT|SUSPENS/.test(norm(m.nome)));
+        R.dg={funcId:x.funcId,modeloId:md?md._id:'',extra:{},resp:{},feriasId:'',guardar:true,ocId:x._id}; R.dv='gerar'; R.f=null; R.fdesl=null; P.go('rhdocs'); window.scrollTo(0,0);
+        if(!md) setTimeout(()=>P.toast('Cadastre o modelo da advertência em Modelos (use os campos "Data da ocorrência" e "Motivo da ocorrência").'),100); return; }
+      /* itens emprestados */
+      if(a==='rh-empnovo'){ R.femp={funcId:b.dataset.id,desde:P.hojeStr()}; P.render(); return; }
+      if(a==='rh-empx'){ R.femp=null; P.render(); return; }
+      if(a==='rh-empsalvar'){ const g=R.femp, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const v=k=>{ const e=document.getElementById(k); return e?String(e.value).trim():''; };
+        Object.assign(g,{item:v('rh-empi'),obs:v('rh-empo'),desde:v('rh-empd')}); if(g.item.length<2) return P.toast('Escreva o item (ex.: Armário).');
+        R.salv=true; P.render(); try{ await P.db().doc(COL.emp+'/'+id()).set({funcId:f._id,funcionario:f.nome,item:g.item.slice(0,60),obs:g.obs.slice(0,80),desde:okIso(g.desde)?g.desde:P.hojeStr(),devolvido:'',em:agora(),por:P.S.uid||null,porNome:eu()}); R.femp=null; P.toast('Anotado.'); } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-empdev'){ const x=R.emp.find(o=>o._id===b.dataset.id); if(!x) return; await grava(COL.emp+'/'+x._id,{devolvido:P.hojeStr(),devolvidoNome:eu()}); x.devolvido=P.hojeStr(); P.toast(x.item+': devolvido.'); P.render(); return; }
+      /* perguntas rápidas */
+      if(a==='rh-perg'){ const k=b.dataset.v; R.perg=R.perg&&R.perg.k===k?null:{k,mes:P.hojeStr().slice(5,7),setor:(R.perg&&R.perg.setor)||''}; P.render(); return; }
+      if(a==='rh-pergx'){ R.perg=null; P.render(); return; }
+      if(a==='rh-pgimp'){ if(R.perg) imprimirDoc(pergHtml(pergDados())); return; }
+      if(a==='rh-pgcop'){ if(!R.perg) return; const t=pergTexto(pergDados()); try{ await navigator.clipboard.writeText(t); P.toast('Lista copiada.'); }catch(e){ P.toast('Não consegui copiar.'); } return; }
+      if(a==='rh-pgwa'){ if(!R.perg) return; window.open('https://wa.me/?text='+encodeURIComponent(pergTexto(pergDados())),'_blank','noopener'); return; }
+      /* feriados */
+      if(a==='rh-feran'){ R.ferAno+=+b.dataset.v; P.render(); return; }
+      if(a==='rh-feradd'||a==='rh-fersug'){ const C=P.ferCal?P.ferCal():{}, lista=(C.lista||[]).slice(), d=a==='rh-fersug'?b.dataset.v:(document.getElementById('rh-fhd')||{}).value, n=a==='rh-fersug'?b.dataset.n:String((document.getElementById('rh-fhn')||{}).value||'').trim(), t=a==='rh-fersug'?'empresa':(document.getElementById('rh-fht')||{}).value||'municipal';
+        if(!okIso(d)) return P.toast('Escolha a data.'); if(n.length<2) return P.toast('Escreva o nome do feriado.');
+        const i=lista.findIndex(x=>x.data===d), it={data:d,nome:n.slice(0,60),tipo:t}; if(i>=0) lista[i]=it; else lista.push(it); lista.sort((x,y)=>x.data.localeCompare(y.data));
+        await ferSalvar({lista,tirados:(C.tirados||[]).filter(x=>x!==d)}); R.ferAno=+d.slice(0,4); P.toast('Feriado incluído: '+n+' ('+br(d).slice(0,5)+').'); return; }
+      if(a==='rh-ferrem'){ const d=b.dataset.v, C=P.ferCal?P.ferCal():{}, nac=(P.ferNac?P.ferNac(+d.slice(0,4)):[]).some(x=>x.data===d)||((P.S.cfg||{}).feriados||[]).includes(d), x=ferAno(+d.slice(0,4)).find(y=>y.data===d);
+        if(!confirm((x?x.nome+' ('+br(d)+')':br(d))+(nac?': a fábrica trabalha neste dia?':': tirar do calendário?'))) return;
+        await ferSalvar({lista:(C.lista||[]).filter(y=>y.data!==d),tirados:nac?[...new Set((C.tirados||[]).concat([d]))]:(C.tirados||[])}); P.toast('Calendário atualizado.'); return; }
+      if(a==='rh-fervolta'){ const C=P.ferCal?P.ferCal():{}; await ferSalvar({tirados:(C.tirados||[]).filter(x=>x!==b.dataset.v)}); P.toast('Voltou a ser feriado.'); return; }
+      /* ficha pelo celular */
+      if(a==='rh-convnovo'){ R.convM={fase:'nome',nome:''}; P.render(); return; }
+      if(a==='rh-convx'){ R.convM=null; P.render(); return; }
+      if(a==='rh-convcriar'){ const nm=String((document.getElementById('rh-convn')||{}).value||'').trim().slice(0,60), t=tokenNovo(), ateMs=Date.now()+FC_VALIDADE*864e5;
+        R.salv=true; P.render(); try{ await P.db().doc(COL.conv+'/'+t).set({nome:nm,docs:docsAdm().filter(n=>!/^ASO\b/i.test(n)),criado:agora(),ateMs,usado:false,porNome:eu(),por:P.S.uid||null}); R.convM={fase:'link',t,nome:nm,ateMs}; } finally{ R.salv=false; P.render(); } return; }
+      if(a==='rh-convver'){ const x=R.conv.find(c=>c._id===b.dataset.id); if(x) R.convM={fase:'link',t:x._id,nome:x.nome,ateMs:x.ateMs}; P.render(); return; }
+      if(a==='rh-convcop'){ try{ await navigator.clipboard.writeText(linkFicha(b.dataset.id)); P.toast('Link copiado.'); }catch(e){ const i=document.getElementById('rh-convu'); if(i){ i.focus(); i.select(); } P.toast('Copie o link selecionado.'); } return; }
+      if(a==='rh-convwa'){ const x=R.conv.find(c=>c._id===b.dataset.id)||{_id:b.dataset.id,nome:(R.convM||{}).nome}; window.open('https://wa.me/?text='+encodeURIComponent(msgWa(x)),'_blank','noopener'); return; }
+      if(a==='rh-convapag'){ if(!confirm('Cancelar este link? A pessoa não vai mais conseguir mandar a ficha.')) return; await P.db().doc(COL.conv+'/'+b.dataset.id).delete(); P.toast('Link cancelado.'); return; }
+      if(a==='rh-fcver'){ R.fcv=b.dataset.id; P.render(); return; }
+      if(a==='rh-fcx'){ R.fcv=null; P.render(); return; }
+      if(a==='rh-fcapag'){ if(!confirm('Apagar esta ficha e as fotos dela?')) return; const t=b.dataset.id; const sn=await P.db().collection(COL.fcarq).where('c','==',t).limit(40).get();
+        for(const d of sn.docs) await P.db().doc(COL.fcarq+'/'+d.id).delete(); await P.db().doc(COL.fcand+'/'+t).delete(); try{ await P.db().doc(COL.conv+'/'+t).delete(); }catch(e){} R.fcv=null; P.toast('Ficha apagada.'); P.render(); return; }
+      if(a==='rh-fcusar'){ const x=R.fcand.find(c=>c._id===b.dataset.id); if(!x) return; const ja=R.func.find(f=>dig(f.cpf)&&dig(f.cpf)===dig(x.cpf));
+        if(ja&&!confirm(ja.nome+' já está cadastrado com este CPF. Completar o cadastro dele com os dados da ficha?')) return;
+        const dados={nome:String(x.nome||'').toUpperCase(),cpf:fCPF(x.cpf),nascimento:okIso(x.nascimento)?x.nascimento:'',telefone:x.telefone||'',email:x.email||'',cep:x.cep||'',endereco:fcEndereco(x),camisa:x.camisa||'',calca:x.calca||'',calcado:x.calcado||'',
+          banco:x.banco||'',agencia:x.agencia||'',conta:x.conta||'',pix:x.pix||'',emergencia:[x.emergNome,x.emergTel].filter(Boolean).join(' · '),fichaCand:x._id};
+        if(ja){ const v=Object.assign({},ja,{cpf:fCPF(ja.cpf)}); Object.keys(dados).forEach(k=>{ if(k!=='nome'&&k!=='cpf'&&dados[k]) v[k]=dados[k]; }); R.f=v; }
+        else R.f=Object.assign({status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr(),obs:x.obs||''},dados);
+        R.fcv=null; R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); P.toast('Confira os dados, escolha a função e o setor e salve.'); return; }
       /* fichas do mês */
       if(a==='rh-fabrir'){ R.fmes=fichasMesIni(); R.fv='mes'; P.go('rhfichas'); return; }
       if(a==='rh-fgerartela'){ R.fmes=fichasMesIni(); R.fv='gerar'; P.go('rhfichas'); fichasRodar(()=>{ try{ const d=frm.contentWindow.document, i=d.getElementById('input-mes'); if(i&&i.value!==R.fmes){ i.value=R.fmes; i.dispatchEvent(new Event('change')); } }catch(e){} }); return; }
@@ -1127,8 +1356,10 @@
         if(String(v.salario||'').trim()){ const n=numBR(v.salario); if(n==null) return P.toast('Salário inválido. Ex.: 2.150,00'); v.salario=n; } else v.salario='';
         v.jornada=String(v.jornada||'').trim(); v.setor=String(v.setor||'').trim(); if(v.setor&&!setoresCad().some(x=>norm(x)===norm(v.setor))) setoresSalvar(setoresCad().concat([v.setor])).catch(()=>{});
         if(v.status==='Desligado') v.desligAgendado=false; else if(!v.desligAgendado){ v.desligamento=''; v.desligMotivo=''; } const iD=v._id||id(); delete v._id; R.salv=true; P.render();
-        const adm=!!v.admNova; delete v.admNova; if(adm){ v.admRoteiro=true; v.admEntregues=v.admEntregues||[]; }
-        try{ await grava(COL.func+'/'+iD,Object.assign(v,R.f._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null})); R.f=null; if(adm){ R.adm={id:iD}; R.pess=null; P.toast('Cadastro salvo. Agora os documentos, o contrato e a ficha.'); } else P.toast('Funcionário salvo.'); } finally{ R.salv=false; P.render(); } return; }
+        const adm=!!v.admNova, fct=v.fichaCand; delete v.admNova; delete v.fichaCand; if(adm){ v.admRoteiro=true; v.admEntregues=v.admEntregues||[]; }
+        try{ await grava(COL.func+'/'+iD,Object.assign(v,R.f._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null}));
+          if(fct){ try{ const n=await fichaCandFinalizar(iD,fct,v); if(n) setTimeout(()=>P.toast(plural(n,'foto de documento guardada','fotos de documentos guardadas')+' na admissão.'),1500); }catch(e){ console.warn('[RH] ficha do celular',e); P.toast('Cadastro salvo, mas as fotos da ficha não foram guardadas. Tente abrir a ficha de novo.'); } }
+          R.f=null; if(adm){ R.adm={id:iD}; R.pess=null; P.toast('Cadastro salvo. Agora os documentos, o contrato e a ficha.'); } else P.toast('Funcionário salvo.'); } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-csv'){ const L=[['Nome','CPF / CNPJ','Função','Setor','Empresa','Vínculo','Admissão','Situação','Desligamento','Telefone','Camisa','Calça','Calçado','Nascimento','Motivo do desligamento']].concat(R.func.map(x=>[x.nome,docF(x),x.funcao,x.setor,x.empresa,x.tipo,br(x.admissao),x.status,br(x.desligamento),x.telefone,x.camisa,x.calca,x.calcado,br(x.nascimento),x.desligMotivo||'']));
         const csv='﻿'+L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(';')).join('\r\n'); baixar(new Blob([csv],{type:'text/csv'}),'funcionarios.csv'); return; }
       /* funções */
@@ -1389,6 +1620,12 @@
   .rh-ats2{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-top:10px}.rh-at2{display:flex;gap:12px;align-items:center;background:var(--ground);border:0;border-radius:12px;padding:12px 14px;text-align:left;font:inherit;color:inherit;cursor:pointer}.rh-at2:hover{background:#EAF2F6}.rh-at2 .rh-tic{margin:0;background:#fff}.rh-at2 b{display:block;font-size:14.5px}.rh-at2 small{color:var(--muted);font-size:12.5px}
   @media (max-width:1150px){ .rh-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .rh-3>.card:first-child{grid-column:1/-1} .rh-wk{grid-template-columns:repeat(4,minmax(0,1fr))} }
   @media (max-width:760px){ .rh-hero{grid-template-columns:minmax(0,1fr);padding:20px} .rh-hero h1{font-size:26px} .rh-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px} .rh-tile{min-height:0;padding:14px} .rh-tn{font-size:28px} .rh-3{grid-template-columns:minmax(0,1fr)} .rh-wk{grid-template-columns:repeat(2,minmax(0,1fr))} .rh-spk{display:none} }
+  .rh-pgc{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.rh-pgb{height:auto;min-height:40px;padding:6px 14px;text-align:left;line-height:1.25}.rh-pgb[aria-pressed="true"]{background:var(--teal-strong);border-color:var(--teal-strong);color:#fff}
+  .rh-pgr{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}.rh-pgf{display:flex;flex-direction:column;gap:2px}.rh-pgf .txt{height:36px;min-width:150px}
+  .rh-devb b{display:block;margin-bottom:4px}.rh-devi{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:4px 0;border-top:1px solid rgba(122,84,16,.15)}.rh-devi:first-of-type{border-top:0}
+  .rh-ferl.pass{opacity:.55}.rh-mais{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.rh-mais summary{cursor:pointer;font-weight:700;color:var(--teal-strong)}
+  .rh-convq{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center;margin-top:10px}.rh-convq svg{border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}
+  @media (max-width:600px){ .rh-convq{grid-template-columns:minmax(0,1fr);justify-items:center} .rh-ferl{grid-template-columns:90px minmax(0,1fr)!important} .rh-ferl .pill{display:none} }
   .rh-kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.rh-kpi div{background:var(--surface);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}.rh-kpi b{font-size:30px;line-height:1.1;display:block;font-weight:800}.rh-kpi span{color:var(--muted);font-size:14px}
   .rh-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.rh-2>.card{margin:0}.rh-2+.card{margin-top:16px}
   .card h2{font-size:17px;margin:0 0 12px}.rh-ch{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}.rh-ch h2{margin:0}

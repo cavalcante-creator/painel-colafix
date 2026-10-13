@@ -139,7 +139,24 @@ const RIT_PADRAO={linhas:['Linha 1','Linha 2'],itens:{
   AC0020:{d:{'Linha 1':50,'Linha 2':50}},AC0025:{d:{'Linha 1':50,'Linha 2':50},f:RIT_PL}}};
 const RIT_FER_PADRAO=['2026-10-12'];
 function ritCfg(){ const r=S.cfg&&S.cfg.ritmo; return r&&r.itens&&Array.isArray(r.linhas)?r:Object.assign({},RIT_PADRAO,{linhas:linhasOrd().slice()}); } /* sem configuração salva: acompanha todas as linhas */
-function feriados(){ return (S.cfg&&Array.isArray(S.cfg.feriados))?S.cfg.feriados:RIT_FER_PADRAO; }
+function ferLegado(){ return (S.cfg&&Array.isArray(S.cfg.feriados))?S.cfg.feriados:RIT_FER_PADRAO; } /* os digitados no Previsto x Realizado (config/geral.feriados) */
+/* Calendário de feriados (13/10): nacionais calculados aqui + config/feriados {lista:[{data,nome,tipo}], tirados:[datas em que a fábrica trabalha]}
+   (o RH cadastra os de Gravataí e as pontes da empresa) + os antigos de config/geral.feriados. Vale para dias úteis da produção e para o RH. */
+function ferPascoa(y){ const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31), dia=((h+l-7*m+114)%31)+1; return y+'-'+pad(mes)+'-'+pad(dia); }
+function feriadosNac(y){ const F=(md,nome,tipo)=>({data:y+'-'+md,nome,tipo:tipo||'nacional'});
+  return [F('01-01','Confraternização Universal'),{data:addDias(ferPascoa(y),-2),nome:'Sexta-feira Santa',tipo:'nacional'},F('04-21','Tiradentes'),F('05-01','Dia do Trabalho'),F('09-07','Independência do Brasil'),
+    F('09-20','Revolução Farroupilha (RS)','estadual'),F('10-12','Nossa Senhora Aparecida'),F('11-02','Finados'),F('11-15','Proclamação da República'),F('11-20','Dia da Consciência Negra'),F('12-25','Natal')]; }
+function feriadosSug(y){ const p=ferPascoa(y); return [{data:addDias(p,-48),nome:'Carnaval (segunda)'},{data:addDias(p,-47),nome:'Carnaval (terça)'},{data:addDias(p,60),nome:'Corpus Christi'},{data:y+'-12-24',nome:'Véspera de Natal'},{data:y+'-12-31',nome:'Véspera de Ano-Novo'}]; }
+const _ferC={};
+function feriadosAno(y){ y=+y; const C=S.ferCal||{}, k=y+'|'+JSON.stringify([C.lista||[],C.tirados||[],(S.cfg&&S.cfg.feriados)||null]); if(_ferC[y]&&_ferC[y].k===k) return _ferC[y].v;
+  const fora=new Set(C.tirados||[]), M={};
+  feriadosNac(y).forEach(x=>{ if(!fora.has(x.data)) M[x.data]=x; });
+  ((S.cfg&&Array.isArray(S.cfg.feriados))?S.cfg.feriados:[]).forEach(d=>{ if(String(d).slice(0,4)===String(y)&&!fora.has(d)&&!M[d]) M[d]={data:d,nome:'Feriado',tipo:'empresa'}; });
+  (C.lista||[]).forEach(x=>{ if(x&&String(x.data).slice(0,4)===String(y)) M[x.data]=Object.assign({tipo:'empresa'},x); });
+  const v=Object.values(M).sort((a,b)=>a.data.localeCompare(b.data)); _ferC[y]={k,v}; return v; }
+function feriadoDe(iso){ return iso?feriadosAno(String(iso).slice(0,4)).find(x=>x.data===iso)||null:null; }
+function feriados(){ const y=+hojeStr().slice(0,4), xs=[]; [y-1,y,y+1].forEach(a=>feriadosAno(a).forEach(x=>xs.push(x.data))); if(!(S.cfg&&Array.isArray(S.cfg.feriados))) RIT_FER_PADRAO.forEach(d=>{ if(!xs.includes(d)) xs.push(d); }); return xs.sort(); }
 S.rit={cp:'',fonte:'painel',un:'sc',curva:'',tab:'linhas',cfg:false,ed:null,salvando:false};
 function ritKg(c){ const I=((S.anl.base.itens||{}).l||{})[c]||{}; const d=String(I.d||((itemDe(c)||{}).descricao)||''); const m=d.match(/(\d+(?:[.,]\d+)?)\s*KG\b/i); const k=m?parseFloat(m[1].replace(',','.')):20; return k>0&&k<=60?k:20; }
 function ritDesc(c){ const I=((S.anl.base.itens||{}).l||{})[c]||{}; return String(I.d||((itemDe(c)||{}).descricao)||'').trim(); }
@@ -378,7 +395,7 @@ function ritCfgCard(D){ const E=S.rit.ed, LT=linhasOrd(); const pm=((S.anl.base.
     <div class="chips"><button class="btn sec" data-act="rit-cfg-x" style="height:42px">Cancelar</button><button class="btn" data-act="rit-cfg-ok" style="height:42px" ${S.rit.salvando?'disabled':''}>${S.rit.salvando?'Salvando…':'Salvar'}</button></div></div>
    <div class="rit-cfg-g"><div><div class="label" style="margin-bottom:6px">LINHAS ACOMPANHADAS</div><div class="chips">${LT.map(l=>`<button class="chip" data-act="rit-cfg-l" data-v="${esc(l)}" aria-pressed="${E.linhas.includes(l)}">${esc(l)}</button>`).join('')}</div></div>
     <div><label class="label" for="rit-jor">JORNADA DA LINHA (MINUTOS POR DIA)</label><input class="txt num" id="rit-jor" inputmode="numeric" value="${esc(String(E.jornada||528))}" style="margin-top:6px;max-width:140px"><div class="sub" style="font-size:12px">Usada para converter tempo parado em sacos perdidos (528 = 8h48).</div></div>
-    <div><label class="label" for="rit-fer">FERIADOS E PARADAS COLETIVAS</label><input class="txt" id="rit-fer" value="${esc(E.fer)}" placeholder="12/10/2026, 02/11/2026" style="margin-top:6px"><div class="sub" style="font-size:12px">Não contam como dia útil (vale para toda a Análise PCP).</div></div></div>
+    <div><label class="label" for="rit-fer">FERIADOS E PARADAS COLETIVAS</label><input class="txt" id="rit-fer" value="${esc(E.fer)}" placeholder="12/10/2026, 02/11/2026" style="margin-top:6px"><div class="sub" style="font-size:12px">Não contam como dia útil (vale para toda a Análise PCP). Os feriados nacionais e os do calendário do RH (Cadastros › Feriados) já contam sozinhos.</div></div></div>
    <div class="dbw" style="margin-top:14px"><table class="dbt" style="min-width:${520+E.linhas.length*110}px"><thead><tr><th style="width:40px"></th><th>Item</th><th style="text-align:right">Previsto ${esc(ritMesNome(S.rit.cp))}</th>${E.linhas.map(l=>`<th style="text-align:center">% ${esc(l)}</th>`).join('')}<th style="text-align:center">Embalagem</th></tr></thead><tbody>
     ${cods.map(c=>{ const it=E.itens[c]; return `<tr class="${it?'':'rit-off'}"><td><input type="checkbox" data-rit-on="${esc(c)}" ${it?'checked':''} aria-label="Acompanhar ${esc(c)}" style="width:18px;height:18px;accent-color:var(--teal)"></td><td><b>${esc(c)}</b><small>${esc(ritNome(c))}</small></td><td class="num" style="text-align:right">${anlN(pm[c]||0)}</td>
       ${E.linhas.map(l=>`<td style="text-align:center"><input class="txt num" style="height:36px;width:76px;text-align:right" inputmode="numeric" data-rit-pc="${esc(c)}" data-l="${esc(l)}" value="${it&&it.d&&it.d[l]!=null?it.d[l]:''}" ${it?'':'disabled'} aria-label="% ${esc(l)} ${esc(c)}"></td>`).join('')}
@@ -654,7 +671,7 @@ async function ritCsv(){ const A=S.rit, D=ritDados(A.cp,A.fonte); if(!D) return;
   else lin=[['Item','Descricao','Linhas','Previsto','Realizado','Saldo','% do mes'].map(q).join(';')].concat(D.its.map(x=>{ const k=ritStats(D,{c:x.c}); return [x.c,x.nome,Object.keys(x.dv).map(l=>l+' '+Math.round(x.dv[l]*100)+'%').join(' / '),n(k.T),n(k.ra),n(Math.max(0,k.sal)),k.T?Math.round(k.ra/k.T*100)+'%':''].map(q).join(';'); }));
   try{ await dl.save({filename:'Previsto_x_Realizado_'+A.cp+(A.tab==='dia'?'_diario':'_itens')+'.csv',data:new Blob(['\ufeff'+lin.join('\r\n')],{type:'text/csv'})}); toast('Planilha exportada.'); }catch(e){ if(!e||e.code!=='declined') toast('Não foi possível baixar.'); } }
 
-function ritEdNovo(){ const C=ritCfg(); return {jornada:C.jornada||528,linhas:[...C.linhas],itens:JSON.parse(JSON.stringify(C.itens)),fer:feriados().map(dataBR).join(', ')}; }
+function ritEdNovo(){ const C=ritCfg(); return {jornada:C.jornada||528,linhas:[...C.linhas],itens:JSON.parse(JSON.stringify(C.itens)),fer:ferLegado().map(dataBR).join(', ')}; }
 async function ritSalvarCfg(){ const E=S.rit.ed; if(!E||S.rit.salvando) return; if(!E.linhas.length){ toast('Escolha ao menos uma linha.'); return; }
   const fer=[]; let ruim=''; String(E.fer||'').split(/[,;\s]+/).filter(Boolean).forEach(t=>{ const m=t.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/); if(!m){ ruim=t; return; } let a=m[3]?+m[3]:+S.rit.cp.slice(0,4); if(a<100) a+=2000; fer.push(a+'-'+pad(+m[2])+'-'+pad(+m[1])); });
   if(ruim){ toast('Não entendi o feriado "'+ruim+'". Use dd/mm/aaaa.'); return; }
