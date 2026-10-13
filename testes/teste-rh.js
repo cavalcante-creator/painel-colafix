@@ -6,10 +6,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300);
  ok('RH entra direto no Início do RH', e0.v==='rhinicio', JSON.stringify(e0));
  // cadastro
- await p.click('[data-act="rh-novo"]'); await p.fill('[data-rh-f="nome"]','Ana Souza'); await p.fill('[data-rh-f="cpf"]','123.456.789-00'); await p.click('[data-act="rh-salvar"]'); await H.dorme(300); const t1=await toast();
+ await p.click('[data-act="rh-admnova"]'); await p.fill('[data-rh-f="nome"]','Ana Souza'); await p.fill('[data-rh-f="cpf"]','123.456.789-00'); await p.click('[data-act="rh-salvar"]'); await H.dorme(300); const t1=await toast();
  await p.fill('[data-rh-f="cpf"]','529.982.247-25'); await p.fill('[data-rh-f="funcao"]','Operador de Produção'); await p.fill('[data-rh-f="setor"]','Linha 1'); await p.fill('[data-rh-f="admissao"]','2024-03-10'); await p.fill('[data-rh-f="camisa"]','M');
  await p.click('[data-act="rh-salvar"]'); await H.dorme(700);
- await p.click('[data-act="rh-novo"]'); await p.fill('[data-rh-f="nome"]','Outra Pessoa'); await p.fill('[data-rh-f="cpf"]','52998224725'); await p.click('[data-act="rh-salvar"]'); await H.dorme(300); const t2=await toast(); await p.click('[data-act="rh-fx"]');
+ await p.click('[data-act="rh-admnova"]'); await p.fill('[data-rh-f="nome"]','Outra Pessoa'); await p.fill('[data-rh-f="cpf"]','52998224725'); await p.click('[data-act="rh-salvar"]'); await H.dorme(300); const t2=await toast(); await p.click('[data-act="rh-fx"]');
  let s=await srv(); const fun=Object.entries(s).filter(([k])=>k.startsWith('rh/dados/funcionarios/'));
  ok('Cadastro de funcionário: CPF inválido e CPF repetido recusados; salvo com nome em maiúsculas', /CPF inválido/.test(t1)&&/Já existe/.test(t2)&&fun.length===1&&fun[0][1].nome==='ANA SOUZA'&&fun[0][1].cpf==='52998224725'&&fun[0][1].criadoPor==='uRH', `${t1} | ${t2} | ${fun.length} salvo`);
  // função
@@ -21,8 +21,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  ok('Funções: avisa função sem EPI e salva EPIs (com CA) e uniforme', avisoFunc&&fc&&fc.nome==='Operador de Produção'&&fc.epis[0].ca==='12345'&&fc.uniformes[0].tam==='M', JSON.stringify(fc&&{n:fc.nome,e:fc.epis,u:fc.uniformes}));
  // menu igual ao exemplo (12/10): Dia a dia, Controle de EPI e Retiradas saíram
  const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
- ok('Menu do RH igual ao exemplo, com as telas na lateral', menu==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Funções e EPIs|Terceirizados', menu);
- await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(200); await p.click('[data-act="rh-fgerartela"]'); await H.dorme(400);
+ ok('Menu do RH igual ao exemplo, com as telas na lateral', menu==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Cadastros|Terceirizados', menu);
+ await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(300); await p.click('[data-act="rh-fvgerar"]'); await H.dorme(400);
  // fichas (sistema original dentro do painel)
  await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
  const st=fr?await fr.evaluate(()=>document.getElementById('status-text').textContent):'(sem iframe)';
@@ -42,12 +42,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  const ban=await p.evaluate(()=>({v:__T.S().view,b:!!document.querySelector('[data-act="rh-arq"]')}));
  ok('Link do arquivo abre o painel na tela das fichas com o botão "Abrir arquivo"', ban.v==='rhfichas'&&ban.b, JSON.stringify(ban));
  // importar planilha (pessoa nova, já cadastrada, CPF inválido)
- await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); fs.writeFileSync('/tmp/func.csv','Nome;CPF;Vínculo;Empresa (PJ);Função;Setor;Admissão\nCarlos Lima;111.444.777-35;CLT;;Operador de Produção;Linha 2;05/02/2023\nRepetida;529.982.247-25;;;;;\nInvalido;000.000.000-00;CLT;;X;Y;\nPedro PJ;862.883.667-57;PJ;Nexus;Eletricista;Manutenção;01/08/2024');
+ await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); fs.writeFileSync('/tmp/func.csv','Nome;CPF;Vínculo;Empresa (PJ);CNPJ (PJ);Função;Setor;Admissão\nCarlos Lima;111.444.777-35;CLT;;;Operador de Produção;Linha 2;05/02/2023\nRepetida;529.982.247-25;;;;;;\nInvalido;000.000.000-00;CLT;;;X;Y;\nPedro PJ;;PJ;Nexus;11.222.333/0001-81;Eletricista;Manutenção;01/08/2024\nPJ Sem CNPJ;;PJ;Zenith;;X;Y;');
  await p.click('[data-act="rh-carga"]'); await H.dorme(300); await p.setInputFiles('#rh-cargaf','/tmp/func.csv'); await H.dorme(1200);
  const prv=await p.evaluate(()=>document.querySelector('.rh-form').innerText);
  p.on('dialog',x=>x.accept()); await p.click('[data-act="rh-cargaok"]'); await H.dorme(1500); const ti=await toast(); s=await srv(); const fsx=Object.entries(s).filter(([k])=>k.startsWith('rh/dados/funcionarios/')).map(([k,v])=>v);
  const car=fsx.find(x=>x.nome==='CARLOS LIMA'), pj=fsx.find(x=>x.nome==='PEDRO PJ');
- ok('Importar planilha: cadastra os novos (CLT Colafix, PJ com empresa), não duplica quem já existe e avisa CPF inválido', fsx.length===3&&car&&car.empresa==='COLAFIX'&&car.admissao==='2023-02-05'&&car.funcao==='Operador de Produção'&&pj&&pj.tipo==='PJ'&&pj.empresa==='NEXUS'&&/2 pessoas novas/.test(prv)&&/INVALIDO \(CPF inválido\)/.test(prv)&&/2 pessoas cadastradas/.test(ti), ti+' n='+fsx.length);
+ ok('Importar planilha: cadastra os novos (CLT Colafix, PJ com empresa), não duplica quem já existe e avisa CPF inválido', fsx.length===3&&car&&car.empresa==='COLAFIX'&&car.admissao==='2023-02-05'&&car.funcao==='Operador de Produção'&&pj&&pj.tipo==='PJ'&&pj.empresa==='NEXUS'&&pj.cnpj==='11222333000181'&&/PJ SEM CNPJ \(CNPJ inválido\)/.test(prv)&&/2 pessoas novas/.test(prv)&&/INVALIDO \(CPF inválido\)/.test(prv)&&/2 pessoas cadastradas/.test(ti), ti+' n='+fsx.length);
  console.log('erros:',B.erros.filter(x=>!/404|cdnjs/.test(x))); await B.browser.close();
  // quem não é do RH
  const C=await H.abrir(); await H.preparar(C.page,d); await C.page.goto(H.BASE); await H.entrar(C.page,'operador','ope123'); await H.dorme(2500);

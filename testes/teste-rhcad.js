@@ -1,0 +1,41 @@
+/* Pedidos de 13/10: Cadastros do RH (setores, configurações), fichas a partir de novembro/2026, Ajustes separados por assunto. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={}; /* sem fichasDesde: vale o padrão da fábrica (novembro de 2026) */
+  D['rh/dados/funcionarios/f1']={nome:'ANA SOUZA',cpf:'52998224725',tipo:'CLT',empresa:'COLAFIX',status:'Ativo',setor:'Linha 1',funcao:'Operador'};
+  D['rh/dados/funcionarios/f2']={nome:'BRUNO LIMA',cpf:'11144477735',tipo:'CLT',empresa:'COLAFIX',status:'Ativo',setor:'Expedição',funcao:'Operador'};
+  let B=await H.abrir({viewport:{width:1366,height:900}}); let p=B.page; p.on('dialog',x=>x.accept());
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2800);
+  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), view=()=>p.evaluate(()=>document.getElementById('view').innerText);
+  await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(400); const vf=await view(); const ant=await p.evaluate(()=>!!document.querySelector('[data-act="rh-fmes"][data-v="-1"]'));
+  const hoje=new Date(), antesNov=hoje.getFullYear()*100+hoje.getMonth()+1<202611;
+  ok('Fichas do mês começam em novembro de 2026 (sem voltar para outubro)', antesNov?(/novembro/i.test(vf)&&/começa em novembro de 2026/.test(vf)&&!ant):!/outubro de 2026/i.test(vf.split('\n')[2]||''), vf.slice(0,160).replace(/\n/g,' | '));
+  await p.evaluate(()=>__T.go('rhfuncoes')); await H.dorme(300); const vc=await view();
+  ok('Cadastros do RH: Funções e EPIs, Setores e Configurações', /Cadastros do RH/.test(vc)&&/Funções e EPIs/.test(vc)&&/Setores/.test(vc)&&/Configurações/.test(vc));
+  await p.click('[data-act="rh-cad"][data-v="setores"]'); await H.dorme(300); const vs=await view();
+  await p.click('[data-act="rh-setall"]'); await H.dorme(500); await p.fill('#rh-setn','Manutenção'); await p.click('[data-act="rh-setadd"]'); await H.dorme(500);
+  await p.fill('#rh-setn','manutenção'); await p.click('[data-act="rh-setadd"]'); await H.dorme(300); const tdup=await p.evaluate(()=>document.getElementById('toast').innerText);
+  await p.click('[data-act="rh-setdel"][data-v="Manutenção"]'); await H.dorme(500); let s=await srv();
+  ok('Setores: avisa os usados sem cadastro, "Cadastrar todos", cadastrar, recusar repetido e tirar (só sem pessoas)', /ainda não cadastrados: Expedição, Linha 1/.test(vs)&&JSON.stringify(s['rh/config'].setores)==='["Expedição","Linha 1"]'&&/já está cadastrado/.test(tdup)&&!(await p.$('[data-act="rh-setdel"][data-v="Linha 1"]')), JSON.stringify(s['rh/config'].setores));
+  await p.click('[data-act="rh-cad"][data-v="config"]'); await H.dorme(300); await p.fill('#rh-cpz','20'); await p.fill('#rh-ccid','Cachoeirinha'); await p.fill('#rh-cdoc','RG\nCPF'); await p.click('[data-act="rh-cfgsalvar"]'); await H.dorme(500); s=await srv();
+  ok('Configurações do RH: dias de aviso, cidade, documentos da admissão e início das fichas', s['rh/config'].prazoAviso===20&&s['rh/config'].cidade==='Cachoeirinha'&&JSON.stringify(s['rh/config'].docsAdmissao)==='["RG","CPF"]'&&s['rh/config'].fichasDesde==='2026-11', JSON.stringify(s['rh/config']));
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); const dois=await p.evaluate(()=>({adm:!!document.querySelector('.head [data-act="rh-admnova"]'),novo:!!document.querySelector('[data-act="rh-novo"]')}));
+  await p.click('.head [data-act="rh-admnova"]'); await H.dorme(300); const opts=await p.evaluate(()=>[...document.querySelectorAll('#rh-setores option')].map(o=>o.value));
+  await p.fill('[data-rh-f="nome"]','Carla Nova'); await p.fill('[data-rh-f="cpf"]','74682489070'); await p.fill('[data-rh-f="setor"]','Almoxarifado'); await p.click('[data-act="rh-salvar"]'); await H.dorme(800); s=await srv();
+  ok('Um botão só (Nova admissão); setor com a lista do cadastro, e setor novo entra no cadastro', dois.adm&&!dois.novo&&opts.includes('Expedição')&&s['rh/config'].setores.includes('Almoxarifado'), JSON.stringify({dois,opts,set:s['rh/config'].setores}));
+  const e1=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close();
+  // Ajustes separados por assunto
+  B=await H.abrir({viewport:{width:1366,height:900}}); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
+  await p.evaluate(()=>{ try{ localStorage.removeItem('aj-grupo'); }catch(e){} __T.go('ajustes'); }); await H.dorme(600);
+  const vis=()=>p.evaluate(()=>[...document.querySelectorAll('#view section.card h2, #view .two h2')].filter(h=>h.offsetParent).map(h=>h.innerText));
+  const g0=await vis(), ch=await p.evaluate(()=>[...document.querySelectorAll('.aj-sub .chip')].map(b=>b.innerText));
+  await p.click('.aj-sub [data-v="dados"]'); await H.dorme(300); const g1=await vis(); const salv=await p.evaluate(()=>{ const b=document.querySelector('[data-act="aj-salvar"]'); return !!(b&&b.offsetParent); });
+  await p.click('.aj-sub [data-v="silos"]'); await H.dorme(300); const g2=await vis();
+  ok('Ajustes separados por assunto (Produção, Silos e cimento, Almoxarifado, Backup e dados)', ch.join('|').startsWith('Produção|Silos e cimento|Almoxarifado|Backup e dados')&&g0.includes('Ordens de produção')&&!g0.includes('Silos e capacidades')&&g1.includes('Backup e arquivo')&&g1.length<=3&&!salv&&g2.includes('Silos e capacidades')&&g2.includes('Produtos')&&!g2.includes('Ordens de produção'), JSON.stringify({ch,g0,g1,g2}));
+  await p.fill('#aj-normal','55'); await p.click('[data-act="aj-salvar"]'); await H.dorme(800); s=await srv();
+  ok('Salvar ajustes continua salvando (mesmo com outras seções escondidas)', s['config/geral']&&s['config/geral'].limites&&+s['config/geral'].limites.normal===55, JSON.stringify(s['config/geral']&&s['config/geral'].limites));
+  const e2=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close();
+  ok('Nenhum erro de JavaScript', !e1.length&&!e2.length, e1.concat(e2).join(' | '));
+  const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
+})().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

@@ -1412,3 +1412,21 @@ function movePainel(o){ const C=S.cal, e=entregueDe(o); const d=C.md||dataEf(o)|
   </section>`; }
 document.head.insertAdjacentHTML('beforeend','<style>.cal-lst .cal-lg{display:grid;gap:8px}.cal-lst .cal-hj{border:1.5px solid var(--teal)}</style>');
 { let w0=window.innerWidth; window.addEventListener('resize',()=>{ const w=window.innerWidth; if((w<700)!==(w0<700)&&S.view==='calendario'&&typeof calRO==='function'&&calRO()) { w0=w; try{ rerenderSeguro(); }catch(e){} } else w0=w; }); }
+
+/* Ajustes separados por assunto (pedido de 13/10): as seções continuam na mesma tela (o "Salvar ajustes" lê todos os campos),
+   só mostramos as do assunto escolhido. Seção nova sem assunto conhecido cai em "Outros". */
+const AJ_GRUPOS=[['prod','Produção',/Sequência de cores|Linhas de produção|Motivos de parada|Ordens de produção/],['silos','Silos e cimento',/Silos e capacidades|Produtos|Limites de cor|WhatsApp/],
+  ['almox','Almoxarifado',/almoxarifado/i],['dados','Backup e dados',/Backup|Trazer os dados/]];
+let ajGrupo=(()=>{ try{ return localStorage.getItem('aj-grupo')||'prod'; }catch(e){ return 'prod'; } })();
+function ajSeparar(){ if(S.view!=='ajustes') return; const v=document.getElementById('view'); if(!v) return; const abas=v.querySelector(':scope > .chips'); if(!abas) return;
+  const secs=[...v.children].filter(e=>e!==abas&&!e.classList.contains('head')&&!e.classList.contains('aj-sub')&&!e.classList.contains('banner'));
+  const tem=new Set(); let salvar=null;
+  secs.forEach(e=>{ if(e.querySelector('[data-act="aj-salvar"]')&&!e.querySelector('h2')){ salvar=e; return; } const t=(e.querySelector('h2')||{}).innerText||''; const g=(AJ_GRUPOS.find(x=>x[2].test(t))||['outros'])[0]; e.dataset.ajg=g; tem.add(g); });
+  if(!tem.has(ajGrupo)) ajGrupo=[...AJ_GRUPOS.map(x=>x[0]),'outros'].find(g=>tem.has(g))||'prod';
+  secs.forEach(e=>{ if(e===salvar) e.style.display=['prod','silos','almox'].includes(ajGrupo)?'':'none'; else e.style.display=e.dataset.ajg===ajGrupo?'':'none'; });
+  let sub=v.querySelector('.aj-sub'); const html=[...AJ_GRUPOS,['outros','Outros']].filter(g=>tem.has(g[0])).map(([k,l])=>`<button class="chip" data-act="aj-grupo" data-v="${k}" aria-pressed="${ajGrupo===k}">${l}</button>`).join('');
+  if(!sub){ sub=document.createElement('div'); sub.className='chips aj-sub'; sub.setAttribute('aria-label','Assunto'); abas.after(sub); }
+  if(sub.innerHTML!==html) sub.innerHTML=html; }
+{ let pend=false; new MutationObserver(()=>{ if(!pend){ pend=true; requestAnimationFrame(()=>{ pend=false; ajSeparar(); }); } }).observe(document.body,{childList:true,subtree:true}); }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="aj-grupo"]'); if(!b) return; ajGrupo=b.dataset.v; try{ localStorage.setItem('aj-grupo',ajGrupo); }catch(e){} ajSeparar(); });
+document.head.insertAdjacentHTML('beforeend','<style>.aj-sub{margin:-6px 0 16px;padding:10px 12px;background:var(--surface);border-radius:12px;border:1px solid var(--line)}.aj-sub .chip{height:36px}</style>');
