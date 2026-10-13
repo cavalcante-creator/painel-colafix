@@ -339,7 +339,7 @@
     return topo('Cadastros do RH','Valem para todo o RH.',cadSeg())
       +`<section class="card rh-form"><div class="rh-g">
         <label><span class="label">Avisar quantos dias antes (férias, experiência, PJ, terceirizados)</span><input class="txt" id="rh-cpz" type="number" min="1" max="90" value="${esc(c.prazoAviso||15)}"></label>
-        <label><span class="label">Cidade (nos documentos)</span><input class="txt" id="rh-ccid" value="${esc(c.cidade||'Gravataí')}"></label>
+        <label><span class="label">Cidade (nos documentos)</span><input class="txt" id="rh-ccid" value="${esc(c.cidade||'Cachoeirinha')}"></label>
         <label><span class="label">Fichas do mês: controlar a partir de</span><input class="txt" id="rh-cfd" type="month" value="${esc(m)}"></label></div>
         <label style="display:block;margin-top:12px"><span class="label">Documentos da admissão (um por linha)</span><textarea class="txt" id="rh-cdoc" rows="6">${esc(docsAdm().join('\n'))}</textarea></label>
         <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" data-act="rh-cfgsalvar">Salvar configurações</button></div></section>`; }
@@ -428,12 +428,12 @@
   function valores(f,ex,fer){ ex=ex||{}; const g=k=>ex[k]!=null&&ex[k]!==''?ex[k]:f[k]; const e=EMP_DOC[f.tipo==='PJ'?f.empresa:'COLAFIX'], sal=numBR(g('salario')), pb=f.tipo==='PJ'?pjBase(f):'';
     return Object.assign(ocVals(f),{NOME:f.nome||'',CPF:fCPF(f.cpf),NASCIMENTO:br(f.nascimento),ENDERECO:[f.endereco,f.cep?'CEP '+f.cep:''].filter(Boolean).join(' · '),FUNCAO:g('funcao')||'',SETOR:g('setor')||'',ADMISSAO:br(g('admissao')),VINCULO:f.tipo==='PJ'?'PJ':'CLT',
       EMPRESA:e?e.nome:empNome(f.empresa),CNPJ:e?e.cnpj:'',CNPJ_PJ:f.tipo==='PJ'&&f.cnpj?fCNPJ(f.cnpj):'',SALARIO:sal!=null?brl(sal):'',SALARIO_EXTENSO:sal!=null?extenso(sal):'',JORNADA:g('jornada')||'',TELEFONE:g('telefone')||'',
-      CIDADE:R.cfg.cidade||'Gravataí',DATA_HOJE:dataExt(),
+      CIDADE:R.cfg.cidade||'Cachoeirinha',DATA_HOJE:dataExt(),
       FERIAS_INICIO:fer?br(fer.inicio):'',FERIAS_FIM:fer?br(fer.fim):'',FERIAS_DIAS:fer?String(fer.dias):'',FERIAS_RETORNO:fer?br(fer.retorno):'',PERIODO_AQUISITIVO:fer?br(fer.aquisitivo)+' a '+br(fer.aquisitivoFim):'',
       ULTIMA_TROCA:pb?br(pb):'',PROXIMA_TROCA:pb?br(addMeses(pb,3)):'',EXP_FIM_1:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim1(f)):'',EXP_FIM_2:f.tipo!=='PJ'&&okIso(f.admissao)?br(expFim2(f)):'',
       DESLIGAMENTO:okIso(f.desligamento)?br(f.desligamento):okIso(R.dg.deslData)?br(R.dg.deslData):''}); }
   const EX_FER={inicio:'2026-11-03',fim:'2026-11-22',dias:20,retorno:'2026-11-23',aquisitivo:'2025-03-10',aquisitivoFim:'2026-03-09'};
-  const EXEMPLO={nome:'MARIA DA SILVA',cpf:'00000000000',nascimento:'1990-04-12',endereco:'Rua das Flores, 120 · Centro · Gravataí',funcao:'Operadora de produção',setor:'Linha 1',admissao:'2024-03-10',tipo:'CLT',empresa:'COLAFIX',salario:2150,jornada:'44 horas semanais',telefone:'(51) 90000-0000'};
+  const EXEMPLO={nome:'MARIA DA SILVA',cpf:'00000000000',nascimento:'1990-04-12',endereco:'Rua das Flores, 120 · Centro · Cachoeirinha',funcao:'Operadora de produção',setor:'Linha 1',admissao:'2024-03-10',tipo:'CLT',empresa:'COLAFIX',salario:2150,jornada:'44 horas semanais',telefone:'(51) 90000-0000'};
   const tkHTML=k=>`<span class="rh-tk" contenteditable="false" data-k="${k}">${esc(CAMPO_NOME(k))}</span>`;
   /* campo perguntado: no Word {?Data de início das férias}; o painel pergunta na hora de gerar */
   const tqHTML=q=>`<span class="rh-tq" contenteditable="false" data-q="${esc(q)}">? ${esc(q)}</span>`;
@@ -1074,7 +1074,7 @@
     return av; }
 
   /* ---------- Feriados (nacionais calculados pelo painel + os cadastrados aqui; valem para o RH e para a produção) ---------- */
-  const FER_TIPOS=[['municipal','Municipal (Gravataí)'],['empresa','Ponte / folga da empresa'],['estadual','Estadual'],['outro','Outro']];
+  const FER_TIPOS=[['municipal','Municipal (Cachoeirinha)'],['empresa','Ponte / folga da empresa'],['estadual','Estadual'],['outro','Outro']];
   const ferTipoNome=t=>({nacional:'Nacional',estadual:'Estadual',municipal:'Municipal',empresa:'Ponte da empresa',outro:'Outro'})[t]||'Feriado';
   const ferAno=y=>P.feriadosAno?P.feriadosAno(y):[], feriadoDe=iso=>P.feriadoDe?P.feriadoDe(iso):null;
   async function ferSalvar(up){ const c=Object.assign({lista:[],tirados:[]},P.ferCal?P.ferCal():{}); Object.assign(c,up);
@@ -1087,10 +1087,10 @@
         ${nac.length?`<div class="sub" style="margin:12px 0 0;font-size:13px">A fábrica trabalha em: ${nac.map(x=>`${esc(x.nome)} (${br(x.data).slice(0,5)}) <button class="lnk" data-act="rh-fervolta" data-v="${x.data}">voltar a ser feriado</button>`).join(' · ')}</div>`:''}
         ${sug.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">MUITAS EMPRESAS FOLGAM (incluir se a Colafix folgar)</div><div class="rh-chips" style="margin:0">${sug.map(s=>`<button class="rh-chip2" data-act="rh-fersug" data-v="${s.data}" data-n="${esc(s.nome)}">+ ${esc(s.nome)} · ${br(s.data).slice(0,5)}</button>`).join('')}</div>`:''}
         <div class="rh-sep"></div><div class="label" style="margin-bottom:6px">NOVO FERIADO OU PONTE</div>
-        <div class="rh-g"><label><span class="label">Data</span><input class="txt" type="date" id="rh-fhd"></label><label><span class="label">Nome</span><input class="txt" id="rh-fhn" placeholder="ex.: Aniversário de Gravataí, ponte de Natal"></label>
+        <div class="rh-g"><label><span class="label">Data</span><input class="txt" type="date" id="rh-fhd"></label><label><span class="label">Nome</span><input class="txt" id="rh-fhn" placeholder="ex.: Aniversário de Cachoeirinha, ponte de Natal"></label>
           <label><span class="label">Tipo</span><select class="txt" id="rh-fht">${FER_TIPOS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></label></div>
         <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn" data-act="rh-feradd">${P.ic('mais',18,2.4)}Incluir</button></div>
-        <div class="sub" style="margin:10px 0 0;font-size:12.5px">Os nacionais o painel já sabe sozinho (incluindo Sexta-feira Santa). Cadastre aqui os de Gravataí e as pontes da empresa.</div></section>`; }
+        <div class="sub" style="margin:10px 0 0;font-size:12.5px">Os nacionais o painel já sabe sozinho (incluindo Sexta-feira Santa). Cadastre aqui os de Cachoeirinha e as pontes da empresa.</div></section>`; }
   /* CLT, art. 134 §3º: as férias não podem começar nos 2 dias antes de feriado ou do domingo (repouso semanal) */
   function ferInicioAviso(d){ if(!okIso(d)) return ''; const ms=[]; [1,2].forEach(k=>{ const x=addDias(d,k), w=dU(x).getUTCDay(), fe=feriadoDe(x); if(w===0) ms.push('domingo '+br(x).slice(0,5)); if(fe) ms.push(fe.nome+' '+br(x).slice(0,5)); });
     return ms.length?`<div class="banner" style="background:var(--crit-tint);color:var(--crit-ink);margin:10px 0 0"><b>Atenção:</b> pela CLT, as férias não podem começar nos 2 dias antes de feriado ou do domingo (${esc(ms.join(', '))}). Escolha outro dia de início.</div>`:''; }
@@ -1369,7 +1369,7 @@
       if(a==='rh-setall'){ const cad=setoresCad(); await setoresSalvar(cad.concat(unicos('setor').filter(n=>!cad.some(c=>norm(c)===norm(n))))); P.toast('Setores cadastrados.'); P.render(); return; }
       if(a==='rh-cfgsalvar'){ const pz=+document.getElementById('rh-cpz').value, cid=document.getElementById('rh-ccid').value.trim(), fd=document.getElementById('rh-cfd').value, docs=document.getElementById('rh-cdoc').value.split('\n').map(x=>x.trim()).filter(Boolean);
         if(!(pz>=1&&pz<=90)) return P.toast('Dias de aviso: de 1 a 90.'); if(fd&&!/^\d{4}-\d{2}$/.test(fd)) return P.toast('Mês inválido.');
-        const up={prazoAviso:pz,cidade:cid||'Gravataí',docsAdmissao:docs.length?docs:DOCS_ADM_PADRAO,alteradoEm:agora()}; if(fd) up.fichasDesde=fd;
+        const up={prazoAviso:pz,cidade:cid||'Cachoeirinha',docsAdmissao:docs.length?docs:DOCS_ADM_PADRAO,alteradoEm:agora()}; if(fd) up.fichasDesde=fd;
         await P.db().doc('rh/config').set(up,{merge:true}); Object.assign(R.cfg,up); if(R.fmes<FDESDE()) R.fmes=FDESDE(); P.toast('Configurações salvas.'); P.render(); return; }
       if(a==='rh-fnovo'){ R.ff={nome:b.dataset.n||'',epis:[],uniformes:[]}; P.render(); window.scrollTo(0,0); return; }
       if(a==='rh-fed'){ R.ff=JSON.parse(JSON.stringify(R.funcoes.find(x=>x._id===b.dataset.id))); P.render(); window.scrollTo(0,0); return; }

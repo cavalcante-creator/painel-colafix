@@ -141,7 +141,7 @@ const RIT_FER_PADRAO=['2026-10-12'];
 function ritCfg(){ const r=S.cfg&&S.cfg.ritmo; return r&&r.itens&&Array.isArray(r.linhas)?r:Object.assign({},RIT_PADRAO,{linhas:linhasOrd().slice()}); } /* sem configuração salva: acompanha todas as linhas */
 function ferLegado(){ return (S.cfg&&Array.isArray(S.cfg.feriados))?S.cfg.feriados:RIT_FER_PADRAO; } /* os digitados no Previsto x Realizado (config/geral.feriados) */
 /* Calendário de feriados (13/10): nacionais calculados aqui + config/feriados {lista:[{data,nome,tipo}], tirados:[datas em que a fábrica trabalha]}
-   (o RH cadastra os de Gravataí e as pontes da empresa) + os antigos de config/geral.feriados. Vale para dias úteis da produção e para o RH. */
+   (o RH cadastra os de Cachoeirinha e as pontes da empresa) + os antigos de config/geral.feriados. Vale para dias úteis da produção e para o RH. */
 function ferPascoa(y){ const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
   const mes=Math.floor((h+l-7*m+114)/31), dia=((h+l-7*m+114)%31)+1; return y+'-'+pad(mes)+'-'+pad(dia); }
 function feriadosNac(y){ const F=(md,nome,tipo)=>({data:y+'-'+md,nome,tipo:tipo||'nacional'});
