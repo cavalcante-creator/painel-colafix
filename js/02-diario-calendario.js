@@ -473,7 +473,7 @@ function dbHoraEnt(){ return (S.cfg&&S.cfg.prazoEntregaRancho)||'17:00'; }
 function dbPrazoMin(o){ const h=hojeStr(), d0=dataEf(o)||h, d=d0<h?h:d0; const [hh,mm]=dbHoraEnt().split(':').map(Number); const dl=new Date(d+'T'+String(hh).padStart(2,'0')+':'+String(mm||0).padStart(2,'0')+':00'); return Math.round((dl-new Date())/6e4); } /* minutos: separar depois de enviado; conferir depois de entregue */
 S.dbo={dia:'',linha:'todas',aberto:null,f:null,so:'',modo:'',pri:''};
 function dbMaster(){ const p=acsP(); return !!(S.acs&&S.acs.dono)||!!(p&&p.tudo); }
-function dbPode(){ const p=acsP(); return {alm:!!p&&(p.tudo||p.mods.includes('producao')||p.mods.includes('almox')), prod:!!p&&(p.tudo||p.mods.includes('producao'))}; }
+function dbPode(){ const p=acsP(); return {alm:!!p&&(p.tudo||p.mods.includes('producao')||p.mods.includes('almox')||p.mods.includes('premix')), prod:!!p&&(p.tudo||p.mods.includes('producao'))}; }
 function dbMenosAberto(e){ return !!(e.conf&&e.conf.falta&&!e.compRec&&!(e.fim&&e.fim.st==='encerrado')); }
 function dbEt(o){ const rc=o.rancho?ranchoDe(o.rancho):null, r=o.rdb||{};
   return {rc, emi:rc&&(rc.criadoEm||rc.atualizadoEm)||null, env:rc&&rc.enviadoEm||null, sep:r.sep||null, ent:r.ent||null, conf:r.conf||null, comp:r.comp||null, compRec:r.compRec||null, fim:r.fim||null}; }
