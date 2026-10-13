@@ -51,7 +51,8 @@
     if (c === 'auth/weak-password') return 'A senha precisa ter pelo menos 6 caracteres.';
     if (c === 'auth/email-already-in-use') return 'Esse usuário já existe.';
     if (c === 'auth/requires-recent-login') return 'Por segurança, saia e entre de novo antes de trocar a senha.';
-    if (c === 'auth/operation-not-allowed') return 'O login por usuário e senha está desligado no Firebase. Avise o administrador.';
+    if (c === 'auth/operation-not-allowed') return 'O login por usuário e senha está desligado no Firebase (Authentication › Método de login › E-mail/senha). Avise o administrador.';
+    if (c === 'auth/configuration-not-found') return 'O login ainda não foi ativado neste Firebase (Authentication › Vamos começar › E-mail/senha).';
     if (c === 'permission-denied' || c === 'sem-permissao') return 'Sem permissão para esta operação.';
     return 'Não foi possível concluir agora. Tente novamente.' + (c ? ' (' + c + ')' : ''); }
   const erroCod = e => { if (e && !e.code) e.code = 'erro'; if (e && e.code === 'permission-denied') e.code = 'sem-permissao'; return e; };
@@ -103,7 +104,7 @@
   async function perfis(ids) { const out = {};
     await Promise.all([...new Set(ids)].map(async id => {
       if (id in cacheNomes) { out[id] = cacheNomes[id]; return; }
-      try { const g = await Promise.race([fs.doc('perfis/' + id).get(), new Promise((_, er) => setTimeout(() => er({ code: 'tempo-esgotado' }), 8000))]); const d = g.exists ? g.data() : null; cacheNomes[id] = d ? { name: d.nome || d.usuario || '', email: d.usuario || d.email || '' } : null; }
+      try { const g = await Promise.race([fs.doc('perfis/' + id).get(), new Promise((_, er) => setTimeout(() => er({ code: 'tempo-esgotado' }), 8000))]); const d = g.exists ? g.data() : null; cacheNomes[id] = d ? { name: d.nome || d.usuario || '', email: d.usuario || d.email || '', projeto: d.projeto || '', importado: !!d.importado } : null; }
       catch (e) { cacheNomes[id] = null; }
       out[id] = cacheNomes[id]; }));
     return out; }
@@ -236,10 +237,10 @@
       try {
         if (pri) { if (!DONOS.includes(em)) { er.textContent = 'O primeiro acesso é só da responsável pelo PCP. As outras contas o PCP cria em Equipe e cargos.'; volta(); return; }
           const nome = el.querySelector('#lg-n').value.trim(); const c = await auth.createUserWithEmailAndPassword(em, se);
-          await c.user.updateProfile({ displayName: nome }); await fs.doc('perfis/' + c.user.uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString() }); }
+          try { await c.user.updateProfile({ displayName: nome }); } catch (x) {} try { await fs.doc('perfis/' + c.user.uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString(), projeto: (CFG.firebase || {}).projectId || '' }); } catch (x) { console.warn('[login] perfil', x && x.code); } }
         else await auth.signInWithEmailAndPassword(em, se);
         b.textContent = 'Carregando seu acesso…'; /* autenticou: o painel abre e confere o perfil (não é erro de senha) */
-      } catch (e) { try { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : msgErro(e); }
+      } catch (e) { try { er.textContent = e && e.code === 'auth/email-already-in-use' ? 'Esse usuário já existe. Volte e entre com ele.' : !pri && e && /invalid-credential|user-not-found|invalid-login/.test(e.code || '') && DONOS.includes(em) ? 'Usuário ou senha incorretos. Se é a primeira vez neste painel, toque em "Primeiro acesso" (embaixo) para criar a sua conta.' : msgErro(e); }
         catch (x) { er.textContent = 'Não foi possível entrar agora. Tente novamente.'; } volta(); } };
     setTimeout(() => { const i = el.querySelector('input'); i && i.focus(); }, 50);
     if (!logo) document.addEventListener('DOMContentLoaded', () => { const src = (document.querySelector('.brand img') || {}).src, bx = el.querySelector('.bx'); if (src && bx && !bx.querySelector('.lg-logo')) { const im = document.createElement('img'); im.className = 'lg-logo'; im.src = src; im.alt = 'Colafix'; bx.prepend(im); } }, { once: true });
@@ -428,7 +429,7 @@
     const c = await sec.auth().createUserWithEmailAndPassword(em, senha); const uid = c.user.uid;
     try { await c.user.updateProfile({ displayName: nome }); } catch (e) {}
     await sec.auth().signOut();
-    await fs.doc('perfis/' + uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString(), criadoPor: EU.uid });
+    await fs.doc('perfis/' + uid).set({ nome, usuario: usuarioDe(em), criadoEm: new Date().toISOString(), criadoPor: EU.uid, projeto: (CFG.firebase || {}).projectId || '' });
     return uid; }
   /* menu do usuário: tocar no nome/avatar no topo */
   document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('[data-act="sair-conta"]')) { sair(); return; }

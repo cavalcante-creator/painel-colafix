@@ -885,6 +885,15 @@ function eqSenha(){ const L='abcdefghjkmnpqrstuvwxyz', a=new Uint32Array(7); cry
 function eqIni(n){ return String(n||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
 function eqCorDe(id){ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return EQ_COR[h%EQ_COR.length]; }
 function eqVis(d){ return d&&d._id!=='_geral'&&!d.apagado; }
+/* Projeto novo do Firebase (13/10/2026): as pessoas que vieram na cópia ainda não têm login aqui ("sem login").
+   Recriar com o mesmo usuário (pode ser a mesma senha) herda o cargo e os ajustes por pessoa; o cadastro antigo é marcado como apagado. */
+function eqProjeto(){ const c=window.PAINEL_CONFIG||{}; return !c.projetoAntigo&&c.firebase&&c.firebase.projectId||''; }
+function eqSemLogin(id){ const E=S.eq; return !!eqProjeto()&&id!==S.uid&&!!E.proj&&E.proj[id]==='importado'; } /* perfil que veio na cópia (backup importado) */
+function eqAntigoDe(usu){ const E=S.eq, u=eqLimpo(usu); return u?(S.acs.lista||[]).find(d=>eqVis(d)&&eqSemLogin(d._id)&&eqLimpo(E.usu[d._id]||'')===u)||null:null; }
+async function eqHerdar(uid,ant,cargo){ let c=Object.assign({},ant); delete c._id; if(cargo&&cargo!==ant.perfil) c=Object.assign(c,acsPreset(cargo));
+  Object.assign(c,{herdadoDe:ant._id,ativo:true,apagado:false,alteradoEm:new Date().toISOString(),alteradoPor:S.uid||null});
+  try{ await S.db.doc('acessos/'+uid).set(c); }catch(e){ erro(e); return false; }
+  try{ await S.db.doc('acessos/'+ant._id).update({apagado:true,ativo:false,migradoPara:uid}); }catch(e){} return true; }
 /* cargos: os prontos (do painel) + os criados por você */
 function eqCargos(){ const ps=(S.acs.lista||[]).filter(eqVis); const n=k=>ps.filter(d=>(d.perfil||'outro')===k).length;
   const ord=k=>{ const i=EQ_PRONTO_ORD.indexOf(k); return i<0?99:i; };
@@ -895,7 +904,7 @@ function eqModsDe(d){ const c=pnlCargo(d.perfil); return c?(c.mods||[]):(d.mods|
 function eqIcones(mods,max){ max=max||6; const ms=(mods||[]).filter(m=>EQ_MOD[m]); return `<span class="eq-ics">${ms.slice(0,max).map(m=>`<span class="eq-mi" title="${esc(EQ_MOD[m][1])}">${ic(EQ_MOD[m][0],15,2)}</span>`).join('')}${ms.length>max?`<span class="eq-mi more">+${ms.length-max}</span>`:''}</span>`; }
 function eqUsuario(id){ return S.eq.usu[id]||''; }
 async function eqCarregaUsu(){ const E=S.eq; if(!S.user) return; const ids=[...(S.acs.lista||[]),...(S.acs.pedidos||[])].map(x=>x._id).filter(i=>i&&i!=='_geral'&&!(i in E.usu)); if(!ids.length) return;
-  ids.forEach(i=>E.usu[i]=''); try{ const ps=await S.user.profiles(ids); let mud=false; ids.forEach(i=>{ const p=ps&&ps[i]; if(p){ if(p.email&&!String(p.email).includes('@')){ E.usu[i]=p.email; mud=true; } if(p.name&&!S.nomes[i]){ S.nomes[i]=p.name; mud=true; } } }); if(mud) rerenderSeguro(); }catch(e){} }
+  ids.forEach(i=>E.usu[i]=''); try{ const ps=await S.user.profiles(ids); let mud=false; E.proj=E.proj||{}; ids.forEach(i=>{ const p=ps&&ps[i]; if(p){ E.proj[i]=p.importado&&!p.projeto?'importado':(p.projeto||''); if(E.proj[i]==='importado') mud=true; if(p.email&&!String(p.email).includes('@')){ E.usu[i]=p.email; mud=true; } if(p.name&&!S.nomes[i]){ S.nomes[i]=p.name; mud=true; } } }); if(mud) rerenderSeguro(); }catch(e){} }
 function eqSelCargo(sel,attrs){ const C=eqCargos(); return `<select class="txt eq-sel" ${attrs||''}>${C.meus.length?`<optgroup label="Seus cargos">${C.meus.map(c=>`<option value="${c.k}" ${c.k===sel?'selected':''}>${esc(c.nome)}</option>`).join('')}</optgroup>`:''}<optgroup label="Cargos prontos">${C.prontos.map(c=>`<option value="${c.k}" ${c.k===sel?'selected':''}>${esc(c.nome)}</option>`).join('')}</optgroup>${sel&&!C.todos.some(c=>c.k===sel)?`<option value="${esc(sel)}" selected>Personalizado</option>`:''}</select>`; }
 
 vAcessos=function(){ const A=S.acs, E=S.eq; if(!A.dono) return acsCaixa('Somente a responsável','Esta tela é só da dona do painel.');
@@ -916,7 +925,10 @@ function eqPessoas(){ const A=S.acs, E=S.eq, C=eqCargos();
   if(E.fil) ps=ps.filter(d=>(d.perfil||'outro')===E.fil);
   if(q) ps=ps.filter(d=>eqLimpo(d.nome+' '+eqUsuario(d._id)+' '+pnlPerfilNome(d.perfil)).replace(/\./g,' ').includes(q));
   const chips=Object.keys(cnt).length>1?`<div class="eq-fil"><button class="chip" data-act="eq-fil" data-v="" aria-pressed="${!E.fil}">Todos · ${(A.lista||[]).filter(eqVis).length}</button>${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<button class="chip" data-act="eq-fil" data-v="${esc(k)}" aria-pressed="${E.fil===k}">${esc(pnlPerfilNome(k))} · ${n}</button>`).join('')}</div>`:'';
-  const card=d=>{ const id=d._id, bl=d.ativo===false, u=eqUsuario(id), conf=E.conf===id;
+  const card=d=>{ const id=d._id, bl=d.ativo===false, u=eqUsuario(id), conf=E.conf===id, sl=eqSemLogin(id);
+    if(sl&&!conf) return `<article class="eq-p off"><div class="eq-pt"><span class="eq-av" style="background:${eqCorDe(id)}">${esc(eqIni(d.nome))}</span><div class="eq-pn"><b>${esc(d.nome)}</b><small>${u?'@'+esc(u):'&nbsp;'} · ${esc(pnlPerfilNome(d.perfil))}</small></div><span class="pill warn">sem login</span></div>
+     <div class="eq-pm sub" style="font-size:12.5px">Veio da cópia. Recrie o login (pode ser a mesma senha): o cargo e os ajustes continuam.</div>
+     <div class="eq-pa"><button class="btn" data-act="eq-recriar" data-id="${esc(id)}">Recriar login</button><button class="eq-lk del" data-act="eq-conf" data-id="${esc(id)}">${ic('lixo',15,2)}Apagar</button></div></article>`;
     return `<article class="eq-p ${bl?'off':''}">
      <div class="eq-pt"><span class="eq-av" style="background:${eqCorDe(id)}">${esc(eqIni(d.nome))}</span><div class="eq-pn"><b>${esc(d.nome)}</b><small>${u?'@'+esc(u):'&nbsp;'}</small></div>${bl?'<span class="pill crit">bloqueado</span>':''}</div>
      <label class="eq-pc"><span>Cargo</span>${eqSelCargo(d.perfil||'outro',`data-eq-cargo="${esc(id)}"`)}</label>
@@ -929,6 +941,7 @@ function eqPessoas(){ const A=S.acs, E=S.eq, C=eqCargos();
     ${pend.map(p=>`<div class="eq-pr"><span class="eq-av sm" style="background:${eqCorDe(p._id)}">${esc(eqIni(acsNome(p._id)))}</span><div class="eq-pn"><b>${esc(acsNome(p._id))}</b><small>${eqUsuario(p._id)?'@'+esc(eqUsuario(p._id))+' · ':''}${p.em?'pediu '+dia(p.em).toLowerCase()+' às '+hora(p.em):''}</small></div>
      ${eqSelCargo('',`id="eq-pp-${esc(p._id)}"`).replace('<optgroup','<option value="" selected>Escolha o cargo…</option><optgroup')}<button class="btn" data-act="eq-liberar" data-id="${esc(p._id)}">Liberar</button><button class="btn sec" data-act="eq-recusar" data-id="${esc(p._id)}">Recusar</button></div>`).join('')}</section>`:''}
    ${ed}
+   ${(()=>{ const n=ps.filter(d=>eqSemLogin(d._id)).length; return n?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink)"><b>${n} ${n===1?'pessoa veio':'pessoas vieram'} da cópia e ainda não ${n===1?'tem':'têm'} login neste painel.</b> Toque em <b>Recriar login</b> em cada uma. Pode usar o mesmo usuário e a mesma senha de antes; o cargo e os ajustes continuam.</div>`:''; })()}
    <div class="eq-bar"><label class="eq-q">${ic('lupa',18,2)}<input class="txt" id="eq-q" placeholder="Procurar pessoa, usuário ou cargo…" value="${esc(E.q)}" autocomplete="off"></label>${chips}</div>
    <div class="eq-grid">
     <article class="eq-p eu"><div class="eq-pt"><span class="eq-av" style="background:var(--teal-strong)">${esc(eqIni(S.nomes[S.uid]||'PCP'))}</span><div class="eq-pn"><b>${esc(S.nomes[S.uid]||'Você')}</b><small>dona do painel</small></div><span class="pill ok">master · tudo</span></div><div class="eq-pm sub" style="font-size:12.5px">Você vê e muda tudo, cria pessoas e cargos.</div></article>
@@ -1009,13 +1022,14 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='eq-mais'){ E.maisCg=!E.maisCg; render(); return; }
   if(a==='eq-novo'||a==='eq-c-outra'){ E.cartao=null; E.nv={nome:'',usu:'',sen:eqSenha(),cargo:'',mexeu:false,err:''}; render(); setTimeout(()=>{ const i=$('#eq-nv-nome'); i&&i.focus(); },40); return; }
   if(a==='eq-nv-x'){ E.nv=null; render(); return; }
+  if(a==='eq-recriar'){ const d=(A.lista||[]).find(x=>x._id===b.dataset.id); if(!d) return; E.cartao=null; E.nv={nome:acsNome(d._id),usu:E.usu[d._id]||'',sen:'',cargo:d.perfil||'outro',mexeu:true,err:'',de:d._id}; render(); setTimeout(()=>{ const i=$('#eq-nv-sen'); i&&i.focus(); },40); return; }
   if(a==='eq-nv-gera'){ E.nv.sen=eqSenha(); render(); return; }
   if(a==='eq-nv-cargo'){ E.nv.cargo=b.dataset.v; E.nv.err=''; render(); return; }
   if(a==='eq-nv-criar'){ const N=E.nv; N.nome=String(N.nome||'').trim(); N.usu=eqLimpo(N.usu); N.sen=String(N.sen||'').trim();
-    N.err=!N.nome?'Escreva o nome da pessoa.':!N.usu?'Escreva o usuário.':N.sen.length<6?'A senha precisa ter pelo menos 6 caracteres.':!N.cargo?'Escolha o cargo.':''; if(N.err){ render(); return; }
+    N.err=!N.nome?'Escreva o nome da pessoa.':!N.usu?'Escreva o usuário.':N.sen.length<6?'A senha precisa ter pelo menos 6 caracteres.':!N.cargo&&!eqAntigoDe(N.usu)?'Escolha o cargo.':''; if(N.err){ render(); return; }
     E.salv=true; render();
-    try{ const uid=await window.claude.criarUsuario(N.usu,N.nome,N.sen); S.nomes[uid]=N.nome; E.usu[uid]=N.usu;
-      const ok=await acsGravar(uid,acsPreset(N.cargo),true); E.salv=false;
+    try{ const ant=(N.de&&(A.lista||[]).find(x=>x._id===N.de))||eqAntigoDe(N.usu); const uid=await window.claude.criarUsuario(N.usu,N.nome,N.sen); S.nomes[uid]=N.nome; E.usu[uid]=N.usu; (E.proj=E.proj||{})[uid]=eqProjeto();
+      const ok=ant?await eqHerdar(uid,ant,N.cargo):await acsGravar(uid,acsPreset(N.cargo),true); if(ant&&!N.cargo) N.cargo=ant.perfil; E.salv=false;
       if(ok){ E.cartao={nome:N.nome,usu:N.usu,sen:N.sen,cargo:pnlPerfilNome(N.cargo),perfil:N.cargo}; E.nv=null; } render(); }
     catch(e){ E.salv=false; N.err=e&&e.code==='auth/email-already-in-use'?'Já existe o usuário @'+N.usu+'. Escolha outro (ex.: '+N.usu+'2).':e&&e.code==='auth/weak-password'?'Senha fraca: use pelo menos 6 caracteres.':e&&e.code==='auth/network-request-failed'?'Sem internet. Tente de novo.':'Não deu certo ('+((e&&e.code)||'erro')+').'; render(); }
     return; }
@@ -1152,10 +1166,10 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='eq-lote-mais'){ L.rows.push(eqLoteLinha()); render(); return; }
   if(a==='eq-lote-del'){ L.rows.splice(+b.dataset.i,1); if(!L.rows.length) L.rows.push(eqLoteLinha()); render(); return; }
   if(a==='eq-lote-criar'){ const fila=L.rows.filter(r=>r.st!=='ok'&&r.nome.trim()); let falta=false; if(!fila.length){ toast('Escreva pelo menos um nome.'); return; }
-    fila.forEach(r=>{ r.usu=eqLimpo(r.usu||eqUsuSug(r.nome)); r.err=!r.cargo?'Escolha o cargo.':!r.usu?'Escreva o usuário.':String(r.sen||'').length<6?'Senha com pelo menos 6 caracteres.':''; if(r.err){ r.st='err'; falta=true; } else r.st=''; });
+    fila.forEach(r=>{ r.usu=eqLimpo(r.usu||eqUsuSug(r.nome)); r.err=!r.cargo&&!eqAntigoDe(r.usu)?'Escolha o cargo.':!r.usu?'Escreva o usuário.':String(r.sen||'').length<6?'Senha com pelo menos 6 caracteres.':''; if(r.err){ r.st='err'; falta=true; } else r.st=''; });
     const us=fila.map(r=>r.usu); fila.forEach(r=>{ if(us.filter(u=>u===r.usu).length>1){ r.err='Usuário repetido na lista.'; r.st='err'; falta=true; } });
     if(falta){ render(); return; } L.rodando=true; render();
-    for(const r of fila){ r.st='vai'; render(); try{ const uid=await window.claude.criarUsuario(r.usu,r.nome.trim(),r.sen); S.nomes[uid]=r.nome.trim(); E.usu[uid]=r.usu; const ok=await acsGravar(uid,acsPreset(r.cargo),true); r.st=ok?'ok':'err'; if(!ok) r.err='Conta criada, mas o cargo não gravou: escolha o cargo na lista.'; }
+    for(const r of fila){ r.st='vai'; render(); try{ const ant=eqAntigoDe(r.usu); const uid=await window.claude.criarUsuario(r.usu,r.nome.trim(),r.sen); S.nomes[uid]=r.nome.trim(); E.usu[uid]=r.usu; (E.proj=E.proj||{})[uid]=eqProjeto(); const ok=ant?await eqHerdar(uid,ant,r.cargo):await acsGravar(uid,acsPreset(r.cargo),true); r.st=ok?'ok':'err'; if(!ok) r.err='Conta criada, mas o cargo não gravou: escolha o cargo na lista.'; }
       catch(e){ r.st='err'; r.err=e&&e.code==='auth/email-already-in-use'?'Já existe @'+r.usu+'. Mude o usuário (ex.: '+r.usu+'2).':e&&e.code==='auth/network-request-failed'?'Sem internet.':'Não deu certo ('+((e&&e.code)||'erro')+').'; } }
     L.rodando=false; const n=L.rows.filter(r=>r.st==='ok').length; toast(n+' acesso'+(n>1?'s':'')+' criado'+(n>1?'s':'')+'.'); render(); return; }
   if(a==='eq-lote-copiar'){ const t=eqLoteCartoes().map(c=>`${c.nome} (${c.cargo})\nEndereço: ${eqLinkDe(c)}\nUsuário: ${c.usu}\nSenha: ${c.sen}`).join('\n\n'); try{ await navigator.clipboard.writeText(t); toast('Copiado.'); }catch(e){ toast('Não consegui copiar.'); } return; }

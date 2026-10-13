@@ -19,7 +19,17 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  B=await H.abrir(); p=B.page; await H.preparar(p,vazio); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500); await p.evaluate(()=>__T.go('backup')); await H.dorme(300);
  p.on('dialog',dg=>dg.accept('IMPORTAR')); await p.setInputFiles('#bk-imp',arq); await H.dorme(4000);
  const novo=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
- const dif=Object.keys(orig).filter(k=>!/^(acessos|pedidos)\//.test(k)&&k!=='config/geral').filter(k=>JSON.stringify(novo[k])!==JSON.stringify(orig[k]));
- const semPerm=Object.keys(novo).filter(k=>/^(acessos|pedidos)\//.test(k)).length;
- ok('Importa num projeto vazio: tudo igual ao original; logins/permissões não vão (são recriados)', dif.length===0&&semPerm===0&&!!novo['perfis/uOPE'], dif.length?'diferentes: '+dif.slice(0,6).join(', '):'ok');
+ const tira=(k,v)=>{ if(/^perfis\//.test(k)&&v){ v=Object.assign({},v); delete v.importado; } return JSON.stringify(v); };
+ const dif=Object.keys(orig).filter(k=>!/^(pedidos|acessos)\//.test(k)&&k!=='config/geral').filter(k=>tira(k,novo[k])!==JSON.stringify(orig[k]));
+ const semPed=Object.keys(novo).filter(k=>/^pedidos\//.test(k)).length, acs=Object.keys(orig).filter(k=>/^acessos\//.test(k));
+ ok('Importa num projeto vazio: tudo igual ao original (cargos e ajustes inclusive); perfis marcados como vindos da cópia', dif.length===0&&semPed===0&&acs.length>0&&acs.every(k=>novo[k])&&novo['perfis/uOPE']&&novo['perfis/uOPE'].importado===true, dif.length?'diferentes: '+dif.slice(0,6).join(', '):'ok');
+ /* Equipe e cargos: quem veio da cópia aparece "sem login"; recriar com o mesmo usuário herda o cargo e os ajustes */
+ await p.reload(); await H.dorme(2800); await p.evaluate(()=>__T.go('acessos')); await H.dorme(1500);
+ const eq=await p.evaluate(()=>document.getElementById('view').innerText); const nSem=await p.$$eval('[data-act="eq-recriar"]',x=>x.length);
+ const alvo=Object.entries(orig).find(([k,v])=>/^acessos\//.test(k)&&v&&v.perfil&&orig['perfis/'+k.split('/')[1]]&&orig['perfis/'+k.split('/')[1]].usuario); const velho=alvo[0].split('/')[1], usu=orig['perfis/'+velho].usuario;
+ await p.click(`[data-act="eq-recriar"][data-id="${velho}"]`); await H.dorme(400); const usuF=await p.inputValue('#eq-nv-usu'); await p.fill('#eq-nv-sen','mesma123'); await p.dispatchEvent('#eq-nv-sen','input');
+ await p.click('[data-act="eq-nv-criar"]'); await H.dorme(1500); const S2=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')));
+ const novoUid=(S2.users[usu+'@painel-colafix.app']||{}).uid, na=novoUid&&S2.docs['acessos/'+novoUid], va=S2.docs['acessos/'+velho];
+ const igual=na&&JSON.stringify(Object.assign({},orig[alvo[0]],{hist:0,alteradoEm:0,alteradoPor:0}).mods)===JSON.stringify(na.mods)&&na.perfil===orig[alvo[0]].perfil;
+ ok('Equipe: pessoas da cópia "sem login"; Recriar login com o mesmo usuário herda cargo e ajustes e tira o cadastro antigo', /vieram da cópia|veio da cópia/.test(eq)&&nSem>0&&usuF===usu&&igual&&na.herdadoDe===velho&&va.apagado===true&&va.migradoPara===novoUid, JSON.stringify({nSem,usu,usuF,na:na&&{perfil:na.perfil,mods:na.mods,her:na.herdadoDe},va:va&&{ap:va.apagado}}).slice(0,300));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

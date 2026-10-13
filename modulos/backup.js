@@ -7,7 +7,7 @@
     'chamados','chamfotos','pecasmov','pecafotos','crachas','conferencias','auditorias','recebimentos','pmxfichas','pmxrec','pmxbaixas','pcpbase','pcpsnap','pcpvendas',
     'ritplano','ritfech','sistema','perfis','acessos','pedidos','_arquivos','_arquivos_p','pedmat','melhorias','exemplo'];
   const SUB={'rh':{docs:['config'],sub:{'rh/dados':['funcionarios','funcoes','retiradas','terceiros','presenca','fichasmes','modelos','docsgerados','ferias','ocorrencias','emprestimos','convites','fichascand'],'rh/arquivos':['lista','partes']}}};
-  const NAO_IMPORTA=['acessos','pedidos'];
+  const NAO_IMPORTA=['pedidos']; /* acessos entram (13/10/2026): as pessoas aparecem em Equipe como "sem login" e, ao recriar o login, herdam cargo e ajustes */
   const B={st:'',prog:'',ult:null,imp:null};
   const fs=()=>window.claude&&window.claude._fs&&window.claude._fs();
   /* datas do Firestore viram {"__ts": milissegundos} no arquivo */
@@ -31,8 +31,8 @@
     if(prompt('Importar '+tot.toLocaleString('pt-BR')+' registros da cópia de '+new Date(dados.exportadoEm).toLocaleString('pt-BR')+' NESTE projeto?\nUse só num projeto NOVO (o que já existir com o mesmo código será substituído).\n\nPara confirmar, digite IMPORTAR')!=='IMPORTAR') return;
     const F=fs(); if(!F){ P.toast('Banco indisponível.'); return; } B.st='importando'; let n=0; P.render();
     try{ let lote=F.batch(), noLote=0; const grava=async(path,data)=>{ lote.set(F.doc(path),volta(data)); noLote++; n++; if(noLote>=400){ await lote.commit(); lote=F.batch(); noLote=0; B.prog=n.toLocaleString('pt-BR')+' de '+tot.toLocaleString('pt-BR')+'…'; P.render(); } };
-      for(const [c,docs] of Object.entries(dados.colecoes)){ if(NAO_IMPORTA.includes(c)||!docs||docs.__erro) continue; for(const [id,d] of Object.entries(docs)) await grava(c+'/'+id,d); }
-      if(noLote) await lote.commit(); P.toast(n.toLocaleString('pt-BR')+' registros importados. Recrie as pessoas em Equipe e cargos.'); }
+      for(const [c,docs] of Object.entries(dados.colecoes)){ if(NAO_IMPORTA.includes(c)||!docs||docs.__erro) continue; for(const [id,d] of Object.entries(docs)) await grava(c+'/'+id,c==='perfis'&&d&&typeof d==='object'?Object.assign({},d,{importado:true}):d); }
+      if(noLote) await lote.commit(); P.toast(n.toLocaleString('pt-BR')+' registros importados. Em Equipe e cargos, toque em "Recriar login" em cada pessoa.'); }
     catch(e){ console.warn('[backup] importar',e); P.toast('A importação parou em '+n+' registros: '+(e.message||e)); }
     B.st=''; B.prog=''; P.render(); }
   function tela(){ if(!P.dono()) return '<section class="card"><div class="empty">Só a administradora.</div></section>';
