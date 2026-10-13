@@ -57,6 +57,11 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 - A cópia (Ajustes › Backup) agora importa também `acessos`; os `perfis` importados ganham `importado:true`. Em Equipe e cargos essas pessoas aparecem como **"sem login"** (`eqSemLogin`); **Recriar login** (`eq-recriar`) ou criar alguém com o mesmo usuário (inclusive em "Várias pessoas") herda cargo e ajustes (`eqHerdar`: copia `acessos/{antigo}` para o uid novo com `herdadoDe` e marca o antigo `apagado`, `migradoPara`). Pode usar a mesma senha. Perfis novos gravam `projeto`. Teste: `teste-backup.js`.
 - Primeiro acesso: o botão é **"Primeiro acesso"** na tela de entrar (só a dona); se o perfil não gravar (regras ainda não publicadas) a conta é criada mesmo assim.
 
+## Organização dos módulos (pedidos de 13/10, `js/12-organizacao.js`)
+- **Produção:** Programação · Calendário · Indicadores. **Almoxarifado** (módulo `premix`): **Fila do almox** (`dbfila`, primeiro) · Diário de bordo (`diario`) · Monitor (`dbmon`) · Fichas · Receitas. **Telas de TV:** Apresentação + TV da fábrica (`tvfab`). **Tablet da produção** (`tabprod`, por enquanto sem uso; no menu só para o cargo da linha/`paradas`/`tabprod`): Tela da linha (`linhatv`, ainda abre para quem tem Produção) e Paradas.
+- Permissões mantidas por `viewOk` (diário/fila/monitor: producao, almox, premix; tvfab: tv, telas, producao, analise; paradas: paradas, tabprod). Quem chama `go('diario')` com `S.dbo.modo='fila'` cai na Fila (Meu dia, painéis). A fila usa sempre o dia da entrega (o que roda amanhã aparece hoje). Botão da ordem "Mandar p/ fila do almox" (`envAlmBtn`).
+- Layout: filtros da Programação mais baixos e os botões de cada ordem numa linha embaixo do produto (≥1241px); diário cabe em 1366 (tabela fixa); calendário com barra fixa e feriado em cinza. Visão do gestor: quadro de paradas abre a Manutenção. Teste: `teste-organizacao.js`.
+
 ## Almoxarifado / rancho
 - Etapas do rancho ficam em `ordens.rdb` (`sep`, `ent`, `conf`, `fim`) e são gravadas por `dbSalvar`. A ação de permissão é **"rancho"** (não "programar").
 - **Celular do almox** (cargo `almoxcel`, tela `mantotem` em modo entrega): folha (QR/RA-/nº) → separado → crachá de quem recebe → "Recebi o rancho". Grava `rdb.ent` com `entreguePor` e `recebidoPor`. Teste: `teste-almoxcel.js`.
@@ -83,6 +88,7 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 | `js/06-manutencao-equipe.js` · `js/07-manutencao-coletor.js` | manutenção (chamados, OS, equipamentos, preventivas, peças, QR) e coletor; equipe e cargos |
 | `js/08-tablet-acessos-avisos.js` | tablet da parede, crachás, ajuste de acesso por pessoa, avisos, gestor, TV dividida, almox |
 | `js/09-silos-final.js` | silos (saldo/consumo), leituras por perfil, API `window.Painel` e `iniciar()` |
+| `js/12-organizacao.js` | organização dos módulos (Almoxarifado, Telas, Tablet da produção) e ajustes de layout de Programação/Diário/Calendário |
 | `js/11-meu-menu.js` | "Meu menu" da administradora (esconder módulos do próprio menu; `perfis/{uid}.menuOculto`) |
 | `js/10-tablet-producao.js` | tablet: abrir a ordem pela folha (QR, `RA-`, `OP-`, nº), **apontar produção**, **pedir material** (`pedmat`) e quadro de pedidos no diário |
 | `js/00-qrcode.js` | biblioteca de QR |
