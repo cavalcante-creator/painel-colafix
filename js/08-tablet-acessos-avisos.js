@@ -1057,3 +1057,87 @@ const offA={pend:0};
 ['online','offline'].forEach(t=>window.addEventListener(t,()=>{ try{ if(ttAtivo()) rerenderTt(); }catch(e){} }));
 document.head.insertAdjacentHTML('beforeend','<style id="off-css">.off-av{background:var(--warn-tint);border-left:6px solid var(--warn);border-radius:12px;padding:10px 14px;font-size:15px}</style>');
 /* ===FIM SEM INTERNET=== */
+/* ===================== ETIQUETA DO CRACHÁ (14/10): imagem PNG ou PDF no tamanho da etiquetadora ===================== */
+/* A etiquetadora térmica imprime pixel por pixel: o desenho é feito já na resolução dela (203/300 dpi), só preto e branco
+   (sem cinza do antisserrilhado, que sai apagado/borrado), com cada quadradinho do QR num número inteiro de pontos.
+   O PNG leva a resolução gravada (pHYs) para o programa da etiquetadora abrir no tamanho certo. Configuração lembrada no aparelho. */
+const ETQ_PADRAO={w:50,h:30,dpi:203,fmt:'png',txt:true,barras:false};
+function etqCfg(){ let o={}; try{ o=JSON.parse(localStorage.getItem('colafix.etq')||'{}')||{}; }catch(e){} return Object.assign({},ETQ_PADRAO,o); }
+function etqSalva(c){ try{ localStorage.setItem('colafix.etq',JSON.stringify(c)); }catch(e){} }
+S.cr.etq=null; /* {ids:[...]} quando a janela da etiqueta está aberta */
+function etqCanvas(c,cfg){ const px=mm=>Math.round(mm/25.4*cfg.dpi), W=Math.max(40,px(cfg.w)), H=Math.max(40,px(cfg.h)), mg=px(1.5);
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d'); g.imageSmoothingEnabled=false; g.fillStyle='#fff'; g.fillRect(0,0,W,H); g.fillStyle='#000';
+  const q=qrcode(0,'M'); q.addData(crQrTexto(c.codigo)); q.make(); const n=q.getModuleCount(), qz=2; /* + a margem da etiqueta: área branca de 4 módulos ou mais */
+  const deitada=W>=H*1.15, temTxt=!!cfg.txt, temBar=!!cfg.barras;
+  const lado=deitada?(temTxt||temBar?Math.min(H-2*mg,Math.round(W*0.55)):Math.min(W,H)-2*mg):Math.min(W-2*mg,Math.round((H-2*mg)*(temTxt||temBar?0.62:1)));
+  const mod=Math.max(1,Math.floor(lado/(n+2*qz))), qs=mod*(n+2*qz);
+  const qx=deitada?(temTxt||temBar?mg:Math.round((W-qs)/2)):Math.round((W-qs)/2), qy=deitada?Math.round((H-qs)/2):mg;
+  for(let r=0;r<n;r++) for(let k=0;k<n;k++) if(q.isDark(r,k)) g.fillRect(qx+(qz+k)*mod,qy+(qz+r)*mod,mod,mod);
+  /* área do texto */
+  const tx=deitada?qx+qs+mg:mg, ty=deitada?mg:qy+qs, tw=deitada?W-tx-mg:W-2*mg, th=deitada?H-2*mg:H-ty-mg; let y=ty;
+  const fit=(t,peso,max)=>{ let s=max; g.font=`${peso} ${s}px Arial, Helvetica, sans-serif`; while(s>8&&g.measureText(t).width>tw){ s--; g.font=`${peso} ${s}px Arial, Helvetica, sans-serif`; } return s; };
+  const al=deitada?'left':'center', xT=deitada?tx:W/2; g.textAlign=al; g.textBaseline='top';
+  const barH=temBar?Math.max(px(5),Math.round(th*(temTxt?0.38:0.8))):0;
+  if(temTxt&&th>10){ const nm=String(c.nome||'').trim(), ln=c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas');
+    const s1=fit(nm,'bold',Math.round(Math.min(px(4.2),(th-barH)*0.42))); g.fillText(nm,xT,y); y+=Math.round(s1*1.18);
+    const s2=fit(ln,'bold',Math.round(s1*0.78)); if(y+s2<=ty+th-barH){ g.fillText(ln,xT,y); y+=Math.round(s2*1.3); } }
+  if(temBar&&barH){ const L=c128Larg(crBarras(c.codigo)), mods=[...L].reduce((a,x)=>a+(+x),0)+20, m=Math.max(1,Math.floor(tw/mods)), bw=m*mods, bx=deitada?tx:Math.round((W-bw)/2);
+    const by=Math.min(ty+th-barH,Math.max(y,ty+th-barH)); let p=bx+10*m, bar=true; for(const ch of L){ const w=+ch*m; if(bar) g.fillRect(p,by,w,barH); p+=w; bar=!bar; } }
+  /* só preto e branco: o cinza do texto vira preto ou branco */
+  const im=g.getImageData(0,0,W,H), d=im.data; for(let i=0;i<d.length;i+=4){ const v=(d[i]+d[i+1]+d[i+2])/3<150?0:255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } g.putImageData(im,0,0);
+  return cv; }
+/* grava a resolução (pontos por metro) no PNG */
+function etqPngDpi(bytes,dpi){ const ppm=Math.round(dpi/0.0254); const crcT=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+  const crc=b=>{ let c=0xFFFFFFFF; for(const x of b) c=crcT[(c^x)&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+  const ch=new Uint8Array(21), dv=new DataView(ch.buffer); dv.setUint32(0,9); ch.set([112,72,89,115],4); dv.setUint32(8,ppm); dv.setUint32(12,ppm); ch[16]=1; dv.setUint32(17,crc(ch.subarray(4,17)));
+  const out=new Uint8Array(bytes.length+21); out.set(bytes.subarray(0,33)); out.set(ch,33); out.set(bytes.subarray(33),54); return out; }
+function etqNome(c){ return String(c.nome||'cracha').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\W+/g,'_'); }
+async function etqBaixar(cs,cfg){ const dl=await window.claude?.use?.('downloads'); if(!dl){ toast('Download indisponível nesta visualização.'); return; } if(!cs.length){ toast('Nenhum crachá.'); return; }
+  try{
+    if(cfg.fmt==='pdf'){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; }
+      const pdf=new window.jspdf.jsPDF({orientation:cfg.w>=cfg.h?'l':'p',unit:'mm',format:[cfg.w,cfg.h]});
+      cs.forEach((c,i)=>{ if(i) pdf.addPage([cfg.w,cfg.h],cfg.w>=cfg.h?'l':'p'); pdf.addImage(etqCanvas(c,cfg).toDataURL('image/png'),'PNG',0,0,cfg.w,cfg.h,undefined,'NONE'); });
+      await dl.save({filename:cs.length===1?'Etiqueta_'+etqNome(cs[0])+'.pdf':'Etiquetas_crachas.pdf',data:pdf.output('blob')});
+      toast('PDF com '+cs.length+' etiqueta(s) de '+cfg.w+' × '+cfg.h+' mm, uma por página. Imprima em 100% (tamanho real).'); }
+    else { for(let i=0;i<cs.length;i++){ const c=cs[i]; const blob=await new Promise(r=>etqCanvas(c,cfg).toBlob(r,'image/png'));
+        const by=etqPngDpi(new Uint8Array(await blob.arrayBuffer()),cfg.dpi);
+        await dl.save({filename:'Etiqueta_'+etqNome(c)+'.png',data:new Blob([by],{type:'image/png'})}); if(i<cs.length-1) await new Promise(r=>setTimeout(r,450)); }
+      toast(cs.length===1?'Imagem baixada ('+cfg.w+' × '+cfg.h+' mm, '+cfg.dpi+' dpi).':cs.length+' imagens baixadas, uma por crachá. Se o navegador perguntar, permita vários downloads.'); }
+  }catch(e){ if(!e||e.code!=='declined'){ console.warn('[etiqueta]',e); toast('Não foi possível gerar a etiqueta. Tente de novo.'); } } }
+function etqJanela(){ const E=S.cr.etq; if(!E) return ''; const cfg=etqCfg(), cs=E.ids.map(crDe).filter(Boolean); if(!cs.length) return '';
+  let prev=''; try{ prev=etqCanvas(cs[0],cfg).toDataURL('image/png'); }catch(e){}
+  const tam=[[50,30],[40,25],[60,40],[50,25],[38,54],[100,50]];
+  const seg=(k,ops)=>`<div class="seg">${ops.map(([v,l])=>`<button data-act="etq-set" data-k="${k}" data-v="${v}" aria-pressed="${String(cfg[k])===String(v)}">${l}</button>`).join('')}</div>`;
+  return `<section class="card etq" id="etq"><div class="head" style="align-items:flex-start"><div><h2>Etiqueta para a etiquetadora</h2><div class="sub">${cs.length===1?esc(cs[0].nome):cs.length+' crachás'} · desenhada na resolução da etiquetadora, só preto e branco, para o QR sair nítido.</div></div><button class="btn sec" data-act="etq-x" style="height:40px">Fechar</button></div>
+   <div class="etq-g"><div class="etq-f">
+     <div><span class="label">FORMATO</span>${seg('fmt',[['png','Imagem (PNG)'],['pdf','PDF']])}</div>
+     <div><span class="label">TAMANHO DA ETIQUETA (MM)</span><div class="chips" style="margin-top:6px">${tam.map(([w,h])=>`<button class="chip" data-act="etq-tam" data-v="${w}x${h}" aria-pressed="${cfg.w===w&&cfg.h===h}">${w} × ${h}</button>`).join('')}</div>
+       <div class="etq-wh"><label>Largura <input class="txt num" id="etq-w" inputmode="decimal" value="${cfg.w}"></label><label>Altura <input class="txt num" id="etq-h" inputmode="decimal" value="${cfg.h}"></label><span class="sub" style="margin:0;font-size:12px">mm, como está no rolo</span></div></div>
+     <div><span class="label">RESOLUÇÃO DA ETIQUETADORA</span>${seg('dpi',[['203','203 dpi (8 pontos/mm)'],['300','300 dpi (12 pontos/mm)']])}<div class="sub" style="font-size:12px">Está no manual ou na etiqueta de baixo da impressora. A maioria é 203.</div></div>
+     <div class="etq-ck"><label><input type="checkbox" id="etq-txt" ${cfg.txt?'checked':''}> Nome e linha</label><label><input type="checkbox" id="etq-bar" ${cfg.barras?'checked':''}> Código de barras (coletor)</label></div>
+     <button class="btn big" data-act="etq-ok">${ic('baixar',20,2)}Baixar ${cfg.fmt==='pdf'?'PDF':cs.length>1?cs.length+' imagens':'imagem'}</button>
+   </div><div class="etq-pv"><span class="label">COMO VAI SAIR</span><div class="etq-pvb" style="aspect-ratio:${cfg.w}/${cfg.h}">${prev?`<img src="${prev}" alt="Prévia da etiqueta de ${esc(cs[0].nome)}">`:''}</div><small>${cfg.w} × ${cfg.h} mm · ${Math.round(cfg.w/25.4*cfg.dpi)} × ${Math.round(cfg.h/25.4*cfg.dpi)} pontos</small>
+     <div class="sub" style="font-size:12px;margin-top:8px">Na etiquetadora: tamanho real (100%), sem "ajustar", e a escuridão/densidade um pouco acima do normal se ainda sair claro.</div></div></div></section>`; }
+{ const _vc=vCrachas; vCrachas=function(){ let h=_vc.apply(this,arguments);
+  h=h.replace(/<button class="eq-lk" data-act="cr-ades" data-id="([^"]+)">/g,(m,id)=>`<button class="eq-lk" data-act="etq-um" data-id="${id}">${ic('baixar',15,2)}Etiqueta</button>`+m);
+  h=h.replace('<button class="btn" data-act="cr-ades-todos">','<button class="btn" data-act="etq-todos">'+ic('baixar',18,2)+'Etiquetas (imagem ou PDF)</button><button class="btn sec" data-act="cr-ades-todos">');
+  const i=h.indexOf('<section class="card">'); return S.cr.etq&&i>=0?h.slice(0,i)+etqJanela()+h.slice(i):h; }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="etq-"]'); if(!b) return; const a=b.dataset.act;
+  if(a==='etq-um'||a==='etq-todos'){ if(!crPodeGerir()){ toast('Você não possui permissão para gerenciar crachás.'); return; }
+    S.cr.etq={ids:a==='etq-um'?[b.dataset.id]:S.cr.lista.filter(x=>x.ativo!==false).sort((p,q)=>String(p.linha).localeCompare(String(q.linha))||String(p.nome).localeCompare(String(q.nome))).map(x=>x._id)}; render();
+    setTimeout(()=>{ const e=document.getElementById('etq'); if(e) e.scrollIntoView({behavior:'smooth',block:'start'}); },30); return; }
+  if(a==='etq-x'){ S.cr.etq=null; render(); return; }
+  const cfg=etqCfg();
+  if(a==='etq-set'){ cfg[b.dataset.k]=b.dataset.k==='dpi'?+b.dataset.v:b.dataset.v; etqSalva(cfg); render(); return; }
+  if(a==='etq-tam'){ const [w,h]=b.dataset.v.split('x').map(Number); cfg.w=w; cfg.h=h; etqSalva(cfg); render(); return; }
+  if(a==='etq-ok'&&S.cr.etq){ b.disabled=true; await etqBaixar(S.cr.etq.ids.map(crDe).filter(Boolean),cfg); b.disabled=false; } });
+document.addEventListener('change',ev=>{ const t=ev.target; if(!['etq-w','etq-h','etq-txt','etq-bar'].includes(t.id)) return; const cfg=etqCfg();
+  if(t.id==='etq-txt') cfg.txt=t.checked; else if(t.id==='etq-bar') cfg.barras=t.checked; else { const v=parseFloat(String(t.value).replace(',','.')); if(!(v>=15&&v<=150)){ toast('Use um tamanho entre 15 e 150 mm.'); render(); return; } cfg[t.id==='etq-w'?'w':'h']=Math.round(v*10)/10; }
+  etqSalva(cfg); render(); });
+document.head.insertAdjacentHTML('beforeend',`<style id="etq-css">.etq{border:1.5px solid var(--teal)}.etq-g{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:22px;margin-top:14px}
+.etq-f{display:flex;flex-direction:column;gap:16px;min-width:0}.etq-f .seg{margin-top:6px;flex-wrap:wrap}.etq-wh{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}.etq-wh label{display:flex;gap:6px;align-items:center;font-size:13px}.etq-wh .txt{width:84px;height:40px}
+.etq-ck{display:flex;gap:18px;flex-wrap:wrap}.etq-ck label{display:flex;gap:8px;align-items:center;cursor:pointer}.etq-ck input{width:20px;height:20px;accent-color:var(--teal)}
+.etq-pv{display:flex;flex-direction:column;gap:6px;min-width:0}.etq-pvb{background:#fff;border:1px dashed var(--faint);border-radius:6px;max-width:100%;width:100%;max-height:320px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.etq-pvb img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.etq-pv small{color:var(--muted)}
+@media (max-width:860px){.etq-g{grid-template-columns:minmax(0,1fr)}}</style>`);
+/* ===FIM ETIQUETA DO CRACHÁ=== */

@@ -84,6 +84,10 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 - Atalhos antigos `go('alxcont'|'alxconf'|'alxrec'|'alxaud')` abrem o programa na parte certa. Para voltar às telas antigas: `config/geral.invAntigo = true`.
 - A varredura lê o conteúdo dentro do iframe. Teste: `teste-inventario.js`.
 
+## Etiqueta do crachá (14/10, fim do js/08, prefixo `etq-`)
+- Em Manutenção › Crachás: **"Etiqueta"** por pessoa e **"Etiquetas (imagem ou PDF)"** para todos. Janela com formato (PNG/PDF), tamanho do rolo em mm (atalhos 50×30, 40×25…), resolução 203/300 dpi, nome e linha, código de barras. Escolha lembrada no aparelho (`localStorage colafix.etq`).
+- `etqCanvas` desenha na resolução da etiquetadora: módulos do QR em pontos inteiros, tudo preto ou branco (sem cinza), PNG com pHYs (dpi gravado). PDF = uma página do tamanho da etiqueta por crachá. Várias imagens = um download por crachá. Teste: `teste-etiqueta.js` (precisa de `npm i --no-save jspdf@2.5.1` e `JSPDF_REAL=1`).
+
 ## Almoxarifado / rancho
 - **Folha de Produção (13/10):** cabeçalho com o **QR grande (27 mm, margem branca de 4 módulos) à direita** e o título, ordem/rancho e o código de barras `RA-`/`OP-` ao lado (o QR antigo, de 16 mm, não era lido). Para ver a folha de verdade: `JSPDF_REAL=1 node folha-amostra.js saida.pdf` (todos os impressos com QR: `JSPDF_REAL=1 node qr-amostras.js <pasta>`) (precisa de `npm i --no-save jspdf@2.5.1`). Teste: `teste-codigos.js`.
 - Etapas do rancho ficam em `ordens.rdb` (`sep`, `ent`, `conf`, `fim`) e são gravadas por `dbSalvar`. A ação de permissão é **"rancho"** (não "programar").
