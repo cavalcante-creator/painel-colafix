@@ -11,7 +11,7 @@
      rh/dados/almocoaj/{AAAA-MM} aj.{AAAA-MM-DD_cpf} = {v:'sim'|'nao', mot, por, em} · log[] (ajustes feitos à mão; nada é apagado)
    Usado pelo rh.js (tela rhalmoco): window.RHAlmoco.iniciar(ctx) e .render(ctx). */
 (function(){
-  const A={mes:'',dados:{},aj:{},vis:'dia',dia:'',emp:'',q:'',lendo:false,ult:null,sub:{},ctx:null};
+  const A={setor:'',sit:'',jus:null,mes:'',dados:{},aj:{},vis:'dia',dia:'',emp:'',q:'',lendo:false,ult:null,sub:{},ctx:null};
   const PADRAO={disp:'REFEITÓRIO',ini:'10:30',fim:'14:30',cafeAte:'09:30'};
   const pad=n=>String(n).padStart(2,'0');
   const hm=s=>{ const m=String(s||'').match(/(\d{1,2}):(\d{2})/); return m?(+m[1])*60+(+m[2]):null; };
@@ -60,48 +60,54 @@
     finally{ A.lendo=false; P.rerender(); } }
 
   /* ---------- situação por pessoa e dia ---------- */
+  /* v: sim (almoçou) · nao (veio e não almoçou, sem justificativa) · just (justificado) · fora (não almoça na empresa) · aus (não veio) */
+  const JUST_PADRAO=['Almoçou fora (autorizado)','Trouxe almoço / comeu em outro lugar','Serviço externo','Consulta ou atestado','Saiu antes ou chegou depois do almoço','Outro'];
+  function foraDe(k){ const f=(cfg().fora||{})[k]; return f&&!f.removido?f:null; }
   function situacao(m,d,k){ const aj=((A.aj[m]||{}).aj||{})[d+'_'+k]; const x=(((A.dados[m]||{}).dias||{})[d]||{})[k];
-    if(aj) return {v:aj.v==='sim'?'sim':'nao',aj,x}; if(!x) return {v:'aus',x:null}; return {v:x.a?'sim':'nao',x}; }
+    let r; if(aj&&aj.v==='just') r={v:'just',j:aj,x}; else if(aj&&!aj.removido) r={v:aj.v==='sim'?'sim':'nao',aj,x}; else if(!x) r={v:'aus',x:null}; else r={v:x.a?'sim':'nao',x};
+    if(r.v==='nao'&&foraDe(k)) r.v='fora'; return r; }
   function pessoasDoMes(m){ const c=A.ctx, D=A.dados[m]||{}, P0=D.pessoas||{}, fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>ks.add(x.split('_')[1]));
     return [...ks].map(k=>{ const p=P0[k]||{}, f=fx[k]; return {k,nome:f?titulo(f.nome):(p.n||'(sem nome)'),emp:p.e||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX INDUSTRIA E COMERCIO LTDA'):''),setor:f?(f.setor||''):'',cad:!!f,grupo:p.g||''}; })
-      .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))) /* a busca por nome filtra na própria tela (almBusca), sem redesenhar */
+      .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))&&(!A.setor||(A.setor==='-'?!p.setor:p.setor===A.setor))) /* a busca por nome filtra na própria tela (almBusca), sem redesenhar */
       .sort((a,b)=>a.nome.localeCompare(b.nome)); }
   const empCurta=e=>!e?'Sem empresa':/COLAFIX/i.test(e)?'Colafix':titulo(e);
 
   /* ---------- tela ---------- */
   function render(c){ A.ctx=c; const P=c.P, esc=c.esc, h=P.hojeStr(); if(!A.mes) A.mes=h.slice(0,7); assinar(A.mes); assinar(mesAnt(A.mes));
     const D=A.dados[A.mes]; const ds=Object.keys((D&&D.dias)||{}).sort(); if(!A.dia||A.dia.slice(0,7)!==A.mes) A.dia=ds.length?ds[ds.length-1]:(A.mes===h.slice(0,7)?h:A.mes+'-01');
-    const C=cfg(), ps=D?pessoasDoMes(A.mes):[], emps=[...new Set(Object.values((D&&D.pessoas)||{}).map(p=>p.e))].sort();
+    const C=cfg(), ps=D?pessoasDoMes(A.mes):[], setores=[...new Set((c.R.func||[]).map(f=>f.setor).filter(Boolean))].sort(), emps=[...new Set(Object.values((D&&D.pessoas)||{}).map(p=>p.e))].sort();
     const ultImp=D&&D.imp&&D.imp.length?D.imp[D.imp.length-1]:null, st=D&&ds.length?stats(A.mes):null;
     const topo=`<section class="card alm-top"><div class="alm-h"><div class="alm-mesnav"><button class="btn sec" data-act="alm-mes" data-v="-1" aria-label="Mês anterior">‹</button><div><div class="eyebrow">RH · REFEITÓRIO</div><h2>Almoço · ${esc(mesNome(A.mes))}</h2></div><button class="btn sec" data-act="alm-mes" data-v="1" aria-label="Próximo mês">›</button></div>
       <label class="btn" style="cursor:pointer">${A.lendo?'Lendo…':P.ic('baixar',18,2.2)+'Importar do Face ID'}<input type="file" accept=".csv,text/csv" id="alm-arq" hidden ${A.lendo?'disabled':''}></label></div>
       <div class="sub alm-reg">Almoçou quem passou no <b>${esc(C.disp)}</b> entre ${esc(C.ini)} e ${esc(C.fim)}. ${ultImp?'Dados de '+esc(c.br(ultImp.de))+' a '+esc(c.br(ultImp.ate))+' · importado por '+esc(ultImp.por||'')+' em '+esc(new Date(ultImp.em).toLocaleDateString('pt-BR')):'Ainda não há dados deste mês.'}
         <details><summary>Como exportar do Control iD</summary><ol><li>Relatórios → Acessos → <b>Acessos Gerais</b>.</li><li>Escolha as datas (pode ser o mês todo), Pessoas: Todos, e clique em Listar.</li><li>Exportar → <b>Exportar CSV</b> e arraste o arquivo aqui (ou toque em "Importar do Face ID").</li><li>Importar de novo o mesmo período só atualiza esses dias: não duplica.</li></ol></details></div>
       ${st?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
-        <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div></div>`:''}</section>`;
+        <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Sem almoço e sem justificativa</span><b class="num">${st.semJust}</b><small>${st.just} justificados · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
     if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty" style="padding:24px;text-align:center">Nenhum dado do Face ID em ${esc(mesNome(A.mes))}. Importe o CSV do Control iD.</div></section>`;
     const abas=`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="dir" aria-pressed="${A.vis==='dir'}">Diretoria</button></div>`;
     if(A.vis==='dir') return topo+`<section class="card"><div class="alm-f">${abas}<span style="flex:1"></span><button class="btn" data-act="alm-ppt" ${A.ppt?'disabled':''}>${P.ic('baixar',18,2.2)}${A.ppt?'Gerando…':'Baixar apresentação (PowerPoint)'}</button></div>${vDir(c,st)}</section>`;
     const filtros=`<div class="alm-f">${abas}
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
+      ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
+      <select class="txt" id="alm-sit" style="max-width:240px">${[['','Todas as situações'],['sim','Almoçou'],['nao','Sem almoço e sem justificativa'],['just','Justificado'],['fora','Não almoça na empresa']].map(([v,t])=>`<option value="${v}" ${A.sit===v?'selected':''}>${t}</option>`).join('')}</select>
       <input class="txt" id="alm-q" type="search" autocomplete="off" placeholder="Buscar nome, setor ou CPF" value="${esc(A.q)}" style="max-width:260px"><span class="sub" id="alm-qn"></span>
       ${A.vis==='mes'?`<span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-xls">${P.ic('baixar',16,2.2)}Excel</button><button class="btn sec rh-sm" data-act="alm-imp">Imprimir</button>`:''}</div>`;
-    return topo+`<section class="card">${filtros}${A.vis==='dia'?vDia(c,ds,ps):vMes(c,ds,ps)}</section>`+vPessoa(c,ds); }
+    return topo+`<section class="card">${filtros}${A.vis==='dia'?vDia(c,ds,ps):vMes(c,ds,ps)}</section>`+vPessoa(c,ds)+vJust(c); }
   function mesAnt(m){ const [y,mm]=m.split('-').map(Number), d=new Date(y,mm-2,1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
   const varTxt=(a,b)=>{ if(!b) return ''; const v=Math.round((a-b)/b*100); return v===0?'igual':(v>0?'▲ '+v+'% a mais':'▼ '+(-v)+'% a menos'); };
   /* números do mês (sempre de todos, sem os filtros da tela) */
-  function stats(m){ const D=A.dados[m]; if(!D) return null; const ds=Object.keys(D.dias||{}).sort(); if(!ds.length) return null; const ps=(()=>{ const q=A.q, e=A.emp; A.q=''; A.emp=''; const r=pessoasDoMes(m); A.q=q; A.emp=e; return r; })();
-    const pd=ds.map(d=>{ let pres=0, alm=0, caf=0; ps.forEach(p=>{ const s=situacao(m,d,p.k); if(s.v!=='aus') pres++; if(s.v==='sim') alm++; if(s.x&&s.x.c) caf++; }); return {d,pres,alm,caf}; });
+  function stats(m){ const D=A.dados[m]; if(!D) return null; const ds=Object.keys(D.dias||{}).sort(); if(!ds.length) return null; const ps=(()=>{ const q=A.q, e=A.emp, se=A.setor; A.q=''; A.emp=''; A.setor=''; const r=pessoasDoMes(m); A.q=q; A.emp=e; A.setor=se; return r; })();
+    const pd=ds.map(d=>{ let pres=0, alm=0, caf=0, sj=0, jj=0; ps.forEach(p=>{ const s=situacao(m,d,p.k); if(s.v!=='aus'&&s.v!=='fora') pres++; if(s.v==='sim') alm++; if(s.v==='nao') sj++; if(s.v==='just') jj++; if(s.x&&s.x.c) caf++; }); return {d,pres,alm,caf,sj,jj}; });
     const mx=Math.max(...pd.map(x=>x.pres)), lim=Math.max(5,mx*0.4), exp=pd.filter(x=>x.pres>=lim);
     const tot=pd.reduce((s,x)=>s+x.alm,0), media=exp.length?Math.round(exp.reduce((s,x)=>s+x.alm,0)/exp.length):0, ades=exp.length?Math.round(exp.reduce((s,x)=>s+x.alm,0)/Math.max(1,exp.reduce((s,x)=>s+x.pres,0))*100):0;
     const quem=ps.filter(p=>ds.some(d=>situacao(m,d,p.k).v==='sim')); const porEmp={}; quem.forEach(p=>{ const e=empCurta(p.emp); const x=(porEmp[e]=porEmp[e]||{e,alm:0,pessoas:0}); x.pessoas++; x.alm+=ds.filter(d=>situacao(m,d,p.k).v==='sim').length; });
     const SEM=['seg','ter','qua','qui','sex','sáb']; const porSem=SEM.map(w=>{ const xs=exp.filter(x=>semana(x.d)===w); return {w,m:xs.length?Math.round(xs.reduce((s,x)=>s+x.alm,0)/xs.length):0,n:xs.length}; }).filter(x=>x.n);
-    const ajN=Object.keys((A.aj[m]||{}).aj||{}).length, C=cfg(), valor=+C.valor||0;
+    const ajN=Object.values((A.aj[m]||{}).aj||{}).filter(x=>x.v!=='just').length, C=cfg(), valor=+C.valor||0;
     const ant=m===mesAnt(m)?null:(A.dados[mesAnt(m)]&&Object.keys(A.dados[mesAnt(m)].dias||{}).length?statsBase(mesAnt(m)):null);
     const ult=D.imp&&D.imp.length?D.imp[D.imp.length-1]:null;
     return {m,pd,exp,dExp:exp.length,tot,media,ades,pessoas:quem.length,semCad:quem.filter(p=>!p.cad).length,porEmp:Object.values(porEmp).sort((a,b)=>b.alm-a.alm),porSem,ajN,valor,custo:valor?tot*valor:0,ant,
-      cafe:pd.reduce((s,x)=>s+x.caf,0),de:ds[0],ate:ds[ds.length-1],ult}; }
+      cafe:pd.reduce((s,x)=>s+x.caf,0),semJust:pd.reduce((s,x)=>s+x.sj,0),just:pd.reduce((s,x)=>s+x.jj,0),fora:ps.filter(p=>foraDe(p.k)).length,de:ds[0],ate:ds[ds.length-1],ult}; }
   function statsBase(m){ const sv=A._stB; if(sv) return null; A._stB=true; try{ const s=stats(m); return s?{mes:m,media:s.media,tot:s.tot,ades:s.ades}:null; } finally{ A._stB=false; } }
   /* ---------- painel da diretoria ---------- */
   const COR={alm:'#1B5C7A',pres:'#C7DCE6',grid:'#E5DFD0'};
@@ -118,7 +124,7 @@
       <div class="alm-dc"><h3>Média por dia da semana</h3>${barrasH(st.porSem.map(x=>({l:x.w,v:x.m,t:x.n+' dias'})),x=>x.v)}</div>
       <div class="alm-dc"><h3>Custo estimado</h3><label class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Valor por refeição <input class="txt num" id="alm-valor" inputmode="decimal" placeholder="R$ 0,00" value="${st.valor?String(st.valor).replace('.',','):''}" style="max-width:120px"><button class="btn sec rh-sm" data-act="alm-valor">Salvar</button></label>
         ${st.valor?`<div class="alm-big num">${R$(st.custo)}</div><div class="sub">${st.tot} almoços × ${R$(st.valor)}${st.ant&&st.ant.tot?' · mês anterior: '+R$(st.ant.tot*st.valor):''}</div>`:'<div class="sub" style="margin-top:8px">Informe o valor da refeição para ver o custo do mês (fica guardado para os próximos meses).</div>'}</div>
-      <div class="alm-dc"><h3>Observações</h3><ul class="alm-obs"><li>${st.cafe} passagens no refeitório antes das ${esc(cfg().cafeAte)} (café), fora da conta do almoço.</li><li>${st.ajN?st.ajN+' '+(st.ajN===1?'dia corrigido':'dias corrigidos')+' à mão pelo RH.':'Nenhuma correção à mão.'}</li><li>Fonte: Face ID (Control iD), ${esc(c.br(st.de))} a ${esc(c.br(st.ate))}.</li></ul></div></div>`; }
+      <div class="alm-dc"><h3>Observações</h3><ul class="alm-obs"><li>${st.cafe} passagens no refeitório antes das ${esc(cfg().cafeAte)} (café), fora da conta do almoço.</li><li>${st.ajN?st.ajN+' '+(st.ajN===1?'dia corrigido':'dias corrigidos')+' à mão pelo RH.':'Nenhuma correção à mão.'}</li><li>${st.semJust} dias sem almoço e sem justificativa · ${st.just} justificados · ${st.fora} ${st.fora===1?'pessoa não almoça':'pessoas não almoçam'} na empresa.</li><li>Fonte: Face ID (Control iD), ${esc(c.br(st.de))} a ${esc(c.br(st.ate))}.</li></ul></div></div>`; }
   /* ---------- apresentação (PowerPoint) ---------- */
   async function gerarPpt(){ const c=A.ctx, P=c.P, st=stats(A.mes); if(!st) return; A.ppt=true; P.rerender();
     try{ if(!window.PptxGenJS) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js');
@@ -151,51 +157,78 @@
         s.addText(st.porEmp.map(x=>x.e+': '+x.pessoas+' pessoas').join('  ·  '),{x:0.6,y:6.6,w:12,h:0.35,fontFace:F,fontSize:11,color:MU}); }
       /* 5 observações */
       { const s=base('Observações',''); const ob=[st.cafe+' passagens no refeitório antes das '+cfg().cafeAte+' (café da manhã), fora da conta do almoço.',st.ajN?st.ajN+' '+(st.ajN===1?'dia foi corrigido':'dias foram corrigidos')+' à mão pelo RH.':'Nenhuma correção à mão no mês.',
-          st.semCad?st.semCad+' pessoas que almoçaram ainda não estão no cadastro do RH (prestadores e terceirizados).':'Todas as pessoas que almoçaram estão no cadastro do RH.','Período dos dados: '+c.br(st.de)+' a '+c.br(st.ate)+'.'];
+          st.semCad?st.semCad+' pessoas que almoçaram ainda não estão no cadastro do RH (prestadores e terceirizados).':'Todas as pessoas que almoçaram estão no cadastro do RH.',st.semJust+' dias sem almoço e sem justificativa; '+st.just+' justificados; '+st.fora+' '+(st.fora===1?'pessoa não almoça':'pessoas não almoçam')+' na empresa (fora da conta da adesão).','Período dos dados: '+c.br(st.de)+' a '+c.br(st.ate)+'.'];
         s.addText(ob.map(t=>({text:t,options:{bullet:true,breakLine:true}})),{x:0.8,y:1.6,w:11.5,h:4.5,fontFace:F,fontSize:20,color:INK,paraSpaceAfter:12,valign:'top'}); }
       await pp.writeFile({fileName:'Refeitorio-'+st.m+'.pptx'}); P.toast('Apresentação baixada.'); }
     catch(e){ console.warn('[almoço] ppt',e); P.toast('Não consegui gerar a apresentação: '+((e&&e.message)||e)); }
     finally{ A.ppt=false; P.rerender(); } }
   function vDia(c,ds,ps){ const esc=c.esc, m=A.mes, d=A.dia;
-    const L=ps.map(p=>Object.assign({s:situacao(m,d,p.k)},p)), sim=L.filter(x=>x.s.v==='sim'), nao=L.filter(x=>x.s.v==='nao');
-    const tira=`<div class="alm-dias">${ds.map(x=>{ const n=ps.filter(p=>situacao(m,x,p.k).v==='sim').length; return `<button data-act="alm-dia" data-v="${x}" aria-pressed="${x===d}"><small>${semana(x)}</small><b>${x.slice(8)}</b><span>${n}</span></button>`; }).join('')}</div>`;
-    const lin=(x,bt)=>`<div class="alm-l" data-b="${esc(almChave(x))}"><div><button class="lnk alm-nm" data-act="alm-pes" data-k="${x.k}">${esc(x.nome)}</button><small>${esc([empCurta(x.emp),x.setor].filter(Boolean).join(' · '))}${x.cad?'':' · sem cadastro no RH'}</small></div>
-      <div class="alm-r">${x.s.x&&x.s.x.a?`<span class="num">${esc(x.s.x.a)}</span>`:''}${x.s.x&&x.s.x.c?`<small>café ${esc(x.s.x.c)}</small>`:''}${x.s.aj?`<small title="${esc(x.s.aj.mot||'')}">ajustado por ${esc(x.s.aj.por||'')}</small>`:''}${bt}</div></div>`;
-    return `${tira}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram</span> <span class="pill warn">${nao.length} vieram e não almoçaram</span></div>
-      <div class="alm-g"><div><div class="label">ALMOÇARAM</div>${sim.map(x=>lin(x,`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="nao">não almoçou</button>`)).join('')||'<div class="sub">Ninguém.</div>'}</div>
-        <div><div class="label">VIERAM E NÃO PASSARAM NO REFEITÓRIO</div>${nao.map(x=>lin(x,`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="sim">almoçou</button>`)).join('')||'<div class="sub">Ninguém.</div>'}</div></div>`; }
+    const L=ps.map(p=>Object.assign({s:situacao(m,d,p.k)},p)), g=v=>L.filter(x=>x.s.v===v), sim=g('sim'), nao=g('nao'), jus=g('just'), fora=g('fora');
+    const tira=`<div class="alm-dias">${ds.map(x=>{ const ss=ps.map(p=>situacao(m,x,p.k).v), n=ss.filter(v=>v==='sim').length, sj=ss.filter(v=>v==='nao').length; return `<button data-act="alm-dia" data-v="${x}" aria-pressed="${x===d}" title="${n} almoçaram · ${sj} sem justificativa"><small>${semana(x)}</small><b>${x.slice(8)}</b><span>${n}</span>${sj?`<em>${sj}</em>`:''}</button>`; }).join('')}</div>`;
+    const info=x=>[empCurta(x.emp),x.setor].filter(Boolean).join(' · ')+(x.cad?'':' · sem cadastro no RH');
+    const lin=(x,extra,bt)=>`<div class="alm-l" data-b="${esc(almChave(x))}"><div><button class="lnk alm-nm" data-act="alm-pes" data-k="${x.k}">${esc(x.nome)}</button><small>${esc(info(x))}</small>${extra||''}</div>
+      <div class="alm-r">${x.s.x&&x.s.x.a?`<span class="num">${esc(x.s.x.a)}</span>`:''}${x.s.x&&x.s.x.c?`<small>café ${esc(x.s.x.c)}</small>`:''}${x.s.aj?`<small title="${esc(x.s.aj.mot||'')}">corrigido por ${esc(x.s.aj.por||'')}</small>`:''}${bt}</div></div>`;
+    const jtx=x=>`<span class="alm-jt">${esc(x.s.j.tipo||'Justificado')}${x.s.j.mot?' · '+esc(x.s.j.mot):''}<small> · ${esc(x.s.j.por||'')}</small></span>`;
+    const bloco=(cls,tit,xs,mk,vazio)=>!A.sit||A.sit===cls?`<div class="alm-bl ${cls}"><div class="label">${tit} <b>(${xs.length})</b></div>${xs.map(mk).join('')||`<div class="sub">${vazio}</div>`}</div>`:'';
+    const esq=bloco('sim','ALMOÇARAM',sim,x=>lin(x,'',`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="nao">não almoçou</button>`),'Ninguém.');
+    const dir=bloco('nao','NÃO ALMOÇARAM · SEM JUSTIFICATIVA',nao,x=>lin(x,'',`<button class="btn sec rh-sm" data-act="alm-jus" data-k="${x.k}" data-d="${d}">Justificar</button><button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="sim">almoçou</button>`),'Ninguém. Tudo justificado.')
+      +bloco('just','JUSTIFICADOS',jus,x=>lin(x,jtx(x),`<button class="lnk" data-act="alm-jus" data-k="${x.k}" data-d="${d}">alterar</button>`),'Nenhuma justificativa neste dia.')
+      +(!A.sit||A.sit==='fora'?`<details class="alm-bl fora" ${A.sit==='fora'?'open':''}><summary class="label">NÃO ALMOÇAM NA EMPRESA <b>(${fora.length})</b></summary>${fora.map(x=>lin(x,`<span class="alm-jt">${esc(foraDe(x.k).mot||'Não almoça na empresa')}</span>`,'')).join('')||'<div class="sub">Ninguém marcado. Para marcar, clique no nome da pessoa.</div>'}</details>`:'');
+    return `${tira}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram</span><span class="pill warn">${nao.length} sem justificativa</span>${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>
+      <div class="alm-g"><div>${esq}</div><div>${dir}</div></div>`; }
+  /* ---------- justificativa (janela) ---------- */
+  function vJust(c){ const J=A.jus; if(!J) return ''; const esc=c.esc, aj=((A.aj[J.d.slice(0,7)]||{}).aj||{})[J.d+'_'+J.k], cur=aj&&aj.v==='just'?aj:null; const tipos=cfg().just||JUST_PADRAO;
+    if(J.tipo===undefined){ J.tipo=cur?cur.tipo:''; J.mot=cur?cur.mot||'':''; }
+    const nome=(pessoasDoMes(A.mes).find(p=>p.k===J.k)||{}).nome||'';
+    return `<div class="rh-modal" data-act="alm-jusx-fundo"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Justificar" style="max-width:520px"><div class="rh-ch"><h2>Justificar · ${esc(nome)}</h2><button class="lnk" data-act="alm-jusx">Fechar</button></div>
+      <div class="sub" style="margin:-4px 0 10px">${esc(c.br(J.d))} · ${semana(J.d)}. A pessoa continua sem almoço nesse dia, mas não conta como falta sem justificativa.</div>
+      <div class="alm-jtipos">${tipos.map(t=>`<button class="${J.tipo===t?'on':''}" data-act="alm-jtipo" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <label style="display:block;margin-top:12px"><span class="label">Observação ${J.tipo==='Outro'?'(diga o motivo)':'(opcional)'}</span><input class="txt" id="alm-jmot" maxlength="120" value="${esc(J.mot||'')}" placeholder="ex.: autorizado pelo supervisor"></label>
+      ${J.erro?`<p class="err" style="color:var(--crit-ink)">${esc(J.erro)}</p>`:''}
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap">${cur?'<button class="lnk" data-act="alm-jrem" style="color:var(--crit-ink)">Tirar a justificativa</button>':'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="alm-jusx">Cancelar</button><button class="btn" data-act="alm-jsalvar">Salvar</button></div></div></div></div>`; }
+  async function gravaAj(k,d,it){ const c=A.ctx, P=c.P, m=d.slice(0,7), ref=P.db().doc('rh/dados/almocoaj/'+m), cur=A.aj[m]||{mes:m,aj:{},log:[]};
+    const aj=Object.assign({},cur.aj||{}); if(it) aj[d+'_'+k]=it; else delete aj[d+'_'+k];
+    const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k,por:c.eu(),em:new Date().toISOString()},it||{v:'removido'})]).slice(-500);
+    await ref.set({mes:m,aj,log}); A.aj[m]=Object.assign({},cur,{aj,log}); }
+  async function marcarFora(k,on){ const c=A.ctx, P=c.P; let mot='';
+    if(on){ mot=prompt('Por que não almoça na empresa? (ex.: almoça em casa, traz marmita e come fora, outro turno)'); if(mot===null) return; }
+    const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}), fora=Object.assign({},al.fora||{});
+    fora[k]=on?{mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()}:Object.assign({},fora[k]||{},{removido:true,remPor:c.eu(),remEm:new Date().toISOString()});
+    al.fora=fora; try{ await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; P.toast(on?'Marcado: não almoça na empresa. Não aparece mais como falta.':'Volta a contar no almoço.'); P.rerender(); }catch(e){ P.erro(e); } }
   /* ---------- detalhe da pessoa no mês (todas as passagens do Face ID) ---------- */
   const durTxt=(a,b)=>{ const x=hm(a), y=hm(b); if(x==null||y==null||y<=x) return ''; const m=y-x; return m<60?m+' min':Math.floor(m/60)+'h'+pad(m%60); };
   function vPessoa(c,ds){ const k=A.pes; if(!k) return ''; const esc=c.esc, m=A.mes, P0=((A.dados[m]||{}).pessoas||{})[k]||{}, f=(c.R.func||[]).find(x=>String(x.cpf||'').replace(/\D/g,'').padStart(11,'0')===k);
     const nome=f?titulo(f.nome):(P0.n||'(sem nome)'), C=cfg(), dRef=nrm(C.disp);
     const L=ds.map(d=>{ const s=situacao(m,d,k), ts=(s.x&&s.x.t)||[]; const ps=ts.map(x=>({h:x.slice(0,8).trim(),d:x.slice(x.indexOf(' ')+1)}));
       const ref=ps.filter(x=>nrm(x.d)===dRef&&hm(x.h)>=hm(C.ini)&&hm(x.h)<=hm(C.fim)); const ent=ps.find(x=>/ENTRADA/.test(nrm(x.d))), sai=[...ps].reverse().find(x=>/SAIDA/.test(nrm(x.d)));
-      return {d,s,ps,ref,ent,sai}; }).filter(x=>x.s.v!=='aus'||x.s.aj);
-    const nSim=L.filter(x=>x.s.v==='sim').length, nNao=L.filter(x=>x.s.v==='nao').length, semT=L.some(x=>x.s.x&&!x.s.x.t);
-    const sit=x=>x.s.v==='sim'?'<span class="pill ok">almoçou</span>':'<span class="pill warn">não almoçou</span>';
+      return {d,s,ps,ref,ent,sai}; }).filter(x=>x.s.v!=='aus'||x.s.aj||x.s.j);
+    const nSim=L.filter(x=>x.s.v==='sim').length, nNao=L.filter(x=>x.s.v==='nao').length, nJ=L.filter(x=>x.s.v==='just').length, fo=foraDe(k), semT=L.some(x=>x.s.x&&!x.s.x.t);
+    const sit=x=>x.s.v==='sim'?'<span class="pill ok">almoçou</span>':x.s.v==='just'?'<span class="pill">justificado</span>':x.s.v==='fora'?'<span class="pill">não almoça aqui</span>':'<span class="pill warn">sem justificativa</span>';
     return `<div class="rh-modal" data-act="alm-pesx-fundo"><div class="rh-mbox alm-pm" role="dialog" aria-modal="true" aria-label="Entradas de ${esc(nome)}">
       <div class="rh-ch"><div><h2>${esc(nome)}</h2><div class="sub">${esc([empCurta(P0.e||''),f&&f.setor,c.fCPF(k),f?'':'sem cadastro no RH'].filter(Boolean).join(' · '))}</div></div><button class="lnk" data-act="alm-pesx">Fechar</button></div>
-      <div class="alm-pk"><div><b class="num">${nSim}</b><span>almoços</span></div><div><b class="num">${nNao}</b><span>dias sem almoço</span></div><div><b class="num">${L.length}</b><span>dias na empresa</span></div><div><b class="num">${L.filter(x=>x.s.x&&x.s.x.c).length}</b><span>cafés</span></div></div>
+      <div class="alm-pk"><div><b class="num">${nSim}</b><span>almoços</span></div><div><b class="num">${nNao}</b><span>sem justificativa</span></div><div><b class="num">${nJ}</b><span>justificados</span></div><div><b class="num">${L.length}</b><span>dias na empresa</span></div><div><b class="num">${L.filter(x=>x.s.x&&x.s.x.c).length}</b><span>cafés</span></div></div>
+      <div class="alm-fora ${fo?'on':''}">${fo?`<b>Não almoça na empresa</b>${fo.mot?' · '+esc(fo.mot):''} <small>(${esc(fo.por||'')})</small> <button class="lnk" data-act="alm-fora" data-k="${k}" data-v="0">voltar a contar</button>`:`<span class="sub">Esta pessoa almoça em outro lugar todo dia?</span> <button class="btn sec rh-sm" data-act="alm-fora" data-k="${k}" data-v="1">Não almoça na empresa</button>`}</div>
       ${semT?'<p class="sub" style="margin:8px 0 0">Para ver todas as passagens destes dias, importe o CSV do Face ID de novo (as importações antigas guardaram só o horário do almoço).</p>':''}
       <div class="alm-pl">${L.map(x=>`<div class="alm-pd ${x.s.v}"><div class="alm-pdh"><b>${esc(c.br(x.d))}</b><small>${semana(x.d)}</small>${sit(x)}
           ${x.ref.length?`<span class="alm-ph">Refeitório ${esc(x.ref[0].h.slice(0,5))}${x.ref.length>1?' → '+esc(x.ref[x.ref.length-1].h.slice(0,5))+' ('+durTxt(x.ref[0].h,x.ref[x.ref.length-1].h)+')':''}</span>`:''}
           ${x.ent||x.sai?`<span class="alm-ph sub">${x.ent?'chegou '+esc(x.ent.h.slice(0,5)):''}${x.ent&&x.sai?' · ':''}${x.sai?'saiu '+esc(x.sai.h.slice(0,5)):''}</span>`:''}
-          <button class="lnk" data-act="alm-aj2" data-k="${k}" data-d="${x.d}" data-v="${x.s.v==='sim'?'nao':'sim'}">${x.s.v==='sim'?'marcar não almoçou':'marcar almoçou'}</button></div>
-        ${x.s.aj?`<div class="alm-paj">Corrigido por ${esc(x.s.aj.por||'')} em ${esc(new Date(x.s.aj.em).toLocaleDateString('pt-BR'))}${x.s.aj.mot?': '+esc(x.s.aj.mot):''}</div>`:''}
+          <span class="alm-pb">${x.s.v==='nao'||x.s.v==='just'?`<button class="lnk" data-act="alm-jus" data-k="${k}" data-d="${x.d}">${x.s.v==='just'?'alterar justificativa':'justificar'}</button>`:''}<button class="lnk" data-act="alm-aj2" data-k="${k}" data-d="${x.d}" data-v="${x.s.v==='sim'?'nao':'sim'}">${x.s.v==='sim'?'marcar não almoçou':'marcar almoçou'}</button></span></div>
+        ${x.s.v==='just'?`<div class="alm-paj">Justificado: ${esc(x.s.j.tipo||'')}${x.s.j.mot?' · '+esc(x.s.j.mot):''} (${esc(x.s.j.por||'')})</div>`:''}
+        ${x.s.aj&&!x.s.j?`<div class="alm-paj">Corrigido por ${esc(x.s.aj.por||'')} em ${esc(new Date(x.s.aj.em).toLocaleDateString('pt-BR'))}${x.s.aj.mot?': '+esc(x.s.aj.mot):''}</div>`:''}
         ${x.ps.length?`<div class="alm-pt">${x.ps.map(p=>`<span class="${nrm(p.d)===dRef?'r':''}"><b class="num">${esc(p.h)}</b> ${esc(p.d)}</span>`).join('')}</div>`:''}</div>`).join('')||'<div class="empty">Sem passagens neste mês.</div>'}</div></div></div>`; }
-  function grade(ds,ps){ return ps.map(p=>{ const v=ds.map(d=>situacao(A.mes,d,p.k)); return {p,v,tot:v.filter(x=>x.v==='sim').length,pres:v.filter(x=>x.v!=='aus').length}; }); }
+  function grade(ds,ps){ return ps.map(p=>{ const v=ds.map(d=>situacao(A.mes,d,p.k)); return {p,v,tot:v.filter(x=>x.v==='sim').length,pres:v.filter(x=>x.v!=='aus').length,sj:v.filter(x=>x.v==='nao').length,jj:v.filter(x=>x.v==='just').length}; }).filter(g=>!A.sit||g.v.some(x=>x.v===A.sit)); }
   function vMes(c,ds,ps){ const esc=c.esc, G=grade(ds,ps);
     const porEmp={}; G.forEach(g=>{ const e=empCurta(g.p.emp); porEmp[e]=(porEmp[e]||0)+g.tot; });
-    return `<div class="sub" style="margin:4px 0 10px">✓ almoçou · ✗ veio e não passou no refeitório · em branco: não veio. Clique num dia para corrigir. Totais: ${Object.entries(porEmp).map(([e,n])=>`<b>${esc(e)}</b> ${n}`).join(' · ')}</div>
-      <div class="alm-tw"><table class="alm-t"><thead><tr><th class="alm-n">Pessoa</th>${ds.map(d=>`<th><small>${semana(d)}</small>${d.slice(8)}</th>`).join('')}<th>Almoços</th><th>Dias na empresa</th></tr></thead>
-      <tbody>${G.map(g=>`<tr data-b="${esc(almChave(g.p))}"><td class="alm-n"><button class="lnk alm-nm" data-act="alm-pes" data-k="${g.p.k}">${esc(g.p.nome)}</button><small>${esc(empCurta(g.p.emp))}${g.p.setor?' · '+esc(g.p.setor):''}</small></td>${g.v.map((s,i)=>`<td class="alm-c ${s.v}${s.aj?' aj':''}" data-act="alm-cel" data-k="${g.p.k}" data-d="${ds[i]}" title="${s.aj?'Ajustado: '+esc(s.aj.mot||''):s.x&&s.x.a?'Refeitório '+esc(s.x.a):''}">${s.v==='sim'?'✓':s.v==='nao'?'✗':''}</td>`).join('')}<td class="num"><b>${g.tot}</b></td><td class="num">${g.pres}</td></tr>`).join('')}</tbody></table></div>`; }
+    return `<div class="sub" style="margin:4px 0 10px">✓ almoçou · ✗ sem almoço e sem justificativa · J justificado · – não almoça na empresa · em branco: não veio. Clique num dia ✗ para justificar ou corrigir. Totais: ${Object.entries(porEmp).map(([e,n])=>`<b>${esc(e)}</b> ${n}`).join(' · ')}</div>
+      <div class="alm-tw"><table class="alm-t"><thead><tr><th class="alm-n">Pessoa</th>${ds.map(d=>`<th><small>${semana(d)}</small>${d.slice(8)}</th>`).join('')}<th>Almoços</th><th>Sem just.</th><th>Justif.</th><th>Dias na empresa</th></tr></thead>
+      <tbody>${G.map(g=>`<tr data-b="${esc(almChave(g.p))}"><td class="alm-n"><button class="lnk alm-nm" data-act="alm-pes" data-k="${g.p.k}">${esc(g.p.nome)}</button><small>${esc(empCurta(g.p.emp))}${g.p.setor?' · '+esc(g.p.setor):''}</small></td>${g.v.map((s,i)=>`<td class="alm-c ${s.v}${s.aj?' aj':''}" data-act="alm-cel" data-k="${g.p.k}" data-d="${ds[i]}" title="${s.j?'Justificado: '+esc((s.j.tipo||'')+(s.j.mot?' · '+s.j.mot:'')):s.aj?'Ajustado: '+esc(s.aj.mot||''):s.x&&s.x.a?'Refeitório '+esc(s.x.a):''}">${s.v==='sim'?'✓':s.v==='nao'?'✗':s.v==='just'?'J':s.v==='fora'?'–':''}</td>`).join('')}<td class="num"><b>${g.tot}</b></td><td class="num">${g.sj||''}</td><td class="num">${g.jj||''}</td><td class="num">${g.pres}</td></tr>`).join('')}</tbody></table></div>`; }
   async function ajustar(k,d,v){ const c=A.ctx, P=c.P, m=d.slice(0,7); const mot=prompt(v==='sim'?'Motivo (ex.: almoçou sem passar o rosto):':'Motivo (ex.: passou no refeitório mas não almoçou):'); if(mot===null) return;
     const ref=P.db().doc('rh/dados/almocoaj/'+m); const cur=A.aj[m]||{mes:m,aj:{},log:[]}; const it={v,mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()};
     const aj=Object.assign({},cur.aj||{}); aj[d+'_'+k]=it; const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k},it)]).slice(-500);
     try{ await ref.set({mes:m,aj,log}); P.toast('Ajuste guardado.'); }catch(e){ P.erro(e); } }
   async function excel(){ const c=A.ctx, D=A.dados[A.mes]; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes));
-    const cab=['Nome','CPF','Empresa','Setor'].concat(ds.map(d=>d.slice(8)+'/'+d.slice(5,7)),['Almoços','Dias na empresa']);
-    const L=[cab].concat(G.map(g=>[g.p.nome,c.fCPF(g.p.k),empCurta(g.p.emp),g.p.setor].concat(g.v.map(s=>s.v==='sim'?1:s.v==='nao'?0:''),[g.tot,g.pres])));
+    const cab=['Nome','CPF','Empresa','Setor'].concat(ds.map(d=>d.slice(8)+'/'+d.slice(5,7)),['Almoços','Sem justificativa','Justificados','Dias na empresa']);
+    const L=[cab].concat(G.map(g=>[g.p.nome,c.fCPF(g.p.k),empCurta(g.p.emp),g.p.setor].concat(g.v.map(s=>s.v==='sim'?1:s.v==='nao'?0:s.v==='just'?'J':s.v==='fora'?'F':''),[g.tot,g.sj,g.jj,g.pres])));
     if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const ws=XLSX.utils.aoa_to_sheet(L); ws['!cols']=cab.map((_,i)=>({wch:i===0?32:i<4?16:i>=cab.length-2?14:6})); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Almoço '+A.mes);
     c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Almoco-'+A.mes+'.xlsx'); }
@@ -209,9 +242,16 @@
     if(a==='alm-vis'){ A.vis=b.dataset.v; P.rerender(); return; }
     if(a==='alm-dia'){ A.dia=b.dataset.v; P.rerender(); return; }
     if(a==='alm-aj'){ ajustar(b.dataset.k,A.dia,b.dataset.v); return; }
-    if(a==='alm-cel'){ const s=situacao(A.mes,b.dataset.d,b.dataset.k); ajustar(b.dataset.k,b.dataset.d,s.v==='sim'?'nao':'sim'); return; }
+    if(a==='alm-cel'){ const s=situacao(A.mes,b.dataset.d,b.dataset.k); if(s.v==='nao'||s.v==='just'){ A.jus={k:b.dataset.k,d:b.dataset.d}; P.rerender(); return; } if(s.v==='aus'&&!s.aj) return; ajustar(b.dataset.k,b.dataset.d,s.v==='sim'?'nao':'sim'); return; }
     if(a==='alm-xls'){ excel().catch(e=>P.erro(e)); return; }
     if(a==='alm-imp'){ imprimir(); return; }
+    if(a==='alm-jus'){ A.jus={k:b.dataset.k,d:b.dataset.d}; P.rerender(); setTimeout(()=>{ const i=document.getElementById('alm-jmot'); if(i&&A.jus.tipo) i.focus(); },50); return; }
+    if(a==='alm-jusx'||(a==='alm-jusx-fundo'&&ev.target===b)){ A.jus=null; P.rerender(); return; }
+    if(a==='alm-jtipo'){ A.jus.tipo=b.dataset.v; A.jus.mot=(document.getElementById('alm-jmot')||{}).value||A.jus.mot; A.jus.erro=''; P.rerender(); return; }
+    if(a==='alm-jsalvar'||a==='alm-jrem'){ const J=A.jus; J.mot=String((document.getElementById('alm-jmot')||{}).value||'').trim();
+      if(a==='alm-jsalvar'){ if(!J.tipo){ J.erro='Escolha o tipo da justificativa.'; P.rerender(); return; } if(J.tipo==='Outro'&&J.mot.length<3){ J.erro='Escreva o motivo.'; P.rerender(); return; } }
+      gravaAj(J.k,J.d,a==='alm-jsalvar'?{v:'just',tipo:J.tipo,mot:J.mot.slice(0,120),por:A.ctx.eu(),em:new Date().toISOString()}:null).then(()=>{ A.jus=null; P.toast(a==='alm-jsalvar'?'Justificativa guardada.':'Justificativa retirada.'); P.rerender(); }).catch(e=>P.erro(e)); return; }
+    if(a==='alm-fora'){ marcarFora(b.dataset.k,b.dataset.v==='1'); return; }
     if(a==='alm-pes'){ A.pes=b.dataset.k; P.rerender(); return; }
     if(a==='alm-pesx'||(a==='alm-pesx-fundo'&&ev.target===b)){ A.pes=null; P.rerender(); return; }
     if(a==='alm-aj2'){ ajustar(b.dataset.k,b.dataset.d,b.dataset.v); return; }
@@ -220,7 +260,9 @@
       P.db().doc('rh/config').set({almoco:Object.assign({},(A.ctx.R.cfg&&A.ctx.R.cfg.almoco)||{},{valor:v})},{merge:true}).then(()=>{ if(A.ctx.R.cfg){ A.ctx.R.cfg.almoco=Object.assign({},A.ctx.R.cfg.almoco||{},{valor:v}); } P.toast(v?'Valor da refeição guardado.':'Valor apagado.'); P.rerender(); }).catch(e=>P.erro(e)); return; } });
   document.addEventListener('change',ev=>{ const t=ev.target; if(!A.ctx) return;
     if(t.id==='alm-arq'&&t.files&&t.files[0]){ importar(t.files[0]); t.value=''; }
-    if(t.id==='alm-emp'){ A.emp=t.value; A.ctx.P.rerender(); } });
+    if(t.id==='alm-emp'){ A.emp=t.value; A.ctx.P.rerender(); }
+    if(t.id==='alm-setor'){ A.setor=t.value; A.ctx.P.rerender(); }
+    if(t.id==='alm-sit'){ A.sit=t.value; A.ctx.P.rerender(); } });
   /* busca: todas as palavras, sem acento, em qualquer ordem (nome, setor, empresa ou CPF) */
   function almChave(p){ return nrm([p.nome,p.setor,empCurta(p.emp)].join(' '))+' '+p.k; }
   function almBusca(){ const ws=nrm(A.q).split(/\s+/).filter(Boolean), dq=String(A.q||'').replace(/\D/g,''); let n=0, t=0;
@@ -247,6 +289,14 @@
 .alm-dh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.alm-lg{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center}.alm-lg i{display:inline-block;width:12px;height:12px;border-radius:3px}
 .alm-hb{display:flex;flex-direction:column;gap:10px}.alm-hbr{display:grid;grid-template-columns:110px 1fr 120px;gap:10px;align-items:center;font-size:14px}.alm-hbr i{height:14px;background:var(--surface-2,#f1ede3);border-radius:7px;overflow:hidden}.alm-hbr i b{display:block;height:100%;background:#1B5C7A;border-radius:7px}.alm-hbr em{font-style:normal;font-weight:700}.alm-hbr small{font-weight:400;color:var(--muted)}
 .alm-big{font-size:32px;font-weight:800;color:var(--teal-strong);margin-top:10px}.alm-obs{margin:0;padding-left:18px;line-height:1.7}
+.alm-kpi{grid-template-columns:repeat(5,minmax(0,1fr))!important}.alm-kpi .alm-kw b{color:var(--warn-ink,#8a5a00)}
+.alm-dias em{font-style:normal;font-size:11px;color:var(--warn-ink,#8a5a00);font-weight:700}.alm-dt .pill{margin-right:6px}
+.alm-bl{margin-bottom:16px}.alm-bl .label b{color:var(--ink)}.alm-bl.fora summary{cursor:pointer}.alm-jt{display:block;font-size:12.5px;color:var(--teal-strong);margin-top:2px}.alm-jt small{color:var(--muted)}
+.alm-jtipos{display:flex;flex-wrap:wrap;gap:8px}.alm-jtipos button{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}.alm-jtipos button.on{border-color:var(--teal);background:var(--teal-wash,#e4eef3);font-weight:700}
+.alm-fora{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2,#f6f4ee);display:flex;gap:10px;align-items:center;flex-wrap:wrap}.alm-fora.on{background:var(--teal-wash,#e4eef3)}
+.alm-pb{margin-left:auto;display:flex;gap:14px}.alm-pdh .alm-pb .lnk{margin-left:0}.alm-pd.just{border-left-color:var(--teal)}.alm-pd.fora{border-left-color:var(--line)}
+.alm-c.just{color:var(--teal-strong);background:var(--teal-wash,#e4eef3)}.alm-c.fora{color:var(--muted);font-weight:400}
+@media (max-width:1100px){.alm-kpi{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media (max-width:760px){.alm-kpi{grid-template-columns:1fr 1fr!important}}
 .alm-nm{font-weight:700;font-size:inherit;color:inherit;text-align:left;padding:0;text-decoration:none}.alm-nm:hover{color:var(--teal-strong);text-decoration:underline}
 .alm-pm{max-width:760px;width:100%;max-height:88vh;overflow:auto}.alm-pk{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}.alm-pk div{background:var(--surface-2,#f6f4ee);border-radius:10px;padding:8px 12px}.alm-pk b{display:block;font-size:22px;color:var(--teal-strong)}.alm-pk span{font-size:12.5px;color:var(--muted)}
 .alm-pl{display:flex;flex-direction:column;gap:8px;margin-top:12px}.alm-pd{border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:10px;padding:8px 12px}.alm-pd.nao{border-left-color:var(--warn)}
