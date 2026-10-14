@@ -61,6 +61,7 @@ async function invGravar(acao,id,d,json){ if(!S.db) throw new Error('Sem conexã
     else { doc.apontadoPor=null; doc.apontadoPorNome=''; }
     if(ant) return S.db.doc('recebimentos/'+k).update(Object.assign(doc,{alteradoEm:em}));
     const m=String(d.data||'').match(/^(\d{2})\/(\d{2})\/(\d{4})/); return S.db.doc('recebimentos/'+k).set(Object.assign(doc,{dia:m?m[3]+'-'+m[2]+'-'+m[1]:hojeStr(),em,por:uid,porNome:nm,obs:d.observacao||'',origem:'programa'})); }
+  if(acao==='salvarTol'){ const t={sc:Math.max(0,+d.sc||0),pct:Math.max(0,+d.pct||0),em,por:uid}; await S.db.doc('config/geral').update({invTol:t}); S.cfg=S.cfg||{}; S.cfg.invTol=t; return; }
   if(acao==='salvarReq'||acao==='removerReq'||acao==='salvarHist') return; /* Transferências: fora do painel */
   if(acao==='notificarEmail') return; /* e-mail automático do Apps Script: ainda não existe no painel */
   console.warn('[inventário] ação desconhecida',acao); }
@@ -76,6 +77,7 @@ window.Painel.inv={
   palete(cod){ const it=itemDe(cod); return it?alxPP(it):0; },
   gravar(acao,id,d,json){ return Promise.resolve().then(()=>invGravar(acao,id,d,json)).catch(e=>{ if(Date.now()-_invErroEm>3000){ _invErroEm=Date.now(); erro(e); } throw e; }); },
   pedido(){ const x=INV.pedido; INV.pedido=null; return x; },
+  tol(){ return (S.cfg&&S.cfg.invTol)||{sc:0,pct:0}; },
   sair(){ const b=document.createElement('button'); b.dataset.act='sair-conta'; b.hidden=true; document.body.appendChild(b); b.click(); b.remove(); }
 };
 document.head.insertAdjacentHTML('beforeend',`<style>
@@ -85,3 +87,15 @@ document.head.insertAdjacentHTML('beforeend',`<style>
   body.inv-solo .inv-frx{border-radius:0;z-index:50}
   @media (max-width:900px){ .inv-frx{border-radius:0} }
 </style>`);
+
+/* Item que dá diferença em 3 contagens seguidas (pedido de 14/10): aviso no Meu dia para quem audita o inventário.
+   Diferença = contado − saldo do Focco gravado na contagem; vale a tolerância de config/geral.invTol {sc, pct} (as duas precisam passar). */
+function invTolPassa(dif,sis,T){ const a=Math.abs(dif); if(!a||a<=T.sc) return false; if(T.pct>0&&sis>0&&a/sis*100<=T.pct) return false; return true; }
+function invDivRepetidas(){ const T=Object.assign({sc:0,pct:0},(S.cfg&&S.cfg.invTol)||{}); const L={};
+  (S.alx&&S.alx.conferencias||[]).filter(c=>!c.excluida).slice().sort((a,b)=>String(b.em||'').localeCompare(String(a.em||''))).forEach(c=>{
+    Object.entries(c.itens||{}).forEach(([cod,it])=>{ [['3',it.almox3,it.saldoSistema3,it.l3||'Almox 3'],['30',it.almox30,it.saldoSistema30,it.l30||'Almox 30']].forEach(([b,ct,sis,lbl])=>{
+      ct=+ct||0; if(!(ct>0||(b==='3'&&it.confirmadoZero))||sis==null||sis==='') return; (L[cod+'|'+b]=L[cod+'|'+b]||[]).push({cod,lbl,dif:ct-(+sis||0),sis:+sis||0}); }); }); });
+  return Object.values(L).filter(ls=>ls.length>=3&&ls.slice(0,3).every(x=>invTolPassa(x.dif,x.sis,T))).map(ls=>ls[0]); }
+registrarAviso(()=>{ let p=null; try{ p=acsP(); }catch(e){} if(!p||!invLigado()||!viewOk('inventario')) return []; if(!(p.tudo||p.auditar||p.verAud)) return [];
+  const r=invDivRepetidas(); if(!r.length) return [];
+  return [{nivel:'warn',rotulo:'Inventário',titulo:r.length+' '+(r.length===1?'item dá':'itens dão')+' diferença em toda contagem',texto:r.slice(0,4).map(x=>x.cod+' ('+x.lbl+')').join(', ')+(r.length>4?' e mais '+(r.length-4):'')+' · 3 contagens seguidas',go:'alxaud'}]; });
