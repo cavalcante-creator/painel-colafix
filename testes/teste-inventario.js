@@ -9,7 +9,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   d.users['conf@painel-colafix.app']={uid:'uCONF',pass:'conf123',nome:'Carla'}; D['perfis/uCONF']={nome:'Carla',usuario:'conf'}; D['acessos/uCONF']={perfil:'conf',mods:['almox'],locais:['a3'],contar:true,receber:true,ativo:true};
   d.users['sis@painel-colafix.app']={uid:'uSIS',pass:'sis123',nome:'Sara'}; D['perfis/uSIS']={nome:'Sara',usuario:'sis'}; D['acessos/uSIS']={perfil:'supsis',mods:['almox'],locais:['a3','a30','rej','sep','a1','a2'],contar:true,receber:true,auditar:true,verAud:true,ativo:true};
   const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept());
-  const entra=async(u,s)=>{ await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,u,s); await H.dorme(2500); };
+  const entra=async(u,s)=>{ await H.preparar(p,d); await p.goto(H.BASE); await p.evaluate(()=>{ try{ localStorage.setItem('inv.layout','antigo'); }catch(e){} }); /* este teste cobre o layout antigo; o novo está no teste-invnovo */ await H.entrar(p,u,s); await H.dorme(2500); };
   const frame=async()=>{ for(let i=0;i<40;i++){ const f=p.frames().find(x=>x.url().includes('inventario/index.html')); if(f){ const pr=await f.evaluate(()=>typeof USUARIO_LOGADO!=='undefined'&&!!USUARIO_LOGADO&&document.getElementById('appLoading').style.display==='none').catch(()=>false); if(pr) return f; } await H.dorme(250); } return null; };
   const docs=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
   const vis=(f,id)=>f.evaluate(id=>{ const e=document.getElementById(id); return !!e&&e.offsetParent!==null; },id);
