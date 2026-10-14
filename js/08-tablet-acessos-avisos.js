@@ -1201,3 +1201,72 @@ body.tt-ent .toast{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;left
 body.tt-ent.tt-mira #tt-video{left:12px;right:auto;width:calc(100vw - 24px)!important}
 </style>`);
 /* ===FIM RANCHO NO CELULAR=== */
+/* ===================== SÓ RECEBE O QUE FOI SEPARADO (14/10) ===================== */
+/* O almox marca na conferência o que separou; quem recebe só recebe esses itens. O que faltou na separação aparece
+   como "não separado" e não entra na entrega: o rancho é entregue em parte (rdb.entp) e continua na fila.
+   Quando o almox abre o rancho de novo, a conferência pede só o que faltou ("complemento", rdb.sep.comp);
+   depois disso, quem recebe recebe o resto e o rancho fecha. */
+function srSepDoc(o){ const irm=o?dbIrmas(o):[]; return (irm.find(x=>x.rdb&&x.rdb.sep&&(x.rdb.sep.rec||x.rdb.sep.itens))||{}).rdb?.sep||null; }
+function srFalta(o){ const s=srSepDoc(o); if(!s) return new Set(); const f=new Set();
+  if(Array.isArray(s.rec)) s.rec.forEach(r=>{ if(!r.ok) f.add(r.c); }); else (s.itens||[]).forEach(i=>i&&i.c&&f.add(i.c));
+  (s.comp||[]).forEach(p=>(p.itens||[]).forEach(c=>f.delete(c))); return f; }
+function srCompModo(){ try{ const T=S.tt, R=T.rch, o=R&&ordById(R.oid); if(!ttEntrega()||T.fase!=='rancho'||T.p||!o||R.cfSalvo) return false;
+  if(dbIrmas(o).some(x=>!(x.rdb&&x.rdb.sep))) return false; if(o.rdb&&o.rdb.ent&&!R.refazer) return false; return srFalta(o).size>0; }catch(e){ return false; } }
+/* conferência do complemento: só os itens que faltaram */
+{ const _cp=cfPrecisa; cfPrecisa=function(){ return _cp.apply(this,arguments)||srCompModo(); }; }
+{ const _cc=cfComeca; cfComeca=function(p){ const r=_cc.apply(this,arguments); try{ if(srCompModo()){ const R=S.tt.rch, f=srFalta(ordById(R.oid)); (R.itens||[]).forEach((x,i)=>{ if(!f.has(x.c)) R.ck[i]=true; }); render(); } }catch(e){} return r; }; }
+{ const _vc=vConferencia; vConferencia=function(){ let h=_vc.apply(this,arguments); if(!srCompModo()) return h; const R=S.tt.rch, f=srFalta(ordById(R.oid));
+  const its=R.itens||[], nomes=its.filter(x=>f.has(x.c)).map(x=>esc(x.c+' '+(x.d||''))).join(', ');
+  h=h.replace(/<button class="cf-i ([^"]*)" data-act="cf-ok" data-i="(\d+)"([^>]*)>/g,(m,cl,i,rest)=>{ const x=its[+i]; return x&&!f.has(x.c)?`<button class="cf-i on cf-ja" data-act="cf-ok" data-i="${i}" disabled${rest}>`:m; });
+  h=h.replace(/(<button class="cf-i on cf-ja"[^>]*>[\s\S]*?<small>)([^<]*)(<\/small>)/g,'$1$2 · já separado antes$3');
+  const av=`<div class="sr-av"><b>Faltou na separação: ${f.size} ${f.size===1?'item':'itens'}</b><span>${nomes}</span><span>Separe agora e toque em OK no que conseguiu. Depois entrega o complemento.</span></div>`;
+  const k=h.indexOf('<div class="cf-l">')>=0?h.indexOf('<div class="cf-l">'):h.indexOf('<div class="tt-rcq'); return k<0?h:h.slice(0,k)+av+h.slice(k); }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cf-salvar"]'); if(!b||b.disabled||!srCompModo()) return;
+  ev.stopPropagation(); ev.preventDefault(); const T=S.tt, R=T.rch, o=ordById(R.oid); if(!R.cfp||T.enviando||!o) return; const f=srFalta(o), its=R.itens||[];
+  const novos=its.filter((x,i)=>f.has(x.c)&&R.ck[i]).map(x=>x.c); if(!novos.length){ T.msg='Toque em OK no que foi separado agora.'; render(); return; }
+  const resta=its.filter(x=>f.has(x.c)&&!novos.includes(x.c)), agora=new Date().toISOString();
+  const parte={em:agora,por:S.uid||null,nome:R.cfp.nome,cracha:R.cfp.codigo||null,itens:novos};
+  T.enviando=true; T.msg=''; render(); let n=0, falhou=false;
+  for(const x of dbIrmas(o)){ const rx=Object.assign({},x.rdb||{}); if(!rx.sep) continue; const sp=Object.assign({},rx.sep);
+    sp.comp=[...(sp.comp||[]),parte]; sp.falta=resta.length>0; sp.itens=resta.map(y=>({c:y.c,i:y.c+' '+(y.d||''),q:fQ(y.q)+' '+(y.um||'')}));
+    if(Array.isArray(sp.rec)) sp.rec=sp.rec.map(r=>novos.includes(r.c)?Object.assign({},r,{ok:true}):r); rx.sep=sp;
+    const txt='Rancho '+(o.rancho||'')+': complemento separado por '+R.cfp.nome+' ('+novos.join(', ')+')'+(resta.length?' · ainda faltando: '+resta.map(y=>y.c).join(', '):' · agora completo')+' (celular do almox)';
+    if(await dbSalvar(x,rx,txt,o.rancho)) n++; else falhou=true; }
+  T.enviando=false; if(!n&&falhou){ T.msg='Não foi possível salvar. Confira a internet e toque de novo.'; render(); return; }
+  R.cfSalvo=true; toast('Complemento separado. Agora o crachá de quem vai receber.'); render(); },true);
+/* entrega: lista do que vai (separado), do que já foi e do que não foi separado */
+function srListas(o,R){ const f=srFalta(o), feitos=epFeitos(o), its=R.itens||[]; return {f,feitos,vai:its.filter(x=>!f.has(x.c)&&!feitos[x.c]),ja:its.filter(x=>feitos[x.c]),nao:its.filter(x=>f.has(x.c)&&!feitos[x.c])}; }
+{ const _ve=vEntrega; vEntrega=function(){ let h=_ve.apply(this,arguments); try{ const T=S.tt, R=T.rch, o=R&&ordById(R.oid);
+    if(!h||T.fase!=='rancho'||!T.p||!o||!R.itens||!R.itens.length||(o.rdb&&o.rdb.ent&&!R.refazer)) return h;
+    const L=srListas(o,R);
+    if(epA.on){ R.itens.forEach((x,i)=>{ if(L.f.has(x.c)&&!L.feitos[x.c]) h=h.replace(new RegExp('<button class="cf-i ([^"]*)" data-act="ep-it" data-i="'+i+'"( ?)>'),`<button class="cf-i sr-nao" data-act="ep-it" data-i="${i}" disabled>`); });
+      return h.replace(/(<button class="cf-i sr-nao"[^>]*>[\s\S]*?<small>)([^<]*)(<\/small>)/g,'$1$2 · não separado$3').replace(/(<button class="cf-i sr-nao"[\s\S]*?<span class="cf-ok">)([^<]*)(<\/span>)/g,'$1—$3'); }
+    if(!L.nao.length&&!L.ja.length) return h;
+    const lin=(x,cl)=>`<div class="${cl}"><b>${esc(x.c)}</b> ${esc(x.d||'')}<span>${fQ(x.q)} ${esc(x.um)}</span></div>`;
+    const lst=`<div class="sr-g"><div class="sr-h ok">${ic('check',16,3)} Separado pelo almox · vai agora (${L.vai.length})</div><div class="tt-ritens">${L.vai.map(x=>lin(x,'')).join('')||'<p class="sub" style="margin:4px 0">Nada separado para entregar agora.</p>'}</div>
+      ${L.nao.length?`<div class="sr-h nao">✕ Não separado · não pode receber agora (${L.nao.length})</div><div class="tt-ritens sr-naol">${L.nao.map(x=>lin(x,'')).join('')}</div><p class="sr-obs">Faltou na separação. Quando o almox separar, abre o rancho de novo e entrega o complemento.</p>`:''}
+      ${L.ja.length?`<div class="sr-h ja">Já entregue antes (${L.ja.length})</div><div class="tt-ritens sr-jal">${L.ja.map(x=>lin(x,'')).join('')}</div>`:''}</div>`;
+    h=h.replace(/<div class="tt-ritens">[\s\S]*?<\/div><\/div>(\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,b)=>lst+b);
+    if(L.nao.length) h=h.replace(/<button class="btn sec tt-big" data-act="tt-econf">[^<]*<\/button>/,'');
+    if(L.nao.length) h=h.replace(/(data-act="tt-recebi"[^>]*>)([\s\S]*?)(<\/button>)/,(m,a,t,c)=>a+(/Salvando/.test(t)?t:ic('check',22,3)+` Recebi o separado (${L.vai.length})`)+c).replace(/data-act="tt-recebi"/,L.vai.length?'data-act="tt-recebi"':'data-act="tt-recebi" disabled');
+  }catch(e){ console.warn('[só separado]',e); } return h; }; }
+/* "Recebi": com item não separado, registra só o separado (entrega em parte) e o rancho continua na fila */
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="tt-recebi"]'); if(!b||!ttEntrega()) return; const T=S.tt, R=T.rch, o=R&&ordById(R.oid); if(!o||!T.p||!R.itens||!R.itens.length) return;
+  const L=srListas(o,R); if(!L.nao.length) return; ev.stopPropagation(); ev.preventDefault(); if(b.disabled||T.enviando||!L.vai.length) return;
+  const agora=new Date().toISOString(), eu=(S.uid&&S.nomes[S.uid])||'', novos=L.vai.map(x=>x.c);
+  const parte={em:agora,por:S.uid||null,itens:novos,recebidoPor:T.p.nome,cracha:T.p.codigo||null,entreguePor:eu,origem:'celular',faltando:L.nao.map(x=>x.c)};
+  T.enviando=true; T.msg=''; render(); let n=0, falhou=false;
+  for(const x of dbIrmas(o)){ const rx=Object.assign({},x.rdb||{}); if(rx.ent&&!R.refazer) continue; rx.entp=[...(rx.entp||[]),parte];
+    const txt='Rancho '+(o.rancho||'')+' entregue em parte (só o separado: '+novos.join(', ')+') por '+eu+', recebido por '+T.p.nome+' · não separado: '+L.nao.map(y=>y.c).join(', ');
+    if(await dbSalvar(x,rx,txt,o.rancho)) n++; else falhou=true; }
+  T.enviando=false; if(!n&&falhou){ T.msg='Não foi possível salvar. Confira a internet e toque de novo.'; render(); return; }
+  toast('Recebido o que foi separado. O que faltou fica na fila para o complemento.'); ttVoltar(); },true);
+document.head.insertAdjacentHTML('beforeend',`<style id="sr-css">
+.sr-av{background:var(--crit-tint);border:2px solid var(--crit);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}.sr-av b{font-size:18px;color:var(--crit-ink)}.sr-av span{font-size:15px}
+.cf-i.cf-ja{opacity:.55}
+.sr-g{text-align:left;margin:10px 0}.sr-h{font-weight:800;font-size:15px;margin:12px 0 4px;display:flex;align-items:center;gap:6px}.sr-h.ok{color:var(--ok-ink)}.sr-h.nao{color:var(--crit-ink)}.sr-h.ja{color:var(--muted)}
+.sr-naol div{background:var(--crit-tint)!important;text-decoration:line-through;color:var(--crit-ink)}.sr-jal div{opacity:.6}
+.tt-box .sr-obs{font-size:14px;color:var(--crit-ink);margin:4px 0 0;line-height:1.35}
+.cf-i.sr-nao{opacity:.5;background:var(--crit-tint);border-color:var(--crit)}
+</style>`);
+/* ===FIM SÓ RECEBE O QUE FOI SEPARADO=== */
