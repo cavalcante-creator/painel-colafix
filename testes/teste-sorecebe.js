@@ -1,0 +1,36 @@
+/* 14/10: quem recebe só recebe o que o almox separou; o que faltou volta como complemento. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,260):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ d.users['celalmox@painel-colafix.app']={uid:'uCEL',pass:'cel123',nome:'Joana Almox'}; D['perfis/uCEL']={nome:'Joana Almox',usuario:'celalmox'}; D['acessos/uCEL']={perfil:'almoxcel',mods:['almoxcel'],locais:[],ativo:true};
+ D['crachas/ANAS2345']={codigo:'ANAS2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true};
+ D['crachas/CARL2345']={codigo:'CARL2345',nome:'Carlos Almox',linha:'*',papel:'operador',ativo:true};
+ D['ordens/5003']=Object.assign({},D['ordens/5001'],{num:'5003',rancho:'777888'});
+ D['ranchos/777888']={numero:'777888',criadoEm:new Date().toISOString(),ordens:[{num:'5003'}],itens:[{c:'MP010',d:'Aditivo X',um:'kg',q:25},{c:'MP011',d:'Pigmento',um:'kg',q:3.5}]};
+ const B=await H.abrir({viewport:{width:390,height:844}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'celalmox','cel123');
+ const espera=async(f,ms)=>{ const t0=Date.now(); while(Date.now()-t0<(ms||15000)){ if(await p.evaluate(f).catch(()=>false)) return true; await H.dorme(200); } return false; };
+ const tela=()=>p.evaluate(()=>(document.querySelector('.tt')||{}).innerText||''); const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+ const bipa=async c=>{ await p.keyboard.type(c,{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); };
+ const abre=async()=>{ await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; __T.S().tt.recente={}; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200); await p.fill('#tt-rnum','777888'); await p.click('[data-act="tt-rnum"]'); await H.dorme(500); };
+ await espera(()=>window.__T&&__T.S().view==='mantotem',12000); await H.dorme(300);
+ await abre(); await bipa('CXCARL2345');
+ await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900);
+ await bipa('CXANAS2345'); const t1=await tela();
+ ok('Entrega mostra o separado e o não separado (riscado), botão "Recebi o separado (1)"', /Separado pelo almox · vai agora \(1\)/.test(t1)&&/Não separado · não pode receber agora \(1\)/.test(t1)&&/Recebi o separado \(1\)/.test(t1), t1.replace(/\n/g,' | ').slice(0,400));
+ await p.screenshot({path:'/tmp/so-separado.png',fullPage:true});
+ await p.click('[data-act="ep-abre"]'); await H.dorme(300); const dis=await p.evaluate(()=>{ const b=document.querySelector('[data-act="ep-it"][data-i="1"]'); return b&&b.disabled; }); await p.click('[data-act="ep-x"]'); await H.dorme(300);
+ ok('"Entregar só uma parte": o item não separado não pode ser marcado', dis===true);
+ await p.click('[data-act="tt-recebi"]'); await H.dorme(900); let s=await srv(); let r=s['ordens/5003'].rdb||{};
+ ok('"Recebi o separado": grava só o MP010 como entregue em parte; o rancho não fecha', !r.ent&&r.entp&&r.entp.length===1&&r.entp[0].itens.join()==='MP010'&&r.entp[0].faltando.join()==='MP011'&&r.entp[0].recebidoPor==='Ana Souza', JSON.stringify(r).slice(0,300));
+ /* complemento */
+ await abre(); const t2=await tela();
+ ok('Ao abrir de novo, pede a conferência do que faltou', /crachá de quem vai conferir/.test(t2), t2.replace(/\n/g,' | ').slice(0,200));
+ await bipa('CXCARL2345'); const t3=await tela(); const ja=await p.evaluate(()=>{ const b=document.querySelector('[data-act="cf-ok"][data-i="0"]'); return b&&b.disabled; });
+ ok('Conferência do complemento: aviso do que faltou e o já separado bloqueado', /Faltou na separação: 1 item/.test(t3)&&/MP011 Pigmento/.test(t3)&&ja===true&&/já separado antes/.test(t3), t3.replace(/\n/g,' | ').slice(0,300));
+ await p.click('[data-act="cf-ok"][data-i="1"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(900); s=await srv(); r=s['ordens/5003'].rdb||{};
+ ok('Complemento grava no separado (comp) e tira a falta', r.sep&&r.sep.comp&&r.sep.comp[0].itens.join()==='MP011'&&r.sep.falta===false&&r.sep.rec.every(x=>x.ok), JSON.stringify(r.sep).slice(0,300));
+ await bipa('CXANAS2345'); const t4=await tela();
+ ok('Entrega do complemento: vai o MP011, o MP010 aparece como já entregue', /vai agora \(1\)/.test(t4)&&/MP011/.test(t4)&&/Já entregue antes \(1\)/.test(t4)&&!/Não separado/.test(t4), t4.replace(/\n/g,' | ').slice(0,300));
+ await p.dblclick('[data-act="tt-recebi"]'); await espera(()=>__T.S().tt.fase==='rcok',6000); s=await srv(); r=s['ordens/5003'].rdb||{};
+ ok('"Recebi o rancho" fecha o rancho', !!r.ent&&r.ent.recebidoPor==='Ana Souza', JSON.stringify(r.ent));
+ const er=B.erros.filter(x=>!/404/.test(x)); ok('Sem erro de JavaScript', !er.length, er.join(' | '));
+ await B.browser.close(); console.log(res.every(x=>x.ok)?'\nTUDO PASSOU':'\nALGO FALHOU'); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
