@@ -3,7 +3,7 @@
   {
    "n": "T1 login correto",
    "ok": true,
-   "det": "tela=geral, menu=Silos | Produção | Telas de TV | Almoxarifado | Manutenção"
+   "det": "tela=geral, menu=Silos | Produção | Telas de TV | Almoxarifado | Monitor do rancho | Manutenção"
   },
   {
    "n": "T6 F5 continua logado",
@@ -27,12 +27,16 @@
   {
    "n": "T9 outro usuário não herda perfil/permissões do anterior",
    "ok": true,
-   "det": "uid=uCARLOS perfil={\"perfil\":\"outro\",\"mods\":[\"almox\"],\"locais\":[\"a3\"],\"contar\":true,\"ativo\":true} menu=Inventário | Almoxarifado (Produção aparece só pelo Diário de bordo, que o almox já via antes)"
+   "det": "uid=uCARLOS perfil={\"perfil\":\"outro\",\"mods\":[\"almox\"],\"locais\":[\"a3\"],\"contar\":true,\"ativo\":true} menu=InventárioAlmoxarifadoMonitor do rancho (Produção aparece só pelo Diário de bordo, que o almox já via antes)"
   },
   {
    "n": "T5 sem permissão: avisa e continua no sistema",
    "ok": true,
-   "det": "{\"view\":\"alxcont\",\"lg\":false,\"toast\":\"Você não possui permissão para acessar este módulo.\",\"gate\":false}"
+   "det": "{\"view\":\"inventario\",\"lg\":false,\"toast\":\"Você não possui permissão para acessar este módulo.\",\"gate\":false}"
+  },
+  {
+   "n": "T5b depois de sair, a tela de entrar aparece (o programa do inventário fecha)",
+   "ok": true
   },
   {
    "n": "T2 senha errada",
@@ -72,7 +76,7 @@
   {
    "n": "T10c conexão volta: entra sozinho, sem recarregar",
    "ok": true,
-   "det": "{\"gate\":\"\",\"nav\":\"Silos\\nProdução\\nTelas de TV\\nAlmoxarifado\\nManutenção\"}"
+   "det": "{\"gate\":\"\",\"nav\":\"Silos\\nProdução\\nTelas de TV\\nAlmoxarifado\\nMonitor do rancho\\nManutenção\"}"
   },
   {
    "n": "T11 sem login não acessa tela interna nem dados",

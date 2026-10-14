@@ -171,6 +171,31 @@ function ritEntMes(cp){ if(!S.db||!cp) return null; if(!_ritSub[cp]){ _ritSub[cp
     inscrever('ritent-'+cp,()=>S.db.collection('entregas').where('em','>=',de).where('em','<',ate).orderBy('em'),snap=>{ S._ritEnt[cp]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); rerenderSeguro(); }); }
   return S._ritEnt[cp]||null; }
 function ritEntregas(cp){ const m=new Map(); (S.entregas||[]).forEach(e=>m.set(e._id,e)); (ritEntMes(cp)||[]).forEach(e=>m.set(e._id,e)); return [...m.values()]; }
+/* 14/10: divisão REAL entre as linhas = entregas lançadas nos últimos 60 dias (sem as anuladas), por item e linha.
+   Usada como divisão automática dos itens sem % configurada e para avisar quando a % configurada não bate com o que as linhas fazem. */
+const RIT_DIV_DIAS=60, RIT_DIV_MIN=200, RIT_DIV_DIF=15; let _ritDvC=null;
+function ritDivReal(){ const h=hojeStr(), ini=addDias(h,-RIT_DIV_DIAS), EM=S.entregas||[]; const key=h+'|'+EM.length+'|'+(S.ordens||[]).length+'|'+(EM[0]&&EM[0]._id||'')+'|'+(EM[EM.length-1]&&EM[EM.length-1]._id||'');
+  if(_ritDvC&&_ritDvC.k===key) return _ritDvC.v;
+  const an=new Set(EM.filter(e=>e.anula).map(e=>e.anula)), OM={}; (S.ordens||[]).forEach(o=>OM[o._id]=o); const it={}; let de='';
+  EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d<ini||d>h) return; const o=OM[e.ordem]; if(!o) return; const l=e.linha||o.linha, q=+e.qtd||0; if(!l||!q) return;
+    const c=codigoDe(o), a=it[c]=it[c]||{}; a[l]=(a[l]||0)+q; if(!de||d<de) de=d; });
+  _ritDvC={k:key,v:{it,de,ate:h}}; return _ritDvC.v; }
+/* parte de cada linha (só as linhas acompanhadas) e o total; null quando há pouco lançamento */
+function ritReal(c,LS){ const a=(ritDivReal().it||{})[c]; if(!a) return null; let t=0; const d={}; LS.forEach(l=>{ if(a[l]>0){ d[l]=a[l]; t+=a[l]; } }); if(t<RIT_DIV_MIN) return null; for(const l in d) d[l]/=t; return {d,q:t}; }
+/* maior diferença, em pontos de %, entre a divisão configurada (dv, frações) e a real */
+function ritDifDv(dv,real){ if(!real) return 0; let m=0; new Set(Object.keys(dv).concat(Object.keys(real.d))).forEach(l=>{ m=Math.max(m,Math.abs((dv[l]||0)-(real.d[l]||0))*100); }); return Math.round(m); }
+function ritDvTxt(d){ return Object.entries(d).filter(([,v])=>v>0.004).sort((a,b)=>b[1]-a[1]).map(([l,v])=>l.replace(/^Linha\s*/i,'L').replace(/^Rejunte\s*/i,'')+' '+Math.round(v*100)+'%').join(' · '); }
+/* 14/10 (pedido da Iasmyn): ajuste único, feito sozinho no painel da dona — troca pela divisão real os itens digitados que não batem (≥15 pontos).
+   Guarda o que era antes em ritmo.aj1410.antes, para poder desfazer. */
+function ritAjusteUnico(){ try{ if(!S.db||!(S.acs&&S.acs.dono)) return false; const r=S.cfg&&S.cfg.ritmo; if(!r||!r.itens||!Array.isArray(r.linhas)||r.aj1410) return !!(r&&r.aj1410);
+    if(!(S.entregas||[]).length||!(S.ordens||[]).length) return false;
+    const itens=JSON.parse(JSON.stringify(r.itens)), antes={}, mud=[];
+    for(const c in itens){ const it=itens[c], real=ritReal(c,r.linhas); if(!real) continue; if(ritDifDv(ritEdDv(it),real)<RIT_DIV_DIF) continue; antes[c]=it.d; itens[c]=Object.assign({},it,{d:ritRealPct(real)}); mud.push(c); }
+    const ritmo=Object.assign({},r,{itens,aj1410:{em:new Date().toISOString(),itens:mud,antes}});
+    S.cfg.ritmo=ritmo; S.anl._c=null;
+    S.db.doc('config/geral').update({ritmo}).then(()=>{ if(mud.length) toast('Curva S: divisão entre as linhas ajustada pelo real em '+mud.length+' ite'+(mud.length>1?'ns':'m')+' ('+mud.join(', ')+').'); rerenderSeguro(); }).catch(e=>console.warn('[curva] ajuste',e));
+    return true; }catch(e){ console.warn('[curva] ajuste',e); return true; } }
+(function(){ let n=0; const t=setInterval(()=>{ if(++n>120||ritAjusteUnico()) clearInterval(t); },5000); })();
 function ritDados(cp,fonte){
   const P=S.anl.base.prev||{}; const pm=(P.mes||{})[cp]; if(!pm) return null;
   const C=ritCfg(), LT=linhasOrd(), LS=C.linhas.filter(l=>LT.includes(l)); if(!LS.length) return null;
@@ -179,9 +204,11 @@ function ritDados(cp,fonte){
   if(!dias.length) return null;
   const h=hojeStr(), n=dias.length;
   const its=Object.keys(C.itens).map(c=>{ const ci=C.itens[c]||{}, dv={}; let s=0; LS.forEach(l=>{ const p=+(ci.d||{})[l]||0; if(p>0){ dv[l]=p; s+=p; } }); for(const l in dv) dv[l]/=s;
-    return {c,prev:+pm[c]||0,dv,f:+ci.f||1,kg:ritKg(c),nome:ritNome(c)}; }).filter(x=>Object.keys(x.dv).length);
+    const real=ritReal(c,LS); return {c,prev:+pm[c]||0,dv,f:+ci.f||1,kg:ritKg(c),nome:ritNome(c),dvF:'cfg',real,dif:ritDifDv(dv,real)}; }).filter(x=>Object.keys(x.dv).length);
   /* previsão comercial completa: itens não configurados entram pela linha cadastrada do item (dividido igual entre as linhas acompanhadas) */
-  { const IL=((S.anl.base.itens||{}).l)||{}; Object.keys(pm).forEach(c=>{ if(C.itens[c]||!(+pm[c]>0)) return; const ls=anlLinhasDe(c,IL[c]).filter(l=>LS.includes(l)); if(!ls.length) return; const dv={}; ls.forEach(l=>dv[l]=1/ls.length); its.push({c,prev:+pm[c],dv,f:1,kg:ritKg(c),nome:ritNome(c),auto:true}); }); }
+  { const IL=((S.anl.base.itens||{}).l)||{}; Object.keys(pm).forEach(c=>{ if(C.itens[c]||!(+pm[c]>0)) return; const real=ritReal(c,LS); let dv={}, dvF='real';
+    if(real) dv=Object.assign({},real.d); else { const ls=anlLinhasDe(c,IL[c]).filter(l=>LS.includes(l)); if(!ls.length) return; ls.forEach(l=>dv[l]=1/ls.length); dvF='cad'; }
+    its.push({c,prev:+pm[c],dv,f:/PLASTIC/i.test(ritDesc(c))&&Object.keys(dv).every(l=>ritFam(l)==='arg')?RIT_PL:1,kg:ritKg(c),nome:ritNome(c),auto:true,dvF,real,dif:0}); }); }
   const IC={}; its.forEach(x=>IC[x.c]=x);
   const diaUtil=d=>{ if(dias.includes(d)) return d; let k=null; for(const x of dias) if(x<d) k=x; return k||dias[0]; };
   const R={}, outros={}, sem={}; LS.forEach(l=>{ outros[l]=0; });
@@ -253,6 +280,8 @@ function ritAlertas(D){ const A=[]; const mes=(ANL_MESES[+D.cp.slice(5,7)-1]||''
     if(k.z>=2) A.push({c:k.z>=3?'crit':'warn',t:`${l}: ${k.z} dias úteis seguidos sem produção dos itens da meta.`,s:''}); });
   const sl=D.dias.filter(d=>d<D.h&&(!D.cut||d<=D.cut)&&!(D.R[d]&&Object.values(D.R[d]).some(b=>Object.values(b).some(v=>v>0))));
   if(sl.length&&D.fonte==='painel') A.push({c:'warn',t:`Dias úteis sem nenhuma entrega lançada nas linhas: ${sl.map(dm).join(', ')}.`,s:'Se houve produção, faltou lançar a entrega no painel.'});
+  const dvr=D.its.filter(x=>x.dvF==='cfg'&&x.prev>0&&x.dif>=RIT_DIV_DIF).sort((a,b)=>b.prev-a.prev);
+  if(dvr.length) A.push({c:'warn',t:`Divisão entre as linhas diferente do que as linhas fizeram em ${dvr.length} ite${dvr.length>1?'ns':'m'}: ${dvr.slice(0,5).map(x=>`${esc(x.c)} (configurado ${esc(ritDvTxt(x.dv))}; real ${esc(ritDvTxt(x.real.d))})`).join(', ')}${dvr.length>5?'…':''}.`,s:'A meta de cada linha fica errada (uma parece atrasada e a outra adiantada); o total da fábrica não muda. Em Opções › Configurar, use "Usar o real".'});
   const par=D.its.filter(x=>x.prev>0).map(x=>({x,k:ritStats(D,{c:x.c})})).filter(o=>o.k.z>=2&&o.k.sal>0&&o.k.ra>0);
   if(par.length) A.push({c:'warn',t:`Itens parados há 2 dias úteis ou mais, com saldo: ${par.map(o=>esc(o.x.c)+' ('+o.k.z+'d)').join(', ')}.`,s:''});
   return A; }
@@ -388,19 +417,31 @@ function ritTabDia(D){ const LS=D.LS, S0=LS.map(l=>ritSerie(D,{l})), T=ritSerie(
       <td class="num" style="text-align:right">${anlN(t.p)}</td><td class="num" style="text-align:right">${t.sn!=null?anlN(t.sn):'—'}</td><td class="num" style="text-align:right">${t.pl?`<span class="${t.sn!=null&&Math.abs(t.pl-t.sn)>t.sn*0.1?'rit-neg':''}">${anlN(t.pl)}</span>`:'—'}</td><td class="num" style="text-align:right">${fut&&!t.r?'':'<b>'+anlN(t.r)+'</b>'}</td><td class="num" style="text-align:right">${fut||!t.ap?'—':`<b class="${t.ok/t.ap<.85?'rit-neg':'rit-pos'}">${Math.round(t.ok/t.ap*100)}%</b>`}</td><td class="num" style="text-align:right">${fut?'':`<b class="${dv<0?'rit-neg':'rit-pos'}">${dv>0?'+':''}${anlN(dv)}</b>`}</td></tr>`; }).join('')}</tbody></table></div>
    <div class="sub" style="font-size:12px;margin-top:8px">Só dias úteis (segunda a sexta). Plano da manhã = foto do programa guardada no começo do dia (em vermelho quando o planejado mudou mais de 10%). Aderência = do que estava programado para o dia em cada ordem, quanto saiu no próprio dia. Meta do dia = previsão comercial da linha ÷ ${D.n} dias úteis do mês. Planejado = ordens e previsões do calendário (em vermelho quando passa da capacidade da linha)${feriados().some(f=>f.slice(0,7)===D.cp)?' (sem os feriados: '+feriados().filter(f=>f.slice(0,7)===D.cp).map(dm).join(', ')+')':''}. Produção em dia não útil entra no dia útil anterior.</div>`; }
 
-function ritCfgCard(D){ const E=S.rit.ed, LT=linhasOrd(); const pm=((S.anl.base.prev||{}).mes||{})[S.rit.cp]||{};
-  const cods=[...new Set(Object.keys(E.itens).concat(Object.keys(pm).filter(c=>pm[c]>0&&anlLinhasDe(c,((S.anl.base.itens||{}).l||{})[c]).some(l=>E.linhas.includes(l)))))]
-    .sort((a,b)=>(E.itens[b]?1:0)-(E.itens[a]?1:0)||(pm[b]||0)-(pm[a]||0)||a.localeCompare(b));
-  return `<section class="card rit-cfg"><div class="head"><div><h2>Configurar o acompanhamento</h2><div class="sub">Quais itens entram, como a previsão se divide entre as linhas e o peso do plástico na capacidade.</div></div>
-    <div class="chips"><button class="btn sec" data-act="rit-cfg-x" style="height:42px">Cancelar</button><button class="btn" data-act="rit-cfg-ok" style="height:42px" ${S.rit.salvando?'disabled':''}>${S.rit.salvando?'Salvando…':'Salvar'}</button></div></div>
+function ritEdDv(it){ const d={}; let t=0; for(const l in (it&&it.d)||{}){ const v=+String(it.d[l]).replace(',','.'); if(v>0){ d[l]=v; t+=v; } } if(t) for(const l in d) d[l]/=t; return d; }
+function ritRealPct(real){ const xs=Object.entries(real.d).sort((a,b)=>b[1]-a[1]), d={}; let s=0; xs.forEach(([l,v],i)=>{ const p=i===xs.length-1?100-s:Math.round(v*100); if(p>0){ d[l]=p; s+=p; } }); return d; }
+function ritCfgCard(D){ const E=S.rit.ed, LT=linhasOrd(); const pm=((S.anl.base.prev||{}).mes||{})[S.rit.cp]||{}; const IL=((S.anl.base.itens||{}).l||{}), RD=ritDivReal();
+  const cods0=[...new Set(Object.keys(E.itens).concat(Object.keys(pm).filter(c=>pm[c]>0&&(anlLinhasDe(c,IL[c]).some(l=>E.linhas.includes(l))||ritReal(c,E.linhas)))))];
+  const info={}; cods0.forEach(c=>{ const it=E.itens[c], real=ritReal(c,E.linhas); let dv, fonte;
+    if(it){ dv=ritEdDv(it); fonte='cfg'; } else if(real){ dv=real.d; fonte='real'; } else { const ls=anlLinhasDe(c,IL[c]).filter(l=>E.linhas.includes(l)); dv={}; ls.forEach(l=>dv[l]=1/ls.length); fonte='cad'; }
+    info[c]={it,real,dv,fonte,dif:it?ritDifDv(dv,real):0}; });
+  const nDif=cods0.filter(c=>info[c].dif>=RIT_DIV_DIF).length, so=!!S.rit.edSo;
+  const cods=cods0.filter(c=>!so||info[c].dif>=RIT_DIV_DIF).sort((a,b)=>(info[b].dif>=RIT_DIV_DIF)-(info[a].dif>=RIT_DIV_DIF)||(E.itens[b]?1:0)-(E.itens[a]?1:0)||(pm[b]||0)-(pm[a]||0)||a.localeCompare(b));
+  const nAuto=cods0.filter(c=>!E.itens[c]).length, nReal=cods0.filter(c=>!E.itens[c]&&info[c].real).length;
+  return `<section class="card rit-cfg"><div class="head"><div><h2>Configurar o acompanhamento</h2><div class="sub">Quais itens entram, como a meta de cada item se divide entre as linhas e o peso do plástico na capacidade.</div></div>
+    <div class="chips"><button class="btn sec" data-act="rit-cfg-x" style="height:42px">Cancelar</button>${nDif?`<button class="btn sec" data-act="rit-cfg-realtodos" style="height:42px" title="Troca a % digitada pela divisão real dos últimos ${RIT_DIV_DIAS} dias nos itens que não batem">Usar o real nos ${nDif} que não batem</button>`:''}<button class="btn" data-act="rit-cfg-ok" style="height:42px" ${S.rit.salvando?'disabled':''}>${S.rit.salvando?'Salvando…':'Salvar'}</button></div></div>
    <div class="rit-cfg-g"><div><div class="label" style="margin-bottom:6px">LINHAS ACOMPANHADAS</div><div class="chips">${LT.map(l=>`<button class="chip" data-act="rit-cfg-l" data-v="${esc(l)}" aria-pressed="${E.linhas.includes(l)}">${esc(l)}</button>`).join('')}</div></div>
     <div><label class="label" for="rit-jor">JORNADA DA LINHA (MINUTOS POR DIA)</label><input class="txt num" id="rit-jor" inputmode="numeric" value="${esc(String(E.jornada||528))}" style="margin-top:6px;max-width:140px"><div class="sub" style="font-size:12px">Usada para converter tempo parado em sacos perdidos (528 = 8h48).</div></div>
     <div><label class="label" for="rit-fer">FERIADOS E PARADAS COLETIVAS</label><input class="txt" id="rit-fer" value="${esc(E.fer)}" placeholder="12/10/2026, 02/11/2026" style="margin-top:6px"><div class="sub" style="font-size:12px">Não contam como dia útil (vale para toda a Análise PCP). Os feriados nacionais e os do calendário do RH (Cadastros › Feriados) já contam sozinhos.</div></div></div>
-   <div class="dbw" style="margin-top:14px"><table class="dbt" style="min-width:${520+E.linhas.length*110}px"><thead><tr><th style="width:40px"></th><th>Item</th><th style="text-align:right">Previsto ${esc(ritMesNome(S.rit.cp))}</th>${E.linhas.map(l=>`<th style="text-align:center">% ${esc(l)}</th>`).join('')}<th style="text-align:center">Embalagem</th></tr></thead><tbody>
-    ${cods.map(c=>{ const it=E.itens[c]; return `<tr class="${it?'':'rit-off'}"><td><input type="checkbox" data-rit-on="${esc(c)}" ${it?'checked':''} aria-label="Acompanhar ${esc(c)}" style="width:18px;height:18px;accent-color:var(--teal)"></td><td><b>${esc(c)}</b><small>${esc(ritNome(c))}</small></td><td class="num" style="text-align:right">${anlN(pm[c]||0)}</td>
-      ${E.linhas.map(l=>`<td style="text-align:center"><input class="txt num" style="height:36px;width:76px;text-align:right" inputmode="numeric" data-rit-pc="${esc(c)}" data-l="${esc(l)}" value="${it&&it.d&&it.d[l]!=null?it.d[l]:''}" ${it?'':'disabled'} aria-label="% ${esc(l)} ${esc(c)}"></td>`).join('')}
+   <div class="rit-dvx"><div><b>Como a meta de cada item vai para as linhas</b>
+     <span>Itens <b>marcados</b> usam a % digitada. Itens <b>sem marca</b> entram sozinhos: pela <b>divisão real</b> (o que cada linha entregou nos últimos ${RIT_DIV_DIAS} dias${RD.de?', desde '+dm(RD.de):''}); sem entrega no período, dividido igual entre as linhas do cadastro do item. Agora: ${nAuto} sem marca, ${nReal} pela divisão real.</span></div>
+     ${nDif?`<button class="chip" data-act="rit-cfg-so" aria-pressed="${so}">Só os ${nDif} que não batem</button>`:'<span class="pill ok">Todos os itens marcados batem com o real</span>'}</div>
+   <div class="dbw" style="margin-top:10px"><table class="dbt rit-cfgt" style="min-width:${700+E.linhas.length*92}px"><thead><tr><th style="width:40px"></th><th>Item</th><th style="text-align:right">Previsto ${esc(ritMesNome(S.rit.cp))}</th><th>Real · ${RIT_DIV_DIAS} dias</th>${E.linhas.map(l=>`<th style="text-align:center">% ${esc(l)}</th>`).join('')}<th style="text-align:center">Embalagem</th></tr></thead><tbody>
+    ${cods.map(c=>{ const I=info[c], it=I.it, ruim=I.dif>=RIT_DIV_DIF, pAuto=l=>I.dv[l]>0.004?String(Math.round(I.dv[l]*100)):'';
+      const realTx=I.real?`<b class="${ruim?'rit-neg':''}">${esc(ritDvTxt(I.real.d))}</b><small>${anlN(I.real.q)} sacos entregues${it&&!ruim?' · bate':''}</small>${it&&I.dif>=1?`<button class="lnk" data-act="rit-cfg-real" data-v="${esc(c)}">Usar o real</button>`:''}`:'<span class="t-mut" style="font-size:12px">sem entrega no período</span>';
+      return `<tr class="${it?'':'rit-off'} ${ruim?'rit-dif':''}"><td><input type="checkbox" data-rit-on="${esc(c)}" ${it?'checked':''} aria-label="Usar % digitada em ${esc(c)}" style="width:18px;height:18px;accent-color:var(--teal)"></td><td><b>${esc(c)}</b><small>${esc(ritNome(c))}</small>${it?'':`<small class="rit-auto-t">automático · ${I.fonte==='real'?'pela divisão real':'pelo cadastro'}</small>`}</td><td class="num" style="text-align:right">${anlN(pm[c]||0)}</td><td class="rit-realc">${realTx}</td>
+      ${E.linhas.map(l=>`<td style="text-align:center"><input class="txt num" style="height:36px;width:70px;text-align:right" inputmode="numeric" data-rit-pc="${esc(c)}" data-l="${esc(l)}" value="${it&&it.d&&it.d[l]!=null?it.d[l]:''}" ${it?'':`disabled placeholder="${pAuto(l)}"`} aria-label="% ${esc(l)} ${esc(c)}"></td>`).join('')}
       <td style="text-align:center"><select class="txt" style="height:36px;width:auto" data-rit-f="${esc(c)}" ${it?'':'disabled'}><option value="1" ${it&&(+it.f||1)<1.01?'selected':''}>Papel</option><option value="${RIT_PL}" ${it&&(+it.f||1)>1.01?'selected':''}>Plástico (4.000/dia)</option></select></td></tr>`; }).join('')}</tbody></table></div>
-   <div class="sub" style="font-size:12px;margin-top:8px">A % de cada linha é proporcional (50 e 50, ou 100 numa só). Plástico pesa ${String(RIT_PL).replace('.',',')}× na capacidade (7.500 sacos de papel ou 4.000 de plástico por dia).</div></section>`; }
+   <div class="sub" style="font-size:12px;margin-top:8px">A % de cada linha é proporcional (50 e 50, ou 100 numa só). Em vermelho: a % digitada difere ${RIT_DIV_DIF} pontos ou mais do real (com pelo menos ${RIT_DIV_MIN} sacos entregues). Isso não muda a meta total, só a de cada linha. Plástico pesa ${String(RIT_PL).replace('.',',')}× na capacidade (7.500 sacos de papel ou 4.000 de plástico por dia).</div></section>`; }
 
 function ritFam(l){ return /rejunte|fixcol|l[ií]quid/i.test(l)?'rej':'arg'; }
 function ritT(v,kg){ return (Math.round(v*(kg||20)/100)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}); }
@@ -677,7 +718,7 @@ async function ritSalvarCfg(){ const E=S.rit.ed; if(!E||S.rit.salvando) return; 
   if(ruim){ toast('Não entendi o feriado "'+ruim+'". Use dd/mm/aaaa.'); return; }
   const itens={}; for(const c in E.itens){ const it=E.itens[c], d={}; let s=0; E.linhas.forEach(l=>{ const v=+String((it.d||{})[l]==null?'':it.d[l]).replace(',','.'); if(v>0){ d[l]=Math.round(v*100)/100; s+=v; } });
     if(!s){ toast(c+': informe a % de pelo menos uma linha.'); return; } itens[c]={d}; if(+it.f>1.01) itens[c].f=RIT_PL; }
-  const ritmo={linhas:E.linhas,itens,jornada:Math.max(60,Math.min(1440,+E.jornada||528)),em:new Date().toISOString(),por:S.uid||null};
+  const ritmo={linhas:E.linhas,itens,jornada:Math.max(60,Math.min(1440,+E.jornada||528)),em:new Date().toISOString(),por:S.uid||null,aj1410:((S.cfg&&S.cfg.ritmo)||{}).aj1410||{em:new Date().toISOString(),manual:true}};
   S.rit.salvando=true; render();
   try{ await S.db.doc('config/geral').update({ritmo,feriados:[...new Set(fer)].sort()}); S.cfg.ritmo=ritmo; S.cfg.feriados=[...new Set(fer)].sort(); S.anl._c=null; S.rit.cfg=false; S.rit.ed=null; toast('Acompanhamento salvo.'); }
   catch(e){ erro(e); } S.rit.salvando=false; render(); }
@@ -696,12 +737,17 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest('[data-act^="r
   if(a==='rit-cfg'){ A.cfg=!A.cfg; A.ed=A.cfg?ritEdNovo():null; render(); if(A.cfg) setTimeout(()=>{ const c=document.querySelector('.rit-cfg'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); },30); return; }
   if(a==='rit-cfg-x'){ A.cfg=false; A.ed=null; render(); return; }
   if(a==='rit-cfg-ok'){ ritSalvarCfg(); return; }
+  if(a==='rit-cfg-so'){ A.edSo=!A.edSo; render(); return; }
+  if((a==='rit-cfg-real'||a==='rit-cfg-realtodos')&&A.ed){ const E=A.ed; const cs=a==='rit-cfg-real'?[v]:Object.keys(E.itens); let n=0;
+    cs.forEach(c=>{ const real=ritReal(c,E.linhas); if(!real) return; const it=E.itens[c]; if(a==='rit-cfg-realtodos'&&ritDifDv(ritEdDv(it),real)<RIT_DIV_DIF) return;
+      E.itens[c]={d:ritRealPct(real),f:it?(+it.f||1):(/PLASTIC/i.test(ritDesc(c))?RIT_PL:1)}; n++; });
+    toast(n?(n===1?cs[0]+': divisão trocada pela real. ':n+' itens com a divisão real. ')+'Confira e clique em Salvar.':'Nada para trocar.'); render(); return; }
   if(a==='rit-cfg-l'&&A.ed){ const L=A.ed.linhas; A.ed.linhas=L.includes(v)?L.filter(x=>x!==v):linhasOrd().filter(x=>L.includes(x)||x===v); render(); return; } });
 document.addEventListener('change',ev=>{ const t=ev.target; const A=S.rit;
   if(t.id==='rit-mes'){ A.cp=t.value; render(); return; }
   if(t.id==='rit-cvi'){ A.curva=t.value; A.auto=!t.value?A.auto:false; render(); return; }
   if(!A.ed) return;
-  if(t.dataset&&t.dataset.ritOn!=null){ const c=t.dataset.ritOn; if(t.checked){ const L=A.ed.linhas, d={}; const ls=anlLinhasDe(c,((S.anl.base.itens||{}).l||{})[c]).filter(l=>L.includes(l)); (ls.length?ls:L).forEach(l=>d[l]=Math.round(100/((ls.length?ls:L).length))); A.ed.itens[c]={d,f:/PLASTIC/i.test(ritDesc(c))?RIT_PL:1}; } else delete A.ed.itens[c]; render(); return; }
+  if(t.dataset&&t.dataset.ritOn!=null){ const c=t.dataset.ritOn; if(t.checked){ const L=A.ed.linhas, rr=ritReal(c,L); if(rr){ A.ed.itens[c]={d:ritRealPct(rr),f:/PLASTIC/i.test(ritDesc(c))?RIT_PL:1}; render(); return; } const d={}; const ls=anlLinhasDe(c,((S.anl.base.itens||{}).l||{})[c]).filter(l=>L.includes(l)); (ls.length?ls:L).forEach(l=>d[l]=Math.round(100/((ls.length?ls:L).length))); A.ed.itens[c]={d,f:/PLASTIC/i.test(ritDesc(c))?RIT_PL:1}; } else delete A.ed.itens[c]; render(); return; }
   if(t.dataset&&t.dataset.ritF!=null){ const it=A.ed.itens[t.dataset.ritF]; if(it) it.f=+t.value; return; } });
 document.addEventListener('input',ev=>{ const t=ev.target, A=S.rit; if(!A.ed) return;
   if(t.id==='rit-fer'){ A.ed.fer=t.value; return; }
