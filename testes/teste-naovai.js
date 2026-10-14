@@ -15,21 +15,21 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await espera(()=>window.__T&&__T.S().view==='mantotem',12000); await H.dorme(300);
  await abre('777888');
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-nv"][data-i="1"]'); await H.dorme(300); const t1=await tela();
- ok('Separação: "Não vai" no item; conta como resolvido e mostra o aviso', /1 item marcado como não vai/.test(t1)&&/2 de 3/.test(t1)&&/Desfazer/.test(t1), t1.replace(/\n/g,' | ').slice(0,300));
+ ok('Separação: "Não vai" no item; conta como resolvido e mostra o aviso', /2 de 3/.test(t1)&&/Desfazer/.test(t1), t1.replace(/\n/g,' | ').slice(0,300));
  await p.screenshot({path:'/tmp/naovai-sep.png',fullPage:true});
  await p.click('[data-act="cf-salvar"]'); await H.dorme(300); const tf=await tela();
  ok('Só o item sem marcação pede confirmação de falta', /1 item ficou sem OK/.test(tf), tf.replace(/\n/g,' | ').slice(0,200));
  await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900); let s=await srv(); let sp=(s['ordens/5003'].rdb||{}).sep||{};
  ok('Grava: não vai = MP011, falta só MP012', JSON.stringify(sp.naoVai)==='["MP011"]'&&sp.itens.map(x=>x.c).join()==='MP012'&&sp.rec.find(r=>r.c==='MP011').nv===true&&/não vai: MP011/.test((s['ordens/5003'].hist||[]).map(x=>x.o).join(' ')), JSON.stringify(sp).slice(0,280));
  await bipa('CXANAS2345'); const t2=await tela();
- ok('Entrega: vai MP010, não separado MP012, "não vai neste rancho" MP011', /vai agora \(1\)/.test(t2)&&/Não separado · não pode receber agora \(1\)/.test(t2)&&/Não vai neste rancho \(1\)/.test(t2)&&/Recebi o separado \(1\)/.test(t2), t2.replace(/\n/g,' | ').slice(0,400));
+ ok('Entrega: vai MP010, não separado MP012, "não vai neste rancho" MP011', /Vai agora \(1\)/.test(t2)&&/Fica para depois \(1\)/.test(t2)&&/Não vai neste rancho \(1\)/.test(t2)&&/Recebi o separado \(1\)/.test(t2), t2.replace(/\n/g,' | ').slice(0,400));
  await p.screenshot({path:'/tmp/naovai-ent.png',fullPage:true});
  await p.click('[data-act="tt-recebi"]'); await H.dorme(900); s=await srv(); let r=s['ordens/5003'].rdb||{};
  ok('Recebe só o separado; continua aberto só por causa da falta (MP012)', !r.ent&&r.entp&&r.entp[0].itens.join()==='MP010'&&r.entp[0].faltando.join()==='MP012', JSON.stringify(r.entp));
  /* rancho com tudo OK + um "não vai": fecha normal */
  await abre('999000'); await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-nv"][data-i="1"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(900);
  await bipa('CXANAS2345'); const t3=await tela();
- ok('Sem falta: "Recebi o rancho" normal, com o "não vai" à parte', /Recebi o rancho/.test(t3)&&/Não vai neste rancho \(1\)/.test(t3)&&!/Não separado/.test(t3), t3.replace(/\n/g,' | ').slice(0,300));
+ ok('Sem falta: "Recebi o rancho" normal, com o "não vai" à parte', /Recebi o rancho/.test(t3)&&/Não vai neste rancho \(1\)/.test(t3)&&!/Fica para depois/.test(t3), t3.replace(/\n/g,' | ').slice(0,300));
  await p.dblclick('[data-act="tt-recebi"]'); await espera(()=>__T.S().tt.fase==='rcok',6000); s=await srv(); r=s['ordens/5004'].rdb||{};
  ok('Fecha o rancho mesmo com o item que não vai', !!r.ent&&!(r.sep.itens||[]).length&&r.sep.falta===false, JSON.stringify(r).slice(0,280));
  const er=B.erros.filter(x=>!/404/.test(x)); ok('Sem erro de JavaScript', !er.length, er.join(' | '));

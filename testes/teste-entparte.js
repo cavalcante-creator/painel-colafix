@@ -15,7 +15,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const o
  await p.click('[data-act="ep-it"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="ep-salvar"]'); await H.dorme(900);
  let s=await srv(); const r1=s['ordens/5001'].rdb, r2=s['ordens/5002'].rdb;
  ok('Só os paletes: grava a parte nas duas ordens e o rancho continua sem "entregue"', r1.entp&&r1.entp.length===1&&r1.entp[0].itens.join()==='PAL01'&&r1.entp[0].recebidoPor==='Ana Souza'&&!r1.ent&&r2.entp&&!r2.ent, JSON.stringify(r1).slice(0,240));
- await abre(); const t2=await tela(); ok('Ao abrir de novo, avisa o que já foi', /Já foram em parte: PAL01/.test(t2)&&/em parte \(1 item\)/.test(t2), t2.replace(/\n/g,' | ').slice(0,220));
+ await abre(); const t2=await tela(); ok('Ao abrir de novo, avisa o que já foi', /Já foram em parte: PAL01/.test(t2)&&/Já entregue antes \(1\)/.test(t2), t2.replace(/\n/g,' | ').slice(0,220));
  await p.click('[data-act="ep-abre"]'); await H.dorme(200); const dis=await p.evaluate(()=>document.querySelector('[data-act="ep-it"][data-i="0"]').disabled);
  await p.click('[data-act="ep-it"][data-i="1"]'); await p.click('[data-act="ep-it"][data-i="2"]'); await H.dorme(150); await p.click('[data-act="ep-salvar"]'); await H.dorme(900);
  s=await srv(); const r3=s['ordens/5001'].rdb;

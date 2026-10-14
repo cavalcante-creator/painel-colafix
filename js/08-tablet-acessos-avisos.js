@@ -1206,7 +1206,7 @@ body.tt-ent.tt-mira #tt-video{left:12px;right:auto;width:calc(100vw - 24px)!impo
    como "não separado" e não entra na entrega: o rancho é entregue em parte (rdb.entp) e continua na fila.
    Quando o almox abre o rancho de novo, a conferência pede só o que faltou ("complemento", rdb.sep.comp);
    depois disso, quem recebe recebe o resto e o rancho fecha. */
-function srSepDoc(o){ const irm=o?dbIrmas(o):[]; return (irm.find(x=>x.rdb&&x.rdb.sep&&(x.rdb.sep.rec||x.rdb.sep.itens))||{}).rdb?.sep||null; }
+function srSepDoc(o){ const irm=o?dbIrmas(o):[]; return (irm.find(x=>x.rdb&&x.rdb.sep&&x.rdb.sep.rec)||irm.find(x=>x.rdb&&x.rdb.sep&&x.rdb.sep.itens)||{}).rdb?.sep||null; }
 function srFalta(o){ const s=srSepDoc(o); if(!s) return new Set(); const f=new Set();
   if(Array.isArray(s.rec)) s.rec.forEach(r=>{ if(!r.ok) f.add(r.c); }); else (s.itens||[]).forEach(i=>i&&i.c&&f.add(i.c));
   (s.comp||[]).forEach(p=>(p.itens||[]).forEach(c=>f.delete(c))); return f; }
@@ -1243,8 +1243,8 @@ function srListas(o,R){ const f=srFalta(o), feitos=epFeitos(o), its=R.itens||[];
       return h.replace(/(<button class="cf-i sr-nao"[^>]*>[\s\S]*?<small>)([^<]*)(<\/small>)/g,'$1$2 · não separado$3').replace(/(<button class="cf-i sr-nao"[\s\S]*?<span class="cf-ok">)([^<]*)(<\/span>)/g,'$1—$3'); }
     if(!L.nao.length&&!L.ja.length) return h;
     const lin=(x,cl)=>`<div class="${cl}"><b>${esc(x.c)}</b> ${esc(x.d||'')}<span>${fQ(x.q)} ${esc(x.um)}</span></div>`;
-    const lst=`<div class="sr-g"><div class="sr-h ok">${ic('check',16,3)} Separado pelo almox · vai agora (${L.vai.length})</div><div class="tt-ritens">${L.vai.map(x=>lin(x,'')).join('')||'<p class="sub" style="margin:4px 0">Nada separado para entregar agora.</p>'}</div>
-      ${L.nao.length?`<div class="sr-h nao">✕ Não separado · não pode receber agora (${L.nao.length})</div><div class="tt-ritens sr-naol">${L.nao.map(x=>lin(x,'')).join('')}</div><p class="sr-obs">Faltou na separação. Quando o almox separar, abre o rancho de novo e entrega o complemento.</p>`:''}
+    const lst=`<div class="sr-g"><div class="sr-h ok">${ic('check',16,3)} Vai agora (${L.vai.length})</div><div class="tt-ritens">${L.vai.map(x=>lin(x,'')).join('')||'<p class="sub" style="margin:4px 0">Nada separado para entregar agora.</p>'}</div>
+      ${L.nao.length?`<div class="sr-h nao">⏳ Fica para depois (${L.nao.length})</div><div class="tt-ritens sr-naol">${L.nao.map(x=>lin(x,'')).join('')}</div><p class="sr-obs">Faltou na separação. Quando o almox separar, abre o rancho de novo e entrega o complemento.</p>`:''}
       ${L.ja.length?`<div class="sr-h ja">Já entregue antes (${L.ja.length})</div><div class="tt-ritens sr-jal">${L.ja.map(x=>lin(x,'')).join('')}</div>`:''}</div>`;
     h=h.replace(/<div class="tt-ritens">[\s\S]*?<\/div><\/div>(\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,b)=>lst+b);
     if(L.nao.length) h=h.replace(/<button class="btn sec tt-big" data-act="tt-econf">[^<]*<\/button>/,'');
@@ -1320,7 +1320,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
     const lin=x=>`<div><b>${esc(x.c)}</b> ${esc(x.d||'')}<span>${fQ(x.q)} ${esc(x.um)}</span></div>`;
     const bloco=`<div class="sr-h nv">Não vai neste rancho (${L.nv.length})</div><div class="tt-ritens sr-nvl">${L.nv.map(lin).join('')}</div>`;
     if(h.indexOf('class="sr-g"')>=0) h=h.replace(/(<div class="sr-g">[\s\S]*?)(<\/div>\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,a,b)=>a+bloco+b);
-    else { h=h.replace(/<div class="tt-ritens">[\s\S]*?<\/div><\/div>(\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,b)=>`<div class="sr-g"><div class="sr-h ok">${ic('check',16,3)} Separado pelo almox · vai agora (${L.vai.length})</div><div class="tt-ritens">${L.vai.map(lin).join('')}</div>${L.ja.length?`<div class="sr-h ja">Já entregue antes (${L.ja.length})</div><div class="tt-ritens sr-jal">${L.ja.map(lin).join('')}</div>`:''}${bloco}</div>`+b); }
+    else { h=h.replace(/<div class="tt-ritens">[\s\S]*?<\/div><\/div>(\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,b)=>`<div class="sr-g"><div class="sr-h ok">${ic('check',16,3)} Vai agora (${L.vai.length})</div><div class="tt-ritens">${L.vai.map(lin).join('')}</div>${L.ja.length?`<div class="sr-h ja">Já entregue antes (${L.ja.length})</div><div class="tt-ritens sr-jal">${L.ja.map(lin).join('')}</div>`:''}${bloco}</div>`+b); }
   }catch(e){ console.warn('[não vai]',e); } return h; }; }
 document.head.insertAdjacentHTML('beforeend',`<style id="nv-css">
 .cf-w{display:flex;flex-direction:column;gap:4px}.cf-w .cf-i{width:100%}
@@ -1331,3 +1331,86 @@ document.head.insertAdjacentHTML('beforeend',`<style id="nv-css">
 .sr-h.nv{color:var(--muted)}.sr-nvl div{opacity:.6;text-decoration:line-through}.cf-i.sr-nv{opacity:.45}
 </style>`);
 /* ===FIM ITEM QUE NÃO VAI=== */
+/* ===================== QUANTIDADE PARCIAL + SONS + TELA MAIS SIMPLES (14/10) ===================== */
+/* Pedido de 14/10: "o almox entregou só 100 kg de cimento branco, não tinha mais". Na separação, "Menos" abre o campo
+   da quantidade separada. O que foi separado vai agora; o resto fica como falta (complemento depois).
+   Quantidades: rec[].qs (separado na 1ª vez), comp[].qtd {cód: qtd}, entp[].qtd {cód: qtd}. Sem qtd = item inteiro (dados antigos).
+   Também: sons em cada passo e menos texto na tela. */
+const _r3=x=>Math.round((+x||0)*1000)/1000;
+function srQs(o,R,sepOv){ const its=(R&&R.itens)||[], s=sepOv!==undefined?sepOv:srSepDoc(o), nv=nvCod(o); if(sepOv&&sepOv.naoVai) sepOv.naoVai.forEach(c=>nv.add(c));
+  const entp=(o&&o.rdb&&o.rdb.entp)||[], m={};
+  its.forEach(x=>{ const q=+x.q||0; let sq;
+    if(!s||(!s.rec&&!s.itens)) sq=q; else { const r=(s.rec||[]).find(r=>r.c===x.c);
+      if(r) sq=r.qs!=null?+r.qs:(r.ok?q:0); else sq=(Array.isArray(s.itens)&&s.itens.some(i=>i&&i.c===x.c))?0:q;
+      (s.comp||[]).forEach(p=>{ if(!(p.itens||[]).includes(x.c)) return; sq+=(p.qtd&&p.qtd[x.c]!=null)?+p.qtd[x.c]:Math.max(0,q-sq); }); }
+    sq=Math.min(q,_r3(sq)); let eq=0; entp.forEach(p=>{ if(!(p.itens||[]).includes(x.c)) return; eq+=(p.qtd&&p.qtd[x.c]!=null)?+p.qtd[x.c]:Math.max(0,q-eq); }); eq=Math.min(q,_r3(eq));
+    const n=nv.has(x.c); m[x.c]={x,q,sq,eq,nv:n,vai:n?0:_r3(Math.max(0,sq-eq)),falta:n?0:_r3(Math.max(0,q-sq))}; });
+  return m; }
+{ const _sf=srFalta; srFalta=function(o){ const R=S.tt&&S.tt.rch; if(!R||!R.itens||!o||!dbIrmas(o).some(x=>x._id===R.oid)) return _sf.apply(this,arguments);
+  const st=srQs(o,R), f=new Set(); for(const c in st) if(st[c].falta>0) f.add(c); return f; }; }
+srListas=function(o,R){ const st=srQs(o,R), its=R.itens||[], cp=(x,q,extra)=>Object.assign({},x,{q},extra||{});
+  return {f:new Set(its.filter(x=>st[x.c].falta>0).map(x=>x.c)),feitos:epFeitos(o),
+    vai:its.filter(x=>st[x.c].vai>0).map(x=>cp(x,st[x.c].vai)),
+    ja:its.filter(x=>st[x.c].eq>0&&!st[x.c].nv).map(x=>cp(x,st[x.c].eq)),
+    nao:its.filter(x=>st[x.c].falta>0).map(x=>cp(x,st[x.c].falta,{d:(x.d||'')+(st[x.c].sq>0?' · falta o resto':'')})),
+    nv:its.filter(x=>st[x.c].nv)}; };
+/* grava as quantidades */
+{ const _ds=dbSalvar; dbSalvar=function(o,rdb,txt,rch){ try{ const T=S.tt, R=T&&T.rch; if(ttEntrega()&&R&&R.itens&&rdb){ const parc=R.parc||{}, old=(o.rdb||{}).sep;
+    if(rdb.sep&&rdb.sep!==old){ const sp=Object.assign({},rdb.sep), pi=c=>{ const i=R.itens.findIndex(x=>x.c===c); return i>=0&&parc[i]!=null?+parc[i]:null; };
+      const comp1=old&&sp.comp&&sp.comp.length>((old.comp||[]).length)?sp.comp[sp.comp.length-1]:null;
+      if(!old&&Array.isArray(sp.rec)){ sp.rec=sp.rec.map(r=>pi(r.c)!=null?Object.assign({},r,{qs:pi(r.c),ok:true}):r); const ps=sp.rec.filter(r=>r.qs!=null); if(ps.length&&txt) txt+=' · parcial: '+ps.map(r=>r.c+' '+fQ(r.qs)+' de '+fQ(r.q)).join(', '); }
+      else if(comp1&&!comp1.qtd){ const st0=srQs(o,R); comp1.qtd={}; (comp1.itens||[]).forEach(c=>{ const v=st0[c], rem=v?v.falta:0, p=pi(c); comp1.qtd[c]=p!=null?Math.min(p,rem):rem; }); }
+      const nvs=new Set([...(sp.naoVai||[]),...R.itens.filter((x,i)=>R.nv&&R.nv[i]).map(x=>x.c)]);
+      const base=!old?Object.assign({},sp,{rec:R.itens.map((x,i)=>({c:x.c,q:+x.q||0,ok:!!(R.ck&&R.ck[i]),qs:pi(x.c)}))}):sp; const st=srQs(o,R,Object.assign({},base,{naoVai:[...nvs]})), its=R.itens.filter(x=>st[x.c]&&st[x.c].falta>0);
+      sp.itens=its.map(x=>({c:x.c,i:x.c+' '+(x.d||''),q:fQ(st[x.c].falta)+' '+(x.um||'')})); sp.falta=its.length>0; rdb=Object.assign({},rdb,{sep:sp}); }
+    if(rdb.entp&&rdb.entp.length&&T.p){ const p=rdb.entp[rdb.entp.length-1]; if(!p.qtd){ const st=srQs(o,R); p.qtd={}; (p.itens||[]).forEach(c=>{ p.qtd[c]=st[c]?st[c].vai:0; }); } } } }catch(e){ console.warn('[parcial]',e); }
+  return _ds.call(this,o,rdb,txt,rch); }; }
+/* ---------- sons ---------- */
+function somT(notas){ try{ const A=window.AudioContext||window.webkitAudioContext; if(!A) return; const x=ttCam.ac||(ttCam.ac=new A()); if(x.state==='suspended') x.resume(); let t=x.currentTime;
+  notas.forEach(([f,d,tipo])=>{ const o=x.createOscillator(), g=x.createGain(); o.type=tipo||'sine'; o.frequency.value=f; o.connect(g); g.connect(x.destination); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.25,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+d); o.start(t); o.stop(t+d+0.02); t+=d*0.9; }); }catch(e){} }
+const SOM={ok:()=>somT([[1320,0.09]]),tira:()=>somT([[700,0.08]]),fim:()=>somT([[880,0.12],[1175,0.12],[1568,0.22]]),erro:()=>somT([[220,0.18,'square'],[180,0.25,'square']]),pronto:()=>somT([[784,0.12],[988,0.12],[1175,0.12],[1568,0.35]])};
+document.addEventListener('click',ev=>{ if(!ttEntrega()) return; const b=ev.target.closest&&ev.target.closest('[data-act]'); if(!b||b.disabled) return; const a=b.dataset.act, R=S.tt.rch;
+  if(a==='cf-ok'){ const i=+b.dataset.i; (R&&R.ck&&R.ck[i])?SOM.tira():SOM.ok(); } else if(a==='cf-nv'||a==='cf-pcok') SOM.ok(); },true);
+{ const _tm=ttMsg; ttMsg=function(t){ if(ttEntrega()) SOM.erro(); return _tm.apply(this,arguments); }; }
+{ const _ds=dbSalvar; let ult=0; dbSalvar=async function(o,rdb,txt){ const r=await _ds.apply(this,arguments); try{ if(r!==false&&ttEntrega()&&Date.now()-ult>1500){ ult=Date.now(); if(/recebido por|entregue/.test(txt||'')) SOM.pronto(); else if(/separado/.test(txt||'')) SOM.fim(); } }catch(e){} return r; }; }
+/* ---------- "Menos": quanto separou ---------- */
+{ const _vc=vConferencia; vConferencia=function(){ let h=_vc.apply(this,arguments); try{ const R=S.tt.rch; if(!ttEntrega()||!R||!R.itens) return h; R.parc=R.parc||{}; const its=R.itens;
+    h=h.replace(/<div class="cf-w">(<button class="cf-i[^"]*"[^>]*data-act="cf-ok" data-i="(\d+)"[^>]*>)([\s\S]*?<\/button>)(<button class="cf-nv[^"]*"[^>]*>[^<]*<\/button>)<\/div>/g,(m,a,i,mid,nvb)=>{ const x=its[+i]; if(!x) return m;
+      if(R.pe===+i) return `<div class="cf-w cf-pew"><div class="cf-pe"><b>${esc(x.d||x.c)}</b><label>Quanto separou? <span>(pedido: ${fQ(x.q)} ${esc(x.um)})</span></label>
+        <div class="cf-per"><input class="txt num" id="cf-pq" type="number" inputmode="decimal" step="any" min="0" value="${R.parc[i]!=null?R.parc[i]:''}" placeholder="0"><span>${esc(x.um)}</span></div>
+        <div class="cf-peb"><button class="btn" data-act="cf-pcok" data-i="${i}">Pronto</button><button class="btn sec" data-act="cf-pcx">Voltar</button></div></div></div>`;
+      if(R.parc[i]!=null){ a=a.replace(/class="cf-i[^"]*"/,'class="cf-i on cf-pcon"'); mid=mid.replace(/<span class="cf-q num">[\s\S]*?<\/span><span class="cf-ok">[\s\S]*?<\/span>/,`<span class="cf-q num">${fQ(R.parc[i])}<small>de ${fQ(x.q)} ${esc(x.um)}</small></span><span class="cf-ok">Menos</span>`); }
+      const pcb=`<button class="cf-nv cf-pc ${R.parc[i]!=null?'on':''}" data-act="cf-pc" data-i="${i}">${R.parc[i]!=null?'Mudar':'Menos'}</button>`;
+      return `<div class="cf-w">${a}${mid}<div class="cf-bts">${pcb}${nvb}</div></div>`; });
+  }catch(e){ console.warn('[parcial]',e); } return h; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cf-pc"],[data-act="cf-pcok"],[data-act="cf-pcx"],[data-act="cf-ok"],[data-act="cf-nv"]'); if(!b||!ttEntrega()) return; const R=S.tt.rch; if(!R) return; R.parc=R.parc||{}; const a=b.dataset.act, i=+b.dataset.i;
+  if(a==='cf-ok'||a==='cf-nv'){ if(R.parc[i]!=null){ delete R.parc[i]; if(a==='cf-ok'){ R.ck[i]=false; } } return; }
+  ev.stopPropagation();
+  if(a==='cf-pc'){ R.pe=i; render(); setTimeout(()=>{ const e=document.getElementById('cf-pq'); if(e){ e.focus(); e.select&&e.select(); } },60); return; }
+  if(a==='cf-pcx'){ R.pe=null; render(); return; }
+  if(a==='cf-pcok'){ const x=R.itens[i], v=parseFloat(String((document.getElementById('cf-pq')||{}).value||'').replace(',','.'));
+    if(!(v>0)){ ttMsg('Digite quanto foi separado. Se não separou nada, volte e deixe sem OK.'); return; }
+    if(v>=+x.q){ delete R.parc[i]; R.ck[i]=true; } else { R.parc[i]=_r3(v); R.ck[i]=true; } if(R.nv) delete R.nv[i]; R.pe=null; R.cfConf=false; render(); } },true);
+document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.target.id==='cf-pq'){ ev.preventDefault(); const b=document.querySelector('[data-act="cf-pcok"]'); if(b) b.click(); } });
+{ const _tv=ttVoltar; ttVoltar=function(){ try{ if(S.tt.rch){ S.tt.rch.parc={}; S.tt.rch.pe=null; } }catch(e){} return _tv.apply(this,arguments); }; }
+/* ---------- tela mais simples ---------- */
+{ const _vt=vTotem; vTotem=function(){ let h=_vt.apply(this,arguments); try{ if(!ttEntrega()||typeof h!=='string') return h;
+    h=h.replace(/<small class="rd-pr">[\s\S]*?<\/small>/,'');                        /* sem o nome do produto no cartão */
+    h=h.replace(/<div class="tt-ola">Separando: <b>[^<]*<\/b><\/div>/,'');             /* o nome já está no topo */
+    h=h.replace(/<p class="cf-nvinfo">[\s\S]*?<\/p>/,'');
+    h=h.replace(/<div class="tt-cst">(?:<div[^>]*><b>[^<]*<\/b><span>[^<]*<\/span><\/div>){2}<\/div>/,'');                /* quadros Separado/Entregue */
+    h=h.replace(/<button class="btn sec tt-big" data-act="tt-econf">[^<]*<\/button>/,''); /* "Conferir item a item" */
+    h=h.replace(/<p class="sr-obs">[\s\S]*?<\/p>/,'<p class="sr-obs">Fica para depois (complemento).</p>');
+    h=h.replace('<button class="btn sec tt-big" data-act="ep-abre">Entregar só uma parte</button>','<button class="lnk tt-ep" data-act="ep-abre">Entregar só uma parte</button>');
+  }catch(e){} return h; }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="pc-css">
+.cf-bts{display:flex;gap:8px;justify-content:flex-end;margin-top:-2px}.cf-bts .cf-nv{margin:0}
+.cf-i.cf-pcon{background:var(--warn-tint);border-color:var(--warn)}.cf-i.cf-pcon .cf-ok{background:var(--warn);border-color:var(--warn);color:#2a1f05}
+.cf-i.cf-pcon .cf-q small{font-size:12px}
+.cf-pe{background:var(--surface);border:3px solid var(--warn);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.cf-pe b{font-size:19px}.cf-pe label{font-size:18px;font-weight:700}.cf-pe label span{font-weight:500;color:var(--muted);font-size:15px}
+.cf-per{display:flex;align-items:center;gap:10px}.cf-per input{height:64px;font-size:30px;font-weight:800;text-align:right;flex:1;min-width:0}.cf-per span{font-size:20px;font-weight:700;color:var(--muted)}
+.cf-peb{display:flex;gap:10px}.cf-peb .btn{flex:1;height:58px;font-size:19px}
+.tt-ep{display:block;width:100%;text-align:center;padding:12px 0;font-size:16px}
+</style>`);
+/* ===FIM QUANTIDADE PARCIAL=== */

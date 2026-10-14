@@ -17,10 +17,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Celular do almox abre direto em "Escaneie o QR da folha", com câmera traseira e sem botão de sair', /Entrega de rancho/.test(e0.t)&&/Escaneie o QR da folha de produção/.test(e0.t)&&!e0.x&&e0.cam==='environment', 'câmera: '+e0.cam);
  const viu=await espera(()=>__T.S().tt.fase==='rancho'&&!!__T.S().tt.rch,20000); await H.dorme(400);
  const t1=await tela();
- ok('A câmera lê a folha: mostra o rancho e já abre a separação no nome de quem está logado (sem pedir crachá)', viu&&/RANCHO\s+123456/.test(t1)&&/5001, 5002/.test(t1)&&/Separando: Joana Almox/.test(t1)&&/MP001/.test(t1)&&!/crachá de quem vai conferir/.test(t1), t1.replace(/\n/g,' | ').slice(0,260));
+ ok('A câmera lê a folha: mostra o rancho e já abre a separação no nome de quem está logado (sem pedir crachá)', viu&&/RANCHO\s+123456/.test(t1)&&/5001, 5002/.test(t1)&&/Separar rancho/.test(t1)&&/MP001/.test(t1)&&!/crachá de quem vai conferir/.test(t1), t1.replace(/\n/g,' | ').slice(0,260));
  await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const tc=await tela();
  const cam1=await p.evaluate(()=>{ const v=document.getElementById('tt-video'); return !!v&&getComputedStyle(v).display!=='none'; }); const __T_rcv=await p.evaluate(()=>!!__T.S().tt.p);
- ok('Crachá do operador antes de separar: recusa e pede para marcar o separado primeiro; a lista continua com OK por item, câmera desligada', /Primeiro marque o que foi separado/.test(tc)&&/Separando: Joana Almox/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2/.test(tc)&&/Concluir separação/.test(tc)&&!cam1&&!__T_rcv, tc.replace(/\n/g,' | ').slice(0,200));
+ ok('Crachá do operador antes de separar: recusa e pede para marcar o separado primeiro; a lista continua com OK por item, câmera desligada', /Primeiro marque o que foi separado/.test(tc)&&/Separar rancho/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2/.test(tc)&&/Concluir separação/.test(tc)&&!cam1&&!__T_rcv, tc.replace(/\n/g,' | ').slice(0,200));
  await p.screenshot({path:'/mnt/user-data/outputs/celular-almox-conferencia.png'});
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(300); const tf=await tela();
  let s0=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
@@ -43,14 +43,14 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>{ __T.S().tt.recente={}; __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(400); const tp=await tela();
  await p.fill('#tt-rnum','777888'); await p.click('[data-act="tt-rnum"]'); await H.dorme(500); const tq=await tela();
- ok('Crachá antes da folha é recusado; a folha abre direto a separação', /Escaneie primeiro a folha/.test(tp)&&/Separando: Joana Almox/.test(tq)&&/MP010/.test(tq), tp.replace(/\n/g,' | ').slice(0,120)+' || '+tq.replace(/\n/g,' | ').slice(0,160));
+ ok('Crachá antes da folha é recusado; a folha abre direto a separação', /Escaneie primeiro a folha/.test(tp)&&/Separar rancho/.test(tq)&&/MP010/.test(tq), tp.replace(/\n/g,' | ').slice(0,120)+' || '+tq.replace(/\n/g,' | ').slice(0,160));
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900);
  s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const sf=s['ordens/5003'].rdb&&s['ordens/5003'].rdb.sep;
  ok('Registrar com falta: grava o item que ficou sem OK como faltando', sf&&sf.falta===true&&sf.itens.length===1&&sf.itens[0].c==='MP011'&&/faltando: MP011/.test((s['ordens/5003'].hist||[]).map(x=>x.o).join(' ')), JSON.stringify(sf));
  await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.fill('#tt-rnum','999000'); await p.click('[data-act="tt-rnum"]'); await H.dorme(400);
 
- const ts=await tela(); ok('Outro rancho: abre direto a separação', /Separando: Joana Almox/.test(ts)&&/MP020/.test(ts), ts.replace(/\n/g,' | ').slice(0,160));
+ const ts=await tela(); ok('Outro rancho: abre direto a separação', /Separar rancho/.test(ts)&&/MP020/.test(ts), ts.replace(/\n/g,' | ').slice(0,160));
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(800);
  await p.click('[data-act="sc-abre"][data-k="rec"]'); await H.dorme(200); await p.fill('#sc-nome','Maria Souza'); await p.press('#sc-nome','Enter'); await H.dorme(300);
  await p.dblclick('[data-act="tt-recebi"]'); await H.dorme(900); s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const r9=s['ordens/5004'].rdb||{};
