@@ -941,7 +941,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
       const txt='Rancho '+(o.rancho||'')+' separado e conferido por '+quem+(R.cfp.codigo?' (crachá)':'')+(falta?' · faltando: '+itens.map(y=>y.c+' ('+y.q+')').join(', '):' · completo')+' (celular do almox)';
       if(await dbSalvar(x,rx,txt,o.rancho)) n++; else falhou=true; }
     T.enviando=false; if(!n&&falhou){ T.msg='Não foi possível salvar. Confira a internet e toque de novo.'; render(); return; }
-    R.cfSalvo=true; R.cfFalta=falta; toast(falta?'Conferência salva com falta. Agora o crachá de quem vai receber.':'Rancho conferido e separado. Agora o crachá de quem vai receber.'); render(); return; } });
+    R.cfSalvo=true; R.cfFalta=falta; toast(falta?'Separação salva com falta. Agora o crachá de quem vai receber.':'Rancho separado. Agora o crachá de quem vai receber.'); render(); return; } });
 document.head.insertAdjacentHTML('beforeend',`<style id="cf-css">
 .cf-n{font-weight:700;color:var(--muted);font-size:15px}
 .cf-l{display:flex;flex-direction:column;gap:8px}
@@ -1290,3 +1290,44 @@ function spAuto(){ try{ const R=S.tt.rch; if(ttEntrega()&&R&&!R.cfp&&cfPrecisa()
 /* a mensagem de aviso aparece em destaque na tela de separação */
 document.head.insertAdjacentHTML('beforeend',`<style id="sp-css">body.tt-ent .tt-cel .tt-err{background:var(--warn-tint);color:var(--warn-ink);border-radius:12px;padding:10px 12px;font-weight:700}</style>`);
 /* ===FIM SEPARAR ANTES DO CRACHÁ=== */
+/* ===================== ITEM QUE NÃO VAI NO RANCHO (14/10) ===================== */
+/* Na separação, cada item tem OK (separado) e "Não vai" (está no rancho mas não se entrega: não vai mesmo ou fica para outro
+   momento por decisão do almox). "Não vai" não é falta: não gera complemento e não impede fechar o rancho.
+   Grava em rdb.sep.naoVai [códigos] e marca rec[].nv. Item sem marcação nenhuma continua sendo falta. */
+function nvCod(o){ const irm=o?dbIrmas(o):[]; const s=new Set(); irm.forEach(x=>((x.rdb&&x.rdb.sep&&x.rdb.sep.naoVai)||[]).forEach(c=>s.add(c))); return s; }
+{ const _ds=dbSalvar; dbSalvar=function(o,rdb,txt,rch){ try{ const R=S.tt&&S.tt.rch; if(ttEntrega()&&R&&R.nv&&rdb&&rdb.sep&&R.itens){ const cods=R.itens.filter((x,i)=>R.nv[i]).map(x=>x.c);
+      if(cods.length){ const sp=Object.assign({},rdb.sep); sp.naoVai=[...new Set([...(sp.naoVai||[]),...cods])]; if(Array.isArray(sp.rec)) sp.rec=sp.rec.map(r=>cods.includes(r.c)?Object.assign({},r,{nv:true}):r);
+        if(Array.isArray(sp.itens)) sp.itens=sp.itens.filter(i=>!cods.includes(i.c)); rdb=Object.assign({},rdb,{sep:sp}); if(txt&&!/não vai:/.test(txt)) txt+=' · não vai: '+cods.join(', '); } } }catch(e){ console.warn('[não vai]',e); }
+  return _ds.call(this,o,rdb,txt,rch); }; }
+/* a falta não conta o que "não vai" */
+{ const _sf=srFalta; srFalta=function(o){ const f=_sf.apply(this,arguments); nvCod(o).forEach(c=>f.delete(c)); return f; }; }
+/* separação: botão "Não vai" ao lado de cada item */
+{ const _vc=vConferencia; vConferencia=function(){ let h=_vc.apply(this,arguments); try{ const R=S.tt.rch; if(!ttEntrega()||!R||!R.itens) return h; R.nv=R.nv||{};
+    h=h.replace(/(<button class="cf-i[^"]*"[^>]*data-act="cf-ok" data-i="(\d+)"[^>]*>)([\s\S]*?)(<\/button>)/g,(m,a,i,mid,c)=>{ if(/disabled/.test(a)) return m; const nv=!!R.nv[i];
+      if(nv){ a=a.replace(/class="cf-i[^"]*"/,'class="cf-i cf-nvon"'); mid=mid.replace(/<span class="cf-ok">[\s\S]*?<\/span>$/,'<span class="cf-ok">Não vai</span>'); }
+      return `<div class="cf-w">${a}${mid}${c}<button class="cf-nv ${nv?'on':''}" data-act="cf-nv" data-i="${i}" aria-pressed="${nv}">${nv?'↩ Desfazer':'Não vai'}</button></div>`; });
+    const nn=Object.values(R.nv).filter(Boolean).length; if(nn) h=h.replace('<div class="cf-l">',`<p class="cf-nvinfo">${nn} ${nn===1?'item marcado':'itens marcados'} como <b>não vai</b>: não é falta e não volta para complemento.</p><div class="cf-l">`);
+  }catch(e){ console.warn('[não vai]',e); } return h; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cf-nv"],[data-act="cf-ok"]'); if(!b||!ttEntrega()) return; const R=S.tt.rch; if(!R) return; R.nv=R.nv||{}; const i=+b.dataset.i;
+  if(b.dataset.act==='cf-ok'){ if(R.nv[i]){ delete R.nv[i]; R.ck[i]=false; } return; } /* tocar no item "não vai" volta a pendente; o OK normal segue */
+  ev.stopPropagation(); if(R.nv[i]){ delete R.nv[i]; R.ck[i]=false; } else { R.nv[i]=true; R.ck=R.ck||{}; R.ck[i]=true; } R.cfConf=false; S.tt.ult=Date.now(); render(); },true);
+{ const _tv=ttVoltar; ttVoltar=function(){ try{ if(S.tt.rch) S.tt.rch.nv={}; }catch(e){} return _tv.apply(this,arguments); }; }
+/* entrega: "não vai" aparece à parte e não entra no recebimento */
+{ const _sl=srListas; srListas=function(o,R){ const L=_sl.apply(this,arguments); const nv=nvCod(o); if(!nv.size) return L; L.nv=(R.itens||[]).filter(x=>nv.has(x.c)); L.vai=L.vai.filter(x=>!nv.has(x.c)); L.nao=L.nao.filter(x=>!nv.has(x.c)); L.ja=L.ja.filter(x=>!nv.has(x.c)); return L; }; }
+{ const _ve=vEntrega; vEntrega=function(){ let h=_ve.apply(this,arguments); try{ const T=S.tt, R=T.rch, o=R&&ordById(R.oid); if(!h||T.fase!=='rancho'||!T.p||!o||!R.itens||!R.itens.length) return h;
+    const nv=nvCod(o); if(!nv.size) return h; const L=srListas(o,R);
+    if(epA.on){ R.itens.forEach((x,i)=>{ if(nv.has(x.c)) h=h.replace(new RegExp('<button class="cf-i ([^"]*)" data-act="ep-it" data-i="'+i+'"( ?)>'),`<button class="cf-i sr-nv" data-act="ep-it" data-i="${i}" disabled>`); }); return h; }
+    const lin=x=>`<div><b>${esc(x.c)}</b> ${esc(x.d||'')}<span>${fQ(x.q)} ${esc(x.um)}</span></div>`;
+    const bloco=`<div class="sr-h nv">Não vai neste rancho (${L.nv.length})</div><div class="tt-ritens sr-nvl">${L.nv.map(lin).join('')}</div>`;
+    if(h.indexOf('class="sr-g"')>=0) h=h.replace(/(<div class="sr-g">[\s\S]*?)(<\/div>\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,a,b)=>a+bloco+b);
+    else { h=h.replace(/<div class="tt-ritens">[\s\S]*?<\/div><\/div>(\s*<button class="btn tt-big" data-act="tt-recebi")/,(m,b)=>`<div class="sr-g"><div class="sr-h ok">${ic('check',16,3)} Separado pelo almox · vai agora (${L.vai.length})</div><div class="tt-ritens">${L.vai.map(lin).join('')}</div>${L.ja.length?`<div class="sr-h ja">Já entregue antes (${L.ja.length})</div><div class="tt-ritens sr-jal">${L.ja.map(lin).join('')}</div>`:''}${bloco}</div>`+b); }
+  }catch(e){ console.warn('[não vai]',e); } return h; }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="nv-css">
+.cf-w{display:flex;flex-direction:column;gap:4px}.cf-w .cf-i{width:100%}
+.cf-nv{align-self:flex-end;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 14px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:-2px}
+.cf-nv.on{border-color:var(--ink-2);color:var(--ink-2)}
+.cf-i.cf-nvon{background:var(--sunken);border-color:var(--line);opacity:.75}.cf-i.cf-nvon .cf-t,.cf-i.cf-nvon .cf-q{text-decoration:line-through}.cf-i.cf-nvon .cf-ok{background:var(--ink-2);border-color:var(--ink-2);color:#fff;font-size:15px}
+.cf-nvinfo{margin:0;font-size:14px;color:var(--ink-2);background:var(--sunken);border-radius:10px;padding:8px 12px}
+.sr-h.nv{color:var(--muted)}.sr-nvl div{opacity:.6;text-decoration:line-through}.cf-i.sr-nv{opacity:.45}
+</style>`);
+/* ===FIM ITEM QUE NÃO VAI=== */
