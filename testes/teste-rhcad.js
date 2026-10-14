@@ -12,7 +12,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   const hoje=new Date(), antesNov=hoje.getFullYear()*100+hoje.getMonth()+1<202611;
   ok('Fichas do mês começam em novembro de 2026 (sem voltar para outubro)', antesNov?(/novembro/i.test(vf)&&/começa em novembro de 2026/.test(vf)&&!ant):!/outubro de 2026/i.test(vf.split('\n')[2]||''), vf.slice(0,160).replace(/\n/g,' | '));
   await p.evaluate(()=>__T.go('rhfuncoes')); await H.dorme(300); const vc=await view();
-  ok('Cadastros do RH: Funções e EPIs, Setores e Configurações', /Cadastros do RH/.test(vc)&&/Funções e EPIs/.test(vc)&&/Setores/.test(vc)&&/Configurações/.test(vc));
+  ok('Cadastros do RH: Funções, EPIs, Setores, Feriados, Textos e Configurações', /Cadastros do RH/.test(vc)&&/Funções/.test(vc)&&/EPIs/.test(vc)&&/Textos das fichas/.test(vc)&&/Setores/.test(vc)&&/Configurações/.test(vc));
   await p.click('[data-act="rh-cad"][data-v="setores"]'); await H.dorme(300); const vs=await view();
   await p.click('[data-act="rh-setall"]'); await H.dorme(500); await p.fill('#rh-setn','Manutenção'); await p.click('[data-act="rh-setadd"]'); await H.dorme(500);
   await p.fill('#rh-setn','manutenção'); await p.click('[data-act="rh-setadd"]'); await H.dorme(300); const tdup=await p.evaluate(()=>document.getElementById('toast').innerText);

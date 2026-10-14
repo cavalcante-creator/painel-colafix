@@ -328,8 +328,9 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
    Módulos novos ficam em modulos/<nome>.js (carregados por modulos/lista.js) e usam window.Painel.
    Painel.registrarModulo({ id, nome, ic, telas:{ <id-da-tela>:{ nome, render:()=>html } }, iniciar:()=>{ assinaturas do banco } }) */
 S.extViews={};
+var TELA_SEM_MENU={}; /* telas de módulo que abrem por link/aba mas não aparecem nas abas do menu (telas:{x:{menu:false}}) */
 function registrarModulo(m){ if(!m||!m.id||MODS.some(x=>x.id===m.id)) return false; const vs=Object.keys(m.telas||{});
-  vs.forEach(v=>{ const t=m.telas[v]; VIEWS[v]={nome:t.nome,ic:m.ic||'grid',mob:t.mob||t.nome}; CRUMB[v]=t.nome; S.extViews[v]=()=>{ try{ return t.render(); }catch(e){ console.warn('[módulo '+m.id+']',e); return '<section class="card"><div class="empty">Não foi possível mostrar esta tela.</div></section>'; } }; });
+  vs.forEach(v=>{ const t=m.telas[v]; VIEWS[v]={nome:t.nome,ic:m.ic||'grid',mob:t.mob||t.nome}; CRUMB[v]=t.nome; if(t.menu===false) TELA_SEM_MENU[v]=1; S.extViews[v]=()=>{ try{ return t.render(); }catch(e){ console.warn('[módulo '+m.id+']',e); return '<section class="card"><div class="empty">Não foi possível mostrar esta tela.</div></section>'; } }; });
   MODS.push({id:m.id,nome:m.nome,ic:m.ic||'grid',views:vs}); if(!ACS_MODS.some(x=>x[0]===m.id)) ACS_MODS.splice(Math.max(0,ACS_MODS.findIndex(x=>x[0]==='ajustes')),0,[m.id,m.nome]);
   if(typeof LEIT_CONHECIDOS!=='undefined'&&!LEIT_CONHECIDOS.includes(m.id)) LEIT_CONHECIDOS.push(m.id);
   if(typeof EQ_MOD!=='undefined'&&!EQ_MOD[m.id]) EQ_MOD[m.id]=[m.ic||'grid',m.nome];

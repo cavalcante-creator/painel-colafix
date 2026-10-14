@@ -216,7 +216,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 
 /* ===== Ranchos dentro da Programação: abre numa gaveta lateral pelo botão, sem ocupar a tela ===== */
 function rchGav(){ return viewOk('programacao')&&viewOk('ranchos'); }
-function mTabs(m){ return mViews(m).filter(v=>!(v==='ranchos'&&rchGav())); }
+function mTabs(m){ return mViews(m).filter(v=>!(v==='ranchos'&&rchGav())&&!(typeof TELA_SEM_MENU!=="undefined"&&TELA_SEM_MENU[v])); }
 function rchGavHtml(){ const b=banner(); let h=vRanchos(); if(b) h=h.replace(b,'');
   return `<div class="rgav-bg" data-act="rg-fechar" aria-hidden="true"></div><aside class="rgav" role="dialog" aria-modal="true" aria-label="Ranchos"><button class="rgav-x" data-act="rg-fechar" aria-label="Fechar ranchos" title="Fechar (Esc)">✕</button><div class="rgav-in">${h}</div></aside>`; }
 function rchPend(){ try{ const g=ranchosDoDia(hojeStr(),''); return (g.grupos||[]).filter(r=>!(r.doc&&r.doc.enviadoEm)).length; }catch(e){ return 0; } }

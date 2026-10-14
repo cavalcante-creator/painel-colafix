@@ -23,7 +23,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4), M=dias(0).slice(0,7
   const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const view=()=>p.evaluate(()=>document.getElementById('view').innerText.replace(/ /g,' '));
   const baixa=async(sel)=>{ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:8000}).catch(()=>null),p.click(sel)]); return dl?{nome:dl.suggestedFilename(),txt:fs.readFileSync(await dl.path(),'utf8'),path:await dl.path()}:null; };
   const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
-  ok('Menu ganhou a Agenda logo depois do Início', nav==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Cadastros|Terceirizados', nav);
+  ok('Menu ganhou a Agenda logo depois do Início', nav==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', nav);
 
   // agenda
   await p.evaluate(()=>__T.go('rhagenda')); await H.dorme(400); const ag=await view();

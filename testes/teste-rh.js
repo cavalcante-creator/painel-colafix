@@ -21,7 +21,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  ok('Funções: avisa função sem EPI e salva EPIs (com CA) e uniforme', avisoFunc&&fc&&fc.nome==='Operador de Produção'&&fc.epis[0].ca==='12345'&&fc.uniformes[0].tam==='M', JSON.stringify(fc&&{n:fc.nome,e:fc.epis,u:fc.uniformes}));
  // menu igual ao exemplo (12/10): Dia a dia, Controle de EPI e Retiradas saíram
  const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
- ok('Menu do RH igual ao exemplo, com as telas na lateral', menu==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros|Terceirizados', menu);
+ ok('Menu do RH igual ao exemplo, com as telas na lateral', menu==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', menu);
  await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(300); await p.click('[data-act="rh-fvgerar"]'); await H.dorme(400);
  // fichas (sistema original dentro do painel)
  await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));

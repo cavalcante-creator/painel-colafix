@@ -229,6 +229,10 @@
   table.fp-table-compact td.item-cell{font-size:8.6pt; padding-left:0.4mm; padding-right:0.4mm; letter-spacing:-0.1px;}
   table.fp-table-compact thead th{font-size:7.5pt; padding-left:0.6mm; padding-right:0.6mm;}
   table.fp-table-compact thead th .ca{font-size:7pt;}
+  table.fp-table col.col-data-mini{width:6.5%;}
+  table.fp-table-mini thead th{font-size:6.6pt; padding-left:0.4mm; padding-right:0.4mm; line-height:1.1;}
+  table.fp-table-mini thead th .ca{font-size:6.2pt;}
+  table.fp-table-mini td.item-cell{font-size:7.6pt; padding-left:0.2mm; padding-right:0.2mm;}
 
   .fp-footer-note{
     margin-top:0.8mm; font-size:6.6pt; color:var(--ink-soft); display:flex; justify-content:space-between;
@@ -671,7 +675,7 @@
     // (caso a aba de uniformes tenha sido renomeada para refletir que
     // ali não é um CA, e sim o tamanho da peça).
     var pares = [];
-    for(var n=1; n<=9; n++){
+    for(var n=1; n<=15; n++){ // até 15 EPIs (com mais de 9 a tabela fica no modo bem compacto)
       var iItem = header.indexOf(norm(prefixItem+" "+n));
       var iCa = header.indexOf(norm("CA "+n));
       if(iCa === -1) iCa = header.indexOf(norm("Tamanho "+n));
@@ -1005,7 +1009,10 @@
           : '<col class="col-assinatura"><col class="col-devdata"><col class="col-devassinatura">') +
         '</colgroup>';
 
-      var tableClass = compacto ? "fp-table fp-table-compact" : "fp-table";
+      // Mais de 9 itens (só EPI, até 15): coluna da data mais estreita e só "( )" para a quantidade.
+      var mini = itensExibir.length > 9;
+      if(mini) colgroup = colgroup.replace('<col class="col-data">','<col class="col-data-mini">');
+      var tableClass = compacto ? "fp-table fp-table-compact"+(mini?" fp-table-mini":"") : "fp-table";
 
       var theadCells = '<th>Data de<br>Recebimento</th>' +
         itensExibir.map(function(it){
@@ -1037,6 +1044,7 @@
               : '(&nbsp;&nbsp;&nbsp;) qtd.&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;) tam.';
             return '<td class="item-cell">'+uniLabel+'</td>';
           }
+          if(mini) return '<td class="item-cell"><span class="qtd-blank">(&nbsp;&nbsp;&nbsp;&nbsp;)</span></td>';
           return '<td class="item-cell"><span class="qtd-blank">('+blankSpacer+')</span> '+qtdLabel+'</td>';
         }).join("");
         rows += '<tr><td class="data-cell">'+dataStr+'</td>'+cells+'<td></td><td></td><td></td></tr>';
@@ -1630,10 +1638,10 @@
       return !!previewWrap.querySelector(".ficha-page");
     },
     /* frente (uniforme) da ficha de uma pessoa, para a prévia ao lado da lista */
-    previa: function(nome, mes){ if(!DB.loaded) return null;
+    previa: function(nome, mes, qual){ if(!DB.loaded) return null; /* qual "epi": a página do EPI (verso) */
       var c=DB.colaboradores.find(function(x){ return norm(x.nome)===norm(nome); }); if(!c) return null;
       var p=String(mes||"").split("-"); var ms={ yyyy:parseInt(p[0],10), mm:parseInt(p[1],10) }; if(!ms.yyyy||!ms.mm) return null;
-      var set=gerarFichaFuncionario(c, ms, "AMBAS"); var pg=set.querySelector(".ficha-page"); if(!pg) return null;
+      var set=gerarFichaFuncionario(c, ms, "AMBAS"); var pgs=set.querySelectorAll(".ficha-page"), pg=qual==="epi"?pgs[pgs.length-1]:pgs[0]; if(!pg) return null;
       var css=Array.prototype.map.call(document.querySelectorAll("style"), function(st){ return st.id==="visual-painel"?"":st.textContent; }).join("\n");
       return { css: css, html: pg.outerHTML };
     }
