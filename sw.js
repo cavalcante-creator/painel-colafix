@@ -2,7 +2,7 @@
    Arquivos do próprio site: busca na rede primeiro (versão nova entra na hora) e usa a cópia guardada sem internet.
    Bibliotecas (Firebase, jsPDF, pdf.js...): usa a cópia guardada e atualiza por trás.
    O banco (Firestore) e o login não passam por aqui. */
-const VERSAO = 'painel-v23';
+const VERSAO = 'painel-v24';
 const BASE = ['./', 'index.html', 'config.js', 'painel-firebase.js', 'css/painel.css', 'js/carregar.js', 'js/00-qrcode.js', 'js/01-base-producao.js', 'js/02-diario-calendario.js', 'js/03-analise.js', 'js/04-analise-paineis-acessos.js', 'js/05-almox-premix.js', 'js/06-manutencao-equipe.js', 'js/07-manutencao-coletor.js', 'js/08-tablet-acessos-avisos.js', 'js/09-silos-final.js', 'js/10-tablet-producao.js', 'js/11-meu-menu.js', 'js/12-organizacao.js', 'js/13-inventario.js', 'modulos/lista.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/assinatura.png'];
 const LIBS = ['https://www.gstatic.com/firebasejs/', 'https://cdnjs.cloudflare.com/', 'https://cdn.jsdelivr.net/npm/jsqr@'];
 self.addEventListener('install', ev => { ev.waitUntil(caches.open(VERSAO).then(c => c.addAll(BASE)).catch(() => {})); self.skipWaiting(); });
