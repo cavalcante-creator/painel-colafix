@@ -173,7 +173,7 @@ function ritEntMes(cp){ if(!S.db||!cp) return null; if(!_ritSub[cp]){ _ritSub[cp
 function ritEntregas(cp){ const m=new Map(); (S.entregas||[]).forEach(e=>m.set(e._id,e)); (ritEntMes(cp)||[]).forEach(e=>m.set(e._id,e)); return [...m.values()]; }
 /* 14/10: divisão REAL entre as linhas = entregas lançadas nos últimos 60 dias (sem as anuladas), por item e linha.
    Usada como divisão automática dos itens sem % configurada e para avisar quando a % configurada não bate com o que as linhas fazem. */
-const RIT_DIV_DIAS=60, RIT_DIV_MIN=200, RIT_DIV_DIF=20; let _ritDvC=null;
+const RIT_DIV_DIAS=60, RIT_DIV_MIN=200, RIT_DIV_DIF=15; let _ritDvC=null;
 function ritDivReal(){ const h=hojeStr(), ini=addDias(h,-RIT_DIV_DIAS), EM=S.entregas||[]; const key=h+'|'+EM.length+'|'+(S.ordens||[]).length+'|'+(EM[0]&&EM[0]._id||'')+'|'+(EM[EM.length-1]&&EM[EM.length-1]._id||'');
   if(_ritDvC&&_ritDvC.k===key) return _ritDvC.v;
   const an=new Set(EM.filter(e=>e.anula).map(e=>e.anula)), OM={}; (S.ordens||[]).forEach(o=>OM[o._id]=o); const it={}; let de='';
