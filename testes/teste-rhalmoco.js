@@ -52,6 +52,22 @@ const csv='/tmp/claude-almoco-teste.csv'; fs.writeFileSync(csv,Buffer.from(linha
  await p.click('[data-act="alm-pes"][data-k="11111111111"]'); await H.dorme(400); const tm=await p.evaluate(()=>(document.querySelector('.alm-pm')||{}).innerText||'');
  ok('Clicar no nome abre o detalhe do mês com todas as passagens, chegada e tempo no refeitório', /Ana Teste/.test(tm)&&/Refeitório 12:36 → 12:49 \(13 min\)/.test(tm)&&/chegou 07:40/.test(tm)&&/07:40:00 Portaria Entrada/.test(tm)&&/2\s*almoços/.test(tm), tm.replace(/\n/g,' | ').slice(0,300));
  await p.click('[data-act="alm-pesx"]'); await H.dorme(200);
+ /* ausência no almoço: regra "toda terça" (13/10/2026 é terça) e um dia só */
+ const cfgAus=()=>p.evaluate(()=>((JSON.parse(localStorage.getItem('__srv')).docs['rh/config']||{}).almoco||{}).ausencias||[]);
+ await p.click('#view [data-act="alm-aus"]'); await H.dorme(300); await p.click('[data-act="alm-austipo"][data-v="regra"]'); await H.dorme(200); await p.click('[data-act="alm-aussalvar"]'); await H.dorme(300);
+ const ae=await p.evaluate(()=>document.body.innerText); await p.selectOption('#alm-auk','11111111111'); await p.click('[data-act="alm-aussalvar"]'); await H.dorme(300); const ae2=await p.evaluate(()=>document.body.innerText);
+ await p.click('[data-act="alm-ausdia"][data-v="2"]'); await H.dorme(200); await p.fill('#alm-aude','2026-10-01'); await p.fill('#alm-aumot','faculdade'); await p.click('[data-act="alm-aussalvar"]'); await H.dorme(700);
+ const au1=await cfgAus(); p.once('dialog',dg=>dg.accept('teste')); await p.click('[data-act="alm-aj"][data-k="11111111111"][data-v="nao"]'); await H.dorme(800); const ta=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Ausência no almoço "toda terça" (Ana): pede a pessoa e o dia da semana; na terça sem almoço ela fica Justificada ("Ausência programada · Toda terça · desde 01/10/2026 · faculdade"), não como falta', /Escolha a pessoa/.test(ae)&&/Marque pelo menos um dia/.test(ae2)&&au1.length===1&&au1[0].cpf==='11111111111'&&au1[0].tipo==='regra'&&au1[0].dias.join()==='2'&&au1[0].de==='2026-10-01'&&/JUSTIFICADOS \(2\)[\s\S]*Ana Teste[\s\S]*Ausência programada · Toda terça · desde 01\/10\/2026 · faculdade/.test(ta)&&/0 sem justificativa/.test(ta), JSON.stringify(au1)+' | '+ta.slice(-500).replace(/\n/g,' | '));
+ await p.click('[data-act="alm-pes"][data-k="22222222222"]'); await H.dorme(300); await p.click('.alm-pm [data-act="alm-aus"]'); await H.dorme(300);
+ const fixo=await p.evaluate(()=>!document.getElementById('alm-auk')&&/Bruno Teste/.test(document.querySelector('[aria-label="Ausência no almoço"]').innerText)); await p.fill('#alm-aud','2026-10-20'); await p.click('[data-act="alm-aussalvar"]'); await H.dorme(600);
+ const au2=await cfgAus(), tb=await p.evaluate(()=>(document.querySelector('.alm-pm')||{}).innerText||'');
+ ok('Programar ausência pela ficha da pessoa (Bruno, só no dia 20/10): aparece na ficha com "tirar"', fixo&&au2.length===2&&au2[1].cpf==='22222222222'&&au2[1].tipo==='dia'&&au2[1].data==='2026-10-20'&&/Só no dia 20\/10\/2026/.test(tb), JSON.stringify(au2[1])+' '+tb.slice(0,400).replace(/\n/g,' | '));
+ await p.click('[data-act="alm-pesx"]'); await H.dorme(200);
+ const id1=au1[0].id; p.once('dialog',dg=>dg.accept()); await p.evaluate(()=>{ const d=document.querySelector('details.alm-bl.aus'); if(d) d.open=true; }); await p.click(`#view [data-act="alm-ausrem"][data-id="${id1}"]`); await H.dorme(700);
+ const au3=await cfgAus(), tr=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Tirar a ausência: fica guardada como removida e a Ana volta para "sem justificativa"', au3.find(a=>a.id===id1).removido===true&&/1 sem justificativa/.test(tr)&&/AUSÊNCIAS PROGRAMADAS \(1\)/.test(tr), tr.slice(-400).replace(/\n/g,' | '));
+ p.once('dialog',dg=>dg.accept('volta')); await p.click('[data-act="alm-aj"][data-k="11111111111"][data-v="sim"]'); await H.dorme(800);
  await p.click('[data-act="alm-vis"][data-v="mes"]'); await H.dorme(400); const t3=await p.evaluate(()=>document.querySelector('.alm-t').innerText);
  ok('Mês (fechamento): grade por pessoa com total de almoços', /Ana Teste[\s\S]*✓/.test(t3)&&/Bruno Teste/.test(t3), t3.replace(/\n/g,' | ').slice(0,240));
  await p.click('[data-act="alm-vis"][data-v="dir"]'); await H.dorme(500); const t4=await p.evaluate(()=>document.getElementById('view').innerText);

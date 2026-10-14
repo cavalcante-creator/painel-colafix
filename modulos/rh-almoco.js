@@ -65,7 +65,17 @@
   function foraDe(k){ const f=(cfg().fora||{})[k]; return f&&!f.removido?f:null; }
   function situacao(m,d,k){ const aj=((A.aj[m]||{}).aj||{})[d+'_'+k]; const x=(((A.dados[m]||{}).dias||{})[d]||{})[k];
     let r; if(aj&&aj.v==='just') r={v:'just',j:aj,x}; else if(aj&&!aj.removido) r={v:aj.v==='sim'?'sim':'nao',aj,x}; else if(!x) r={v:'aus',x:null}; else r={v:x.a?'sim':'nao',x};
-    if(r.v==='nao'&&foraDe(k)) r.v='fora'; return r; }
+    if(r.v==='nao'&&foraDe(k)) r.v='fora';
+    if(r.v==='nao'){ const au=ausDe(k,d); if(au) r={v:'just',x:r.x,aj:r.aj,aus:au,j:{tipo:'Ausência programada',mot:ausTxt(au)+(au.mot?' · '+au.mot:''),por:au.por||''}}; }
+    return r; }
+  /* ---------- ausência no almoço (programada): um dia ou regra por dia da semana (rh/config.almoco.ausencias) ---------- */
+  const SEMN=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const ausAtivas=()=>(cfg().ausencias||[]).filter(a=>a&&!a.removido);
+  function ausVale(a,d){ if(a.tipo==='dia') return a.data===d; if(a.de&&d<a.de) return false; if(a.ate&&d>a.ate) return false; return (a.dias||[]).includes(new Date(d+'T12:00').getDay()); }
+  function ausDe(k,d){ return ausAtivas().find(a=>a.cpf===k&&ausVale(a,d))||null; }
+  function ausTxt(a){ const br=x=>x?x.slice(8)+'/'+x.slice(5,7)+'/'+x.slice(0,4):''; if(a.tipo==='dia') return 'Só no dia '+br(a.data);
+    const ds=(a.dias||[]).slice().sort().map(i=>SEMN[i]); const t=ds.length>1?ds.slice(0,-1).join(', ')+' e '+ds[ds.length-1]:ds[0]||'';
+    return 'Toda '+t+(a.de?' · desde '+br(a.de):'')+(a.ate?' · até '+br(a.ate):''); }
   function pessoasDoMes(m){ const c=A.ctx, D=A.dados[m]||{}, P0=D.pessoas||{}, fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>ks.add(x.split('_')[1]));
     return [...ks].map(k=>{ const p=P0[k]||{}, f=fx[k]; return {k,nome:f?titulo(f.nome):(p.n||'(sem nome)'),emp:p.e||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX INDUSTRIA E COMERCIO LTDA'):''),setor:f?(f.setor||''):'',cad:!!f,grupo:p.g||''}; })
@@ -92,8 +102,9 @@
       ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
       <select class="txt" id="alm-sit" style="max-width:240px">${[['','Todas as situações'],['sim','Almoçou'],['nao','Sem almoço e sem justificativa'],['just','Justificado'],['fora','Não almoça na empresa']].map(([v,t])=>`<option value="${v}" ${A.sit===v?'selected':''}>${t}</option>`).join('')}</select>
       <input class="txt" id="alm-q" type="search" autocomplete="off" placeholder="Buscar nome, setor ou CPF" value="${esc(A.q)}" style="max-width:260px"><span class="sub" id="alm-qn"></span>
+      <button class="btn sec rh-sm" data-act="alm-aus">Ausência no almoço</button>
       ${A.vis==='mes'?`<span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-xls">${P.ic('baixar',16,2.2)}Excel</button><button class="btn sec rh-sm" data-act="alm-imp">Imprimir</button>`:''}</div>`;
-    return topo+`<section class="card">${filtros}${A.vis==='dia'?vDia(c,ds,ps):vMes(c,ds,ps)}</section>`+vPessoa(c,ds)+vJust(c); }
+    return topo+`<section class="card">${filtros}${A.vis==='dia'?vDia(c,ds,ps):vMes(c,ds,ps)}</section>`+vPessoa(c,ds)+vJust(c)+vAus(c); }
   function mesAnt(m){ const [y,mm]=m.split('-').map(Number), d=new Date(y,mm-2,1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
   const varTxt=(a,b)=>{ if(!b) return ''; const v=Math.round((a-b)/b*100); return v===0?'igual':(v>0?'▲ '+v+'% a mais':'▼ '+(-v)+'% a menos'); };
   /* números do mês (sempre de todos, sem os filtros da tela) */
@@ -223,7 +234,8 @@
     const esq=bloco('sim','ALMOÇARAM',sim,x=>lin(x,'',`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="nao">não almoçou</button>`),'Ninguém.');
     const dir=bloco('nao','NÃO ALMOÇARAM · SEM JUSTIFICATIVA',nao,x=>lin(x,'',`<button class="btn sec rh-sm" data-act="alm-jus" data-k="${x.k}" data-d="${d}">Justificar</button><button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="sim">almoçou</button>`),'Ninguém. Tudo justificado.')
       +bloco('just','JUSTIFICADOS',jus,x=>lin(x,jtx(x),`<button class="lnk" data-act="alm-jus" data-k="${x.k}" data-d="${d}">alterar</button>`),'Nenhuma justificativa neste dia.')
-      +(!A.sit||A.sit==='fora'?`<details class="alm-bl fora" ${A.sit==='fora'?'open':''}><summary class="label">NÃO ALMOÇAM NA EMPRESA <b>(${fora.length})</b></summary>${fora.map(x=>lin(x,`<span class="alm-jt">${esc(foraDe(x.k).mot||'Não almoça na empresa')}</span>`,'')).join('')||'<div class="sub">Ninguém marcado. Para marcar, clique no nome da pessoa.</div>'}</details>`:'');
+      +(!A.sit||A.sit==='fora'?`<details class="alm-bl fora" ${A.sit==='fora'?'open':''}><summary class="label">NÃO ALMOÇAM NA EMPRESA <b>(${fora.length})</b></summary>${fora.map(x=>lin(x,`<span class="alm-jt">${esc(foraDe(x.k).mot||'Não almoça na empresa')}</span>`,'')).join('')||'<div class="sub">Ninguém marcado. Para marcar, clique no nome da pessoa.</div>'}</details>`:'')
+      +(!A.sit?`<details class="alm-bl aus"><summary class="label">AUSÊNCIAS PROGRAMADAS <b>(${ausAtivas().length})</b></summary>${ausLista(c,null)}</details>`:'');
     return `${tira}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram</span><span class="pill warn">${nao.length} sem justificativa</span>${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>
       <div class="alm-g"><div>${esq}</div><div>${dir}</div></div>`; }
   /* ---------- justificativa (janela) ---------- */
@@ -245,6 +257,39 @@
     const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}), fora=Object.assign({},al.fora||{});
     fora[k]=on?{mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()}:Object.assign({},fora[k]||{},{removido:true,remPor:c.eu(),remEm:new Date().toISOString()});
     al.fora=fora; try{ await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; P.toast(on?'Marcado: não almoça na empresa. Não aparece mais como falta.':'Volta a contar no almoço.'); P.rerender(); }catch(e){ P.erro(e); } }
+  function nomeDe(k){ const f=(A.ctx.R.func||[]).find(x=>String(x.cpf||'').replace(/\D/g,'').padStart(11,'0')===k); if(f) return titulo(f.nome);
+    for(const m of Object.keys(A.dados)){ const p=((A.dados[m]||{}).pessoas||{})[k]; if(p&&p.n) return titulo(p.n); } return ''; }
+  function ausLista(c,k){ const esc=c.esc, L=ausAtivas().filter(a=>!k||a.cpf===k).sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
+    return L.map(a=>`<div class="alm-l"><div>${k?'':`<button class="lnk alm-nm" data-act="alm-pes" data-k="${a.cpf}">${esc(a.nome||nomeDe(a.cpf)||'(sem nome)')}</button>`}<span class="alm-jt">${esc(ausTxt(a))}${a.mot?' · '+esc(a.mot):''}<small> · ${esc(a.por||'')}</small></span></div><div class="alm-r"><button class="lnk" data-act="alm-ausrem" data-id="${esc(a.id)}" style="color:var(--crit-ink)">tirar</button></div></div>`).join('')
+      ||'<div class="sub">Nenhuma ausência programada. Use o botão "Ausência no almoço".</div>'; }
+  function opcoesPessoas(){ const mp={}; Object.keys(A.dados).forEach(m=>Object.entries(((A.dados[m]||{}).pessoas)||{}).forEach(([k,p])=>{ mp[k]=mp[k]||titulo(p.n||''); }));
+    (A.ctx.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k.length>=10&&f.status!=='desligado') mp[k.padStart(11,'0')]=titulo(f.nome); });
+    return Object.entries(mp).filter(([,n])=>n).sort((a,b)=>a[1].localeCompare(b[1])); }
+  function vAus(c){ const U=A.aus; if(!U) return ''; const esc=c.esc, ops=U.fixo?[]:opcoesPessoas(), d1=[1,2,3,4,5,6];
+    return `<div class="rh-modal" data-act="alm-ausx-fundo"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Ausência no almoço" style="max-width:540px"><div class="rh-ch"><h2>Ausência no almoço</h2><button class="lnk" data-act="alm-ausx">Fechar</button></div>
+      <div class="sub" style="margin:-4px 0 10px">Nos dias marcados a pessoa não aparece como falta: fica como <b>justificada</b> (se almoçar mesmo assim, conta o almoço).</div>
+      <label style="display:block"><span class="label">Pessoa</span>${U.fixo?`<div><b>${esc(nomeDe(U.k)||'(sem nome)')}</b></div>`:`<select class="txt" id="alm-auk"><option value="">Escolha…</option>${ops.map(([k,n])=>`<option value="${k}" ${U.k===k?'selected':''}>${esc(n)}</option>`).join('')}</select>`}</label>
+      <div class="seg" role="group" style="margin-top:12px"><button data-act="alm-austipo" data-v="dia" aria-pressed="${U.tipo==='dia'}">Só um dia</button><button data-act="alm-austipo" data-v="regra" aria-pressed="${U.tipo==='regra'}">Toda semana</button></div>
+      ${U.tipo==='dia'?`<label style="display:block;margin-top:12px"><span class="label">Dia</span><input class="txt" type="date" id="alm-aud" value="${esc(U.data||'')}"></label>`
+        :`<div style="margin-top:12px"><span class="label">Em quais dias da semana não almoça</span><div class="alm-jtipos">${d1.map(i=>`<button class="${(U.dias||[]).includes(i)?'on':''}" data-act="alm-ausdia" data-v="${i}">${SEMN[i]}</button>`).join('')}</div></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><label><span class="label">Desde</span><input class="txt" type="date" id="alm-aude" value="${esc(U.de||'')}"></label><label><span class="label">Até (opcional)</span><input class="txt" type="date" id="alm-auate" value="${esc(U.ate||'')}"></label></div>`}
+      <label style="display:block;margin-top:12px"><span class="label">Motivo (opcional)</span><input class="txt" id="alm-aumot" maxlength="120" value="${esc(U.mot||'')}" placeholder="ex.: faculdade às terças, acordo com o supervisor"></label>
+      ${U.erro?`<p class="err" style="color:var(--crit-ink)">${esc(U.erro)}</p>`:''}
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn sec" data-act="alm-ausx">Cancelar</button><button class="btn" data-act="alm-aussalvar">Salvar</button></div></div></div>`; }
+  function lerAus(){ const U=A.aus, v=id=>{ const e=document.getElementById(id); return e?String(e.value||'').trim():null; };
+    const k=v('alm-auk'); if(k!==null) U.k=k; const d=v('alm-aud'); if(d!==null) U.data=d; const de=v('alm-aude'); if(de!==null) U.de=de; const at=v('alm-auate'); if(at!==null) U.ate=at; const mt=v('alm-aumot'); if(mt!==null) U.mot=mt; }
+  async function gravaAus(lista){ const c=A.ctx, P=c.P, al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}); al.ausencias=lista.slice(-300);
+    await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; }
+  async function salvarAus(){ const c=A.ctx, P=c.P, U=A.aus; lerAus(); U.erro='';
+    if(!U.k) U.erro='Escolha a pessoa.'; else if(U.tipo==='dia'&&!/^\d{4}-\d\d-\d\d$/.test(U.data||'')) U.erro='Escolha o dia.';
+    else if(U.tipo==='regra'&&!(U.dias||[]).length) U.erro='Marque pelo menos um dia da semana.'; else if(U.tipo==='regra'&&U.ate&&U.de&&U.ate<U.de) U.erro='O "até" está antes do "desde".';
+    if(U.erro){ P.rerender(); return; }
+    const it={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),cpf:U.k,nome:nomeDe(U.k),tipo:U.tipo,mot:String(U.mot||'').slice(0,120),por:c.eu(),em:new Date().toISOString()};
+    if(U.tipo==='dia') it.data=U.data; else { it.dias=U.dias.slice().sort(); it.de=U.de||''; it.ate=U.ate||''; }
+    try{ await gravaAus((cfg().ausencias||[]).concat([it])); A.aus=null; P.toast('Ausência guardada: '+ausTxt(it)+'.'); P.rerender(); }catch(e){ P.erro(e); } }
+  async function tirarAus(id){ const c=A.ctx, P=c.P; if(!confirm('Tirar esta ausência programada? Os dias voltam a contar como falta se não almoçar.')) return;
+    const L=(cfg().ausencias||[]).map(a=>a.id===id?Object.assign({},a,{removido:true,remPor:c.eu(),remEm:new Date().toISOString()}):a);
+    try{ await gravaAus(L); P.toast('Ausência retirada.'); P.rerender(); }catch(e){ P.erro(e); } }
   /* ---------- detalhe da pessoa no mês (todas as passagens do Face ID) ---------- */
   const durTxt=(a,b)=>{ const x=hm(a), y=hm(b); if(x==null||y==null||y<=x) return ''; const m=y-x; return m<60?m+' min':Math.floor(m/60)+'h'+pad(m%60); };
   function vPessoa(c,ds){ const k=A.pes; if(!k) return ''; const esc=c.esc, m=A.mes, P0=((A.dados[m]||{}).pessoas||{})[k]||{}, f=(c.R.func||[]).find(x=>String(x.cpf||'').replace(/\D/g,'').padStart(11,'0')===k);
@@ -258,6 +303,7 @@
       <div class="rh-ch"><div><h2>${esc(nome)}</h2><div class="sub">${esc([empCurta(P0.e||''),f&&f.setor,c.fCPF(k),f?'':'sem cadastro no RH'].filter(Boolean).join(' · '))}</div></div><button class="lnk" data-act="alm-pesx">Fechar</button></div>
       <div class="alm-pk"><div><b class="num">${nSim}</b><span>almoços</span></div><div><b class="num">${nNao}</b><span>sem justificativa</span></div><div><b class="num">${nJ}</b><span>justificados</span></div><div><b class="num">${L.length}</b><span>dias na empresa</span></div><div><b class="num">${L.filter(x=>x.s.x&&x.s.x.c).length}</b><span>cafés</span></div></div>
       <div class="alm-fora ${fo?'on':''}">${fo?`<b>Não almoça na empresa</b>${fo.mot?' · '+esc(fo.mot):''} <small>(${esc(fo.por||'')})</small> <button class="lnk" data-act="alm-fora" data-k="${k}" data-v="0">voltar a contar</button>`:`<span class="sub">Esta pessoa almoça em outro lugar todo dia?</span> <button class="btn sec rh-sm" data-act="alm-fora" data-k="${k}" data-v="1">Não almoça na empresa</button>`}</div>
+      <div class="alm-fora"><span class="sub">Não almoça em alguns dias (ex.: toda terça) ou num dia só?</span> <button class="btn sec rh-sm" data-act="alm-aus" data-k="${k}">Programar ausência</button>${ausAtivas().some(a=>a.cpf===k)?`<div style="flex-basis:100%">${ausLista(c,k)}</div>`:''}</div>
       ${semT?'<p class="sub" style="margin:8px 0 0">Para ver todas as passagens destes dias, importe o CSV do Face ID de novo (as importações antigas guardaram só o horário do almoço).</p>':''}
       <div class="alm-pl">${L.map(x=>`<div class="alm-pd ${x.s.v}"><div class="alm-pdh"><b>${esc(c.br(x.d))}</b><small>${semana(x.d)}</small>${sit(x)}
           ${x.ref.length?`<span class="alm-ph">Refeitório ${esc(x.ref[0].h.slice(0,5))}${x.ref.length>1?' → '+esc(x.ref[x.ref.length-1].h.slice(0,5))+' ('+durTxt(x.ref[0].h,x.ref[x.ref.length-1].h)+')':''}</span>`:''}
@@ -302,7 +348,13 @@
       if(a==='alm-jsalvar'){ if(!J.tipo){ J.erro='Escolha o tipo da justificativa.'; P.rerender(); return; } if(J.tipo==='Outro'&&J.mot.length<3){ J.erro='Escreva o motivo.'; P.rerender(); return; } }
       gravaAj(J.k,J.d,a==='alm-jsalvar'?{v:'just',tipo:J.tipo,mot:J.mot.slice(0,120),por:A.ctx.eu(),em:new Date().toISOString()}:null).then(()=>{ A.jus=null; P.toast(a==='alm-jsalvar'?'Justificativa guardada.':'Justificativa retirada.'); P.rerender(); }).catch(e=>P.erro(e)); return; }
     if(a==='alm-fora'){ marcarFora(b.dataset.k,b.dataset.v==='1'); return; }
-    if(a==='alm-pes'){ A.pes=b.dataset.k; P.rerender(); return; }
+    if(a==='alm-pes'){ A.pes=b.dataset.k; A.aus=null; P.rerender(); return; }
+    if(a==='alm-aus'){ const h=P.hojeStr(), k=b.dataset.k||''; A.aus={k,fixo:!!k,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.rerender(); return; }
+    if(a==='alm-ausx'||(a==='alm-ausx-fundo'&&ev.target===b)){ A.aus=null; P.rerender(); return; }
+    if(a==='alm-austipo'){ lerAus(); A.aus.tipo=b.dataset.v; A.aus.erro=''; P.rerender(); return; }
+    if(a==='alm-ausdia'){ lerAus(); const i=+b.dataset.v, L=A.aus.dias||[]; A.aus.dias=L.includes(i)?L.filter(x=>x!==i):L.concat([i]); A.aus.erro=''; P.rerender(); return; }
+    if(a==='alm-aussalvar'){ salvarAus(); return; }
+    if(a==='alm-ausrem'){ tirarAus(b.dataset.id); return; }
     if(a==='alm-pesx'||(a==='alm-pesx-fundo'&&ev.target===b)){ A.pes=null; P.rerender(); return; }
     if(a==='alm-aj2'){ ajustar(b.dataset.k,b.dataset.d,b.dataset.v); return; }
     if(a==='alm-ppt'){ gerarPpt(); return; }
