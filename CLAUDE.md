@@ -148,3 +148,11 @@ node teste-login.js        # e o teste do que foi mexido (ex.: teste-manut.js, t
 ## Entregar
 - Commit com mensagem em português explicando o que mudou. Preferir **pull request** para a usuária revisar.
 - Dizer em uma frase o que ela precisa fazer (ex.: "publicar o firestore.rules no console") ou "nada a fazer, já está no ar".
+
+## Telas de TV mais legíveis (14/10, `js/14-tv-melhor.js`)
+- **Encaixe:** no modo TV (`body.tv`, menos a tela dividida) a tela é reduzida com `zoom` no `#view` até caber inteira na TV (`tvEncaixa`, depois de cada render, no resize e a cada 1,5 s).
+- **Previsto × Realizado na TV (`ritTv`):** sem a linha miúda "planejado · aderência", nome da linha, números, situação e anel maiores; o submenu (`.navsub`) some na TV.
+- **Rodízio (Telas de TV):** tempos 5 e 10 s além de 15/30/60/120; "Começar a passar sozinha quando este aparelho abrir o painel" (`localStorage['colafix.apresAuto']`, `aprAuto()`), que chama `aprIniciar` com as telas marcadas.
+- **Fundo escuro na TV** (opção em Telas de TV, por aparelho: `localStorage['colafix.tvEscuro']`, `tvEscuro()`/`tvTema()`): no modo TV põe `data-theme="dark"` no `<html>` (tema escuro do painel) e tira ao sair. As telas que tinham cor escrita direto (`.rtv`, `.tv2`, `.md*`, `.me*`, monitor) têm a versão escura **gerada** por `testes/gera-tv-escuro.py` (bloco entre `/* gerado: tv-escuro */` e `/* fim do gerado */` em `js/14-tv-melhor.js`; inclui as animações de pisca `…Esc`). **Mudou cor de uma tela de TV no css? Rode `python3 testes/gera-tv-escuro.py`.** O rodízio já é em looping (`aprPassa`, volta para a primeira).
+- **Nível dos silos na TV:** a tela `silosver` (só consulta) entrou em `APR_TELAS` (`k:'silosver'`, ligada no rodízio); quem tem o módulo **Telas de TV** (`telas`) pode abri-la (`viewOk`), e `spRota` a mostra nas miniaturas do gestor e na tela dividida. Na TV os tanques ficam maiores (`body.tv .sv-*`). O gestor agora tem 7 TVs.
+- Teste: `teste-tvmelhor.js`.

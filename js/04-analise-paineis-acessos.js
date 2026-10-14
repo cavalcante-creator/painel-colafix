@@ -682,7 +682,7 @@ function ritTv(D,embed){ const op=ritCvAtual(D,true); const F=ritFams(D); const 
   const tile=(f,tit,key)=>{ const k=ritStats(D,f), st=ritSt(k), fp=k.T&&k.du?Math.round(k.proj/k.T*100):null;
     return `<section class="rtv-t st-${st.c} ${op.k===key?'on':''}" data-k="${esc(key)}">
      <div class="rtv-th"><span class="rtv-ln">${esc(tit)}</span><span class="rtv-chip"><i></i>${st.t}</span></div>
-     <div class="rtv-main">${ring(k)}<div class="rtv-fig"><b class="num">${anlN(k.ra)}</b><span>de <span class="num">${anlN(k.T)}</span> sacos da meta</span>
+     <div class="rtv-main">${ring(k)}<div class="rtv-fig"><b class="num">${anlN(k.ra)}</b><span>${document.body.classList.contains('tv')?`meta <span class="num">${anlN(k.T)}</span>`:`de <span class="num">${anlN(k.T)}</span> sacos da meta`}</span>
        <em class="num ${k.dev<0?'neg':'pos'}">${k.dev>0?'+':''}${anlN(k.dev)} <small>vs meta até hoje</small></em>${k.PLt?`<small class="rtv-pl">planejado ${anlN(k.PLt)}${k.ader!=null?' · aderência '+Math.round(k.ader*100)+'%':''}</small>`:''}</div></div>
      <div class="rtv-spw">${spark(f)}<div class="rtv-spl"><span>dia a dia</span><span>meta ${anlN(k.n?k.T/k.n:0)}/dia</span></div></div>
      <div class="rtv-kk"><div><span>Precisa/dia</span><b class="num ${k.cd&&k.needEq>k.cd?'neg':''}">${k.rem?anlN(k.need):'—'}</b></div><div><span>Capacidade</span><b class="num">${k.cd?anlN(k.cd):'—'}</b></div><div><span>Fecha em</span><b class="num ${fp!=null&&fp<97?'neg':'pos'}">${fp==null?'—':fp+'%'}</b></div></div></section>`; };
@@ -776,7 +776,9 @@ function aprTelas(){ return APR_TELAS.filter(t=>viewOk(t.v)); }
 function aprSel(t){ const s=S.apres.sel; return s&&s[t.k]!=null?!!s[t.k]:t.on; }
 function vApres(){ const A=S.apres, ts=aprTelas(), n=ts.filter(aprSel).length;
   return `<div class="head"><div><div class="eyebrow">TELAS DE TV</div><h1>Apresentação</h1><div class="sub">Escolha as telas e inicie: elas passam sozinhas em tela cheia. Use ← → para trocar, espaço para pausar e Esc para sair.</div></div></div>
-   <section class="card apr-cfg"><div class="apr-go"><div><div class="label">TEMPO EM CADA TELA</div><div class="seg" style="margin-top:6px">${[15,30,60,120].map(v=>`<button data-act="apr-seg" data-v="${v}" aria-pressed="${A.seg===v}">${v<60?v+' s':(v/60)+' min'}</button>`).join('')}</div></div>
+   <section class="card apr-cfg"><div class="apr-go"><div><div class="label">TEMPO EM CADA TELA</div><div class="seg" style="margin-top:6px">${[5,10,15,30,60,120].map(v=>`<button data-act="apr-seg" data-v="${v}" aria-pressed="${A.seg===v}">${v<60?v+' s':(v/60)+' min'}</button>`).join('')}</div>
+       <label class="ck" style="margin-top:10px"><input type="checkbox" data-act="apr-auto" ${aprAuto()?'checked':''}> Começar a passar sozinha quando este aparelho abrir o painel</label>
+       <label class="ck" style="margin-top:6px"><input type="checkbox" data-act="tv-escuro" ${tvEscuro()?'checked':''}> Fundo escuro na TV (só neste aparelho)</label></div>
      <button class="btn big" data-act="apr-ini" ${n?'':'disabled'}>${ic('tv',20,2)}Iniciar apresentação <small class="num" style="font-weight:600;opacity:.8">${n} ${n===1?'tela':'telas'}</small></button></div></section>
    <div class="apr-g">${ts.map((t,i)=>`<section class="apr-c ${aprSel(t)?'on':''}" style="--c:${t.cor}"><div class="apr-pv">${aprMini(t.k)}</div>
      <div class="apr-b"><div class="apr-n"><b>${esc(t.nome)}</b><label class="apr-ck"><input type="checkbox" data-apr-sel="${t.k}" ${aprSel(t)?'checked':''}> Na apresentação</label></div><div class="sub" style="margin:2px 0 0;font-size:13px">${esc(t.d)}</div>
