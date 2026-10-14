@@ -80,9 +80,9 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   ok('Registrar troca: não aceita data futura, guarda o histórico e a próxima fica 3 meses depois', /não pode ser no futuro/.test(t4)&&jo.ultimaTroca===dias(0)&&jo.trocas.length===1&&jo.trocas[0].obs==='contrato novo'&&new RegExp(br(meses(3))).test(jl)&&/Em dia/.test(jl), jl);
   const errosRH=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close(); ok('Nenhum erro de JavaScript', !errosRH.length, errosRH.join(' | '));
 
-  // Meu dia da dona mostra os avisos de prazo
+  // Meu dia da dona não mostra os avisos do RH (pedido de 13/10)
   const C=await H.abrir({viewport:{width:1440,height:900}}); await H.preparar(C.page,d); await C.page.goto(H.BASE); await H.entrar(C.page,'iasmyn','senha123'); await H.dorme(3000);
   await C.page.evaluate(()=>__T.go('meudia')); await H.dorme(800); const md2=await C.page.evaluate(()=>document.getElementById('view').innerText);
-  ok('Meu dia (dona) mostra os avisos de férias e troca do PJ', /Férias: ANA SOUZA|Troca do PJ: PEDRO ALVES/.test(md2), (md2.match(/AVISOS[\s\S]{0,300}/)||[''])[0].replace(/\n/g,' | '));
+  ok('Meu dia (dona) não mostra os avisos de férias e troca do PJ (ficam no Início do RH)', !/Férias: ANA SOUZA|Troca do PJ: PEDRO ALVES/.test(md2), (md2.match(/AVISOS[\s\S]{0,300}/)||[''])[0].replace(/\n/g,' | '));
   await C.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?f+' FALHOU':'TODOS PASSARAM'); process.exit(f?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

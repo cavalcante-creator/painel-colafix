@@ -163,7 +163,9 @@
   function tSit(x){ if(x.status==='Encerrado') return {c:'neu',t:'Encerrado',n:9}; if(!x.fim) return {c:'neu',t:'Sem vencimento',n:8}; const d=diasAte(x.fim), av=+x.aviso>0?+x.aviso:30;
     if(d<0) return {c:'crit',t:'Vencido há '+(-d)+' dia'+(d===-1?'':'s'),n:0,d}; if(d===0) return {c:'crit',t:'Vence hoje',n:1,d}; if(d<=av) return {c:'warn',t:'Vence em '+d+' dia'+(d===1?'':'s'),n:2,d}; return {c:'ok',t:'Em dia · vence em '+d+' dias',n:3,d}; }
   function tAvisos(){ return R.terc.filter(x=>x.status!=='Encerrado'&&x.fim).map(x=>({x,s:tSit(x)})).filter(o=>o.s.c==='crit'||o.s.c==='warn').sort((a,b)=>a.s.d-b.s.d); }
-  P.registrarAviso(()=>tAvisos().map(o=>({nivel:o.s.c,rotulo:o.s.d<0?'Vencido':o.s.d===0?'Vence hoje':'Atenção',titulo:'Contrato de terceirizado: '+o.x.nome,texto:o.s.t+' ('+br(o.x.fim)+')'+(o.x.empresa?' · '+o.x.empresa:''),go:'rhterc'})));
+  /* avisos do RH no Meu dia: só para o pessoal do RH (a administradora vê no Início do RH, pedido de 13/10) */
+  const avRH=fn=>P.registrarAviso(()=>P.dono()?[]:fn());
+  avRH(()=>tAvisos().map(o=>({nivel:o.s.c,rotulo:o.s.d<0?'Vencido':o.s.d===0?'Vence hoje':'Atenção',titulo:'Contrato de terceirizado: '+o.x.nome,texto:o.s.t+' ('+br(o.x.fim)+')'+(o.x.empresa?' · '+o.x.empresa:''),go:'rhterc'})));
   function avisosRH(){ const av=[];
     tAvisos().forEach(({x,s})=>{ const d=s.d; av.push({c:s.c,r:d<0?'Vencido':d===0?'Vence hoje':'Atenção',t:'Contrato: '+x.nome,s:(d<0?'venceu há '+(-d)+' dia'+(d===-1?'':'s'):d===0?'vence hoje':'vence em '+d+' dia'+(d===1?'':'s'))+' ('+br(x.fim).slice(0,5)+')',act:`data-act="rh-ted" data-go-terc="1" data-id="${x._id}"`,l:'Abrir'}); });
     const porF={}; ativos().filter(f=>f.funcao&&semEpi(f)).forEach(f=>{ const k=norm(f.funcao); (porF[k]=porF[k]||{nome:f.funcao,n:0}).n++; });
@@ -721,7 +723,7 @@
     caAvisos().forEach(({e,s})=>av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'CA do EPI: '+e.nome,s:caTxt(e.ca)+' · '+s.t.toLowerCase()+' ('+br(e.validade)+') · atualize o CA',act:`data-act="rh-cad" data-v="epis" data-go-cad="1"`,l:'Abrir',go:'rhfuncoes'}));
     pjs().forEach(f=>{ const s=pjSit(f); if(s.c==='crit'||s.c==='warn') av.push({c:s.c,r:s.c==='crit'?'Atrasada':'Atenção',t:'Troca do PJ: '+f.nome,s:'próxima troca '+br(s.prox)+' · '+s.t.toLowerCase(),act:`data-act="rh-pzabrir" data-v="pj"`,l:'Abrir',go:'rhferias'}); });
     return av; }
-  P.registrarAviso(()=>avisosPrazo().map(a=>({nivel:a.c,rotulo:a.r,titulo:a.t,texto:a.s,go:a.go})));
+  avRH(()=>avisosPrazo().map(a=>({nivel:a.c,rotulo:a.r,titulo:a.t,texto:a.s,go:a.go})));
 
   function vFerias(){ const EY='RH · FÉRIAS E PRAZOS', nf=clts().filter(f=>['crit','warn'].includes(sitFer(f).c)).length, np=pjs().filter(f=>['crit','warn'].includes(pjSit(f).c)).length, ne=emExp().filter(o=>['crit','warn'].includes(o.s.c)).length;
     const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['mapa','Mapa do ano'],['exp','Experiência'+(ne?' · '+ne:'')],['pj','Troca dos PJ'+(np?' · '+np:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
@@ -850,7 +852,7 @@
   function docSit(d){ if(!okIso(d.validade)) return {c:'neu',t:'Sem validade',n:5}; const n=diasAte(d.validade);
     if(n<0) return {c:'crit',t:'Vencido há '+plural(-n,'dia','dias'),n:0,d:n}; if(n===0) return {c:'crit',t:'Vence hoje',n:1,d:n}; if(n<=PZ_AVISO()) return {c:'warn',t:'Vence em '+plural(n,'dia','dias'),n:2,d:n}; return {c:'ok',t:'Em dia · até '+br(d.validade),n:3,d:n}; }
   function tDocAvisos(){ const av=[]; R.terc.filter(x=>x.status!=='Encerrado').forEach(x=>tDocs(x).forEach(d=>{ const s=docSit(d); if(s.c==='crit'||s.c==='warn') av.push({x,d,s}); })); return av.sort((a,b)=>a.s.d-b.s.d); }
-  P.registrarAviso(()=>tDocAvisos().map(o=>({nivel:o.s.c,rotulo:o.s.c==='crit'?'Vencido':'Atenção',titulo:'Documento de terceirizado: '+o.x.nome,texto:o.d.nome+' · '+o.s.t.toLowerCase()+(okIso(o.d.validade)?' ('+br(o.d.validade)+')':''),go:'rhterc'})));
+  avRH(()=>tDocAvisos().map(o=>({nivel:o.s.c,rotulo:o.s.c==='crit'?'Vencido':'Atenção',titulo:'Documento de terceirizado: '+o.x.nome,texto:o.d.nome+' · '+o.s.t.toLowerCase()+(okIso(o.d.validade)?' ('+br(o.d.validade)+')':''),go:'rhterc'})));
   function tDocResumo(x){ const ds=tDocs(x); if(!ds.length) return ''; const ss=ds.map(docSit), v=ss.filter(s=>s.c==='crit').length, w=ss.filter(s=>s.c==='warn').length;
     return v?`<span class="pill crit">${plural(v,'documento vencido','documentos vencidos')}</span>`:w?`<span class="pill warn">${plural(w,'documento vencendo','documentos vencendo')}</span>`:`<span class="pill ok">documentos em dia</span>`; }
   function painelDocsTerc(){ const x=R.terc.find(y=>y._id===R.tdoc); if(!x) return ''; const ds=tDocs(x).map(d=>({d,s:docSit(d)})).sort((a,b)=>a.s.n-b.s.n||String(a.d.validade).localeCompare(String(b.d.validade)));

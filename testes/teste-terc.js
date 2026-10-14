@@ -8,8 +8,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const abre=async(u,s)=>{ const B=await H.abrir({viewport:{width:1366,height:1000}}); await B.ctx.clock.setFixedTime(HOJE); await H.preparar(B.page,d); await B.page.goto(H.BASE); await H.entrar(B.page,u,s); await H.dorme(3000); return B; };
  let B=await abre('iasmyn','senha123'); let p=B.page; await p.evaluate(()=>__T.go('meudia')); await H.dorme(800);
  const md=await p.evaluate(()=>(document.querySelector('.md-av')||{}).innerText||'');
- ok('Meu dia (administradora): avisa o vencido primeiro e o que vence em 10 dias; não avisa o em dia nem o encerrado', /LIMPA TUDO/.test(md)&&/Vencido há 1 dia/.test(md)&&/JOSÉ VIGILANTE/.test(md)&&/Vence em 10 dias/.test(md)&&!/MARIO/.test(md)&&!/ANTIGO/.test(md)&&md.indexOf('LIMPA')<md.indexOf('JOSÉ'), md.replace(/\n/g,' | ').slice(0,220));
- await p.click('.md-av [data-go="rhterc"]'); await H.dorme(400); ok('Botão "Abrir" do aviso leva aos terceirizados (aba de Funcionários)', await p.evaluate(()=>__T.S().view==='rhfunc'&&/Novo terceirizado/.test(document.getElementById('view').innerText))); await p.screenshot({path:'/mnt/user-data/outputs/rh-terceirizados.png'}); await B.browser.close();
+ ok('Meu dia da administradora não mostra os avisos do RH (ficam no Início do RH)', !/LIMPA TUDO|JOSÉ VIGILANTE|terceirizado/i.test(md), md.replace(/\n/g,' | ').slice(0,220));
+ await B.browser.close();
  B=await abre('rh','rh1234'); p=B.page; const ini=await p.evaluate(()=>document.getElementById('view').innerText); await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); const f0=await p.evaluate(()=>(document.querySelector('.banner')||{}).innerText||'');
  ok('Painel do RH mostra os contratos vencidos e vencendo nos avisos', /Contrato: LIMPA TUDO/.test(ini)&&/Contrato: JOSÉ VIGILANTE/.test(ini), ini.replace(/\n/g,' | ').slice(0,200));
  await p.evaluate(()=>__T.go('rhterc')); await H.dorme(400); const t=await p.evaluate(()=>document.getElementById('view').innerText);
