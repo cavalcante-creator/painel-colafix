@@ -1061,9 +1061,9 @@ document.head.insertAdjacentHTML('beforeend','<style id="off-css">.off-av{backgr
 /* A etiquetadora térmica imprime pixel por pixel: o desenho é feito já na resolução dela (203/300 dpi), só preto e branco
    (sem cinza do antisserrilhado, que sai apagado/borrado), com cada quadradinho do QR num número inteiro de pontos.
    O PNG leva a resolução gravada (pHYs) para o programa da etiquetadora abrir no tamanho certo. Configuração lembrada no aparelho. */
-const ETQ_PADRAO={w:50,h:30,dpi:203,fmt:'png',txt:true,barras:false};
-function etqCfg(){ let o={}; try{ o=JSON.parse(localStorage.getItem('colafix.etq')||'{}')||{}; }catch(e){} return Object.assign({},ETQ_PADRAO,o); }
-function etqSalva(c){ try{ localStorage.setItem('colafix.etq',JSON.stringify(c)); }catch(e){} }
+const ETQ_PADRAO={w:100,h:50,dpi:203,fmt:'png',txt:true,barras:false}; /* Zebra ZD220 da Colafix (203 dpi) com o rolo de 100 × 50 mm */
+function etqCfg(){ let o={}; try{ o=JSON.parse(localStorage.getItem('colafix.etq2')||'{}')||{}; }catch(e){} return Object.assign({},ETQ_PADRAO,o); }
+function etqSalva(c){ try{ localStorage.setItem('colafix.etq2',JSON.stringify(c)); }catch(e){} }
 S.cr.etq=null; /* {ids:[...]} quando a janela da etiqueta está aberta */
 function etqCanvas(c,cfg){ const px=mm=>Math.round(mm/25.4*cfg.dpi), W=Math.max(40,px(cfg.w)), H=Math.max(40,px(cfg.h)), mg=px(1.5);
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const g=cv.getContext('2d'); g.imageSmoothingEnabled=false; g.fillStyle='#fff'; g.fillRect(0,0,W,H); g.fillStyle='#000';
@@ -1079,7 +1079,7 @@ function etqCanvas(c,cfg){ const px=mm=>Math.round(mm/25.4*cfg.dpi), W=Math.max(
   const al=deitada?'left':'center', xT=deitada?tx:W/2; g.textAlign=al; g.textBaseline='top';
   const barH=temBar?Math.max(px(5),Math.round(th*(temTxt?0.38:0.8))):0;
   if(temTxt&&th>10){ const nm=String(c.nome||'').trim(), ln=c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas');
-    const s1=fit(nm,'bold',Math.round(Math.min(px(4.2),(th-barH)*0.42))); g.fillText(nm,xT,y); y+=Math.round(s1*1.18);
+    const s1=fit(nm,'bold',Math.round(Math.min(px(6.5),(th-barH)*0.42))); g.fillText(nm,xT,y); y+=Math.round(s1*1.18);
     const s2=fit(ln,'bold',Math.round(s1*0.78)); if(y+s2<=ty+th-barH){ g.fillText(ln,xT,y); y+=Math.round(s2*1.3); } }
   if(temBar&&barH){ const L=c128Larg(crBarras(c.codigo)), mods=[...L].reduce((a,x)=>a+(+x),0)+20, m=Math.max(1,Math.floor(tw/mods)), bw=m*mods, bx=deitada?tx:Math.round((W-bw)/2);
     const by=Math.min(ty+th-barH,Math.max(y,ty+th-barH)); let p=bx+10*m, bar=true; for(const ch of L){ const w=+ch*m; if(bar) g.fillRect(p,by,w,barH); p+=w; bar=!bar; } }
@@ -1106,18 +1106,18 @@ async function etqBaixar(cs,cfg){ const dl=await window.claude?.use?.('downloads
   }catch(e){ if(!e||e.code!=='declined'){ console.warn('[etiqueta]',e); toast('Não foi possível gerar a etiqueta. Tente de novo.'); } } }
 function etqJanela(){ const E=S.cr.etq; if(!E) return ''; const cfg=etqCfg(), cs=E.ids.map(crDe).filter(Boolean); if(!cs.length) return '';
   let prev=''; try{ prev=etqCanvas(cs[0],cfg).toDataURL('image/png'); }catch(e){}
-  const tam=[[50,30],[40,25],[60,40],[50,25],[38,54],[100,50]];
+  const tam=[[100,50],[100,40],[100,60],[60,40],[50,30],[40,25]];
   const seg=(k,ops)=>`<div class="seg">${ops.map(([v,l])=>`<button data-act="etq-set" data-k="${k}" data-v="${v}" aria-pressed="${String(cfg[k])===String(v)}">${l}</button>`).join('')}</div>`;
   return `<section class="card etq" id="etq"><div class="head" style="align-items:flex-start"><div><h2>Etiqueta para a etiquetadora</h2><div class="sub">${cs.length===1?esc(cs[0].nome):cs.length+' crachás'} · desenhada na resolução da etiquetadora, só preto e branco, para o QR sair nítido.</div></div><button class="btn sec" data-act="etq-x" style="height:40px">Fechar</button></div>
    <div class="etq-g"><div class="etq-f">
      <div><span class="label">FORMATO</span>${seg('fmt',[['png','Imagem (PNG)'],['pdf','PDF']])}</div>
      <div><span class="label">TAMANHO DA ETIQUETA (MM)</span><div class="chips" style="margin-top:6px">${tam.map(([w,h])=>`<button class="chip" data-act="etq-tam" data-v="${w}x${h}" aria-pressed="${cfg.w===w&&cfg.h===h}">${w} × ${h}</button>`).join('')}</div>
        <div class="etq-wh"><label>Largura <input class="txt num" id="etq-w" inputmode="decimal" value="${cfg.w}"></label><label>Altura <input class="txt num" id="etq-h" inputmode="decimal" value="${cfg.h}"></label><span class="sub" style="margin:0;font-size:12px">mm, como está no rolo</span></div></div>
-     <div><span class="label">RESOLUÇÃO DA ETIQUETADORA</span>${seg('dpi',[['203','203 dpi (8 pontos/mm)'],['300','300 dpi (12 pontos/mm)']])}<div class="sub" style="font-size:12px">Está no manual ou na etiqueta de baixo da impressora. A maioria é 203.</div></div>
+     <div><span class="label">RESOLUÇÃO DA ETIQUETADORA</span>${seg('dpi',[['203','203 dpi (8 pontos/mm)'],['300','300 dpi (12 pontos/mm)']])}<div class="sub" style="font-size:12px">A Zebra ZD220 da fábrica é 203 dpi.</div></div>
      <div class="etq-ck"><label><input type="checkbox" id="etq-txt" ${cfg.txt?'checked':''}> Nome e linha</label><label><input type="checkbox" id="etq-bar" ${cfg.barras?'checked':''}> Código de barras (coletor)</label></div>
      <button class="btn big" data-act="etq-ok">${ic('baixar',20,2)}Baixar ${cfg.fmt==='pdf'?'PDF':cs.length>1?cs.length+' imagens':'imagem'}</button>
    </div><div class="etq-pv"><span class="label">COMO VAI SAIR</span><div class="etq-pvb" style="aspect-ratio:${cfg.w}/${cfg.h}">${prev?`<img src="${prev}" alt="Prévia da etiqueta de ${esc(cs[0].nome)}">`:''}</div><small>${cfg.w} × ${cfg.h} mm · ${Math.round(cfg.w/25.4*cfg.dpi)} × ${Math.round(cfg.h/25.4*cfg.dpi)} pontos</small>
-     <div class="sub" style="font-size:12px;margin-top:8px">Na etiquetadora: tamanho real (100%), sem "ajustar", e a escuridão/densidade um pouco acima do normal se ainda sair claro.</div></div></div></section>`; }
+     <div class="sub" style="font-size:12px;margin-top:8px">Zebra ZD220: imprima em tamanho real (100%), sem "ajustar à página", com o papel do driver no mesmo tamanho da etiqueta. Se sair claro: Preferências da impressora › Opções › Escurecimento (Darkness) entre 20 e 25 e velocidade 2 ou 3 pol/s.</div></div></div></section>`; }
 { const _vc=vCrachas; vCrachas=function(){ let h=_vc.apply(this,arguments);
   h=h.replace(/<button class="eq-lk" data-act="cr-ades" data-id="([^"]+)">/g,(m,id)=>`<button class="eq-lk" data-act="etq-um" data-id="${id}">${ic('baixar',15,2)}Etiqueta</button>`+m);
   h=h.replace('<button class="btn" data-act="cr-ades-todos">','<button class="btn" data-act="etq-todos">'+ic('baixar',18,2)+'Etiquetas (imagem ou PDF)</button><button class="btn sec" data-act="cr-ades-todos">');
