@@ -12,7 +12,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const bipa=async c=>{ await p.keyboard.type(c,{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); };
  const abre=async()=>{ await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; __T.S().tt.recente={}; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200); await p.fill('#tt-rnum','777888'); await p.click('[data-act="tt-rnum"]'); await H.dorme(500); };
  await espera(()=>window.__T&&__T.S().view==='mantotem',12000); await H.dorme(300);
- await abre(); await bipa('CXCARL2345');
+ await abre();
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900);
  await bipa('CXANAS2345'); const t1=await tela();
  ok('Entrega mostra o separado e o não separado (riscado), botão "Recebi o separado (1)"', /Separado pelo almox · vai agora \(1\)/.test(t1)&&/Não separado · não pode receber agora \(1\)/.test(t1)&&/Recebi o separado \(1\)/.test(t1), t1.replace(/\n/g,' | ').slice(0,400));
@@ -23,8 +23,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('"Recebi o separado": grava só o MP010 como entregue em parte; o rancho não fecha', !r.ent&&r.entp&&r.entp.length===1&&r.entp[0].itens.join()==='MP010'&&r.entp[0].faltando.join()==='MP011'&&r.entp[0].recebidoPor==='Ana Souza', JSON.stringify(r).slice(0,300));
  /* complemento */
  await abre(); const t2=await tela();
- ok('Ao abrir de novo, pede a conferência do que faltou', /crachá de quem vai conferir/.test(t2), t2.replace(/\n/g,' | ').slice(0,200));
- await bipa('CXCARL2345'); const t3=await tela(); const ja=await p.evaluate(()=>{ const b=document.querySelector('[data-act="cf-ok"][data-i="0"]'); return b&&b.disabled; });
+ ok('Ao abrir de novo, abre direto a separação do que faltou', /Separando: Joana Almox/.test(t2)&&/Faltou na separação/.test(t2), t2.replace(/\n/g,' | ').slice(0,200));
+ const t3=t2; const ja=await p.evaluate(()=>{ const b=document.querySelector('[data-act="cf-ok"][data-i="0"]'); return b&&b.disabled; });
  ok('Conferência do complemento: aviso do que faltou e o já separado bloqueado', /Faltou na separação: 1 item/.test(t3)&&/MP011 Pigmento/.test(t3)&&ja===true&&/já separado antes/.test(t3), t3.replace(/\n/g,' | ').slice(0,300));
  await p.click('[data-act="cf-ok"][data-i="1"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(900); s=await srv(); r=s['ordens/5003'].rdb||{};
  ok('Complemento grava no separado (comp) e tira a falta', r.sep&&r.sep.comp&&r.sep.comp[0].itens.join()==='MP011'&&r.sep.falta===false&&r.sep.rec.every(x=>x.ok), JSON.stringify(r.sep).slice(0,300));

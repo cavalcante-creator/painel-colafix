@@ -1159,7 +1159,7 @@ function rdCartao(){ const T=S.tt, R=T.rch; if(!R) return ''; const o=ordById(R.
     /* cartão grande do rancho no lugar da linha "Rancho X · ordens · linhas" */
     if(T.rch) h=h.replace(/<div class="tt-ola">Rancho <b>[^<]*<\/b>[^<]*<\/div>/,rdCartao());
     /* barra de progresso da conferência */
-    h=h.replace(/<div class="cf-n num">(\d+) de (\d+) conferidos<\/div>/,(m,a,b)=>{ const p=+b?Math.round(+a/+b*100):0; return `<div class="rd-prog ${+a===+b?'ok':''}"><div class="rd-progt"><b class="num">${a} de ${b}</b><span>${+a===+b?'Tudo conferido. Toque em Concluir.':'Toque em OK em cada item que está certo'}</span></div><div class="rd-bar"><i style="width:${p}%"></i></div></div>`; });
+    h=h.replace(/<div class="cf-n num">(\d+) de (\d+) conferidos<\/div>/,(m,a,b)=>{ const p=+b?Math.round(+a/+b*100):0; return `<div class="rd-prog ${+a===+b?'ok':''}"><div class="rd-progt"><b class="num">${a} de ${b}</b><span>${+a===+b?'Tudo separado. Toque em Concluir separação.':'Toque em OK em cada item que você separou'}</span></div><div class="rd-bar"><i style="width:${p}%"></i></div></div>`; });
     /* "o que fazer agora" */
     h=h.replace(/<div class="tt-rcq">/g,'<div class="tt-rcq rd-agora"><span class="rd-tag">AGORA</span>');
     if(n===1) h=h.replace('<div class="tt-box">','<div class="tt-box rd-agora1"><span class="rd-tag">AGORA</span>');
@@ -1270,3 +1270,23 @@ document.head.insertAdjacentHTML('beforeend',`<style id="sr-css">
 .cf-i.sr-nao{opacity:.5;background:var(--crit-tint);border-color:var(--crit)}
 </style>`);
 /* ===FIM SÓ RECEBE O QUE FOI SEPARADO=== */
+/* ===================== SEPARAR ANTES DO CRACHÁ DE QUEM RECEBE (14/10) ===================== */
+/* Pedido de 14/10: o almox marca o que separou ANTES de escanear o crachá do operador. Ao abrir o rancho, a separação
+   (lista com OK por item) já aparece no nome de quem está logado no celular; nenhum crachá é aceito até tocar em
+   "Concluir separação". Só depois o celular pede o crachá de quem vai receber. */
+function spEu(){ return (S.uid&&S.nomes&&S.nomes[S.uid])||'Almoxarifado'; }
+function spAuto(){ try{ const R=S.tt.rch; if(ttEntrega()&&R&&!R.cfp&&cfPrecisa()) cfComeca({codigo:null,nome:spEu(),conta:true}); }catch(e){ console.warn('[separar]',e); } }
+{ const _tr=ttRancho; ttRancho=function(){ const r=_tr.apply(this,arguments); spAuto(); return r; }; }
+{ const _r=render; render=function(){ try{ if(S.view==='mantotem'&&S.tt&&S.tt.fase==='rancho'&&S.tt.rch&&!S.tt.rch.cfp&&ttEntrega()&&cfPrecisa()){ S.tt.rch.cfp={codigo:null,nome:spEu(),conta:true}; S.tt.rch.ck=S.tt.rch.ck||{}; } }catch(e){} const x=_r.apply(this,arguments); try{ if(ttEntrega()&&cfConferindo()&&(ttCam.stream||ttCam.timer)) ttCamDesliga(); }catch(e){} return x; }; }
+{ const _tl=ttLeu; ttLeu=function(txt){ if(!ttEntrega()) return _tl.apply(this,arguments); const T=S.tt, s=String(txt||'').trim().toUpperCase();
+  if(TT_RE.test(s)){ if(T.fase==='espera'){ ttMsg('Escaneie primeiro a folha de produção. O crachá de quem recebe vem depois da separação.'); return; }
+    if(cfPrecisa()){ ttMsg('Primeiro marque o que foi separado e toque em "Concluir separação". O crachá de quem recebe vem depois.'); render(); return; } }
+  return _tl.apply(this,arguments); }; }
+{ const _vc=vConferencia; vConferencia=function(){ let h=_vc.apply(this,arguments); if(!ttEntrega()) return h;
+  return h.replace('<b>Conferir rancho</b>','<b>Separar rancho</b>').replace('Conferindo: <b>','Separando: <b>').replace('>Concluir conferência<','>Concluir separação<')
+    .replace('Toque em OK em cada item que está certo','Toque em OK em cada item que você separou').replace('Tudo conferido. Toque em Concluir.','Tudo separado. Toque em Concluir separação.')
+    .replace(/<div class="tt-rcq[^"]*">[\s\S]*?crachá de quem vai conferir[\s\S]*?<\/div><\/div>/,''); }; }
+{ const _rp=rdPassos; rdPassos=function(n){ return _rp.apply(this,arguments).replace('<b>Conferir</b><small>Item a item</small>','<b>Separar</b><small>Marcar o que separou</small>').replace('<b>Entregar</b><small>Na linha</small>','<b>Entregar</b><small>Crachá de quem recebe</small>'); }; }
+/* a mensagem de aviso aparece em destaque na tela de separação */
+document.head.insertAdjacentHTML('beforeend',`<style id="sp-css">body.tt-ent .tt-cel .tt-err{background:var(--warn-tint);color:var(--warn-ink);border-radius:12px;padding:10px 12px;font-weight:700}</style>`);
+/* ===FIM SEPARAR ANTES DO CRACHÁ=== */

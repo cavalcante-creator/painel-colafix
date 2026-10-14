@@ -16,19 +16,19 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const e0=await p.evaluate(()=>({t:(document.querySelector('.tt')||{}).innerText||'',x:!!document.querySelector('.tt-x'),cam:window.__cam&&window.__cam.video&&window.__cam.video.facingMode}));
  ok('Celular do almox abre direto em "Escaneie o QR da folha", com câmera traseira e sem botão de sair', /Entrega de rancho/.test(e0.t)&&/Escaneie o QR da folha de produção/.test(e0.t)&&!e0.x&&e0.cam==='environment', 'câmera: '+e0.cam);
  const viu=await espera(()=>__T.S().tt.fase==='rancho'&&!!__T.S().tt.rch,20000); await H.dorme(400);
- const vis=await p.evaluate(()=>getComputedStyle(document.getElementById('tt-video')).display); const t1=await tela();
- ok('A câmera lê a folha: mostra o rancho, as ordens e pede o crachá de quem vai conferir (com visor da câmera)', viu&&/RANCHO\s+123456/.test(t1)&&/5001, 5002/.test(t1)&&/crachá de quem vai conferir/.test(t1)&&!/Marcar como separado/.test(t1)&&vis==='block', t1.replace(/\n/g,' | ').slice(0,200));
+ const t1=await tela();
+ ok('A câmera lê a folha: mostra o rancho e já abre a separação no nome de quem está logado (sem pedir crachá)', viu&&/RANCHO\s+123456/.test(t1)&&/5001, 5002/.test(t1)&&/Separando: Joana Almox/.test(t1)&&/MP001/.test(t1)&&!/crachá de quem vai conferir/.test(t1), t1.replace(/\n/g,' | ').slice(0,260));
  await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const tc=await tela();
- const cam1=await p.evaluate(()=>{ const v=document.getElementById('tt-video'); return !!v&&getComputedStyle(v).display!=='none'; });
- ok('Crachá do conferente: lista com a quantidade que deveria vir e um OK por item, câmera desligada', /Conferindo: Carlos Almox/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2/.test(tc)&&!cam1, tc.replace(/\n/g,' | ').slice(0,220));
+ const cam1=await p.evaluate(()=>{ const v=document.getElementById('tt-video'); return !!v&&getComputedStyle(v).display!=='none'; }); const __T_rcv=await p.evaluate(()=>!!__T.S().tt.p);
+ ok('Crachá do operador antes de separar: recusa e pede para marcar o separado primeiro; a lista continua com OK por item, câmera desligada', /Primeiro marque o que foi separado/.test(tc)&&/Separando: Joana Almox/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2/.test(tc)&&/Concluir separação/.test(tc)&&!cam1&&!__T_rcv, tc.replace(/\n/g,' | ').slice(0,200));
  await p.screenshot({path:'/mnt/user-data/outputs/celular-almox-conferencia.png'});
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(300); const tf=await tela();
  let s0=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
  ok('Concluir com item sem OK pede confirmação antes e ainda não grava', /1 item ficou sem OK/.test(tf)&&!s0['ordens/5001'].rdb, tf.replace(/\n/g,' | ').slice(0,160));
  await p.click('[data-act="cf-nao"]'); await H.dorme(200); await p.click('[data-act="cf-ok"][data-i="1"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(900);
  let s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const sp=s['ordens/5001'].rdb&&s['ordens/5001'].rdb.sep;
- ok('Tudo OK: grava separado e conferido nas duas ordens, com o nome e o crachá de quem conferiu', sp&&sp.conferido&&sp.nome==='Carlos Almox'&&sp.cracha==='CARL2345'&&sp.falta===false&&sp.por==='uCEL'&&sp.rec.length===2&&s['ordens/5002'].rdb.sep&&s['ordens/5002'].rdb.sep.junto==='5001', JSON.stringify(sp));
- const t1b=await tela(); ok('Depois da conferência segue para o crachá de quem vai receber', /crachá de quem vai receber/.test(t1b), t1b.replace(/\n/g,' | ').slice(0,160));
+ ok('Tudo OK: grava separado nas duas ordens, no nome de quem está logado', sp&&sp.conferido&&sp.nome==='Joana Almox'&&sp.cracha===null&&sp.falta===false&&sp.por==='uCEL'&&sp.rec.length===2&&s['ordens/5002'].rdb.sep&&s['ordens/5002'].rdb.sep.junto==='5001', JSON.stringify(sp));
+ const t1b=await tela(); ok('Depois de concluir a separação, pede o crachá de quem vai receber', /crachá de quem vai receber/.test(t1b), t1b.replace(/\n/g,' | ').slice(0,160));
  await p.keyboard.type('CXANAS2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const t2=await tela();
  ok('Bipa o crachá de quem recebe: "Entregar para ANA SOUZA" com os itens e o botão "Recebi o rancho"', /Entregar para/.test(t2)&&/Ana Souza/i.test(t2)&&/MP001/.test(t2)&&/Recebi o rancho/.test(t2), t2.replace(/\n/g,' | ').slice(0,200));
  await p.screenshot({path:'/mnt/user-data/outputs/celular-almox-entrega.png'});
@@ -43,18 +43,18 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>{ __T.S().tt.recente={}; __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(400); const tp=await tela();
  await p.fill('#tt-rnum','777888'); await p.click('[data-act="tt-rnum"]'); await H.dorme(500); const tq=await tela();
- ok('Crachá antes da folha: guarda o conferente e já abre a lista do rancho', /Conferente: Carlos Almox/.test(tp)&&/Conferindo: Carlos Almox/.test(tq)&&/MP010/.test(tq), tq.replace(/\n/g,' | ').slice(0,160));
+ ok('Crachá antes da folha é recusado; a folha abre direto a separação', /Escaneie primeiro a folha/.test(tp)&&/Separando: Joana Almox/.test(tq)&&/MP010/.test(tq), tp.replace(/\n/g,' | ').slice(0,120)+' || '+tq.replace(/\n/g,' | ').slice(0,160));
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"][data-f="1"]'); await H.dorme(900);
  s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const sf=s['ordens/5003'].rdb&&s['ordens/5003'].rdb.sep;
  ok('Registrar com falta: grava o item que ficou sem OK como faltando', sf&&sf.falta===true&&sf.itens.length===1&&sf.itens[0].c==='MP011'&&/faltando: MP011/.test((s['ordens/5003'].hist||[]).map(x=>x.o).join(' ')), JSON.stringify(sf));
  await p.evaluate(()=>{ __T.S().tt.fase='espera'; __T.S().tt.p=null; }); await p.evaluate(()=>__T.go('mantotem')); await H.dorme(200);
  await p.fill('#tt-rnum','999000'); await p.click('[data-act="tt-rnum"]'); await H.dorme(400);
- await p.click('[data-act="sc-abre"][data-k="cf"]'); await H.dorme(200); await p.fill('#sc-nome','Pedro Silva'); await p.click('[data-act="sc-ok"]'); await H.dorme(300);
- const ts=await tela(); ok('Sem crachá: digita o nome de quem confere e abre a lista', /Conferindo: Pedro Silva/.test(ts)&&/MP020/.test(ts), ts.replace(/\n/g,' | ').slice(0,160));
+
+ const ts=await tela(); ok('Outro rancho: abre direto a separação', /Separando: Joana Almox/.test(ts)&&/MP020/.test(ts), ts.replace(/\n/g,' | ').slice(0,160));
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(150); await p.click('[data-act="cf-salvar"]'); await H.dorme(800);
  await p.click('[data-act="sc-abre"][data-k="rec"]'); await H.dorme(200); await p.fill('#sc-nome','Maria Souza'); await p.press('#sc-nome','Enter'); await H.dorme(300);
  await p.dblclick('[data-act="tt-recebi"]'); await H.dorme(900); s=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const r9=s['ordens/5004'].rdb||{};
- ok('Sem crachá também para quem recebe: grava os dois nomes, sem código de crachá', r9.sep&&r9.sep.nome==='Pedro Silva'&&r9.sep.cracha===null&&r9.ent&&r9.ent.recebidoPor==='Maria Souza'&&r9.ent.cracha===null, JSON.stringify(r9).slice(0,240));
+ ok('Sem crachá também para quem recebe: grava quem separou (conta) e quem recebeu (nome digitado), sem código de crachá', r9.sep&&r9.sep.nome==='Joana Almox'&&r9.sep.cracha===null&&r9.ent&&r9.ent.recebidoPor==='Maria Souza'&&r9.ent.cracha===null, JSON.stringify(r9).slice(0,240));
  const tent=[]; for(const v of ['diario','programacao','manch']){ await p.evaluate(v=>__T.go(v),v); await H.dorme(150); tent.push(v+'→'+await p.evaluate(()=>__T.S().view)); }
  ok('O celular do almox não abre outras telas', tent.every(x=>x.endsWith('→mantotem')), tent.join(' '));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
