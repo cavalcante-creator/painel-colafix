@@ -8,13 +8,19 @@ const ord=(num,linha,data,rancho,x)=>Object.assign({num,produto:'AC3001 - ARGAMA
  D['ordens/8003']=ord('8003','Linha 2','2026-10-13','880003',{rdb:{sep:{em:hoje},ent:{em:hoje}}});                                  /* de hoje, entregue hoje */
  D['ordens/8004']=ord('8004','Linha 2','2026-10-12','880004',{continuaEm:'2026-10-13',rdb:{sep:{em:ont},ent:{em:ont},conf:{em:ont,falta:true,itens:[{c:'MP1',q:'5 kg'}]}}}); /* a menos, complemento pendente */
  D['ordens/8005']=ord('8005','Linha 1','2026-10-13','880005');                                                                       /* de hoje, ainda não entregue */
- ['880001','880002','880003','880004','880005'].forEach(n=>D['ranchos/'+n]={numero:n,criadoEm:ont,ordens:[{num:'80'+n.slice(-2)}]});
+ D['ordens/8006']=ord('8006','Linha 1','2026-10-12','880006',{continuaEm:'2026-10-13'});                                             /* passou para hoje, sem nada registrado */
+ D['ordens/8007']=ord('8007','Linha 2','2026-10-12','880007',{continuaEm:'2026-10-13',rdb:{sep:{em:ont,falta:true,itens:[{c:'MP2',q:'400 kg'}]},entp:[{em:ont,itens:['MP1']}]}}); /* passou, falta complemento */
+ ['880001','880002','880003','880004','880005','880006','880007'].forEach(n=>D['ranchos/'+n]={numero:n,criadoEm:ont,ordens:[{num:'80'+n.slice(-2)}]});
  const B=await H.abrir(); await B.ctx.clock.setFixedTime(new Date('2026-10-13T14:00:00')); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123');
  await p.waitForFunction(()=>window.__T&&__T.S().ordens&&__T.S().ordens.length>=5,null,{timeout:15000}); await H.dorme(500);
  const tem=(t,n)=>new RegExp('\\b'+n+'\\b').test(t);
  for(const v of ['diario','dbmon']){ await p.evaluate(v=>{ __T.go(v); __T.S().dbo.dia='2026-10-13'; },v); await p.evaluate(()=>__T.go(__T.S().view)); await H.dorme(500);
    const t=await p.evaluate(()=>document.getElementById('view').innerText);
-   ok(v+': esconde a reprogramada já entregue ontem (8001) e mostra a não entregue (8002), as de hoje (8003, 8005) e a que veio a menos (8004)', !tem(t,'8001')&&tem(t,'8002')&&tem(t,'8003')&&tem(t,'8004')&&tem(t,'8005'), t.replace(/\n/g,' | ').slice(0,300)); }
+   ok(v+': esconde a reprogramada já entregue ontem (8001) e mostra a não entregue (8002), as de hoje (8003, 8005) e a que veio a menos (8004)', !tem(t,'8001')&&tem(t,'8002')&&tem(t,'8003')&&tem(t,'8004')&&tem(t,'8005')&&!tem(t,'8006')&&tem(t,'8007'), t.replace(/\n/g,' | ').slice(0,300)); }
  await p.evaluate(()=>{ __T.go('diario'); __T.S().dbo.modo='tabela'; __T.S().dbo.q='8001'; }); await p.evaluate(()=>__T.go('diario')); await H.dorme(400);
+ await p.evaluate(()=>{ __T.S().dbo.q=''; __T.S().dbo.modo='tabela'; }); await p.evaluate(()=>__T.go('diario')); await H.dorme(400);
+ const tc=await p.evaluate(()=>document.getElementById('view').innerText); ok('Passou para hoje sem falta (8006) fica escondida, com aviso e "Mostrar"; a que falta complemento (8007) aparece', !tem(tc,'8006')&&tem(tc,'8007')&&/continua de dias anteriores/.test(tc), tc.replace(/\n/g,' | ').slice(0,200));
+ await p.click('[data-act="db-cont"]'); await H.dorme(300); ok('"Mostrar" traz de volta', tem(await p.evaluate(()=>document.getElementById('view').innerText),'8006')); await p.click('[data-act="db-cont"]'); await H.dorme(200);
+ await p.evaluate(()=>{ __T.S().dbo.q='8001'; }); await p.evaluate(()=>__T.go('diario')); await H.dorme(400);
  ok('Buscando o número, a reprogramada ainda aparece', tem(await p.evaluate(()=>document.getElementById('view').innerText),'8001'));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

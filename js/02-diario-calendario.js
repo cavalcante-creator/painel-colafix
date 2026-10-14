@@ -619,6 +619,11 @@ function vDiario(){ const D=S.dbo, h=hojeStr(); if(!D.dia) D.dia=h; const dia=D.
   let xs=S.ordens.filter(o=>o.linha&&(o.status==='aberta'||o.status==='encerrada')).filter(o=>{ if(dq) return dqCasa(o); const d=dataEf(o); const k=o.status==='aberta'&&d<h?h:(o.status==='encerrada'&&o.fimEm?hojeStr(new Date(o.fimEm)):d); return k===diaP||(o.status==='aberta'&&d<=diaP&&dia===h); });
   /* pedido de 13/10: rancho já entregue na linha num dia anterior (ordem que continua ou foi reprogramada) não volta para o diário; só fica se veio a menos e ainda falta o complemento */
   if(!dq) xs=xs.filter(o=>{ const e=dbEt(o), v=e.ent; if(!v) return true; const iso=typeof v==='string'?v:v.em; if(!iso||hojeStr(new Date(iso))>=dia) return true; return dbMenosAberto(e); });
+  /* pedido de 14/10: ordem que "passou para amanhã" (continua de um dia anterior) já começou a rodar, então o rancho já foi para a linha:
+     não aparece de novo como nova. Só fica se ainda falta algo do rancho (veio a menos, entregue em parte ou separado com falta). "Mostrar" traz de volta. */
+  S.dbo._contN=0;
+  if(!dq&&!D.cont) xs=xs.filter(o=>{ const cont=o.continuaEm&&o.data&&o.continuaEm>o.data&&dia>o.data; if(!cont) return true; const e=dbEt(o), r=o.rdb||{};
+    const falta=dbMenosAberto(e)||(r.entp&&r.entp.length&&!r.ent)||(r.sep&&r.sep.falta&&!r.ent); if(falta) return true; S.dbo._contN++; return false; });
   if(D.linha!=='todas') xs=xs.filter(o=>o.linha===D.linha);
   if(D.pri) xs=xs.filter(o=>D.pri==='sem'?!dbPri(o):String(dbPri(o))===D.pri);
   xs.sort((a,b)=>LT.indexOf(a.linha)-LT.indexOf(b.linha)||seqCmp(a,b));
@@ -1439,3 +1444,9 @@ function ajSeparar(){ if(S.view!=='ajustes') return; const v=document.getElement
 { let pend=false; new MutationObserver(()=>{ if(!pend){ pend=true; requestAnimationFrame(()=>{ pend=false; ajSeparar(); }); } }).observe(document.body,{childList:true,subtree:true}); }
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="aj-grupo"]'); if(!b) return; ajGrupo=b.dataset.v; try{ localStorage.setItem('aj-grupo',ajGrupo); }catch(e){} ajSeparar(); });
 document.head.insertAdjacentHTML('beforeend','<style>.aj-sub{margin:-6px 0 16px;padding:10px 12px;background:var(--surface);border-radius:12px;border:1px solid var(--line)}.aj-sub .chip{height:36px}</style>');
+/* aviso das ordens que continuam de dias anteriores (escondidas do diário) */
+{ const _vd=vDiario; vDiario=function(){ let h=_vd.apply(this,arguments); try{ const D=S.dbo, n=D._contN||0; if((!n&&!D.cont)||D.modo==='monitor'||typeof h!=='string') return h;
+    const av=`<div class="dbcont">${D.cont?'Mostrando também as ordens que continuam de dias anteriores.':`${n} ${n===1?'ordem continua':'ordens continuam'} de dias anteriores (passou para hoje) e não ${n===1?'aparece':'aparecem'} aqui: o rancho já foi para a linha.`} <button class="lnk" data-act="db-cont">${D.cont?'Esconder':'Mostrar'}</button></div>`;
+    const i=h.indexOf('<section'); return i<0?h+av:h.slice(0,i)+av+h.slice(i); }catch(e){ return h; } }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="db-cont"]'); if(!b) return; S.dbo.cont=!S.dbo.cont; render(); });
+document.head.insertAdjacentHTML('beforeend','<style id="dbcont-css">.dbcont{font-size:13px;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:8px 12px}.dbcont .lnk{padding:0;margin-left:6px}</style>');
