@@ -893,8 +893,8 @@
         const e=expInfo(f); if(e){ if(e.etapa===1) add(e.f1,'exp','Fim da 1ª etapa da experiência de '+f.nome,'prorrogar, efetivar ou desligar',e.c==='ok'?'neu':e.c,pz('exp'),'exp1-'+f._id); add(e.f2,'exp','Fim da experiência de '+f.nome,'efetivar ou desligar',e.etapa===2&&e.c!=='ok'?e.c:'neu',pz('exp'),'exp2-'+f._id); } }
       else { const s=pjSit(f); if(s.prox) add(s.prox,'pj','Troca do PJ '+f.nome,'3 meses da '+(okIso(f.ultimaTroca)?'última troca':'admissão'),s.c==='ok'?'neu':s.c,pz('pj'),'pj-'+f._id+'-'+s.prox); }
       if(f.desligAgendado&&okIso(f.desligamento)) add(f.desligamento,'desl','Último dia de '+f.nome,f.desligMotivo||'desligamento marcado','warn',pe(f),'desl-'+f._id);
-      if(okIso(f.nascimento)){ const d=proxAniv(f.nascimento); add(d,'aniv','Aniversário de '+titulo(f.nome),(+d.slice(0,4)-+f.nascimento.slice(0,4))+' anos','neu',pe(f),'aniv-'+f._id+'-'+d.slice(0,4)); }
-      if(okIso(f.admissao)){ const d=proxAniv(f.admissao), a=+d.slice(0,4)-+f.admissao.slice(0,4); if(a===1||(a>0&&a%5===0)) add(d,'casa',plural(a,'ano','anos')+' de casa de '+titulo(f.nome),f.setor||'','neu',pe(f),'casa-'+f._id+'-'+d.slice(0,4)); } });
+      if(okIso(f.nascimento)){ const d=proxAniv(f.nascimento); add(d,'aniv','Aniversário de '+titulo(f.nome),(+d.slice(0,4)-+f.nascimento.slice(0,4))+' anos','neu',`data-act="rh-cartao" data-id="${f._id}"`,'aniv-'+f._id+'-'+d.slice(0,4)); }
+      if(okIso(f.admissao)){ const d=proxAniv(f.admissao), a=+d.slice(0,4)-+f.admissao.slice(0,4); if(a===1||(a>0&&a%5===0)) add(d,'casa',plural(a,'ano','anos')+' de casa de '+titulo(f.nome),f.setor||'','neu',`data-act="rh-cartao" data-v="casa" data-id="${f._id}"`,'casa-'+f._id+'-'+d.slice(0,4)); } });
     const vivo=id=>R.func.some(f=>f._id===id&&f.status!=='Desligado');
     R.fer.filter(x=>!x.anterior&&x.status!=='cancelada'&&vivo(x.funcId)).forEach(x=>{ const av=temAviso(x);
       add(x.inicio,'ferias','Começam as férias de '+x.funcionario,plural(+x.dias,'dia','dias')+' · volta '+br(x.retorno)+(av?'':' · aviso de férias ainda não gerado'),av?'neu':'warn',av?pz('ferias'):`data-act="rh-dgfer" data-id="${x._id}"`,'feri-'+x._id);
@@ -911,7 +911,7 @@
     if(!R.lido.func) return topo('Agenda','',seg,EY)+'<section class="card"><div class="empty">Carregando…</div></section>';
     const {atras,prox}=agendaJanela(), hj=P.hojeStr();
     const lin=x=>{ const d=dU(x.data); return `<div class="rh-ag ${x.c}"><div class="rh-agd"><b>${String(d.getUTCDate()).padStart(2,'0')}/${x.data.slice(5,7)}</b><small>${x.data===hj?'hoje':DIA_CURTO[d.getUTCDay()]}</small></div>
-      <div><span class="rh-agt">${esc(TIPO_AG[x.tipo]||'')}</span><b>${esc(x.t)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</div>${x.act?`<button class="lnk" ${x.act}>Abrir</button>`:'<span></span>'}</div>`; };
+      <div><span class="rh-agt">${esc(TIPO_AG[x.tipo]||'')}</span><b>${esc(x.t)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</div>${x.act?`<button class="lnk" ${x.act}>${x.tipo==='aniv'||x.tipo==='casa'?'🎉 Fazer cartão':'Abrir'}</button>`:'<span></span>'}</div>`; };
     const semanas={}; prox.forEach(x=>{ const k=x.data===hj?'Hoje':x.data<=addDias(hj,7)?'Próximos 7 dias':x.data.slice(0,7)===hj.slice(0,7)?'Ainda este mês':cap(mesNome(x.data))+' de '+x.data.slice(0,4); (semanas[k]=semanas[k]||[]).push(x); });
     return topo('Agenda','Tudo o que vence ou acontece, em ordem de data: férias, experiência, troca dos PJ, terceirizados, aniversários.',seg+`<button class="btn" data-act="rh-ics" ${prox.length?'':'disabled'}>Mandar para o Outlook</button>`,EY)
       +`<div class="rh-chips">${[30,60,90].map(n=>`<button class="rh-chip2" data-act="rh-agdias" data-v="${n}" aria-pressed="${R.agDias===n}">Próximos ${n} dias</button>`).join('')}<span class="sub" style="margin:0 0 0 auto;font-size:12.5px">"Mandar para o Outlook" baixa um arquivo: abra e o Outlook guarda tudo com lembrete na véspera.</span></div>`

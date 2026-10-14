@@ -32,6 +32,9 @@ const hoje=new Date(), md=String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(h
   await p.evaluate(()=>{ __T.S(); }); await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-pess"][data-id="f1"]'); await H.dorme(500);
   const pf=!!(await p.$('.rh-pfb [data-act="rh-cartao"]')); await p.evaluate(()=>__T.go('rhagenda')); await H.dorme(400);
   ok('Perfil da pessoa tem o botão "Cartão de aniversário"', pf);
+  const ag=await p.evaluate(()=>[...document.querySelectorAll('.rh-agc [data-act="rh-cartao"]')].map(b=>b.textContent+':'+(b.dataset.v||'aniv')+':'+b.dataset.id));
+  await p.click('.rh-agc [data-act="rh-cartao"][data-id="f1"]'); await H.dorme(500); const ab=await p.evaluate(()=>!!document.getElementById('rhc-cv')); await p.click('[data-act="rhc-x"]'); await H.dorme(300);
+  ok('Agenda: o aniversário tem "Fazer cartão" e abre o cartão direto', ag.some(x=>/Fazer cartão:aniv:f1/.test(x))&&ag.some(x=>/casa:f2/.test(x))&&ab, ag.join());
   await p.setViewportSize({width:390,height:844}); await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(400); await p.click('.rh-party [data-act="rh-cartao"][data-id="f1"]'); await H.dorme(500);
   const lat=await p.evaluate(()=>({l:document.documentElement.scrollWidth-document.documentElement.clientWidth,w:document.getElementById('rhc-cv').getBoundingClientRect().width}));
   ok('No celular o cartão cabe na tela', lat.l<=1&&lat.w>200&&lat.w<=360, JSON.stringify(lat));
