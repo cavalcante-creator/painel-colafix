@@ -1322,7 +1322,7 @@ function renderConfHistorico() {
 
   const visiveis = confHistFiltrado.slice(0, _confHistPagina);
   visiveis.forEach((conf, i) => {
-    const qtdItens = Object.keys(conf.itens).length;
+    const qtdItens = Object.keys(conf.itens||{}).length;
     // ITEM 9: contador de divergências removido do histórico
 
     const div = document.createElement('div');
@@ -1342,7 +1342,8 @@ function renderConfHistorico() {
     const cpHist = confPerm();
     const podeAuditarHist = podeAuditarEstoque();
     let itensHtml = '';
-    Object.entries(conf.itens).forEach(([cod, it]) => {
+    let itensVisH = 0;
+    Object.entries(conf.itens||{}).forEach(([cod, it]) => {
       const invItemH = CONF_ITEMS.find(i => i.cod === cod) || ITEMS.find(i => i.cod === cod);
       const isRejH  = !!(invItemH && invItemH.temRejunte);
       const isSepH  = !!(invItemH && invItemH.temSeparacao);
@@ -1371,13 +1372,30 @@ function renderConfHistorico() {
       const podeVerA3H    = temContagemBloco3H && isA3H  && !isRejH && !isSepH && !isA1H && (cpHist.acessoTotal || cpHist.podeContarAlmox3);
       const podeVerA2H    = temContagemBloco30H && isA2H  && (cpHist.acessoTotal || cpHist.podeContarAlmox2);
       const podeVerA30H   = temContagemBloco30H && !isA2H && !!(invItemH && invItemH.temAlmox30) && (cpHist.acessoTotal || cpHist.podeContarAlmox30);
-      const mostrar3H  = podeVerRejH || podeVerSepH || podeVerA1H || podeVerA3H;
-      const mostrar30H = podeVerA2H || podeVerA30H;
+      let mostrar3H  = podeVerRejH || podeVerSepH || podeVerA1H || podeVerA3H;
+      let mostrar30H = podeVerA2H || podeVerA30H;
+      let lblH3   = podeVerRejH ? 'Rejunte' : podeVerSepH ? 'Separação' : podeVerA1H ? 'Almox 1' : 'Almox 3';
+      let cor3H   = podeVerRejH ? 'var(--purple,#7B5EA7)' : podeVerSepH ? 'var(--orange,#E07B39)' : podeVerA1H ? 'var(--orange,#E07B39)' : 'var(--accent)';
+      let lblH30  = podeVerA2H ? 'Almox 2' : 'Almox 30';
+      let cor30H  = podeVerA2H ? 'var(--purple,#7B5EA7)' : 'var(--green)';
+      // [FIX 14/10] Item que não está no cadastro (ou sem o local marcado) — comum nas conferências
+      // antigas da planilha — sumia do histórico e a conferência abria vazia. Agora o local vem do
+      // próprio registro (l3/l30 ou o local da conferência), respeitando a permissão do local.
+      const semCadLocal = !invItemH || !(isRejH||isSepH||isA1H||isA2H||invItemH.temAlmox3||invItemH.temAlmox30);
+      if(semCadLocal){
+        const PERM_LBL = {'Almox 3':'podeContarAlmox3','Almox 30':'podeContarAlmox30','Almox 1':'podeContarAlmox1','Almox 2':'podeContarAlmox2','Rejunte':'podeContarRejunte','Rejunte / Área Líquida':'podeContarRejunte','Separação':'podeContarSeparacao'};
+        const podeLbl = l => cpHist.acessoTotal || !PERM_LBL[l] || !!cpHist[PERM_LBL[l]];
+        const lc = conf.local && conf.local!=='Todos' && !/\+/.test(conf.local) ? conf.local : null;
+        const l3 = it.l3 || (lc && lc!=='Almox 30' && lc!=='Almox 2' ? lc : 'Almox 3');
+        const l30 = it.l30 || (lc==='Almox 2' ? 'Almox 2' : 'Almox 30');
+        mostrar3H  = temContagemBloco3H  && podeLbl(l3);
+        mostrar30H = (Number(it.almox30)||0) > 0 && podeLbl(l30);
+        lblH3 = l3; lblH30 = l30;
+        cor3H = /Rejunte|Almox 2/.test(l3) ? 'var(--purple,#7B5EA7)' : /Separa|Almox 1/.test(l3) ? 'var(--orange,#E07B39)' : 'var(--accent)';
+        cor30H = l30==='Almox 2' ? 'var(--purple,#7B5EA7)' : 'var(--green)';
+      }
       if(!mostrar3H && !mostrar30H) return; // ocultar item inteiro se sem permissão
-      const lblH3   = podeVerRejH ? 'Rejunte' : podeVerSepH ? 'Separação' : podeVerA1H ? 'Almox 1' : 'Almox 3';
-      const cor3H   = podeVerRejH ? 'var(--purple,#7B5EA7)' : podeVerSepH ? 'var(--orange,#E07B39)' : podeVerA1H ? 'var(--orange,#E07B39)' : 'var(--accent)';
-      const lblH30  = podeVerA2H ? 'Almox 2' : 'Almox 30';
-      const cor30H  = podeVerA2H ? 'var(--purple,#7B5EA7)' : 'var(--green)';
+      itensVisH++;
       const qtdRasgH = Number(it.qtdRasgada)||0;
 
       // Linha de auditoria por local (Almox 3/Rejunte/Separação e Almox 30), cada uma com seu próprio status
@@ -1447,7 +1465,7 @@ function renderConfHistorico() {
       </div>
       <div class="conf-detail-content" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
         ${painelAuditoriaHTML}
-        ${qtdItens > 0 ? `<div style="display:flex;flex-direction:column;gap:4px">${itensHtml}</div>` : ''}
+        ${itensVisH > 0 ? `<div style="display:flex;flex-direction:column;gap:4px">${itensHtml}</div>` : `<div style="padding:10px;font-size:11px;color:var(--text3)">${qtdItens>0?'Nenhum item desta conferência é de um local que você pode ver.':'Esta conferência não tem itens gravados.'}</div>`}
       </div>
     `;
     list.appendChild(div);

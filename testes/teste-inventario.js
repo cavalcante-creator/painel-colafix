@@ -5,7 +5,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   const it=(cod,desc,locais,grupos)=>({codigo:cod,descricao:desc,ativo:true,linhas:[],almox:{locais,grupos:grupos||['COLAFIX'],un:null,conv:null}});
   D['itens/AC0001']=Object.assign(it('AC0001','ARGAMASSA AC1 20 KG',['a3','a30']),{linhas:['Linha 1']}); D['config/geral'].paletes={'Linha 1':96}; /* múltiplo de palete da configuração */ D['itens/AC0002']=it('AC0002','ARGAMASSA AC2 20 KG',['a3','a30']); D['itens/RJ0001']=it('RJ0001','REJUNTE CINZA 1 KG',['rej'],['BAUTECH']);
   D['pcpbase/itens']={em:'2026-10-13T08:00:00.000Z',atual:{},l:{AC0001:{a3:100,a30:50,d:'ARGAMASSA AC1 20 KG'},AC0002:{a3:20,a30:0,d:'ARGAMASSA AC2 20 KG'}}};
-  D['conferencias/CONF-1-1']={numero:'CONF-1-1',em:new Date(Date.now()-3600e3).toISOString(),dia:'2026-10-13',por:null,porNome:'CONFERENTE',local:'Almox 3',origem:'planilha',itens:{AC0002:{nome:'ARGAMASSA AC2 20 KG',almox3:30,almox30:0,total:30,pal3:0,sac3:30,pal30:0,sac30:0}}};
+  D['conferencias/CONF-1-1']={numero:'CONF-1-1',em:new Date(Date.now()-3600e3).toISOString(),dia:'2026-10-13',por:null,porNome:'CONFERENTE',local:'Almox 3',origem:'planilha',itens:{AC0002:{nome:'ARGAMASSA AC2 20 KG',almox3:30,almox30:0,total:30,pal3:0,sac3:30,pal30:0,sac30:0},XX9999:{nome:'ITEM FORA DO CADASTRO',almox3:12,almox30:0,total:12}}};
   d.users['conf@painel-colafix.app']={uid:'uCONF',pass:'conf123',nome:'Carla'}; D['perfis/uCONF']={nome:'Carla',usuario:'conf'}; D['acessos/uCONF']={perfil:'conf',mods:['almox'],locais:['a3'],contar:true,receber:true,ativo:true};
   d.users['sis@painel-colafix.app']={uid:'uSIS',pass:'sis123',nome:'Sara'}; D['perfis/uSIS']={nome:'Sara',usuario:'sis'}; D['acessos/uSIS']={perfil:'supsis',mods:['almox'],locais:['a3','a30','rej','sep','a1','a2'],contar:true,receber:true,auditar:true,verAud:true,ativo:true};
   const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept());
@@ -23,6 +23,8 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   const solo1=await p.evaluate(()=>document.body.classList.contains('inv-solo'));
   const tr=f&&await vis(f,'tab-transf-group');
   ok('PCP abre o programa dentro do painel (Administrador, só Conferência — sem Transferências —, itens do cadastro, saldo do sistema e conferências do banco)', menu[0]&&menu[1]&&a&&a.perf==='Administrador'&&a.itens===3&&a.conf===1&&a.saldo===100&&!solo1&&!tr&&sairOc, JSON.stringify({menu,a,solo1,tr,sairOc}));
+  const hx=f&&await f.evaluate(()=>{ const c=[...document.querySelectorAll('.conf-detail-content')].find(x=>x.parentElement.innerText.includes('CONF-1-1')); if(!c) return null; c.parentElement.click(); return {d:c.style.display,t:c.innerText}; });
+  ok('Histórico: abrir a conferência lista os itens, inclusive item fora do cadastro (conferências antigas)', hx&&hx.d==='block'&&/AC0002/.test(hx.t)&&/XX9999/.test(hx.t)&&/12 sc/.test(hx.t), JSON.stringify(hx).slice(0,300));
   await p.evaluate(()=>__T.go('alxaud')); await H.dorme(3200);
   const aud=await p.evaluate(()=>__T.S().view)==='inventario'&&await f.evaluate(()=>document.getElementById('pg-divergencias').classList.contains('active'));
   ok('Atalho antigo da auditoria (Meu dia) abre o programa na Auditoria', aud);
