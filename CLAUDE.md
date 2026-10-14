@@ -85,7 +85,7 @@ Painel.hojeStr() · Painel.hora(iso) · Painel.dia(iso) · Painel.dm(data) · Pa
 - A varredura lê o conteúdo dentro do iframe. Teste: `teste-inventario.js`.
 
 ## Etiqueta do crachá (14/10, fim do js/08, prefixo `etq-`)
-- Em Manutenção › Crachás: **"Etiqueta"** por pessoa e **"Etiquetas (imagem ou PDF)"** para todos. Janela com formato (PNG/PDF), tamanho do rolo em mm (atalhos 50×30, 40×25…), resolução 203/300 dpi, nome e linha, código de barras. Padrão: **Zebra ZD220 (203 dpi), rolo 100 × 50 mm** (foto de 14/10). Escolha lembrada no aparelho (`localStorage colafix.etq2`).
+- Em Manutenção › Crachás: **"Etiqueta"** por pessoa e **"Etiquetas (imagem ou PDF)"** para todos. Janela com formato (PNG/PDF), tamanho do rolo em mm (atalhos 50×30, 40×25…), resolução 203/300 dpi, nome e linha, código de barras. Etiquetadora: **Zebra ZD220 (203 dpi)**. Padrão aprovado em 14/10: **38 × 54 mm em pé** (QR em cima, nome, linha, barras e o código, igual ao adesivo). Escolha lembrada no aparelho (`localStorage colafix.etq3`).
 - `etqCanvas` desenha na resolução da etiquetadora: módulos do QR em pontos inteiros, tudo preto ou branco (sem cinza), PNG com pHYs (dpi gravado). PDF = uma página do tamanho da etiqueta por crachá. Várias imagens = um download por crachá. Teste: `teste-etiqueta.js` (precisa de `npm i --no-save jspdf@2.5.1` e `JSPDF_REAL=1`).
 
 ## Almoxarifado / rancho
