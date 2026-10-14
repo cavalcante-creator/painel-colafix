@@ -12,6 +12,10 @@ const hoje=new Date(), md=String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(h
   await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(500);
   const bts=await p.evaluate(()=>[...document.querySelectorAll('[data-act="rh-cartao"]')].map(b=>(b.dataset.v||'aniv')+':'+b.dataset.id));
   ok('Início: botão "Cartão" para quem faz aniversário hoje e para quem completa 5 anos de casa', bts.includes('aniv:f1')&&bts.includes('casa:f2'), bts.join());
+  const wc=await p.evaluate(()=>[...document.querySelectorAll('.rh-wcc')].map(b=>b.innerText.replace(/\n/g,' | ')));
+  if(process.env.SHOT) await (await p.$('.rh-wk, .rh-wd')).evaluate(e=>e.closest('section').scrollIntoView()).then(()=>p.screenshot({path:process.env.SHOT+'/semana.png'})).catch(()=>{});
+  await p.click('.rh-wcc[data-id="f1"]'); await H.dorme(600); const ab7=await p.evaluate(()=>!!document.getElementById('rhc-cv')); await p.click('[data-act="rhc-x"]'); await H.dorme(300);
+  ok('Próximos 7 dias: aniversário e tempo de casa mostram "Fazer cartão" e abrem o cartão', wc.some(t=>/Aniversário \| Maria da Silva Souza \| 🎉 Fazer cartão/i.test(t))&&wc.some(t=>/Tempo de casa · 5 anos \| José Pereira/i.test(t))&&ab7, wc.join(' || '));
   await p.click('.rh-party [data-act="rh-cartao"][data-id="f1"]'); await H.dorme(700);
   const m=await p.evaluate(()=>{ const cv=document.getElementById('rhc-cv'); if(!cv) return null; const g=cv.getContext('2d'), px=g.getImageData(540,560,1,1).data, cnt=(()=>{ const d=g.getImageData(0,0,1080,1350).data; let n=0; for(let i=0;i<d.length;i+=4*97) if(d[i]<120) n++; return n; })();
     return {tit:document.querySelector('.rhc-box h2').textContent,nome:document.getElementById('rhc-nome').value,escuros:cnt,zap:!!document.querySelector('[data-act="rhc-zap"]')}; });
