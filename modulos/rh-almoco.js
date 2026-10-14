@@ -86,7 +86,7 @@
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Sem almoço e sem justificativa</span><b class="num">${st.semJust}</b><small>${st.just} justificados · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
     if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty" style="padding:24px;text-align:center">Nenhum dado do Face ID em ${esc(mesNome(A.mes))}. Importe o CSV do Control iD.</div></section>`;
     const abas=`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="dir" aria-pressed="${A.vis==='dir'}">Diretoria</button></div>`;
-    if(A.vis==='dir') return topo+`<section class="card"><div class="alm-f">${abas}<span style="flex:1"></span><button class="btn" data-act="alm-ppt" ${A.ppt?'disabled':''}>${P.ic('baixar',18,2.2)}${A.ppt?'Gerando…':'Baixar apresentação (PowerPoint)'}</button></div>${vDir(c,st)}</section>`;
+    if(A.vis==='dir') return topo+`<section class="card"><div class="alm-f">${abas}<span style="flex:1"></span><button class="btn sec" data-act="alm-pdf" ${A.pdf?'disabled':''}>${P.ic('baixar',18,2.2)}${A.pdf?'Gerando…':'Relatório em PDF'}</button><button class="btn" data-act="alm-ppt" ${A.ppt?'disabled':''}>${P.ic('baixar',18,2.2)}${A.ppt?'Gerando…':'Baixar apresentação (PowerPoint)'}</button></div>${vDir(c,st)}</section>`;
     const filtros=`<div class="alm-f">${abas}
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
       ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
@@ -125,6 +125,56 @@
       <div class="alm-dc"><h3>Custo estimado</h3><label class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Valor por refeição <input class="txt num" id="alm-valor" inputmode="decimal" placeholder="R$ 0,00" value="${st.valor?String(st.valor).replace('.',','):''}" style="max-width:120px"><button class="btn sec rh-sm" data-act="alm-valor">Salvar</button></label>
         ${st.valor?`<div class="alm-big num">${R$(st.custo)}</div><div class="sub">${st.tot} almoços × ${R$(st.valor)}${st.ant&&st.ant.tot?' · mês anterior: '+R$(st.ant.tot*st.valor):''}</div>`:'<div class="sub" style="margin-top:8px">Informe o valor da refeição para ver o custo do mês (fica guardado para os próximos meses).</div>'}</div>
       <div class="alm-dc"><h3>Observações</h3><ul class="alm-obs"><li>${st.cafe} passagens no refeitório antes das ${esc(cfg().cafeAte)} (café), fora da conta do almoço.</li><li>${st.ajN?st.ajN+' '+(st.ajN===1?'dia corrigido':'dias corrigidos')+' à mão pelo RH.':'Nenhuma correção à mão.'}</li><li>${st.semJust} dias sem almoço e sem justificativa · ${st.just} justificados · ${st.fora} ${st.fora===1?'pessoa não almoça':'pessoas não almoçam'} na empresa.</li><li>Fonte: Face ID (Control iD), ${esc(c.br(st.de))} a ${esc(c.br(st.ate))}.</li></ul></div></div>`; }
+  /* ---------- relatório em PDF para a diretoria (A4, 2 páginas) ---------- */
+  async function gerarPdf(){ const c=A.ctx, P=c.P, st=stats(A.mes); if(!st) return; A.pdf=true; P.rerender();
+    try{ if(!window.jspdf) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      const pdf=new window.jspdf.jsPDF('p','mm','a4'), W=210, ML=14, CW=W-2*ML; const T=[27,92,122], INK=[26,26,26], MU=[107,101,88], BG=[245,241,232], LT=[199,220,230], AM=[138,90,0];
+      const R$=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}), cor=(a,f)=>{ pdf[f?'setFillColor':'setTextColor'](a[0],a[1],a[2]); };
+      const logo=document.querySelector('.brand img'); const lw=34, lh=logo&&logo.naturalWidth?lw*logo.naturalHeight/logo.naturalWidth:9;
+      const cab=(pg)=>{ cor(T,1); pdf.rect(0,0,W,3,'F'); if(logo&&logo.src){ try{ pdf.addImage(logo.src,'PNG',W-ML-lw,9,lw,lh); }catch(e){} }
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(18); cor(INK); pdf.text('Refeitório · '+mesNome(st.m),ML,17);
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); cor(MU); pdf.text('Controle do almoço pelo Face ID (Control iD) · dados de '+c.br(st.de)+' a '+c.br(st.ate),ML,23);
+        pdf.setFontSize(8); pdf.text('Gerado em '+new Date().toLocaleString('pt-BR')+' · Painel de Operação Colafix · página '+pg,ML,290); };
+      const tit=(t,y)=>{ pdf.setFont('helvetica','bold'); pdf.setFontSize(12); cor(INK); pdf.text(t,ML,y); };
+      cab(1);
+      /* números */
+      const K=[['Almoços no mês',st.tot.toLocaleString('pt-BR'),st.dExp+' dias de expediente'],['Média por dia',String(st.media),st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'],['Adesão',st.ades+'%','de quem estava na empresa'],
+        st.valor?['Custo estimado',R$(st.custo),st.tot+' × '+R$(st.valor)]:['Pessoas que almoçaram',String(st.pessoas),'no mês']];
+      const kw=(CW-9)/4; K.forEach((k,i)=>{ const x=ML+i*(kw+3); cor(BG,1); pdf.roundedRect(x,30,kw,30,2.5,2.5,'F'); pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); cor(MU); pdf.text(k[0],x+4,37);
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(k[1].length>9?15:22); cor(T); pdf.text(k[1],x+4,49); pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); cor(MU); pdf.text(pdf.splitTextToSize(k[2],kw-8),x+4,55); });
+      /* almoços por dia */
+      tit('Almoços por dia',72); pdf.setFont('helvetica','normal'); pdf.setFontSize(8); cor(T,1); pdf.rect(W-ML-62,68.5,3,3,'F'); cor(MU); pdf.text('almoçaram',W-ML-58,71); cor(LT,1); pdf.rect(W-ML-38,68.5,3,3,'F'); pdf.text('na empresa',W-ML-34,71);
+      { const x0=ML+8, y0=76, h=58, w=CW-8, n=st.pd.length, mx=Math.max(10,...st.pd.map(x=>x.pres)), top=Math.ceil(mx/10)*10, slot=w/n, bw=Math.min(9,slot*0.72), yy=v=>y0+h-h*v/top;
+        pdf.setDrawColor(229,223,208); pdf.setLineWidth(0.2); [0,top/2,top].forEach(v=>{ pdf.line(x0,yy(v),x0+w,yy(v)); pdf.setFontSize(7); cor(MU); pdf.text(String(v),x0-2,yy(v)+1,{align:'right'}); });
+        st.pd.forEach((x,i)=>{ const X=x0+i*slot+(slot-bw)/2; cor(LT,1); pdf.rect(X,yy(x.pres),bw,yy(0)-yy(x.pres),'F'); cor(T,1); pdf.rect(X+bw*0.18,yy(x.alm),bw*0.64,yy(0)-yy(x.alm),'F');
+          pdf.setFontSize(6.8); cor(MU); pdf.text(x.d.slice(8),X+bw/2,y0+h+4,{align:'center'}); if(x.pres>=mx*0.4){ pdf.setFont('helvetica','bold'); cor(INK); pdf.text(String(x.alm),X+bw/2,yy(x.alm)-1.2,{align:'center'}); pdf.setFont('helvetica','normal'); } }); }
+      /* por empresa e por dia da semana */
+      const barras=(xs,x,y,w,fmt)=>{ const mx=Math.max(1,...xs.map(z=>z.v)); xs.forEach((z,i)=>{ const yy=y+i*9; pdf.setFont('helvetica','normal'); pdf.setFontSize(9); cor(INK); pdf.text(z.l,x,yy+3.2); cor(BG,1); pdf.roundedRect(x+28,yy,w-58,4.5,2,2,'F'); cor(T,1); pdf.roundedRect(x+28,yy,Math.max(2,(w-58)*z.v/mx),4.5,2,2,'F');
+        pdf.setFont('helvetica','bold'); pdf.text(fmt(z),x+w-28,yy+3.4); pdf.setFont('helvetica','normal'); }); };
+      tit('Por empresa',152); barras(st.porEmp.slice(0,6).map(z=>({l:z.e.slice(0,16),v:z.alm,p:z.pessoas})),ML,157,CW/2-4,z=>z.v+'  ('+z.p+' pessoas)');
+      { const x=ML+CW/2+4; pdf.setFont('helvetica','bold'); pdf.setFontSize(12); cor(INK); pdf.text('Média por dia da semana',x,152); barras(st.porSem.map(z=>({l:z.w,v:z.m})),x,157,CW/2-4,z=>String(z.v)); }
+      /* faltas e observações */
+      let y=Math.max(157+st.porEmp.slice(0,6).length*9,157+st.porSem.length*9)+8; tit('Faltas ao almoço',y); y+=6;
+      const F=[['Sem almoço e sem justificativa',st.semJust,AM],['Justificados',st.just,T],['Pessoas que não almoçam na empresa',st.fora,MU]];
+      F.forEach((f,i)=>{ const x=ML+i*(CW/3); pdf.setFont('helvetica','bold'); pdf.setFontSize(18); cor(f[2]); pdf.text(String(f[1]),x,y+7); pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); cor(MU); pdf.text(pdf.splitTextToSize(f[0],CW/3-6),x,y+12); }); y+=24;
+      tit('Observações',y); y+=6; pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); cor(INK);
+      const ob=['Almoço = passagem "Autorizado" no leitor do refeitório entre '+cfg().ini+' e '+cfg().fim+'. Quem estava na empresa e não passou lá conta como "sem almoço".',st.cafe+' passagens no refeitório antes das '+cfg().cafeAte+' (café da manhã), fora da conta do almoço.',
+        st.ajN?st.ajN+' '+(st.ajN===1?'dia foi corrigido':'dias foram corrigidos')+' à mão pelo RH.':'Nenhuma correção à mão no mês.',st.fora?st.fora+' '+(st.fora===1?'pessoa marcada':'pessoas marcadas')+' como "não almoça na empresa" ficam fora da adesão.':null,
+        st.semCad?st.semCad+' pessoas que almoçaram não estão no cadastro do RH (prestadores e terceirizados).':null].filter(Boolean);
+      ob.forEach(t=>{ const L=pdf.splitTextToSize(t,CW-6); if(y+L.length*4.5>282){ pdf.addPage(); cab(2); y=32; } pdf.text('•',ML,y); pdf.text(L,ML+4,y); y+=L.length*4.5+1.5; });
+      /* página 2: resumo por pessoa */
+      pdf.addPage(); cab(2); tit('Almoços por pessoa'+(st.valor?' e desconto':''),33); pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); cor(MU); pdf.text('Em ordem alfabética. Sem just. = dias na empresa sem almoço e sem justificativa · J = justificado'+(st.valor?' · desconto = almoços × '+R$(st.valor):'')+'.',ML,38.5);
+      const ds=Object.keys(A.dados[st.m].dias||{}).sort(); const G=(()=>{ const q=A.q,e=A.emp,se=A.setor,si=A.sit; A.q='';A.emp='';A.setor='';A.sit=''; try{ return grade(ds,pessoasDoMes(st.m)); } finally{ A.q=q;A.emp=e;A.setor=se;A.sit=si; } })()
+        .filter(g=>g.pres||g.tot).sort((a,b)=>a.p.nome.localeCompare(b.p.nome));
+      const cols=st.valor?[['Nome',62],['Empresa',30],['Setor',26],['Almoços',15],['Sem just.',15],['J',8],['Desconto',26]]:[['Nome',70],['Empresa',34],['Setor',30],['Almoços',14],['Sem just.',14],['J',10]]; let yt=45;
+      const linha=(vals,bold,fundo)=>{ if(fundo){ cor(BG,1); pdf.rect(ML,yt-3.6,CW,5.2,'F'); } let x=ML+1; pdf.setFont('helvetica',bold?'bold':'normal'); pdf.setFontSize(8.3); cor(INK);
+        vals.forEach((v,i)=>{ const w=cols[i][1]; const t=String(v==null?'':v); pdf.text(i>=3?t:pdf.splitTextToSize(t,w-2)[0],i>=3?x+w-3:x,yt,i>=3?{align:'right'}:undefined); x+=w; }); yt+=5.2; };
+      linha(cols.map(x=>x[0]),true,true);
+      G.forEach((g,i)=>{ if(yt>282){ pdf.addPage(); cab(pdf.getNumberOfPages()); yt=34; linha(cols.map(x=>x[0]),true,true); } linha([g.p.nome,empCurta(g.p.emp),g.p.setor||'—',g.tot,g.sj||'',g.jj||''].concat(st.valor?[R$(g.tot*st.valor)]:[]),false,i%2===1); });
+      if(st.valor){ if(yt>280){ pdf.addPage(); cab(pdf.getNumberOfPages()); yt=34; } yt+=1; linha(['Total ('+G.length+' pessoas)','','',G.reduce((a,g)=>a+g.tot,0),G.reduce((a,g)=>a+g.sj,0)||'',G.reduce((a,g)=>a+g.jj,0)||'',R$(G.reduce((a,g)=>a+g.tot,0)*st.valor)],true,true); }
+      pdf.setProperties({title:'Refeitório '+mesNome(st.m)}); const blob=pdf.output('blob'); c.baixar(blob,'Refeitorio-'+st.m+'.pdf'); P.toast('Relatório em PDF baixado.'); }
+    catch(e){ console.warn('[almoço] pdf',e); P.toast('Não consegui gerar o PDF: '+((e&&e.message)||e)); }
+    finally{ A.pdf=false; P.rerender(); } }
   /* ---------- apresentação (PowerPoint) ---------- */
   async function gerarPpt(){ const c=A.ctx, P=c.P, st=stats(A.mes); if(!st) return; A.ppt=true; P.rerender();
     try{ if(!window.PptxGenJS) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js');
@@ -227,8 +277,8 @@
     const aj=Object.assign({},cur.aj||{}); aj[d+'_'+k]=it; const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k},it)]).slice(-500);
     try{ await ref.set({mes:m,aj,log}); P.toast('Ajuste guardado.'); }catch(e){ P.erro(e); } }
   async function excel(){ const c=A.ctx, D=A.dados[A.mes]; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes));
-    const cab=['Nome','CPF','Empresa','Setor'].concat(ds.map(d=>d.slice(8)+'/'+d.slice(5,7)),['Almoços','Sem justificativa','Justificados','Dias na empresa']);
-    const L=[cab].concat(G.map(g=>[g.p.nome,c.fCPF(g.p.k),empCurta(g.p.emp),g.p.setor].concat(g.v.map(s=>s.v==='sim'?1:s.v==='nao'?0:s.v==='just'?'J':s.v==='fora'?'F':''),[g.tot,g.sj,g.jj,g.pres])));
+    const cab=['Nome','CPF','Empresa','Setor'].concat(ds.map(d=>d.slice(8)+'/'+d.slice(5,7)),['Almoços','Sem justificativa','Justificados','Dias na empresa'].concat(+cfg().valor?['Desconto (R$)']:[]));
+    const L=[cab].concat(G.map(g=>[g.p.nome,c.fCPF(g.p.k),empCurta(g.p.emp),g.p.setor].concat(g.v.map(s=>s.v==='sim'?1:s.v==='nao'?0:s.v==='just'?'J':s.v==='fora'?'F':''),[g.tot,g.sj,g.jj,g.pres].concat(+cfg().valor?[Math.round(g.tot*(+cfg().valor)*100)/100]:[]))));
     if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const ws=XLSX.utils.aoa_to_sheet(L); ws['!cols']=cab.map((_,i)=>({wch:i===0?32:i<4?16:i>=cab.length-2?14:6})); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Almoço '+A.mes);
     c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Almoco-'+A.mes+'.xlsx'); }
@@ -256,6 +306,7 @@
     if(a==='alm-pesx'||(a==='alm-pesx-fundo'&&ev.target===b)){ A.pes=null; P.rerender(); return; }
     if(a==='alm-aj2'){ ajustar(b.dataset.k,b.dataset.d,b.dataset.v); return; }
     if(a==='alm-ppt'){ gerarPpt(); return; }
+    if(a==='alm-pdf'){ gerarPdf(); return; }
     if(a==='alm-valor'){ const v=parseFloat(String((document.getElementById('alm-valor')||{}).value||'').replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
       P.db().doc('rh/config').set({almoco:Object.assign({},(A.ctx.R.cfg&&A.ctx.R.cfg.almoco)||{},{valor:v})},{merge:true}).then(()=>{ if(A.ctx.R.cfg){ A.ctx.R.cfg.almoco=Object.assign({},A.ctx.R.cfg.almoco||{},{valor:v}); } P.toast(v?'Valor da refeição guardado.':'Valor apagado.'); P.rerender(); }).catch(e=>P.erro(e)); return; } });
   document.addEventListener('change',ev=>{ const t=ev.target; if(!A.ctx) return;
