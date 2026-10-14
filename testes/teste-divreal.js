@@ -4,7 +4,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
 (async()=>{ const {d}=H.seed((d)=>{ const D=d.docs; const h=new Date(); const cp=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); const ago=dd=>new Date(Date.now()-dd*864e5).toISOString();
   const L=['Linha 1','Linha 2','Rejunte M1','Rejunte M2'];
   Object.assign(D['config/geral'],{linhas:L,linhasOrdem:L,capacidade:{'Linha 1':7500,'Linha 2':7500,'Rejunte M1':300,'Rejunte M2':300},
-    ritmo:{linhas:L,itens:{AC0003:{d:{'Linha 1':50,'Linha 2':50}},AB0001:{d:{'Linha 2':100}}},jornada:528}});
+    ritmo:{linhas:L,itens:{AC0003:{d:{'Linha 1':50,'Linha 2':50}},AB0001:{d:{'Linha 2':100}}},jornada:528,aj1410:(process.env.AUTO?undefined:{teste:true})}});
   D['pcpbase/prev']={mes:{[cp]:{AC0003:30000,AB0001:10000,RE0067:2000,RE0074:1500}}};
   D['pcpbase/itens']={l:{AC0003:{d:'ARGAMASSA CINZA AC2 EMB PAPEL 20 KG'},AB0001:{d:'ARGAMASSA BRANCA AC3 EMB PLASTICA 20 KG'},RE0067:{d:'REJUNTE FLEXIVEL CINZA 1 KG'},RE0074:{d:'REJUNTE FLEXIVEL BRANCO 1 KG'}}};
   D['itens/RE0067']={codigo:'RE0067',linhas:['Rejunte M1','Rejunte M2']}; D['itens/RE0074']={codigo:'RE0074',linhas:['Rejunte M1','Rejunte M2']};

@@ -185,6 +185,17 @@ function ritReal(c,LS){ const a=(ritDivReal().it||{})[c]; if(!a) return null; le
 /* maior diferença, em pontos de %, entre a divisão configurada (dv, frações) e a real */
 function ritDifDv(dv,real){ if(!real) return 0; let m=0; new Set(Object.keys(dv).concat(Object.keys(real.d))).forEach(l=>{ m=Math.max(m,Math.abs((dv[l]||0)-(real.d[l]||0))*100); }); return Math.round(m); }
 function ritDvTxt(d){ return Object.entries(d).filter(([,v])=>v>0.004).sort((a,b)=>b[1]-a[1]).map(([l,v])=>l.replace(/^Linha\s*/i,'L').replace(/^Rejunte\s*/i,'')+' '+Math.round(v*100)+'%').join(' · '); }
+/* 14/10 (pedido da Iasmyn): ajuste único, feito sozinho no painel da dona — troca pela divisão real os itens digitados que não batem (≥15 pontos).
+   Guarda o que era antes em ritmo.aj1410.antes, para poder desfazer. */
+function ritAjusteUnico(){ try{ if(!S.db||!(S.acs&&S.acs.dono)) return false; const r=S.cfg&&S.cfg.ritmo; if(!r||!r.itens||!Array.isArray(r.linhas)||r.aj1410) return !!(r&&r.aj1410);
+    if(!(S.entregas||[]).length||!(S.ordens||[]).length) return false;
+    const itens=JSON.parse(JSON.stringify(r.itens)), antes={}, mud=[];
+    for(const c in itens){ const it=itens[c], real=ritReal(c,r.linhas); if(!real) continue; if(ritDifDv(ritEdDv(it),real)<RIT_DIV_DIF) continue; antes[c]=it.d; itens[c]=Object.assign({},it,{d:ritRealPct(real)}); mud.push(c); }
+    const ritmo=Object.assign({},r,{itens,aj1410:{em:new Date().toISOString(),itens:mud,antes}});
+    S.cfg.ritmo=ritmo; S.anl._c=null;
+    S.db.doc('config/geral').update({ritmo}).then(()=>{ if(mud.length) toast('Curva S: divisão entre as linhas ajustada pelo real em '+mud.length+' ite'+(mud.length>1?'ns':'m')+' ('+mud.join(', ')+').'); rerenderSeguro(); }).catch(e=>console.warn('[curva] ajuste',e));
+    return true; }catch(e){ console.warn('[curva] ajuste',e); return true; } }
+(function(){ let n=0; const t=setInterval(()=>{ if(++n>120||ritAjusteUnico()) clearInterval(t); },5000); })();
 function ritDados(cp,fonte){
   const P=S.anl.base.prev||{}; const pm=(P.mes||{})[cp]; if(!pm) return null;
   const C=ritCfg(), LT=linhasOrd(), LS=C.linhas.filter(l=>LT.includes(l)); if(!LS.length) return null;
@@ -707,7 +718,7 @@ async function ritSalvarCfg(){ const E=S.rit.ed; if(!E||S.rit.salvando) return; 
   if(ruim){ toast('Não entendi o feriado "'+ruim+'". Use dd/mm/aaaa.'); return; }
   const itens={}; for(const c in E.itens){ const it=E.itens[c], d={}; let s=0; E.linhas.forEach(l=>{ const v=+String((it.d||{})[l]==null?'':it.d[l]).replace(',','.'); if(v>0){ d[l]=Math.round(v*100)/100; s+=v; } });
     if(!s){ toast(c+': informe a % de pelo menos uma linha.'); return; } itens[c]={d}; if(+it.f>1.01) itens[c].f=RIT_PL; }
-  const ritmo={linhas:E.linhas,itens,jornada:Math.max(60,Math.min(1440,+E.jornada||528)),em:new Date().toISOString(),por:S.uid||null};
+  const ritmo={linhas:E.linhas,itens,jornada:Math.max(60,Math.min(1440,+E.jornada||528)),em:new Date().toISOString(),por:S.uid||null,aj1410:((S.cfg&&S.cfg.ritmo)||{}).aj1410||{em:new Date().toISOString(),manual:true}};
   S.rit.salvando=true; render();
   try{ await S.db.doc('config/geral').update({ritmo,feriados:[...new Set(fer)].sort()}); S.cfg.ritmo=ritmo; S.cfg.feriados=[...new Set(fer)].sort(); S.anl._c=null; S.rit.cfg=false; S.rit.ed=null; toast('Acompanhamento salvo.'); }
   catch(e){ erro(e); } S.rit.salvando=false; render(); }
