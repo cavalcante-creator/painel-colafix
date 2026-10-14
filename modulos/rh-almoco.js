@@ -63,7 +63,7 @@
   function pessoasDoMes(m){ const c=A.ctx, D=A.dados[m]||{}, P0=D.pessoas||{}, fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>ks.add(x.split('_')[1]));
     return [...ks].map(k=>{ const p=P0[k]||{}, f=fx[k]; return {k,nome:f?titulo(f.nome):(p.n||'(sem nome)'),emp:p.e||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX INDUSTRIA E COMERCIO LTDA'):''),setor:f?(f.setor||''):'',cad:!!f,grupo:p.g||''}; })
-      .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))&&(!A.q||nrm(p.nome).includes(nrm(A.q))))
+      .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))) /* a busca por nome filtra na própria tela (almBusca), sem redesenhar */
       .sort((a,b)=>a.nome.localeCompare(b.nome)); }
   const empCurta=e=>!e?'Sem empresa':/COLAFIX/i.test(e)?'Colafix':titulo(e);
 
@@ -83,7 +83,7 @@
     if(A.vis==='dir') return topo+`<section class="card"><div class="alm-f">${abas}<span style="flex:1"></span><button class="btn" data-act="alm-ppt" ${A.ppt?'disabled':''}>${P.ic('baixar',18,2.2)}${A.ppt?'Gerando…':'Baixar apresentação (PowerPoint)'}</button></div>${vDir(c,st)}</section>`;
     const filtros=`<div class="alm-f">${abas}
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
-      <input class="txt" id="alm-q" placeholder="Buscar nome" value="${esc(A.q)}" style="max-width:220px">
+      <input class="txt" id="alm-q" type="search" autocomplete="off" placeholder="Buscar nome, setor ou CPF" value="${esc(A.q)}" style="max-width:260px"><span class="sub" id="alm-qn"></span>
       ${A.vis==='mes'?`<span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-xls">${P.ic('baixar',16,2.2)}Excel</button><button class="btn sec rh-sm" data-act="alm-imp">Imprimir</button>`:''}</div>`;
     return topo+`<section class="card">${filtros}${A.vis==='dia'?vDia(c,ds,ps):vMes(c,ds,ps)}</section>`; }
   function mesAnt(m){ const [y,mm]=m.split('-').map(Number), d=new Date(y,mm-2,1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
@@ -157,7 +157,7 @@
   function vDia(c,ds,ps){ const esc=c.esc, m=A.mes, d=A.dia;
     const L=ps.map(p=>Object.assign({s:situacao(m,d,p.k)},p)), sim=L.filter(x=>x.s.v==='sim'), nao=L.filter(x=>x.s.v==='nao');
     const tira=`<div class="alm-dias">${ds.map(x=>{ const n=ps.filter(p=>situacao(m,x,p.k).v==='sim').length; return `<button data-act="alm-dia" data-v="${x}" aria-pressed="${x===d}"><small>${semana(x)}</small><b>${x.slice(8)}</b><span>${n}</span></button>`; }).join('')}</div>`;
-    const lin=(x,bt)=>`<div class="alm-l"><div><b>${esc(x.nome)}</b><small>${esc([empCurta(x.emp),x.setor].filter(Boolean).join(' · '))}${x.cad?'':' · sem cadastro no RH'}</small></div>
+    const lin=(x,bt)=>`<div class="alm-l" data-b="${esc(almChave(x))}"><div><b>${esc(x.nome)}</b><small>${esc([empCurta(x.emp),x.setor].filter(Boolean).join(' · '))}${x.cad?'':' · sem cadastro no RH'}</small></div>
       <div class="alm-r">${x.s.x&&x.s.x.a?`<span class="num">${esc(x.s.x.a)}</span>`:''}${x.s.x&&x.s.x.c?`<small>café ${esc(x.s.x.c)}</small>`:''}${x.s.aj?`<small title="${esc(x.s.aj.mot||'')}">ajustado por ${esc(x.s.aj.por||'')}</small>`:''}${bt}</div></div>`;
     return `${tira}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram</span> <span class="pill warn">${nao.length} vieram e não almoçaram</span></div>
       <div class="alm-g"><div><div class="label">ALMOÇARAM</div>${sim.map(x=>lin(x,`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="nao">não almoçou</button>`)).join('')||'<div class="sub">Ninguém.</div>'}</div>
@@ -167,7 +167,7 @@
     const porEmp={}; G.forEach(g=>{ const e=empCurta(g.p.emp); porEmp[e]=(porEmp[e]||0)+g.tot; });
     return `<div class="sub" style="margin:4px 0 10px">✓ almoçou · ✗ veio e não passou no refeitório · em branco: não veio. Clique num dia para corrigir. Totais: ${Object.entries(porEmp).map(([e,n])=>`<b>${esc(e)}</b> ${n}`).join(' · ')}</div>
       <div class="alm-tw"><table class="alm-t"><thead><tr><th class="alm-n">Pessoa</th>${ds.map(d=>`<th><small>${semana(d)}</small>${d.slice(8)}</th>`).join('')}<th>Almoços</th><th>Dias na empresa</th></tr></thead>
-      <tbody>${G.map(g=>`<tr><td class="alm-n"><b>${esc(g.p.nome)}</b><small>${esc(empCurta(g.p.emp))}${g.p.setor?' · '+esc(g.p.setor):''}</small></td>${g.v.map((s,i)=>`<td class="alm-c ${s.v}${s.aj?' aj':''}" data-act="alm-cel" data-k="${g.p.k}" data-d="${ds[i]}" title="${s.aj?'Ajustado: '+esc(s.aj.mot||''):s.x&&s.x.a?'Refeitório '+esc(s.x.a):''}">${s.v==='sim'?'✓':s.v==='nao'?'✗':''}</td>`).join('')}<td class="num"><b>${g.tot}</b></td><td class="num">${g.pres}</td></tr>`).join('')}</tbody></table></div>`; }
+      <tbody>${G.map(g=>`<tr data-b="${esc(almChave(g.p))}"><td class="alm-n"><b>${esc(g.p.nome)}</b><small>${esc(empCurta(g.p.emp))}${g.p.setor?' · '+esc(g.p.setor):''}</small></td>${g.v.map((s,i)=>`<td class="alm-c ${s.v}${s.aj?' aj':''}" data-act="alm-cel" data-k="${g.p.k}" data-d="${ds[i]}" title="${s.aj?'Ajustado: '+esc(s.aj.mot||''):s.x&&s.x.a?'Refeitório '+esc(s.x.a):''}">${s.v==='sim'?'✓':s.v==='nao'?'✗':''}</td>`).join('')}<td class="num"><b>${g.tot}</b></td><td class="num">${g.pres}</td></tr>`).join('')}</tbody></table></div>`; }
   async function ajustar(k,d,v){ const c=A.ctx, P=c.P, m=d.slice(0,7); const mot=prompt(v==='sim'?'Motivo (ex.: almoçou sem passar o rosto):':'Motivo (ex.: passou no refeitório mas não almoçou):'); if(mot===null) return;
     const ref=P.db().doc('rh/dados/almocoaj/'+m); const cur=A.aj[m]||{mes:m,aj:{},log:[]}; const it={v,mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()};
     const aj=Object.assign({},cur.aj||{}); aj[d+'_'+k]=it; const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k},it)]).slice(-500);
@@ -197,7 +197,13 @@
   document.addEventListener('change',ev=>{ const t=ev.target; if(!A.ctx) return;
     if(t.id==='alm-arq'&&t.files&&t.files[0]){ importar(t.files[0]); t.value=''; }
     if(t.id==='alm-emp'){ A.emp=t.value; A.ctx.P.rerender(); } });
-  document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='alm-q'&&A.ctx){ A.q=t.value; clearTimeout(A._qt); A._qt=setTimeout(()=>{ A.ctx.P.rerender(); setTimeout(()=>{ const i=document.getElementById('alm-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },0); },300); } });
+  /* busca: todas as palavras, sem acento, em qualquer ordem (nome, setor, empresa ou CPF) */
+  function almChave(p){ return nrm([p.nome,p.setor,empCurta(p.emp)].join(' '))+' '+p.k; }
+  function almBusca(){ const ws=nrm(A.q).split(/\s+/).filter(Boolean), dq=String(A.q||'').replace(/\D/g,''); let n=0, t=0;
+    document.querySelectorAll('#view [data-b]').forEach(el=>{ const b=el.dataset.b; const ok=!ws.length||ws.every(w=>b.includes(w))||(dq.length>=3&&b.slice(-11).includes(dq)); el.hidden=!ok; t++; if(ok) n++; });
+    const q=document.getElementById('alm-qn'); if(q) q.textContent=ws.length?(n?n+' encontrado'+(n===1?'':'s'):'Ninguém com esse nome neste mês'):''; }
+  document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='alm-q'&&A.ctx){ A.q=t.value; almBusca(); } });
+  { const P0=window.Painel; if(P0&&P0.rerender){ new MutationObserver(()=>{ if(A.q&&document.getElementById('alm-q')) almBusca(); }).observe(document.getElementById('view')||document.body,{childList:true}); } }
   document.addEventListener('dragover',ev=>{ if(A.ctx&&A.ctx.P.S.view==='rhalmoco') ev.preventDefault(); });
   document.addEventListener('drop',ev=>{ if(!A.ctx||A.ctx.P.S.view!=='rhalmoco') return; const f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(!f) return; ev.preventDefault(); importar(f); });
   document.head.insertAdjacentHTML('beforeend',`<style id="alm-css">

@@ -26,6 +26,12 @@ const csv='/tmp/claude-almoco-teste.csv'; fs.writeFileSync(csv,Buffer.from(linha
  p.once('dialog',dg=>dg.accept('almoçou sem passar o rosto')); await p.click('[data-act="alm-aj"][data-k="22222222222"]'); await H.dorme(800);
  const t2=await p.evaluate(()=>document.getElementById('view').innerText); const aj=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/dados/almocoaj/2026-10']);
  ok('Ajuste à mão: Bruno passa para "almoçou", com motivo e quem ajustou, e fica no histórico', /2 almoçaram/.test(t2)&&aj.aj['2026-10-13_22222222222'].v==='sim'&&aj.aj['2026-10-13_22222222222'].mot==='almoçou sem passar o rosto'&&aj.log.length===1, JSON.stringify(aj).slice(0,200));
+ const vis=()=>p.evaluate(()=>[...document.querySelectorAll('#view [data-b]')].filter(e=>!e.hidden).map(e=>e.querySelector('b').textContent));
+ await p.click('#alm-q'); await p.keyboard.type('teste ana',{delay:40}); await H.dorme(200); const v1=await vis(); const foco=await p.evaluate(()=>document.activeElement&&document.activeElement.id);
+ await p.fill('#alm-q','brúno'); await p.dispatchEvent('#alm-q','input'); await H.dorme(150); const v2=await vis();
+ await p.fill('#alm-q','2222'); await p.dispatchEvent('#alm-q','input'); await H.dorme(150); const v3=await vis(); const qn=await p.evaluate(()=>document.getElementById('alm-qn').textContent);
+ ok('Busca: palavras em qualquer ordem, sem acento, ou parte do CPF; o campo não perde o foco enquanto digita', v1.join()==='Ana Teste'&&foco==='alm-q'&&v2.join()==='Bruno Teste'&&v3.join()==='Bruno Teste'&&/1 encontrado/.test(qn), JSON.stringify({v1,v2,v3,foco,qn}));
+ await p.fill('#alm-q',''); await p.dispatchEvent('#alm-q','input');
  await p.click('[data-act="alm-vis"][data-v="mes"]'); await H.dorme(400); const t3=await p.evaluate(()=>document.querySelector('.alm-t').innerText);
  ok('Mês (fechamento): grade por pessoa com total de almoços', /Ana Teste[\s\S]*✓/.test(t3)&&/Bruno Teste/.test(t3), t3.replace(/\n/g,' | ').slice(0,240));
  await p.click('[data-act="alm-vis"][data-v="dir"]'); await H.dorme(500); const t4=await p.evaluate(()=>document.getElementById('view').innerText);
