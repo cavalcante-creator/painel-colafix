@@ -1142,3 +1142,62 @@ document.head.insertAdjacentHTML('beforeend',`<style id="etq-css">.etq{border:1.
 .etq-pvb img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.etq-pv small{color:var(--muted)}
 @media (max-width:860px){.etq-g{grid-template-columns:minmax(0,1fr)}}</style>`);
 /* ===FIM ETIQUETA DO CRACHÁ=== */
+/* ===================== RANCHO NO CELULAR DO ALMOX · VISUAL DIDÁTICO (14/10) ===================== */
+/* Só muda a aparência das telas do celular do almox (cargo almoxcel): passos 1-2-3 no topo, cartão grande do rancho,
+   "o que fazer agora" em destaque, barra de progresso da conferência, botão principal grande em cima e Cancelar discreto.
+   A lógica (leitura, gravação) não muda. */
+function rdPasso(h){ const T=S.tt; if(T.fase==='rcok') return 4; if(T.fase==='espera') return 1; if(/class="cf-l"|crachá de quem vai conferir|Carregando os itens/.test(h)) return 2; return 3; }
+function rdPassos(n){ const P=[['1','Folha','Ler o QR'],['2','Conferir','Item a item'],['3','Entregar','Na linha']];
+  return `<ol class="rd-pas" aria-label="Passo ${Math.min(n,3)} de 3">${P.map(([k,t,s],i)=>{ const st=i+1<n?'feito':i+1===n?'agora':''; return `<li class="${st}"><span class="rd-n">${st==='feito'?ic('check',16,3):k}</span><b>${t}</b><small>${s}</small></li>`; }).join('')}</ol>`; }
+function rdCartao(){ const T=S.tt, R=T.rch; if(!R) return ''; const o=ordById(R.oid); const irm=o?dbIrmas(o):[]; const ls=[...new Set(irm.map(x=>x.linha).filter(Boolean))];
+  const prod=o?String(o.produto||'').replace(/^[A-Z0-9]+\s*[-—]\s*/,''):'';
+  return `<div class="rd-rc"><div class="rd-rcn"><span>RANCHO</span><b class="num">${esc(R.num)}</b></div><div class="rd-rci">${ls.map(l=>`<span class="rd-ln">${esc(l)}</span>`).join('')}<small>${irm.length>1?'Ordens ':'Ordem '}${irm.map(x=>esc(x.num)).join(', ')}</small>${prod?`<small class="rd-pr">${esc(prod.slice(0,48))}${irm.length>1?' e outras':''}</small>`:''}</div></div>`; }
+{ const _vt=vTotem; vTotem=function(){ let h=_vt.apply(this,arguments); try{ if(!ttEntrega()||typeof h!=='string'||h.indexOf('tt-cel')<0) return h;
+    const n=rdPasso(h), T=S.tt;
+    /* passos logo abaixo do topo */
+    const i=h.indexOf('</div></div>',h.indexOf('tt-top')); if(i>=0) h=h.slice(0,i+12)+rdPassos(n)+h.slice(i+12);
+    /* cartão grande do rancho no lugar da linha "Rancho X · ordens · linhas" */
+    if(T.rch) h=h.replace(/<div class="tt-ola">Rancho <b>[^<]*<\/b>[^<]*<\/div>/,rdCartao());
+    /* barra de progresso da conferência */
+    h=h.replace(/<div class="cf-n num">(\d+) de (\d+) conferidos<\/div>/,(m,a,b)=>{ const p=+b?Math.round(+a/+b*100):0; return `<div class="rd-prog ${+a===+b?'ok':''}"><div class="rd-progt"><b class="num">${a} de ${b}</b><span>${+a===+b?'Tudo conferido. Toque em Concluir.':'Toque em OK em cada item que está certo'}</span></div><div class="rd-bar"><i style="width:${p}%"></i></div></div>`; });
+    /* "o que fazer agora" */
+    h=h.replace(/<div class="tt-rcq">/g,'<div class="tt-rcq rd-agora"><span class="rd-tag">AGORA</span>');
+    if(n===1) h=h.replace('<div class="tt-box">','<div class="tt-box rd-agora1"><span class="rd-tag">AGORA</span>');
+    h=h.replace('✅ Recebi o rancho',ic('check',22,3)+' Recebi o rancho');
+  }catch(e){ console.warn('[rancho celular]',e); } return h; }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="rd-css">
+body.tt-ent .tt-cel{gap:14px}
+body.tt-ent .tt-top b{font-size:22px}body.tt-ent .tt-clk{font-size:30px}
+.rd-pas{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;counter-reset:none}
+.rd-pas li{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 9px;border-radius:12px;background:var(--surface);border:2px solid var(--line);color:var(--muted);text-align:center;min-width:0}
+.rd-pas b{font-size:15px;color:inherit}.rd-pas small{font-size:11.5px;line-height:1.2}
+.rd-n{width:28px;height:28px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:var(--sunken);color:var(--ink-2)}
+.rd-pas li.agora{border-color:var(--teal);background:var(--teal-wash);color:var(--teal-strong)}.rd-pas li.agora .rd-n{background:var(--teal);color:#fff}
+.rd-pas li.feito{border-color:var(--ok);color:var(--ok-ink)}.rd-pas li.feito .rd-n{background:var(--ok);color:#fff}
+.rd-rc{display:flex;gap:14px;align-items:center;background:var(--teal-strong);color:#fff;border-radius:16px;padding:12px 16px}
+.rd-rcn{display:flex;flex-direction:column;line-height:1}.rd-rcn span{font-size:11px;font-weight:800;letter-spacing:.14em;opacity:.8}.rd-rcn b{font-size:34px;font-weight:800;letter-spacing:.02em;margin-top:4px}
+.rd-rci{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;min-width:0;flex:1}.rd-ln{background:#fff;color:var(--teal-strong);border-radius:999px;padding:2px 10px;font-weight:800;font-size:14px}
+.rd-rci small{flex-basis:100%;font-size:13px;opacity:.9}.rd-rci .rd-pr{opacity:.75;font-size:12px}
+.rd-agora{position:relative;background:var(--teal)!important;color:#fff!important;padding:22px 18px 16px!important;border-radius:16px;box-shadow:0 0 0 4px var(--teal-tint);animation:rdpul 2s ease-in-out infinite}
+.rd-agora b{font-size:22px!important;line-height:1.25}.rd-agora span:not(.rd-tag){opacity:.9}.rd-agora svg{flex-shrink:0;width:34px;height:34px}
+.rd-tag{position:absolute;top:-11px;left:14px;background:var(--warn);color:#2a1f05;font-size:11px;font-weight:900;letter-spacing:.14em;padding:3px 10px;border-radius:999px}
+.rd-agora1{position:relative;border:3px solid var(--teal);padding-top:22px}
+@keyframes rdpul{0%,100%{box-shadow:0 0 0 4px var(--teal-tint)}50%{box-shadow:0 0 0 9px var(--teal-tint)}}
+@media (prefers-reduced-motion:reduce){.rd-agora{animation:none}}
+.rd-prog{background:var(--surface);border-radius:14px;padding:12px 14px;border:2px solid var(--line)}.rd-prog.ok{border-color:var(--ok);background:var(--ok-tint)}
+.rd-progt{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.rd-progt b{font-size:24px}.rd-progt span{color:var(--muted);font-size:14px}.rd-prog.ok .rd-progt span{color:var(--ok-ink);font-weight:700}
+.rd-bar{height:12px;border-radius:999px;background:var(--sunken);overflow:hidden;margin-top:8px}.rd-bar i{display:block;height:100%;background:var(--ok);border-radius:999px;transition:width .25s}
+body.tt-ent .cf-i{min-height:84px;border-left-width:8px}body.tt-ent .cf-t b{font-size:15px;color:var(--muted)}body.tt-ent .cf-t small{font-size:17px;color:var(--ink);font-weight:700;margin-top:2px}
+body.tt-ent .cf-q{font-size:28px}body.tt-ent .cf-ok{height:60px;font-size:20px}
+body.tt-ent .tt-cel .tt-rod{flex-direction:column-reverse;align-items:stretch;gap:10px}
+body.tt-ent .tt-cel .tt-rod .btn{width:100%;min-width:0;height:64px;font-size:20px}
+body.tt-ent .tt-cel .tt-rod .btn.sec[data-act="tt-voltar"]{height:44px;font-size:16px;background:transparent;border:0;box-shadow:none;color:var(--muted);text-decoration:underline}
+body.tt-ent .tt-big{height:68px;font-size:21px}
+body.tt-ent .tt-ritens{max-height:none;border-top:0;margin:12px 0;display:flex;flex-direction:column;gap:6px}
+body.tt-ent .tt-ritens div{background:var(--surface-2);border:0;border-radius:10px;padding:10px 12px;font-size:16px;align-items:center}
+body.tt-ent .tt-ritens span{font-weight:800;font-size:18px;white-space:nowrap}
+body.tt-ent .tt-rec h1{font-size:30px}
+body.tt-ent .toast{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;left:12px;right:12px;transform:none;max-width:none;font-size:16px;text-align:center}
+body.tt-ent.tt-mira #tt-video{left:12px;right:auto;width:calc(100vw - 24px)!important}
+</style>`);
+/* ===FIM RANCHO NO CELULAR=== */

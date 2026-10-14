@@ -17,10 +17,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Celular do almox abre direto em "Escaneie o QR da folha", com câmera traseira e sem botão de sair', /Entrega de rancho/.test(e0.t)&&/Escaneie o QR da folha de produção/.test(e0.t)&&!e0.x&&e0.cam==='environment', 'câmera: '+e0.cam);
  const viu=await espera(()=>__T.S().tt.fase==='rancho'&&!!__T.S().tt.rch,20000); await H.dorme(400);
  const vis=await p.evaluate(()=>getComputedStyle(document.getElementById('tt-video')).display); const t1=await tela();
- ok('A câmera lê a folha: mostra o rancho, as ordens e pede o crachá de quem vai conferir (com visor da câmera)', viu&&/Rancho 123456/.test(t1)&&/5001, 5002/.test(t1)&&/crachá de quem vai conferir/.test(t1)&&!/Marcar como separado/.test(t1)&&vis==='block', t1.replace(/\n/g,' | ').slice(0,200));
+ ok('A câmera lê a folha: mostra o rancho, as ordens e pede o crachá de quem vai conferir (com visor da câmera)', viu&&/RANCHO\s+123456/.test(t1)&&/5001, 5002/.test(t1)&&/crachá de quem vai conferir/.test(t1)&&!/Marcar como separado/.test(t1)&&vis==='block', t1.replace(/\n/g,' | ').slice(0,200));
  await p.keyboard.type('CXCARL2345',{delay:8}); await p.keyboard.press('Enter'); await H.dorme(500); const tc=await tela();
  const cam1=await p.evaluate(()=>{ const v=document.getElementById('tt-video'); return !!v&&getComputedStyle(v).display!=='none'; });
- ok('Crachá do conferente: lista com a quantidade que deveria vir e um OK por item, câmera desligada', /Conferindo: Carlos Almox/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2 conferidos/.test(tc)&&!cam1, tc.replace(/\n/g,' | ').slice(0,220));
+ ok('Crachá do conferente: lista com a quantidade que deveria vir e um OK por item, câmera desligada', /Conferindo: Carlos Almox/.test(tc)&&/MP001/.test(tc)&&/500/.test(tc)&&/1\.200/.test(tc)&&/0 de 2/.test(tc)&&!cam1, tc.replace(/\n/g,' | ').slice(0,220));
  await p.screenshot({path:'/mnt/user-data/outputs/celular-almox-conferencia.png'});
  await p.click('[data-act="cf-ok"][data-i="0"]'); await H.dorme(200); await p.click('[data-act="cf-salvar"]'); await H.dorme(300); const tf=await tela();
  let s0=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
