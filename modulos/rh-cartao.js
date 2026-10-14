@@ -6,7 +6,7 @@
   const C={ab:null,ctx:null,fontes:false};
   const TEMAS={
     festa:{nome:'Festa',fundo:['#FBF4EA','#F4E6D3'],tit:'#1B5C7A',nome2:'#C8102E',txt:'#2B3A42',sub:'#6B7780',conf:['#C8102E','#1B5C7A','#E9A23B','#3E8E6E','#7FB3CF','#F28C8C']},
-    azul:{nome:'Azul Colafix',fundo:['#1B5C7A','#0E3346'],tit:'#FFFFFF',nome2:'#FFD27A',txt:'#EAF2F6',sub:'#B8D0DC',conf:['#FFD27A','#FFFFFF','#7FB3CF','#F28C8C','#9ED9BF']},
+    azul:{nome:'Azul Colafix',escuro:true,fundo:['#1B5C7A','#0E3346'],tit:'#FFFFFF',nome2:'#FFD27A',txt:'#EAF2F6',sub:'#B8D0DC',conf:['#FFD27A','#FFFFFF','#7FB3CF','#F28C8C','#9ED9BF']},
     rosa:{nome:'Rosa',fundo:['#FDEEF0','#F7D9DE'],tit:'#8E2C48',nome2:'#C8102E',txt:'#3A2A30',sub:'#7D6870',conf:['#C8102E','#E9A23B','#8E2C48','#F7A1B0','#7FB3CF']}};
   const MSG={aniv:'Que o seu novo ano seja cheio de saúde, alegria e conquistas. Obrigado por fazer parte da nossa equipe!',
     casa:'Obrigado por todos esses anos de dedicação e parceria. Que venham muitos outros juntos!'};
@@ -46,16 +46,20 @@
     g.fillStyle='rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(x-r*0.3,y-r*0.38,r*0.16,r*0.26,-0.5,0,Math.PI*2); g.fill();
     g.fillStyle=cor; g.beginPath(); g.moveTo(x-9,y+r+10); g.lineTo(x+9,y+r+10); g.lineTo(x,y+r-4); g.fill();
     g.strokeStyle='rgba(60,60,60,.45)'; g.lineWidth=2.5; g.beginPath(); g.moveTo(x,y+r+10); g.bezierCurveTo(x+18,y+r+40,x-18,y+r+70,x+4,y+r+105); g.stroke(); g.restore(); }
+  function logoPara(escuro){ const im=document.querySelector('.brand img'); if(!im||!im.complete||!im.naturalWidth) return null; if(!escuro) return im;
+    if(C.logoClaro&&C.logoClaro._src===im.src) return C.logoClaro;
+    const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; const x=c.getContext('2d'); x.drawImage(im,0,0);
+    try{ const d=x.getImageData(0,0,c.width,c.height), p=d.data; for(let i=0;i<p.length;i+=4){ const r=p[i],g=p[i+1],b=p[i+2], mx=Math.max(r,g,b), mn=Math.min(r,g,b); if(mx-mn<60&&mx<140){ p[i]=p[i+1]=p[i+2]=255; } } x.putImageData(d,0,0); }catch(e){ return im; }
+    c._src=im.src; C.logoClaro=c; return c; }
   function desenhar(){ const cv=document.getElementById('rhc-cv'), A=C.ab; if(!cv||!A) return; const g=cv.getContext('2d'), W=1080, H=1350, T=TEMAS[A.tema]||TEMAS.festa, r=rnd(A.cheio+A.tema);
     const gr=g.createLinearGradient(0,0,W,H); gr.addColorStop(0,T.fundo[0]); gr.addColorStop(1,T.fundo[1]); g.fillStyle=gr; g.fillRect(0,0,W,H);
     /* confete só nas beiradas (não passa por cima do texto) */
-    for(let i=0;i<150;i++){ const x=r()*W, y=r()*H; if(!(x<120||x>960||y<270||y>1290)) continue; g.save(); g.translate(x,y); g.rotate(r()*Math.PI); g.fillStyle=T.conf[i%T.conf.length]; g.globalAlpha=0.55+r()*0.4;
+    for(let i=0;i<150;i++){ const x=r()*W, y=r()*H; if(!(x<120||x>960||y<270||y>1290)) continue; if(x>290&&x<790&&y>50&&y<210) continue; g.save(); g.translate(x,y); g.rotate(r()*Math.PI); g.fillStyle=T.conf[i%T.conf.length]; g.globalAlpha=0.55+r()*0.4;
       if(i%3===0){ g.beginPath(); g.arc(0,0,6+r()*8,0,Math.PI*2); g.fill(); } else g.fillRect(-11,-5,22+r()*12,10); g.restore(); }
     balao(g,110,150,64,T.conf[0]); balao(g,222,95,48,T.conf[1]); balao(g,968,150,66,T.conf[2]); balao(g,862,92,46,T.conf[3%T.conf.length]);
-    /* faixa branca com a logo */
-    const logo=document.querySelector('.brand img');
-    g.save(); g.fillStyle='rgba(255,255,255,.96)'; const lw=380, lh=118, lx=(W-lw)/2, ly=70; g.beginPath(); g.roundRect?g.roundRect(lx,ly,lw,lh,59):g.rect(lx,ly,lw,lh); g.fill(); g.restore();
-    if(logo&&logo.complete&&logo.naturalWidth){ const k=Math.min((lw-70)/logo.naturalWidth,(lh-36)/logo.naturalHeight); const w=logo.naturalWidth*k, h=logo.naturalHeight*k; g.drawImage(logo,(W-w)/2,ly+(lh-h)/2,w,h); }
+    /* logo direto no fundo (sem faixa branca); no fundo escuro o "fix" (preto) fica branco e o "Cola" continua vermelho */
+    const logo=logoPara(T.escuro);
+    if(logo){ const lw=360, lh=100, ly=80, k=Math.min(lw/logo.width,lh/logo.height), w=logo.width*k, h=logo.height*k; g.drawImage(logo,(W-w)/2,ly+(lh-h)/2,w,h); }
     g.textAlign='center'; g.textBaseline='alphabetic';
     /* bloco do meio, centralizado na altura */
     const tit=A.tipo==='aniv'?'Feliz aniversário':(A.anos>0?A.anos+(A.anos===1?' ano':' anos')+' de Colafix':'Tempo de casa'), tt=A.tipo==='aniv'?118:104;
