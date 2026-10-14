@@ -27,6 +27,15 @@ const hoje=new Date(), md=String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(h
   if(process.env.SHOT) fs.copyFileSync(f,process.env.SHOT+'/cartao.png');
   await H.dorme(500); const s=await srv();
   ok('Trocar as cores (azul) mantém a mensagem; "Baixar imagem" gera o PNG 1080×1350 e guarda a mensagem e as cores', tema[2]>tema[0]&&msgFica==='Parabéns, Maria! Muitas felicidades.'&&dl.suggestedFilename()==='Cartao-aniversario-Maria-Souza.png'&&png.readUInt32BE(16)===1080&&png.readUInt32BE(20)===1350&&s['rh/config'].anivMsg==='Parabéns, Maria! Muitas felicidades.'&&s['rh/config'].anivTema==='azul', JSON.stringify({tema,arq:dl.suggestedFilename(),cfg:s['rh/config'].anivMsg}));
+  /* 14/10: embaixo do nome vai a função (padrão); o RH troca para o setor ou tira */
+  const vai=()=>p.evaluate(()=>{ const e=document.querySelector('.rhc-infot'); return e?e.textContent:''; });
+  const pix=()=>p.evaluate(()=>document.getElementById('rhc-cv').toDataURL().length);
+  const v0=await vai(), px0=await pix(); await p.click('[data-act="rhc-info"][data-v="setor"]'); await H.dorme(400); const v1=await vai(), px1=await pix();
+  await p.click('[data-act="rhc-info"][data-v="nada"]'); await H.dorme(400); const v2=await vai(), px2=await pix();
+  ok('Embaixo do nome: função por padrão, setor ou nada (o desenho muda)', v0==='Vai sair: Auxiliar'&&v1==='Vai sair: Expedição'&&v2===''&&px0!==px1&&px1!==px2, [v0,v1,v2].join(' / '));
+  const [dl2]=await Promise.all([p.waitForEvent('download'),p.click('[data-act="rhc-baixar"]')]); await H.dorme(600); const s2=await srv();
+  ok('A escolha do RH fica guardada (rh/config.anivInfo)', s2['rh/config']&&s2['rh/config'].anivInfo==='nada', JSON.stringify((s2['rh/config']||{}).anivInfo));
+  await p.click('[data-act="rhc-info"][data-v="funcao"]'); await H.dorme(300);
   await p.evaluate(()=>{ window.__ab=null; window.open=(u)=>{ window.__ab=u; return null; }; }); await p.click('[data-act="rhc-zap"]'); await H.dorme(200); const u=decodeURIComponent(await p.evaluate(()=>window.__ab||''));
   ok('WhatsApp: abre a conversa com o telefone do cadastro e a mensagem', /wa\.me\/5551999991234/.test(u)&&/Feliz aniversário, Maria! Parabéns, Maria! Muitas felicidades\. — Equipe Colafix/.test(u), u.slice(0,160));
   await p.click('[data-act="rhc-x"]'); await H.dorme(300);

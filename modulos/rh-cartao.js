@@ -24,9 +24,12 @@
   /* abre a janela do cartão para a pessoa (f = cadastro do funcionário) */
   function abrir(ctx,f,tipo){ C.ctx=ctx; const R=ctx.R, hj=ctx.P.hojeStr(); tipo=tipo==='casa'?'casa':'aniv';
     const base=tipo==='aniv'?f.nascimento:f.admissao, anos=/^\d{4}-\d\d-\d\d$/.test(base||'')?(+hj.slice(0,4)-+base.slice(0,4)):0;
-    C.ab={id:f._id,tipo,nome:nomeCurto(f.nome),cheio:titulo(f.nome),setor:f.setor||'',tel:f.telefone||'',anos,dia:base?base.slice(5):hj.slice(5),
+    C.ab={id:f._id,tipo,nome:nomeCurto(f.nome),cheio:titulo(f.nome),setor:f.setor||'',funcao:f.funcao||'',info:(R.cfg&&R.cfg.anivInfo)||'funcao',tel:f.telefone||'',anos,dia:base?base.slice(5):hj.slice(5),
       msg:(R.cfg&&R.cfg[tipo==='aniv'?'anivMsg':'casaMsg'])||MSG[tipo],tema:(R.cfg&&R.cfg.anivTema)||'festa',idade:false};
     fontes(); ctx.P.render(); }
+  /* 14/10: o RH escolhe o que vai embaixo do nome: a função (padrão), o setor ou nada */
+  function subT(A){ return A.info==='nada'?'':A.info==='setor'?(A.setor||''):(A.funcao||''); }
+  function faixaSub(g,A,x,y,larg){ const t=subT(A).toUpperCase(); let s=32; g.font=FN(600,s); g.letterSpacing='4px'; while(g.measureText(t).width>larg&&s>20){ s-=2; g.font=FN(600,s); } g.fillText(t,x,y); g.letterSpacing='0px'; }
   function modal(ctx){ const A=C.ab; if(!A) return ''; C.ctx=ctx; const esc=ctx.esc;
     setTimeout(()=>{ desenhar(); minis(); },0);
     return `<div class="rh-modal" data-act="rhc-x-fundo"><div class="rh-mbox rhc-box" role="dialog" aria-modal="true" aria-label="Cartão"><div class="rh-ch"><h2>${A.tipo==='aniv'?'Cartão de aniversário':'Cartão de tempo de casa'} · ${esc(A.cheio)}</h2><button class="lnk" data-act="rhc-x">Fechar</button></div>
@@ -35,6 +38,7 @@
           <label><span class="label">Nome no cartão</span><input class="txt" id="rhc-nome" maxlength="40" value="${esc(A.nome)}"></label>
           <label><span class="label">Mensagem</span><textarea class="txt" id="rhc-msg" rows="5" maxlength="260">${esc(A.msg)}</textarea></label>
           <div><span class="label">Modelo</span><div class="rhc-mods">${Object.entries(TEMAS).map(([k,t])=>`<button data-act="rhc-tema" data-v="${k}" aria-pressed="${A.tema===k}" title="${t.nome}"><canvas class="rhc-mini" data-m="${k}" width="216" height="270" aria-hidden="true"></canvas><span>${t.nome}</span></button>`).join('')}</div></div>
+          <div><span class="label">Embaixo do nome</span><div class="seg rhc-info">${[['funcao','Função'+(A.funcao?'':' (sem cadastro)')],['setor','Setor'+(A.setor?'':' (sem cadastro)')],['nada','Não mostrar']].map(([v,l])=>`<button data-act="rhc-info" data-v="${v}" aria-pressed="${A.info===v}">${esc(l)}</button>`).join('')}</div>${subT(A)?`<small class="rhc-infot">Vai sair: ${esc(subT(A))}</small>`:''}</div>
           ${A.tipo==='aniv'&&A.anos>0?`<label class="rhc-ck"><input type="checkbox" id="rhc-idade" ${A.idade?'checked':''}> Mostrar a idade (${A.anos} anos)</label>`:''}
           <div class="rhc-bt"><button class="btn" data-act="rhc-baixar">${ctx.P.ic('baixar',18,2.2)}Baixar imagem</button>
             ${navigator.share?'<button class="btn sec" data-act="rhc-share">Compartilhar (WhatsApp…)</button>':''}
@@ -65,13 +69,13 @@
   function fundo(g,T,W,H){ const gr=g.createLinearGradient(0,0,W,H); gr.addColorStop(0,T.fundo[0]); gr.addColorStop(1,T.fundo[1]); g.fillStyle=gr; g.fillRect(0,0,W,H); }
   /* bloco central (título, nome, setor, idade, linha, mensagem), centralizado entre topo0 e base0 */
   function miolo(g,A,T,W,topo0,base0,o){ o=o||{}; const tt=o.tt||(A.tipo==='aniv'?118:104), m=medir(g,A,900,o.tn||132,46);
-    const hSet=A.setor?50:0, hId=A.tipo==='aniv'&&A.idade&&A.anos>0?60:0, fixo=(o.semTit?0:tt+40)+m.tn+hSet+hId+56;
+    const hSet=subT(A)?50:0, hId=A.tipo==='aniv'&&A.idade&&A.anos>0?60:0, fixo=(o.semTit?0:tt+40)+m.tn+hSet+hId+56;
     while(fixo+m.ls.length*m.tm*1.4>base0-topo0&&m.tm>28){ m.tm-=2; g.font=FN(400,m.tm); m.ls=quebra(g,A.msg,840); }
     const hMsg=m.ls.length*m.tm*1.4, total=fixo+hMsg;
     let y=topo0+Math.max(0,(base0-topo0-total)/2); g.textAlign='center';
     if(!o.semTit){ y+=tt; g.fillStyle=T.tit; g.font=FN('',tt,'script'); g.fillText(o.tit||titTxt(A),W/2,y); y+=40; }
     y+=m.tn; g.fillStyle=T.nome2; g.font=FN(o.pesoNome||800,m.tn); if(o.esp) g.letterSpacing=o.esp+'px'; g.fillText(o.maius?A.nome.toUpperCase():A.nome,W/2,y-m.tn*0.12); g.letterSpacing='0px';
-    if(hSet){ y+=hSet; g.fillStyle=T.sub; g.font=FN(600,32); g.letterSpacing='4px'; g.fillText(A.setor.toUpperCase(),W/2,y); g.letterSpacing='0px'; }
+    if(hSet){ y+=hSet; g.fillStyle=T.sub; faixaSub(g,A,W/2,y,900); }
     if(hId){ y+=hId; g.fillStyle=T.tit; g.font=FN(600,40); g.fillText(A.anos+' anos',W/2,y); }
     y+=34; if(o.losango){ g.strokeStyle=T.sub; g.lineWidth=2; g.beginPath(); g.moveTo(W/2-150,y); g.lineTo(W/2-18,y); g.moveTo(W/2+18,y); g.lineTo(W/2+150,y); g.stroke(); g.fillStyle=T.sub; g.beginPath(); g.moveTo(W/2,y-10); g.lineTo(W/2+10,y); g.lineTo(W/2,y+10); g.lineTo(W/2-10,y); g.fill(); }
     else { g.strokeStyle=T.nome2; g.globalAlpha=.5; g.lineWidth=4; g.beginPath(); g.moveTo(W/2-70,y); g.lineTo(W/2+70,y); g.stroke(); g.globalAlpha=1; }
@@ -99,7 +103,7 @@
       g.fillStyle='#FFFFFF'; g.beginPath(); g.arc(cx,cy,150,0,Math.PI*2); g.fill(); g.strokeStyle='#C8102E'; g.lineWidth=10; g.stroke();
       g.fillStyle='#1B5C7A'; g.font=FN(800,120); g.textAlign='center'; g.textBaseline='middle'; g.fillText(ini,cx,cy+6); g.textBaseline='alphabetic';
       const m=medir(g,A,900,120,46); g.textAlign='left'; let y=760; g.fillStyle=T.nome2; g.font=FN(800,m.tn); g.fillText(A.nome,80,y);
-      if(A.setor){ y+=56; g.fillStyle=T.sub; g.font=FN(600,32); g.letterSpacing='4px'; g.fillText(A.setor.toUpperCase(),82,y); g.letterSpacing='0px'; }
+      if(subT(A)){ y+=56; g.fillStyle=T.sub; faixaSub(g,A,82,y,880); }
       if(A.tipo==='aniv'&&A.idade&&A.anos>0){ y+=56; g.fillStyle=T.tit; g.font=FN(600,38); g.fillText(A.anos+' anos',82,y); }
       y+=40; g.fillStyle='#C8102E'; g.fillRect(82,y,90,8); g.fillStyle=T.txt; g.font=FN(400,m.tm); const ls=quebra(g,A.msg,900); ls.forEach((l,i)=>g.fillText(l,80,y+40+m.tm+i*m.tm*1.4));
       g.fillStyle=T.tit; g.font=FN(600,38); g.fillText('Com carinho, Equipe Colafix',80,H-110); g.fillStyle='#6B7780'; g.font=FN(400,30); g.textAlign='right'; g.fillText(diaTxt(A),W-80,H-110);
@@ -128,14 +132,15 @@
   function ler(){ const A=C.ab; if(!A) return; const v=id=>document.getElementById(id); if(v('rhc-nome')) A.nome=v('rhc-nome').value.trim(); if(v('rhc-msg')) A.msg=v('rhc-msg').value.trim(); if(v('rhc-idade')) A.idade=v('rhc-idade').checked; }
   const nomeArq=()=>'Cartao-'+(C.ab.tipo==='aniv'?'aniversario':'tempo-de-casa')+'-'+C.ab.nome.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'-')+'.png';
   const blob=()=>new Promise(res=>{ desenhar(); document.getElementById('rhc-cv').toBlob(b=>res(b),'image/png'); });
-  function guardaMsg(){ const c=C.ctx, A=C.ab, k=A.tipo==='aniv'?'anivMsg':'casaMsg'; if(!c||((c.R.cfg||{})[k]===A.msg&&(c.R.cfg||{}).anivTema===A.tema)) return;
-    const d={[k]:A.msg,anivTema:A.tema}; c.P.db().doc('rh/config').set(d,{merge:true}).then(()=>{ if(c.R.cfg) Object.assign(c.R.cfg,d); }).catch(()=>{}); }
+  function guardaMsg(){ const c=C.ctx, A=C.ab, k=A.tipo==='aniv'?'anivMsg':'casaMsg'; if(!c||((c.R.cfg||{})[k]===A.msg&&(c.R.cfg||{}).anivTema===A.tema&&((c.R.cfg||{}).anivInfo||'funcao')===A.info)) return;
+    const d={[k]:A.msg,anivTema:A.tema,anivInfo:A.info}; c.P.db().doc('rh/config').set(d,{merge:true}).then(()=>{ if(c.R.cfg) Object.assign(c.R.cfg,d); }).catch(()=>{}); }
   document.addEventListener('input',ev=>{ const t=ev.target; if(C.ab&&t&&/^rhc-/.test(t.id||'')){ ler(); desenhar(); clearTimeout(C.tm); C.tm=setTimeout(minis,600); } });
   document.addEventListener('change',ev=>{ const t=ev.target; if(C.ab&&t&&t.id==='rhc-idade'){ ler(); desenhar(); } });
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rhc-"]'); if(!b||!C.ab) return; const a=b.dataset.act, P=C.ctx.P;
     if(a==='rhc-x'||(a==='rhc-x-fundo'&&ev.target===b)){ C.ab=null; P.render(); return; }
     ler();
     if(a==='rhc-tema'){ C.ab.tema=b.dataset.v; P.render(); return; }
+    if(a==='rhc-info'){ C.ab.info=b.dataset.v; P.render(); return; }
     if(a==='rhc-baixar'){ guardaMsg(); C.ctx.baixar(await blob(),nomeArq()); P.toast('Imagem baixada.'); return; }
     if(a==='rhc-share'){ guardaMsg(); try{ const f=new File([await blob()],nomeArq(),{type:'image/png'}); if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],text:texto()}); else await navigator.share({text:texto()}); }catch(e){ if(e&&e.name!=='AbortError') P.erro(e); } return; }
     if(a==='rhc-zap'){ guardaMsg(); const tel=String(C.ab.tel||'').replace(/\D/g,''), n=tel?(tel.length<=11?'55'+tel:tel):''; window.open('https://wa.me/'+n+'?text='+encodeURIComponent(texto()),'_blank','noopener'); return; }
@@ -146,7 +151,7 @@
   const st=document.createElement('style'); st.textContent=`
   .rhc-box{max-width:1000px}.rhc-g{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:22px;align-items:start}
   .rhc-pv canvas{width:100%;height:auto;display:block;border-radius:14px;box-shadow:0 6px 24px rgba(20,40,52,.18)}
-  .rhc-f{display:flex;flex-direction:column;gap:14px}.rhc-f label{display:flex;flex-direction:column;gap:4px}.rhc-f label.rhc-ck{flex-direction:row;align-items:center;gap:8px}
+  .rhc-f{display:flex;flex-direction:column;gap:14px}.rhc-f label{display:flex;flex-direction:column;gap:4px}.rhc-f label.rhc-ck{flex-direction:row;align-items:center;gap:8px}.rhc-info{margin-top:6px;flex-wrap:wrap}.rhc-infot{display:block;margin-top:4px;color:var(--muted);font-size:12.5px}
   .rhc-mods{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:4px}.rhc-mods button{font:inherit;font-size:12.5px;display:flex;flex-direction:column;align-items:center;gap:4px;border:2px solid transparent;background:none;border-radius:12px;padding:4px;cursor:pointer;color:var(--ink)}
   .rhc-mods button[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-wash,#e4eef3);font-weight:700}.rhc-mini{width:100%;height:auto;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
   @media (max-width:1100px){ .rhc-mods{grid-template-columns:repeat(3,minmax(0,1fr))} }
