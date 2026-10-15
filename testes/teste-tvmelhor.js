@@ -10,10 +10,10 @@ function base(){ const {d}=seedManut(); const D=d.docs; const h=new Date(); cons
 (async()=>{ const d=base();
  for(const vp of [{width:1920,height:1080},{width:1366,height:768}]){ const B=await H.abrir({viewport:vp}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tvfabrica','tv1234'); await H.dorme(3000);
    await p.evaluate(()=>__T.go('tvapres')); await H.dorme(400); await p.click('[data-act="apr-abre"][data-v="ritmo"]'); await H.dorme(1800);
-   const m=await p.evaluate(()=>{ const t=[...document.querySelectorAll('.rtv-t')]; const sobra=t.filter(x=>x.scrollHeight>x.clientHeight+2||x.scrollWidth>x.clientWidth+2).length;
-     return {h:document.documentElement.scrollHeight,vh:innerHeight,w:document.documentElement.scrollWidth,vw:innerWidth,n:t.length,sobra,nome:parseFloat(getComputedStyle(document.querySelector('.rtv-ln')).fontSize)*(+document.getElementById('view').style.zoom||1),
-       num:parseFloat(getComputedStyle(document.querySelector('.rtv-fig b')).fontSize)*(+document.getElementById('view').style.zoom||1),miudo:!!document.querySelector('.rtv-pl')&&getComputedStyle(document.querySelector('.rtv-pl')).display!=='none',sub:!!document.querySelector('.navsub')&&getComputedStyle(document.querySelector('.navsub')).display!=='none',meta:(document.querySelector('.rtv-fig span')||{}).innerText}; });
-   ok(`TV ${vp.width}×${vp.height}: Previsto × Realizado cabe inteiro, quadros sem texto sobrando, sem letras miúdas nem submenu`, m.h<=m.vh+1&&m.w<=m.vw+1&&m.n>=8&&m.sobra===0&&!m.miudo&&!m.sub&&/^meta /.test(m.meta||''), JSON.stringify(m));
+   const m=await p.evaluate(()=>{ const t=[...document.querySelectorAll('.tvn-tl')], tv=document.querySelector('.tvn'), z=+(tv&&tv.style.zoom)||1; const sobra=t.filter(x=>x.scrollHeight>x.clientHeight+2||x.scrollWidth>x.clientWidth+2).length;
+     const r=tv.getBoundingClientRect(); return {h:document.documentElement.scrollHeight,vh:innerHeight,w:document.documentElement.scrollWidth,vw:innerWidth,dentro:r.right<=innerWidth+1&&r.bottom<=innerHeight+1,n:t.length,sobra,
+       nome:Math.round(parseFloat(getComputedStyle(document.querySelector('.tvn-tl .tvn-ch b')).fontSize)*z),num:Math.round(parseFloat(getComputedStyle(document.querySelector('.tvn-pc b')).fontSize)*z),sub:!!document.querySelector('.navsub')&&getComputedStyle(document.querySelector('.navsub')).display!=='none'}; });
+   ok(`TV ${vp.width}×${vp.height}: Previsto × Realizado (layout novo) cabe inteiro, proporcional ao monitor, quadros sem texto sobrando, sem submenu`, m.h<=m.vh+1&&m.w<=m.vw+1&&m.dentro&&m.n>=8&&m.sobra===0&&!m.sub&&m.num>=m.nome, JSON.stringify(m));
    await B.browser.close(); }
  const B=await H.abrir({viewport:{width:1920,height:1080}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tvfabrica','tv1234'); await H.dorme(3000);
  await p.evaluate(()=>__T.go('tvapres')); await H.dorme(400);
@@ -30,8 +30,8 @@ function base(){ const {d}=seedManut(); const D=d.docs; const h=new Date(); cons
  const temOp=await p.evaluate(()=>!!document.querySelector('[data-act="tv-escuro"]')); await p.check('[data-act="tv-escuro"]'); await H.dorme(300);
  const fora=await p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
  await p.click('[data-act="apr-abre"][data-v="ritmo"]'); await H.dorme(1800);
- const dentro=await p.evaluate(()=>({tema:document.documentElement.getAttribute('data-theme'),card:getComputedStyle(document.querySelector('.rtv-t')).backgroundColor,logo:getComputedStyle(document.querySelector('.rtv-logo')||document.body).backgroundColor}));
- ok('"Fundo escuro na TV": só no modo TV; quadros escuros e logo com fundo branco', temOp&&fora!=='dark'&&dentro.tema==='dark'&&/rgb\((2[0-9]|1[0-9]), (2[0-9]|3[0-9]|4[0-9]), (3[0-9]|4[0-9])\)/.test(dentro.card)&&dentro.logo==='rgb(255, 255, 255)', JSON.stringify({fora,...dentro}));
+ const dentro=await p.evaluate(()=>({tema:document.documentElement.getAttribute('data-theme'),card:getComputedStyle(document.querySelector('.tvn-tl')).backgroundColor,logo:(document.querySelector('.tvn-logo')||{}).getAttribute('src')}));
+ ok('"Fundo escuro na TV": só no modo TV; quadros escuros e logo de fix branco', temOp&&fora!=='dark'&&dentro.tema==='dark'&&/rgb\((2[0-9]|1[0-9]), (2[0-9]|3[0-9]|4[0-9]), (3[0-9]|4[0-9])\)/.test(dentro.card)&&/logo-colafix-escuro/.test(dentro.logo||''), JSON.stringify({fora,...dentro}));
  await p.keyboard.press('Escape'); await H.dorme(900); const depois=await p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
  ok('Ao sair do modo TV, o painel volta ao normal', depois!=='dark', String(depois));
  await p.evaluate(()=>__T.go('tvapres')); await H.dorme(400); const tem=await p.evaluate(()=>{ const b=document.querySelector('[data-act="apr-abre"][data-v="silosver"]'); return !!b; });

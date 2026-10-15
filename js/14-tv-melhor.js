@@ -4,9 +4,15 @@
    3) Rodízio (Telas de TV): tempos de 5 e 10 s e "começar a passar sozinha" ao abrir o painel neste aparelho. */
 "use strict";
 function tvEncaixa(){ const v=document.getElementById('view'); if(!v) return; const tv=document.body.classList.contains('tv')&&S.view!=='tvsplit';
-  if(!tv){ if(v.style.zoom) v.style.zoom=''; return; }
+  const tn=v.querySelector(':scope > .tvn');
+  if(!tv){ if(v.style.zoom) v.style.zoom=''; if(tn&&tn.style.zoom) tn.style.zoom=''; return; }
+  /* telas novas (15-tvs): desenhadas em 1920×1080 e ampliadas/reduzidas por inteiro para o monitor, dentro da margem */
+  if(tn){ if(v.style.zoom) v.style.zoom=''; const mm=(typeof tvMargem==='function'?tvMargem():0)/100, z=Math.min(innerWidth*(1-2*mm)/1920,innerHeight*(1-2*mm)/1080); if(Math.abs((+tn.style.zoom||1)-z)>0.001) tn.style.zoom=String(z); return; }
+  /* cabe na área segura: a tela inteira menos a margem da TV (overscan) */
+  const m=(typeof tvMargem==='function'?tvMargem():0)/100, aw=innerWidth*(1-2*m), ah=innerHeight*(1-2*m);
+  const mede=()=>{ const r=v.getBoundingClientRect(), zz=+v.style.zoom||1; return {w:Math.max(v.scrollWidth*zz,r.width),h:Math.max(v.scrollHeight*zz,r.height)}; };
   v.style.zoom=''; let z=1;
-  for(let i=0;i<4;i++){ const de=document.documentElement, f=Math.min(innerHeight/de.scrollHeight,innerWidth/de.scrollWidth); if(f>=0.997) break; z=Math.max(0.45,z*f*0.998); v.style.zoom=String(z); } }
+  for(let i=0;i<4;i++){ const t=mede(), f=Math.min(aw/(t.w*1),ah/(t.h*1)); if(f>=0.997) break; z=Math.max(0.45,z*f*0.998); v.style.zoom=String(z); } }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ requestAnimationFrame(tvEncaixa); }catch(e){} return x; }; }
 addEventListener('resize',()=>tvEncaixa()); setInterval(()=>{ if(document.body.classList.contains('tv')) tvEncaixa(); },1500);
 /* fundo escuro na TV: usa o tema escuro do painel só enquanto estiver no modo TV (cada aparelho escolhe) */
@@ -16,12 +22,20 @@ function tvTema(){ const de=document.documentElement, quer=document.body.classLi
   if(quer&&de.getAttribute('data-theme')!=='dark'){ de.setAttribute('data-theme','dark'); tvTemaNosso=true; }
   else if(!quer&&tvTemaNosso){ de.removeAttribute('data-theme'); tvTemaNosso=false; } }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ tvTema(); }catch(e){} return x; }; }
-setInterval(()=>{ try{ tvTema(); }catch(e){} },700);
+setInterval(()=>{ try{ tvTema(); if(document.documentElement.style.getPropertyValue('--tvm')!==String(tvMargem())){ tvMargemAplica(); tvEncaixa(); } }catch(e){} },700);
 document.addEventListener('change',ev=>{ const t=ev.target; if(!(t.dataset&&t.dataset.act==='tv-escuro')) return; try{ localStorage.setItem('colafix.tvEscuro',t.checked?'1':'0'); }catch(e){} tvTema(); toast(t.checked?'Fundo escuro ligado nesta TV (vale no modo TV).':'Fundo escuro desligado nesta TV.'); });
 /* "Nível dos silos" (a tela só de consulta) também passa na TV: quem tem Telas de TV pode abrir */
 { const _vo=viewOk; viewOk=function(v){ if(v==='silosver'){ try{ const p=acsP(); if(p&&(p.mods||[]).includes('telas')) return true; }catch(e){} } return _vo.apply(this,arguments); }; }
 { const _sr=spRota; spRota=function(v){ if(v==='silosver') return vSilosVer(); return _sr.apply(this,arguments); }; }
 if(!APR_TELAS.some(t=>t.k==='silosver')){ const i=APR_TELAS.findIndex(t=>t.k==='silos'); APR_TELAS.splice(i<0?APR_TELAS.length:i+1,0,{k:'silosver',v:'silosver',nome:'Nível dos silos',d:'Os tanques de cimento e areia em tamanho grande, com o nível e o aviso de crítico. Só consulta.',cor:'#3E7A63',on:true}); }
+/* margem da TV: TVs ligadas por HDMI costumam cortar as bordas (overscan). Cada aparelho escolhe 0/2/4/6% de margem. */
+function tvMargem(){ try{ const v=+localStorage.getItem('colafix.tvMargem'); return [0,2,4,6].includes(v)?v:0; }catch(e){ return 0; } }
+function tvMargemAplica(){ document.documentElement.style.setProperty('--tvm',String(tvMargem())); }
+function tvMargemMuda(v){ try{ localStorage.setItem('colafix.tvMargem',String(v)); }catch(e){} tvMargemAplica(); tvEncaixa(); }
+tvMargemAplica();
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="tv-margem"]'); if(!b) return; tvMargemMuda(+b.dataset.v); toast('Margem da TV neste aparelho: '+b.dataset.v+'%'); render(); });
+document.addEventListener('keydown',ev=>{ if(!document.body.classList.contains('tv')||ev.ctrlKey||ev.altKey||ev.metaKey) return; if(ev.key!=='m'&&ev.key!=='M') return; const a=document.activeElement; if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
+  const L=[0,2,4,6], v=L[(L.indexOf(tvMargem())+1)%L.length]; tvMargemMuda(v); toast('Margem da TV: '+v+'% (tecla M troca)'); });
 /* começar a passar sozinha neste aparelho */
 function aprAuto(){ try{ return localStorage.getItem('colafix.apresAuto')==='1'; }catch(e){ return false; } }
 document.addEventListener('change',ev=>{ const t=ev.target; if(!(t.dataset&&t.dataset.act==='apr-auto')) return; try{ localStorage.setItem('colafix.apresAuto',t.checked?'1':'0'); }catch(e){} toast(t.checked?'Este aparelho vai começar a passar as telas sozinho.':'Este aparelho não vai mais começar sozinho.'); });
@@ -29,6 +43,8 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(!(t.dataset&&t.da
     if(!aprAuto()||S.apres.on) return; const lista=aprTelas().filter(aprSel); if(lista.length) setTimeout(()=>aprIniciar(lista),1500); }catch(e){} },500); }
 document.head.insertAdjacentHTML('beforeend',`<style id="tv-melhor-css">
 body.tv .navsub{display:none!important}
+body.tv{box-sizing:border-box;padding:calc(var(--tvm,0)*1vh) calc(var(--tvm,0)*1vw)!important}
+body.tv .rap{inset:calc(var(--tvm,0)*1vh) calc(var(--tvm,0)*1vw)!important}
 body.tv .sv-ts{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))!important;gap:20px!important}
 body.tv .sv-t{padding:16px 12px!important}
 body.tv .sv-tk svg{width:auto!important;height:clamp(150px,22vh,260px)!important;max-width:100%}

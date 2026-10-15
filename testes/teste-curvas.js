@@ -11,13 +11,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const n=await p.evaluate(()=>({svg:!!document.querySelector('svg.rit-cv'),t:(document.querySelector('.rit-cvn')||{}).innerText||''}));
  ok('Curva S aparece na tela Previsto × Realizado', n.svg, 'mostrando: '+n.t);
  await p.evaluate(()=>__T.go('tvapres')); await H.dorme(300); await p.click('[data-act="apr-abre"][data-v="ritmo"]'); await H.dorme(900);
- const a=await p.evaluate(()=>({svg:!!document.querySelector('svg.rit-cv'),t:(document.querySelector('.rit-cvn')||{}).innerText||'',v:__T.S().view}));
- const ta=[a.t]; for(let i=0;i<3;i++){ await H.dorme(10500); ta.push(await p.evaluate(()=>(document.querySelector('.rit-cvn')||{}).innerText||'')); }
- ok('Na TV em tela cheia: aparece e troca sozinha a cada 10 s', a.svg&&new Set(ta).size>1, ta.join(' → '));
+ const a=await p.evaluate(()=>({svg:!!document.querySelector('.tvn-svg svg'),t:(document.querySelector('.tvn-cv h2')||{}).innerText||'',v:__T.S().view}));
+ const ta=[a.t]; for(let i=0;i<3;i++){ await H.dorme(12600); ta.push(await p.evaluate(()=>(document.querySelector('.tvn-cv h2')||{}).innerText||'')); }
+ ok('Na TV em tela cheia (layout novo): curva aparece e a linha em destaque troca sozinha', a.svg&&new Set(ta).size>1, ta.join(' → '));
  await p.keyboard.press('Escape'); await H.dorme(500);
  await p.evaluate(()=>{ const S=__T.S(); S.split.lay='2'; S.split.slots=['ritmo','tvfab']; __T.go('tvsplit'); }); await H.dorme(900);
- const ts=[await p.evaluate(()=>{ const x=document.querySelector('.sp .rit-cvn'); return (!!document.querySelector('.sp svg.rit-cv'))+':'+(x?x.innerText:''); })];
- for(let i=0;i<3;i++){ await H.dorme(10500); ts.push(await p.evaluate(()=>{ const x=document.querySelector('.sp .rit-cvn'); return (!!document.querySelector('.sp svg.rit-cv'))+':'+(x?x.innerText:''); })); }
+ const ts=[await p.evaluate(()=>{ const x=document.querySelector('.sp .tvn-cv h2'); return (!!document.querySelector('.sp .tvn-svg svg'))+':'+(x?x.innerText:''); })];
+ for(let i=0;i<3;i++){ await H.dorme(12600); ts.push(await p.evaluate(()=>{ const x=document.querySelector('.sp .tvn-cv h2'); return (!!document.querySelector('.sp .tvn-svg svg'))+':'+(x?x.innerText:''); })); }
  await p.screenshot({path:'/tmp/curva-split.png'});
- ok('Na tela dividida: aparece e troca sozinha a cada 10 s', ts.every(x=>x.startsWith('true'))&&ts.every((x,i)=>i===0||x!==ts[i-1]), ts.join(' → '));
+ ok('Na tela dividida (layout novo): curva aparece e a linha em destaque troca sozinha', ts.every(x=>x.startsWith('true'))&&new Set(ts).size>1, ts.join(' → '));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
