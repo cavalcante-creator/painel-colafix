@@ -174,10 +174,10 @@ function ritEntregas(cp){ const m=new Map(); (S.entregas||[]).forEach(e=>m.set(e
 /* 14/10: divisão REAL entre as linhas = entregas lançadas nos últimos 60 dias (sem as anuladas), por item e linha.
    Usada como divisão automática dos itens sem % configurada e para avisar quando a % configurada não bate com o que as linhas fazem. */
 const RIT_DIV_DIAS=60, RIT_DIV_MIN=200, RIT_DIV_DIF=15; let _ritDvC=null;
-function ritDivReal(){ const h=hojeStr(), ini=addDias(h,-RIT_DIV_DIAS), EM=S.entregas||[]; const key=h+'|'+EM.length+'|'+(S.ordens||[]).length+'|'+(EM[0]&&EM[0]._id||'')+'|'+(EM[EM.length-1]&&EM[EM.length-1]._id||'');
+function ritDivReal(){ const h=hojeStr(), ini=addDias(h,-RIT_DIV_DIAS), EM=S.entregas||[]; const key=h+'|'+EM.length+'|'+(S.ordens||[]).length+'|'+Object.keys(S.ritOrdX||{}).length+'|'+(EM[0]&&EM[0]._id||'')+'|'+(EM[EM.length-1]&&EM[EM.length-1]._id||'');
   if(_ritDvC&&_ritDvC.k===key) return _ritDvC.v;
   const an=new Set(EM.filter(e=>e.anula).map(e=>e.anula)), OM={}; (S.ordens||[]).forEach(o=>OM[o._id]=o); const it={}; let de='';
-  EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d<ini||d>h) return; const o=OM[e.ordem]; if(!o) return; const l=e.linha||o.linha, q=+e.qtd||0; if(!l||!q) return;
+  EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d<ini||d>h) return; const o=OM[e.ordem]||(S.ritOrdX||{})[e.ordem]; if(!o){ ritFaltaOrdem(e.ordem); return; } const l=e.linha||o.linha, q=+e.qtd||0; if(!l||!q) return;
     const c=codigoDe(o), a=it[c]=it[c]||{}; a[l]=(a[l]||0)+q; if(!de||d<de) de=d; });
   _ritDvC={k:key,v:{it,de,ate:h}}; return _ritDvC.v; }
 /* parte de cada linha (só as linhas acompanhadas) e o total; null quando há pouco lançamento */
@@ -196,6 +196,13 @@ function ritAjusteUnico(){ try{ if(!S.db||!(S.acs&&S.acs.dono)) return false; co
     S.db.doc('config/geral').update({ritmo}).then(()=>{ if(mud.length) toast('Curva S: divisão entre as linhas ajustada pelo real em '+mud.length+' ite'+(mud.length>1?'ns':'m')+' ('+mud.join(', ')+').'); rerenderSeguro(); }).catch(e=>console.warn('[curva] ajuste',e));
     return true; }catch(e){ console.warn('[curva] ajuste',e); return true; } }
 (function(){ let n=0; const t=setInterval(()=>{ if(++n>120||ritAjusteUnico()) clearInterval(t); },5000); })();
+/* apontamento de uma ordem que não está carregada (ex.: encerrada no começo do mês, fora das 1.000 mais recentes):
+   busca a ordem uma vez para a produção dela entrar no realizado. */
+S.ritOrdX=S.ritOrdX||{}; const _ritFalta=new Set(); let _ritFaltaT=null;
+function ritFaltaOrdem(id){ if(!id||S.ritOrdX[id]||_ritFalta.has(id)) return; _ritFalta.add(id); clearTimeout(_ritFaltaT);
+  _ritFaltaT=setTimeout(async()=>{ const ids=[..._ritFalta].filter(x=>!S.ritOrdX[x]); if(!ids.length||!S.db) return;
+    for(let i=0;i<ids.length;i+=20){ await Promise.all(ids.slice(i,i+20).map(id=>S.db.doc('ordens/'+id).get().then(g=>{ if(g.exists) S.ritOrdX[id]=Object.assign({_id:g.id},g.data()); }).catch(()=>{}))); }
+    rerenderSeguro(); },300); }
 function ritDados(cp,fonte){
   const P=S.anl.base.prev||{}; const pm=(P.mes||{})[cp]; if(!pm) return null;
   const C=ritCfg(), LT=linhasOrd(), LS=C.linhas.filter(l=>LT.includes(l)); if(!LS.length) return null;
@@ -217,7 +224,7 @@ function ritDados(cp,fonte){
   if(fonte==='focco'){ const V=S.anl.base.vendas||{}, D=V.diario||{}; fonteAte=V.ate||'';
     its.forEach(x=>{ const dd=D[x.c]||{}; for(const d in dd){ if(d.slice(0,7)!==cp) continue; const q=+((dd[d]||[])[0])||0; if(!q) continue; for(const l in x.dv) add(d,l,x.c,q*x.dv[l]); } }); }
   else { const EM=ritEntregas(cp), an=new Set(EM.filter(e=>e.anula).map(e=>e.anula)), OM={}; S.ordens.forEach(o=>OM[o._id]=o);
-    EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d.slice(0,7)!==cp) return; const o=OM[e.ordem]; if(!o) return;
+    EM.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d.slice(0,7)!==cp) return; const o=OM[e.ordem]||(S.ritOrdX||{})[e.ordem]; if(!o){ ritFaltaOrdem(e.ordem); return; }
       const l=e.linha||o.linha, q=+e.qtd||0; if(!LS.includes(l)||!q) return; const c=codigoDe(o);
       if(!IC[c]){ outros[l]+=q; sem[c]=(sem[c]||0)+q; } add(d,l,c,q); }); }
   /* planejado: o que está programado no calendário (ordens + previsões sem número) por dia útil e linha */

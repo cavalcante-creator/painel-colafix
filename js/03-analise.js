@@ -920,7 +920,7 @@ function anlAvisoMeuDia(){ const R=anlDados(); if(!R) return ''; const n3=R.dias
 // ---------- Painel × sistema (apontamento) ----------
 function anlAptDados(dias){ const V=S.anl.base.vendas||{}, D=V.diario||{}; const fim=V.ate||addDias(hojeStr(),-1); const ini=addDias(fim,-dias+1);
   const an=anuladas(), porCod={}; const lin=(c)=>porCod[c]=porCod[c]||{c,painel:0,sis:0,dia:{}};
-  S.entregas.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d<ini||d>fim) return; const o=ordById(e.ordem); if(!o) return; const x=lin(codigoDe(o)); const q=+e.qtd||0; x.painel+=q; (x.dia[d]=x.dia[d]||[0,0])[0]+=q; });
+  S.entregas.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d<ini||d>fim) return; const o=ordById(e.ordem)||(S.ritOrdX||{})[e.ordem]; if(!o){ if(typeof ritFaltaOrdem==='function') ritFaltaOrdem(e.ordem); return; } const x=lin(codigoDe(o)); const q=+e.qtd||0; x.painel+=q; (x.dia[d]=x.dia[d]||[0,0])[0]+=q; });
   for(const c in D) for(const d in D[c]){ if(d<ini||d>fim) continue; const q=D[c][d][0]||0; if(!q) continue; const x=lin(c); x.sis+=q; (x.dia[d]=x.dia[d]||[0,0])[1]+=q; }
   const rows=Object.values(porCod).map(x=>Object.assign(x,{dif:x.painel-x.sis})).filter(x=>x.painel||x.sis).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif));
   return {ini,fim,rows}; }
