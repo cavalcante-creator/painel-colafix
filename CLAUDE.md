@@ -174,3 +174,5 @@ node teste-login.js        # e o teste do que foi mexido (ex.: teste-manut.js, t
   - **Calendário:** `config/geral.tvVira` (12–22 h, padrão 16) → `tvnViraH()` em `16-tvs2.js`.
   - **Previsão mensal por item na TV** (`tvnprev`, APR `prevmes`): `anlPrevRows(anlDados())` do mês, ordenado por necessidade de produção, 9 itens por página trocando a cada 15 s. O gestor tem 9 TVs.
 - Teste: `teste-tvfase3.js` (usa `tv-cenario-8linhas.js` com `{user, pass, seed}`).
+- **Logo no escuro (TV):** `icons/logo-colafix-escuro.png` é a logo original do painel com o "fix" pintado de branco (fundo transparente, sem ruído). No modo TV escuro, `tvLogo()` (em `14-tv-melhor.js`) troca a imagem `img[alt="Colafix"]` por ela e devolve ao sair — nada de placa branca. As telas novas (`.tvn-logo`) já usam a versão escura direto.
+- **Calendário da TV:** cada ordem mostra código **e nome do produto** (`nome(x)` em `vTvnCal`).

@@ -67,18 +67,20 @@ function vTvnCal(){ const h=hojeStr(), hr=new Date().getHours(), util=d=>anlUtil
   let foco=h; if(!util(foco)||hr>=tvnViraH()) foco=tvfProxUtil(h); let ant=addDias(foco,-1); for(let g=0;g<8&&!util(ant);g++) ant=addDias(ant,-1);
   const d2=tvfProxUtil(foco), d3=tvfProxUtil(d2), cols=[ant,foco,d2,d3], nomeD=d=>new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','').toUpperCase()+' '+dm(d);
   const pend=x=>x._pv?(+x.qtd||0):Math.max(0,(+x.total||0)-entregueDe(x)), cod=x=>x._pv?(x.codigo||codigoDe(x)):codigoDe(x), qt=x=>x._pv?(+x.qtd||0):(+x.total||0);
+  const nome=x=>{ const n=String(x.produto||x.descricao||'').replace(/^[A-Z0-9]+\s*[-—]\s*/,'').trim(); return n||((typeof itemDe==='function'&&itemDe(cod(x)))||{}).descricao||''; };
+  const lin=(x,ok)=>`<div class="tvn-cx">${ok?'<b class="okm">✓</b> ':''}<b>${esc(cod(x))}</b> <span class="tvn-pn">${esc(nome(x))}</span> <span class="tvn-pq">· ${f0(qt(x))}</span></div>`;
   let nSem=0, nConc=0, nAtr=0, nFoco=0;
   const ran=x=>{ const m=x._pv?null:tvMat(x); if(!m) return ''; const c=/linha/.test(m.t)?'ok':/separ|caminho/.test(m.t)?'info':'warn'; return `<span class="tvn-rs ${c}"><i></i>${c==='ok'?'rancho entregue':c==='info'?'rancho separado':'sem rancho'}</span>`; };
   const rows=linhasOrd().map(l=>{ const cap=capDe(l);
     const cel=cols.map((d,i)=>{ const xs=corLista(l,d); nSem+=xs.length; if(i===1) nFoco+=xs.length;
-      if(i===0) return `<div class="tvn-cc pas">${xs.slice(0,2).map(x=>`<div>${pend(x)<=0?'<b class="okm">✓</b> ':''}${esc(cod(x))} · ${f0(qt(x))}</div>`).join('')||'<span class="tvn-mut">—</span>'}</div>`;
+      if(i===0) return `<div class="tvn-cc pas">${xs.slice(0,2).map(x=>lin(x,pend(x)<=0)).join('')||'<span class="tvn-mut">—</span>'}</div>`;
       if(i===1){ const P=(corAtiva(l)?corAvaliar(xs).passos:[])||[], ab=xs.map((x,j)=>({x,p:P[j]})).filter(z=>pend(z.x)>0), cur=ab[0];
         xs.forEach(x=>{ if(pend(x)<=0) nConc++; else if(!x._pv&&ordAtras(x,h)) nAtr++; });
         if(!cur) return `<div class="tvn-cc foco">${xs.length?'<span class="tvn-mut">✓ tudo produzido</span>':'<span class="tvn-mut">nada programado</span>'}</div>`;
         const x=cur.x, e=x._pv?0:entregueDe(x), tot=qt(x), pc=tot?Math.min(100,e/tot*100):0, atr=!x._pv&&ordAtras(x,h), k=atr?'crit':e>0?'info':'neu', nx=ab[1];
         const troca=nx&&nx.p&&nx.p.t?' <b class="warnm">↻ troca de cor</b>':'';
-        return `<div class="tvn-cc foco${atr?' tvn-pisca':''}"><div class="tvn-oh"><div><b>${esc(cod(x))}</b> <span>${f0(tot)}</span></div>${tvnEtq(k,atr?'ATRASADA':e>0?'EM PRODUÇÃO':'A INICIAR')}</div><div class="tvn-bar"><i class="${k}" style="width:${pc}%"></i></div>${nx?`<div class="tvn-mut">A seguir: <b>${esc(cod(nx.x))}</b> · ${f0(pend(nx.x))} ${ran(nx.x)}${troca}</div>`:''}</div>`; }
-      return `<div class="tvn-cc">${xs.slice(0,2).map(x=>`<div><b>${esc(cod(x))}</b> ${f0(qt(x))} ${ran(x)}</div>`).join('')||'<span class="tvn-mut">—</span>'}</div>`; }).join('');
+        return `<div class="tvn-cc foco${atr?' tvn-pisca':''}"><div class="tvn-oh"><div class="tvn-cx"><b>${esc(cod(x))}</b> <span class="tvn-pn">${esc(nome(x))}</span> <span class="tvn-pq">· ${f0(e)} de ${f0(tot)}</span></div>${tvnEtq(k,atr?'ATRASADA':e>0?'EM PRODUÇÃO':'A INICIAR')}</div><div class="tvn-bar"><i class="${k}" style="width:${pc}%"></i></div>${nx?`<div class="tvn-mut">A seguir: <b>${esc(cod(nx.x))}</b> ${esc(nome(nx.x))} · ${f0(pend(nx.x))} ${ran(nx.x)}${troca}</div>`:''}</div>`; }
+      return `<div class="tvn-cc">${xs.slice(0,2).map(x=>`<div class="tvn-cx2">${lin(x)}${ran(x)}</div>`).join('')||'<span class="tvn-mut">—</span>'}</div>`; }).join('');
     const tF=corLista(l,foco).reduce((a,x)=>a+qt(x),0), pc=cap?Math.round(tF/cap*100):null;
     return `<div class="tvn-cl"><b>${esc(l)}</b>${pc!=null?`<span class="${pc>100?'warn':''}">${foco===h?'hoje':'amanhã'} ${pc}% da capacidade</span>`:''}</div>${cel}`; }).join('');
   const hd=cols.map((d,i)=>`<div class="tvn-ch3${i===1?' foco':''}">${i===1?(foco===h?'HOJE':'AMANHÃ')+' · ':''}${nomeD(d)}${i===1&&foco===h?` <span>às ${tvnViraH()}:00 o destaque passa para amanhã</span>`:''}</div>`).join('');
@@ -146,7 +148,8 @@ document.head.insertAdjacentHTML('beforeend',`<style id="tvn2-css">
 .tvn-ch3{padding:0 6px 4px;font-size:21px;font-weight:700;color:var(--tx2);display:flex;align-items:baseline;gap:8px}.tvn-ch3.foco{color:var(--info);font-size:24px}.tvn-ch3 span{font-size:14px;font-weight:500;margin-left:auto;opacity:.85}
 .tvn-cl{display:flex;flex-direction:column;justify-content:center;padding-left:4px}.tvn-cl b{font-size:24px}.tvn-cl span{font-size:15px;font-weight:600;color:var(--tx2)}.tvn-cl span.warn{color:var(--warn)}
 .tvn-cc{background:var(--card);box-shadow:var(--sombra);border-radius:12px;padding:8px 14px;display:flex;flex-direction:column;justify-content:center;gap:5px;min-width:0;overflow:hidden;font-size:19px}.tvn-cc>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tvn-cc.pas{color:var(--tx2);font-size:17px}.tvn-cc.foco{border:2px solid var(--info)}.tvn-cc.foco .tvn-oh b{font-size:23px}.tvn-cc .tvn-mut{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tvn-cc.pas{color:var(--tx2);font-size:18px}.tvn-cc.foco{border:2px solid var(--info)}.tvn-cc.foco .tvn-oh b{font-size:23px}.tvn-cc .tvn-mut{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tvn-cx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.tvn-pn{color:var(--tx2);font-size:.92em}.tvn-pq{color:var(--tx2);font-size:.86em}.tvn-cx2{display:flex;flex-direction:column;gap:1px;min-width:0}.tvn-cc.foco .tvn-oh>.tvn-cx{flex:1}
 .tvn-rs{display:inline-flex;align-items:center;gap:5px;font-size:14px;font-weight:600}.tvn-rs i{width:8px;height:8px;border-radius:50%;background:currentColor}.tvn-rs.ok{color:var(--ok)}.tvn-rs.info{color:var(--info)}.tvn-rs.warn{color:var(--warn)}
 .tvn-dt{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}.tvn-dr{display:grid;grid-template-columns:150px minmax(0,1fr) 150px 150px 150px 380px;align-items:center;gap:24px;padding:14px 24px;background:var(--card);box-shadow:var(--sombra);border-radius:12px;font-size:28px}
 .tvn-dr.th{background:none;box-shadow:none;padding:0 24px;font-size:15px;font-weight:700;letter-spacing:.08em;color:var(--tx2)}.tvn-dr .r{text-align:right}.tvn-dr .tvn-mut{font-size:21px}.tvn-dr b.warn{color:var(--warn)}
