@@ -45,4 +45,14 @@ const coletor=async(p,cod)=>{ await p.keyboard.type(cod,{delay:12}); await p.key
  const tt=await p.evaluate(()=>{ const T=__T.S().tt; return {fase:T.fase,nome:T.p&&T.p.nome}; });
  ok('Coletor em modo "códigos Alt" (texto sem teclas): o campo de captura recebe e identifica a Ana', foco==='cr-cap'&&tt.nome==='Ana Souza'&&tt.fase!=='espera', JSON.stringify({foco,...tt}));
  await B.browser.close();
+ for(const [modo,fim] of [['sem nada no fim',null],['terminando com Tab','Tab']]){
+   B=await H.abrir(); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tablet','tab123'); await H.dorme(1800);
+   await p.evaluate(()=>__T.go('mantotem')); await H.dorme(1500); await p.keyboard.type('777888',{delay:12}); if(fim) await p.keyboard.press(fim); await H.dorme(1300);
+   const r=await p.evaluate(()=>{ const T=__T.S().tt; return {fase:T.fase,nome:T.p&&T.p.nome}; });
+   ok('Coletor '+modo+': identifica o Bruno', r.nome==='Bruno Lima', JSON.stringify(r)); await B.browser.close(); }
+ B=await H.abrir(); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
+ await p.evaluate(()=>__T.go('mancrachas')); await H.dorme(1200); await p.click('#cr-tst-in'); await p.keyboard.type('000123',{delay:12}); await p.keyboard.press('Enter'); await H.dorme(500);
+ const out=await p.evaluate(()=>(document.getElementById('cr-tst-out')||{}).innerText||'');
+ ok('Teste do coletor mostra o que chegou (texto, teclas, fim, modo, de quem é)', /"000123"/.test(out)&&/Teclas:\s*6/.test(out)&&/Enter/.test(out)&&/teclas normais/.test(out)&&/Ana Souza/.test(out), out.replace(/\n/g,' | '));
+ await B.browser.close();
  console.log(res.filter(r=>!r.ok).length?'':'tudo ok'); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
