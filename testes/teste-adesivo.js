@@ -37,4 +37,12 @@ const coletor=async(p,cod)=>{ await p.keyboard.type(cod,{delay:12}); await p.key
  const msg=await p.evaluate(()=>{ const m=document.body.innerText.match(/O coletor leu[^\n]*/); return m?m[0]:''; });
  ok('Diagnóstico: no tablet, código bipado que não é crachá mostra o que foi lido', /999000/.test(msg)&&/não é um crachá cadastrado/.test(msg), msg||'(nada na tela)');
  await B.browser.close();
+ // coletor que "digita" por códigos Alt (não gera teclas normais): o texto entra direto no campo
+ B=await H.abrir(); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tablet','tab123'); await H.dorme(1800);
+ await p.evaluate(()=>__T.go('mantotem')); await H.dorme(1500);
+ const foco=await p.evaluate(()=>document.activeElement&&document.activeElement.id);
+ await p.keyboard.insertText('000123'); await p.keyboard.press('Enter'); await H.dorme(1200);
+ const tt=await p.evaluate(()=>{ const T=__T.S().tt; return {fase:T.fase,nome:T.p&&T.p.nome}; });
+ ok('Coletor em modo "códigos Alt" (texto sem teclas): o campo de captura recebe e identifica a Ana', foco==='cr-cap'&&tt.nome==='Ana Souza'&&tt.fase!=='espera', JSON.stringify({foco,...tt}));
+ await B.browser.close();
  console.log(res.filter(r=>!r.ok).length?'':'tudo ok'); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
