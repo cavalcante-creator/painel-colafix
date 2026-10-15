@@ -30,4 +30,11 @@ const coletor=async(p,cod)=>{ await p.keyboard.type(cod,{delay:12}); await p.key
    else ok('Tablet da parede: adesivo de crachá desativado é recusado', tt.nome!==quem||tt.fase==='espera', JSON.stringify(tt));
    if(cod==='777888'){ ok('Técnico pelo adesivo vê os chamados (Cheguei/Terminei)', tt.papel==='tecnico', tt.papel); }
    await B.browser.close(); }
+
+ B=await H.abrir(); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'tablet','tab123'); await H.dorme(1800);
+ await p.evaluate(()=>__T.go('mantotem')); await H.dorme(1500); await p.evaluate(()=>{ window.__toasts=[]; const o=window.toast; });
+ await p.keyboard.type('999000',{delay:12}); await p.keyboard.press('Enter'); await H.dorme(700);
+ const msg=await p.evaluate(()=>{ const m=document.body.innerText.match(/O coletor leu[^\n]*/); return m?m[0]:''; });
+ ok('Diagnóstico: no tablet, código bipado que não é crachá mostra o que foi lido', /999000/.test(msg)&&/não é um crachá cadastrado/.test(msg), msg||'(nada na tela)');
+ await B.browser.close();
  console.log(res.filter(r=>!r.ok).length?'':'tudo ok'); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
