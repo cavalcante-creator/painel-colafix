@@ -573,11 +573,11 @@ async function cbPdf(){ if(!window.jspdf){ toast('Gerador de PDF indisponível. 
 /* ---------- o que o leitor digitar ---------- */
 S.cb.buf=''; S.cb.t=0; S.cb.inicio=null;
 document.addEventListener('keydown',ev=>{ if(ev.ctrlKey||ev.altKey||ev.metaKey) return; const agora=performance.now(), gap=agora-S.cb.t; S.cb.t=agora;
-  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(cod.length>=4&&(/^(CH|RA|EQ|OP)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod)||/(rancho|chamado|equip)=/i.test(cod))&&gap<(S.view==='mantotem'?400:120)){ const a=document.activeElement;
+  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(((cod.length>=4&&(/^(CH|RA|EQ|OP)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod)||/(rancho|chamado|equip)=/i.test(cod)))||crPorAdesivo(cod))&&gap<(S.view==='mantotem'?400:120)){ const a=document.activeElement;
       if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&typeof a.value==='string'&&a.value.toUpperCase().endsWith(cod.toUpperCase())){ a.value=a.value.slice(0,a.value.length-cod.length); a.dispatchEvent(new Event('input',{bubbles:true})); }
       ev.preventDefault(); ev.stopPropagation(); cbLeu(cod); } return; }
   if(ev.key&&ev.key.length===1){ if(gap>(S.view==='mantotem'?300:80)) S.cb.buf=''; else if(S.cb.buf&&gap<50) ev.stopImmediatePropagation(); /* rajada do leitor: não dispara os atalhos do teclado (N, A, P, F) */ S.cb.buf+=ev.key; if(S.cb.buf.length>40) S.cb.buf=S.cb.buf.slice(-40); } },true);
-function cbLeu(cod){ cod=String(cod).toUpperCase(); const mcr=cod.match(/^CX([A-Z0-9]{8})$/)||cod.match(/CRACHA\W*([A-Z0-9]{8})$/); if(mcr){ crColetor(mcr[1]); return; } const naTela=S.view==='manqr'&&S.cb.modo==='barras';
+function cbLeu(cod){ cod=String(cod).toUpperCase(); { const ad=crPorAdesivo(cod); if(ad){ crColetor(ad.codigo||ad._id); return; } } /* crachá de adesivo (código de barras próprio da empresa) */ const mcr=cod.match(/^CX([A-Z0-9]{8})$/)||cod.match(/CRACHA\W*([A-Z0-9]{8})$/); if(mcr){ crColetor(mcr[1]); return; } const naTela=S.view==='manqr'&&S.cb.modo==='barras';
   if(cod.startsWith('CH-')){ const l=cbLinhaDe(cod); if(!l){ S.cb.ultimo={cod,ok:false}; toast('Código '+cod+' não é de nenhuma linha.'); if(naTela) render(); return; }
     if(naTela){ S.cb.ultimo={cod,ok:true,txt:'abre o chamado da '+l}; render(); toast('Leitor funcionando: '+l+'.'); return; }
     if(typeof tabOn==='function'&&tabOn()&&linhasOrd().includes(l)){ tabSet(l); go('linhatv'); toast('Tablet: '+l); return; }
