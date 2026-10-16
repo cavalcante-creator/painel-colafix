@@ -47,6 +47,13 @@ function vChamados(){ const T=S.tt, L=ttLinhas(), h=new Date(), esc_=cqEsc();
   else return null; /* outras fases (sem crachá, ranchos…) usam a tela antiga */
   return `<div class="cq${esc_?' esc':''}">${cab}<main class="cq-main">${c}</main></div>`; }
 
+/* motivo legível dos erros do Firebase (antes ficavam num aviso escondido atrás da tela) */
+function cqErroTxt(e){ const c=String((e&&e.code)||''), m=String((e&&e.message)||e||'');
+  if(/permission|insufficient/i.test(c+m)) return 'sem permissão para gravar: confira o login deste computador';
+  if(/unavailable|offline|network|failed to get|timeout|deadline/i.test(c+m)) return 'sem conexão com o Firebase';
+  if(/unauthenticated/i.test(c+m)) return 'login expirado: entre de novo';
+  return m.slice(0,140)||c; }
+{ const _me=manErro; manErro=function(e,msg){ try{ if(S.man) S.man._ultErro=cqErroTxt(e); }catch(x){} return _me.apply(this,arguments); }; }
 /* rota: no login "Chamados" a tela do tablet é esta */
 { const _vt=vTotem; vTotem=function(){ if(ttSoChamados()){ const h=vChamados(); if(h) return h; } return _vt.apply(this,arguments); }; }
 /* técnico: a fase "fim" antiga vira a escolha da causa */
@@ -60,10 +67,14 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='cq-volta-maq'){ vai('maquina'); return; } if(a==='cq-volta-def'){ vai('defeito'); return; } if(a==='cq-volta-tec'){ vai('tecnico'); return; }
   if(a==='cq-def'){ T.defeito=b.dataset.v; T.txt=''; vai('impacto'); return; }
   if(a==='cq-imp'){ if(T.enviando) return; T.enviando=true; T.msg=''; render();
+    if(S.man.salv&&Date.now()-(S.man._salvDesde||0)>30000) S.man.salv=false; /* salvamento anterior pendurado: destrava */
     manNovo(T.linha); Object.assign(S.man.f,{linha:T.linha,quando:manAgoraLocal(),defeito:T.defeito||'Outro',impacto:b.dataset.v,nome:T.p.nome,equip:T.equip||'',equipId:T.equipId||'',origem:'tablet',cracha:T.p.codigo||null});
-    S.man.novo=false; S.man.cur=null; try{ await manSalvar(); }catch(e){ console.warn('[chamados] abrir',e); }
+    S.man.novo=false; S.man.cur=null; S.man._ultErro=''; S.man._salvDesde=Date.now();
+    let estourou=false; const salvar=manSalvar().catch(e=>{ S.man._ultErro=cqErroTxt(e); });
+    await Promise.race([salvar,new Promise(r=>setTimeout(()=>{ estourou=true; r(); },window.__cqTempo||25000))]);
     const n=S.man.cur; S.man.cur=null; S.man.novo=false; T.enviando=false;
-    if(n!=null){ T.numero=n; if(T.p.codigo) T.recente[T.p.codigo]=Date.now()+22000; vai('ok'); } else { T.msg='Não foi possível abrir o chamado. Verifique a internet e toque de novo.'; render(); } return; }
+    if(n!=null){ T.numero=n; if(T.p.codigo) T.recente[T.p.codigo]=Date.now()+22000; vai('ok'); }
+    else { if(estourou){ S.man.salv=false; } T.msg=estourou?'O Firebase não respondeu em 25 segundos'+(S.man._ultErro?' ('+S.man._ultErro+')':'')+'. Verifique a internet deste computador e toque de novo.':'Não foi possível abrir o chamado'+(S.man._ultErro?': '+S.man._ultErro:'')+'. Toque de novo.'; render(); } return; }
   if(a==='cq-comecar'){ const c=manDoc(+b.dataset.n); if(!c||T.enviando) return; T.enviando=true; render();
     try{ const agora=new Date().toISOString(); const E=Object.assign({},c.exec||{}); if(!E.tecnico) E.tecnico=T.p.nome; if(!E.inicio) E.inicio=manAgoraLocal(); E.tecnicoCracha=T.p.codigo||null;
       const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Conserto começado por '+T.p.nome+(T.p.codigo?' (crachá)':'')}]).slice(-200);
@@ -115,6 +126,7 @@ document.head.insertAdjacentHTML('beforeend',`<style id="cq-css">
 .cq-vz{font-size:clamp(20px,3vh,32px);color:var(--tx2);padding:30px 0}
 .cq-fim{flex:1;background:var(--card);box-shadow:var(--sombra);border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:20px}.cq-fim svg{width:clamp(80px,13vh,140px);height:auto;fill:none;stroke:var(--ok);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .cq-fim h1{margin:0;font-size:clamp(34px,6.6vh,72px);font-weight:800}.cq-fim p{margin:0;font-size:clamp(18px,3vh,32px);color:var(--tx2)}.cq-fim b.crit{color:var(--crit)}
+body:has(.cq) #toast{z-index:100!important;position:fixed}
 @media (max-width:820px){.cq-g2{grid-template-columns:1fr}.cq-ch{grid-template-columns:1fr}.cq-tt{display:none}}
 </style>`);
 if(!document.getElementById('tvn-font')){ try{ const l=document.createElement('link'); l.id='tvn-font'; l.rel='stylesheet'; l.href='https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400;100,500;100,600;100,700;100,800&display=swap'; document.head.appendChild(l); }catch(e){} }
