@@ -754,7 +754,7 @@
     let xs=clts().map(f=>({f,s:sitFer(f)})); const nAt=xs.filter(o=>['crit','warn'].includes(o.s.c)).length; if(F==='atencao') xs=xs.filter(o=>['crit','warn'].includes(o.s.c));
     xs.sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
     const venc=clts().reduce((n,f)=>n+periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim<hj).length,0), prox=ferProximas();
-    return (R.fajs?formAjuste():'')+(R.ffer?formFerias():'')
+    return ffiCard()+(R.fajs?formAjuste():'')+(R.ffer?formFerias():'')
       +(prox.length?`<section class="card"><h2>Férias marcadas</h2><div class="rh-tw"><table class="rh-t"><thead><tr><th>Funcionário</th><th>Férias</th><th>Volta</th><th>Aviso de férias</th><th></th></tr></thead><tbody>
         ${prox.map(x=>{ const ag=x.inicio<=hj; return `<tr><td><b>${esc(x.funcionario)}</b><small style="display:block;color:var(--muted)">período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}</small></td><td class="num">${br(x.inicio)} a ${br(x.fim)} <small style="color:var(--muted)">· ${plural(+x.dias,'dia','dias')}</small>${ag?' <span class="pill ok">em férias</span>':''}</td><td class="num">${br(x.retorno)}</td>
           <td>${temAviso(x)?'<span class="pill ok">Gerado</span>':`<button class="btn rh-sm" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}</td><td class="rh-ac">${ag?'':`<button class="lnk" data-act="rh-fercanc" data-id="${x._id}" style="color:var(--crit-ink)">Desmarcar</button>`}</td></tr>`; }).join('')}</tbody></table></div></section>`:'')
@@ -1329,6 +1329,72 @@
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r()+modalConv()+modalFicha()+(window.RHCartao?RHCartao.modal({P,R,esc,baixar}):''); }; });
   /* tela Almoço (modulos/rh-almoco.js): controle do almoço pelo Face ID */
   const almCtx=()=>({P,R,esc,eu,br,fCPF,carregarJs,baixar});
+  /* ---------- Férias pelo relatório do sistema de folha (PDF "Programação de férias", Alleader) ----------
+     O RH importa o PDF; o painel guarda em cada funcionário a situação da folha (ferFolha) e cria as férias já programadas.
+     Daí em diante os períodos, dias de direito, gozados e o limite para gozo vêm da folha (consideram faltas e afastamentos). */
+  const dIso=s=>{ const m=String(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?m[3]+'-'+m[2]+'-'+m[1]:''; };
+  const nPt=s=>{ const v=String(s||'').trim(); if(!v||/^[-.]+$/.test(v)) return 0; return +v.replace(/\./g,'').replace(',','.')||0; };
+  function rhFolhaParse(linhas){ const R0={dataBase:'',emissao:'',emps:[]}; let cur=null;
+    const rest=(r)=>{ const m=String(r).trim().match(/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\S+)\s+(\S+)/); if(!m) return null;
+      const ig=dIso(m[1]); return {inicioGozo:ig,diasGozo:ig?nPt(m[2]):0,abono:ig?nPt(m[3]):0,dir:nPt(m[5]),goz:nPt(m[6]),rest:nPt(m[7]),lim:dIso(m[8]),afast:nPt(m[9]),faltas:nPt(m[10])}; };
+    for(const l0 of linhas){ const l=String(l0).replace(/\s+/g,' ').trim(); let m;
+      if((m=l.match(/Data base:\s*(\d{2}\/\d{2}\/\d{4})/))) R0.dataBase=dIso(m[1]);
+      if((m=l.match(/Emiss[aã]o:\s*(\d{2}\/\d{2}\/\d{4})/))) R0.emissao=dIso(m[1]);
+      if((m=l.match(/^(\d{1,6}) (.+?) (\d{2}\/\d{2}\/\d{4}) (\d{2}\/\d{2}\/\d{4}) (\d+) (\d{2}\/12) (\d{2}\/\d{2}\/\d{4}) (\d{2}\/\d{2}\/\d{4}) (.+)$/))){
+        const p=rest(m[9]); if(!p) continue; cur={cod:m[1],nome:m[2].trim(),adm:dIso(m[3]),venc:dIso(m[4]),ferVenc:+m[5],ferPro:m[6],periodos:[Object.assign({ini:dIso(m[7]),fim:dIso(m[8])},p)]}; R0.emps.push(cur); continue; }
+      if(cur&&(m=l.match(/^(\d{2}\/\d{2}\/\d{4}) (\d{2}\/\d{2}\/\d{4}) (.+)$/))){ const p=rest(m[3]); if(p) cur.periodos.push(Object.assign({ini:dIso(m[1]),fim:dIso(m[2])},p)); continue; } }
+    return R0; }
+  window.rhFolhaParse=rhFolhaParse;
+  async function rhPdfLinhas(file){
+    if(!window.pdfjsLib) await new Promise((ok,er)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload=ok; s.onerror=()=>er(new Error('Não consegui carregar o leitor de PDF (verifique a internet).')); document.head.appendChild(s); });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const doc=await window.pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise, out=[];
+    for(let p=1;p<=doc.numPages;p++){ const tc=await (await doc.getPage(p)).getTextContent(), g=new Map();
+      tc.items.forEach(it=>{ if(!it.str||!it.str.trim()) return; const y=Math.round(it.transform[5]/2)*2; (g.get(y)||g.set(y,[]).get(y)).push(it); });
+      [...g.keys()].sort((a,b)=>b-a).forEach(y=>out.push(g.get(y).sort((a,b)=>a.transform[4]-b.transform[4]).map(i=>i.str.trim()).join(' '))); }
+    return out; }
+  function rhFolhaPrevia(dados){ const fsAll=R.func.filter(f=>f.status!=='Desligado'), enc=[], nao=[];
+    const parte=n=>{ const w=norm(n).split(' ').filter(Boolean); return w[0]+' '+w[w.length-1]; };
+    dados.emps.forEach(e=>{ let f=fsAll.find(x=>norm(x.nome)===norm(e.nome)); if(!f){ const c=fsAll.filter(x=>parte(x.nome)===parte(e.nome)); if(c.length===1) f=c[0]; } if(f) enc.push({f,e}); else nao.push(e); });
+    R.ffi={dados,enc,nao}; P.render(); }
+  window.rhFolhaPreviaLinhas=linhas=>rhFolhaPrevia(rhFolhaParse(linhas));
+  window.rhFerDbg=fid=>{ const f=R.func.find(x=>x._id===fid); return f?({periodos:periodos(f).map(p=>({ini:p.ini,fim:p.fim,lim:p.lim,saldo:p.saldo})),sit:sitFer(f)}):null; }; /* conferência (testes) */
+  async function rhFolhaAplica(){ const X=R.ffi; if(!X||R.salv) return; R.salv=true; P.render(); let nf=0, np=0;
+    try{ for(const {f,e} of X.enc){
+        const ferFolha={dataBase:X.dados.dataBase,emissao:X.dados.emissao,cod:e.cod,ferVenc:e.ferVenc,periodos:e.periodos,importadoEm:agora(),por:eu()};
+        const up={ferFolha}; if(!okIso(f.admissao)&&e.adm) up.admissao=e.adm; await grava(COL.func+'/'+f._id,up); Object.assign(f,up); nf++;
+        const novos=e.periodos.filter(p=>p.inicioGozo&&p.diasGozo>0).map(p=>p.inicioGozo), fs=ferDe(f);
+        for(const x of fs.filter(x=>x.origem==='folha'&&!novos.includes(x.inicio))) await P.db().doc(COL.ferias+'/'+x._id).delete();
+        for(const p of e.periodos.filter(p=>p.inicioGozo&&p.diasGozo>0)){ if(fs.some(x=>x.inicio===p.inicioGozo)) continue; const dias=Math.round(p.diasGozo);
+          await P.db().doc(COL.ferias+'/'+id()).set({funcId:f._id,funcionario:f.nome,aquisitivo:p.ini,aquisitivoFim:p.fim,inicio:p.inicioGozo,dias,fim:addDias(p.inicioGozo,dias-1),retorno:addDias(p.inicioGozo,dias),status:'programada',origem:'folha',em:agora(),por:P.S.uid||null,porNome:eu()}); np++; } }
+      P.toast(`Relatório aplicado: ${nf} funcionário(s) atualizados${np?' · '+np+' férias programadas trazidas da folha':''}.`); R.ffi=null; }
+    catch(err){ P.toast('Não foi possível aplicar: '+((err&&err.message)||err)); }
+    R.salv=false; P.render(); }
+  /* períodos e situação: com o relatório, valem os dados da folha */
+  { const _per=periodos; periodos=function(f){ const FF=f&&f.ferFolha; if(!f||f.tipo==='PJ'||!FF||!(FF.periodos||[]).length) return _per(f);
+      const hj=P.hojeStr(), fs=ferDe(f), emis=FF.emissao||FF.dataBase||'', conta=x=>!x.anterior&&(x.origem==='folha'||String(x.inicio||'')>emis);
+      const mk=(k,p)=>{ const ps=fs.filter(x=>x.aquisitivo===p.ini&&conta(x)), usados=ps.reduce((a,x)=>a+(+x.dias||0),0); return {k,ini:p.ini,fim:p.fim,lim:p.lim,completo:p.fim<hj,ps,usados,saldo:Math.max(0,Math.floor((p.rest!=null?+p.rest:30)-usados)),folha:p.folha?p:p.dir!=null?p:null}; };
+      const out=FF.periodos.map((p,k)=>mk(k,p)); let ult=FF.periodos[FF.periodos.length-1];
+      for(let k=out.length;k<out.length+3;k++){ const ini=addDias(ult.fim,1); if(ini>hj) break; const p={ini,fim:addDias(addMeses(ini,12),-1),lim:addDias(addMeses(ini,24),-1),rest:30}; out.push(mk(k,p)); ult=p; }
+      return out; }; }
+  { const _sit=sitFer; sitFer=function(f){ const s=_sit(f), fp=s&&s.p&&s.p.folha; if(fp&&(+fp.afast||0)>=30&&s.c==='crit') return {c:'neu',t:'Afastado '+fp.afast+' dias no período · conferir na folha',n:5,p:s.p,d:s.d}; return s; }; }
+  function ffiCard(){ const X=R.ffi, com=clts().filter(f=>f.ferFolha), ult=com.reduce((a,f)=>String(f.ferFolha.importadoEm||'')>String(a.importadoEm||'')?f.ferFolha:a,{});
+    const topoC=`<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 style="margin:0">Sistema de folha</h2><div class="sub" style="margin:2px 0 0">${com.length?`Situação da folha de ${com.length} funcionário(s) · relatório de ${br(ult.emissao)} (data base ${br(ult.dataBase)})`:'Importe o relatório "Programação de férias" do sistema de folha para os prazos usarem os dados oficiais (faltas, afastamentos, dias gozados).'}</div></div>
+      <label class="btn" style="cursor:pointer">${P.ic('folha',16,2)}Importar relatório de férias (PDF)<input type="file" id="rh-ffi-file" accept=".pdf,application/pdf" hidden></label></div>`;
+    if(!X) return topoC+'</section>';
+    const lin=({f,e})=>{ const p0=e.periodos[0], prog=e.periodos.filter(p=>p.inicioGozo), ultP=e.periodos[e.periodos.length-1];
+      return `<tr><td><b>${esc(f.nome)}</b>${norm(f.nome)!==norm(e.nome)?`<small style="display:block;color:var(--muted)">na folha: ${esc(e.nome)}</small>`:''}</td><td class="num">${br(p0.ini)} a ${br(p0.fim)}${e.periodos.length>1?`<small style="display:block;color:var(--muted)">+ ${br(ultP.ini)} a ${br(ultP.fim)}</small>`:''}</td>
+        <td class="num">${p0.rest} dias${p0.goz?` <small style="color:var(--muted)">(gozou ${p0.goz})</small>`:''}</td><td class="num">${br(p0.lim)}${e.ferVenc?' <span class="pill warn">vencida</span>':''}</td>
+        <td>${prog.map(p=>`<span class="pill ok">${br(p.inicioGozo)} · ${p.diasGozo} dias</span>`).join(' ')||'—'}</td><td class="num">${[p0.faltas?p0.faltas+' falta(s)':'',e.periodos.some(p=>p.afast)?Math.max(...e.periodos.map(p=>p.afast))+' dias afastado':''].filter(Boolean).join(' · ')||'—'}</td></tr>`; };
+    return topoC+`<div style="margin-top:14px"><div class="label">CONFERÊNCIA · ${X.enc.length} de ${X.dados.emps.length} funcionário(s) encontrados no cadastro · data base ${br(X.dados.dataBase)}</div>
+      ${X.nao.length?`<div class="banner" style="margin-top:8px">Não encontrados no cadastro (cadastre ou confira o nome): <b>${X.nao.map(e=>esc(e.nome)).join(', ')}</b></div>`:''}
+      <div class="rh-tw" style="margin-top:8px"><table class="rh-t"><thead><tr><th>Funcionário</th><th>Período aquisitivo</th><th>Saldo</th><th>Limite p/ gozo</th><th>Programadas na folha</th><th>Faltas · afastamento</th></tr></thead><tbody>${X.enc.map(lin).join('')}</tbody></table></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px"><button class="btn sec" data-act="rh-ffi-x">Cancelar</button><button class="btn" data-act="rh-ffi-ok" ${R.salv?'disabled':''}>${R.salv?'Aplicando…':'Aplicar '+X.enc.length+' funcionário(s)'}</button></div></div></section>`; }
+  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="rh-ffi-ok"],[data-act="rh-ffi-x"]'); if(!b) return; if(b.dataset.act==='rh-ffi-x'){ R.ffi=null; P.render(); } else rhFolhaAplica(); });
+  document.addEventListener('change',async ev=>{ const t=ev.target; if(!t||t.id!=='rh-ffi-file'||!t.files||!t.files[0]) return; const fl=t.files[0]; t.value='';
+    try{ P.toast('Lendo o relatório…'); const d=rhFolhaParse(await rhPdfLinhas(fl)); if(!d.emps.length){ P.toast('Não encontrei funcionários nesse PDF. É o relatório "Programação de férias" do sistema de folha?'); return; } rhFolhaPrevia(d); }
+    catch(err){ P.toast((err&&err.message)||'Não consegui ler o PDF.'); } });
+
   P.registrarModulo({ id:'rh', nome:'RH', ic:'equipe', telas:TELAS, iniciar });
   P.registrarPerfil('rh',{ nome:'RH (funcionários, fichas, documentos, terceirizados)', mods:['rh'], soVer:true, pos:2, desc:'Só o módulo RH: funcionários, fichas de EPI e uniforme do mês, documentos e contratos, funções e EPIs e terceirizados. Não vê nem muda nada da fábrica.' });
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
