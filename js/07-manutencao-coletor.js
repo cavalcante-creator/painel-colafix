@@ -134,7 +134,7 @@ async function mpConverteQr(){ if(S.mp.conv||!S.db||!S.acs||!S.acs.pronto||!view
   try{ for(const q of pend){ const qref=S.db.doc('chamados/'+q._id); const lk=await qref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:9000}); if(!lk.acquired) continue;
       try{ const g=await qref.get(); if(!g.exists) continue; const d=Object.assign({},g.data()); delete d.qr;
         let n=(S.chamados||[]).reduce((m,c)=>Math.max(m,(+c.numero||0)<900000?(+c.numero||0):0),0)+1, doc=null;
-        for(let i=0;i<60&&!doc;i++,n++){ const ref=S.db.doc('chamados/os-'+manNum(n)); const r=await ref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:5000}); if(!r.acquired) continue; const x=await ref.get(); if(x.exists&&x.data()&&x.data().numero) continue; doc=Object.assign({},d,{numero:n,origem:'qr',qid:q._id}); await ref.set(doc); }
+        for(let i=0;i<60&&!doc;i++,n++){ const ref=S.db.doc('chamados/os-'+manNum(n)); const r=await manTrava(ref,5000); if(!r.acquired) continue; const x=await ref.get(); if(x.exists&&x.data()&&x.data().numero) continue; doc=Object.assign({},d,{numero:n,origem:'qr',qid:q._id}); await ref.set(doc); }
         if(!doc) continue;
         if(doc.impacto==='parou'&&linhasOrd().includes(doc.linha)){ const ab=S.paradas.find(p=>p.linha===doc.linha&&!p.fim); let pid=ab?ab._id:null;
           if(!pid){ const ini=new Date(doc.criado||Date.now()).toISOString(); const ref=await S.db.collection('paradas').add({linha:doc.linha,motivo:'Manutenção',inicio:ini,fim:null,por:null,obs:'OS '+manNum(doc.numero)+' · '+String(doc.defeito||'').slice(0,80)+' (pelo QR, '+(doc.nome||'')+')',os:doc.numero}); pid=ref&&ref.id; }
@@ -223,7 +223,7 @@ function mxHoras(m){ return m==null?'—':m<60?m+' min':(m/60).toFixed(m<600?1:0
 function mxDias(d){ return d==null?'—':d<1?Math.round(d*24)+' h':(d<10?d.toFixed(1).replace('.',','):Math.round(d))+' d'; }
 /* número da OS (mesmo jeito do chamado normal) */
 async function mxNovaOS(base){ let n=(S.chamados||[]).reduce((m,c)=>Math.max(m,(+c.numero||0)<900000?(+c.numero||0):0),0)+1, doc=null;
-  for(let i=0;i<60&&!doc;i++,n++){ const ref=S.db.doc('chamados/os-'+manNum(n)); const r=await ref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:5000}); if(!r.acquired) continue; const x=await ref.get(); if(x.exists&&x.data()&&x.data().numero) continue; doc=Object.assign({},base,{numero:n}); await ref.set(doc); }
+  for(let i=0;i<60&&!doc;i++,n++){ const ref=S.db.doc('chamados/os-'+manNum(n)); const r=await manTrava(ref,5000); if(!r.acquired) continue; const x=await ref.get(); if(x.exists&&x.data()&&x.data().numero) continue; doc=Object.assign({},base,{numero:n}); await ref.set(doc); }
   if(!doc) throw new Error('Não consegui reservar o número da OS.');
   if(!(S.chamados||[]).some(c=>c.numero===doc.numero)) S.chamados=[Object.assign({_id:'os-'+manNum(doc.numero)},doc)].concat(S.chamados||[]);
   return doc; }

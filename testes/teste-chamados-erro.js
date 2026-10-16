@@ -10,13 +10,21 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await ate(); await p.click('[data-act="cq-imp"][data-v="parou"]'); await H.dorme(2600);
  let m=await p.evaluate(()=>({msg:(document.querySelector('.cq-msg')||{}).innerText||'',env:__T.S().tt.enviando,dis:!!document.querySelector('[data-act="cq-imp"][disabled]')}));
  ok('Firebase sem responder: em vez de só carregar, mostra o aviso e libera o botão', /não respondeu/.test(m.msg)&&!m.env&&!m.dis, JSON.stringify(m));
- // 2) o Firebase recusa a gravação
- await p.evaluate(()=>{ window.__dbRestaura(); const db=__T.S().db, d0=db.doc.bind(db); db.doc=pth=>{ const r=d0(pth); if(/^chamados\/os-/.test(pth)) r.acquire=async()=>{ const e=new Error('Missing or insufficient permissions.'); e.code='permission-denied'; throw e; }; return r; }; });
+ const zera=async()=>{ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(600); };
+ // 2) regras antigas: a trava é recusada → o painel numera sem trava e abre o chamado
+ await p.evaluate(()=>{ window.__dbRestaura(); const db=__T.S().db, d0=db.doc.bind(db); db.doc=pth=>{ const r=d0(pth); if(/^chamados\/os-/.test(pth)) r.acquire=async()=>{ const e=new Error('Missing or insufficient permissions.'); e.code='permission-denied'; throw e; }; return r; }; window.__dbRestaura=()=>{ db.doc=d0; }; });
  await p.click('[data-act="cq-imp"][data-v="parou"]'); await H.dorme(2500);
- m=await p.evaluate(()=>({msg:(document.querySelector('.cq-msg')||{}).innerText||'',env:__T.S().tt.enviando}));
- ok('Firebase recusando: a tela diz o motivo (sem permissão) e libera para tentar de novo', /permiss|Não foi possível/.test(m.msg)&&!m.env, JSON.stringify(m));
- // 3) voltou ao normal: o mesmo toque abre o chamado
- await p.evaluate(()=>{ window.__dbRestaura(); }); await p.click('[data-act="cq-imp"][data-v="parou"]'); await H.dorme(2500);
- const tela=await p.evaluate(()=>(document.querySelector('.cq-fim h1')||{}).innerText||'');
- ok('Com o Firebase de volta, o mesmo toque abre o chamado', /Chamado aberto/.test(tela), tela);
+ let t2=await p.evaluate(()=>(document.querySelector('.cq-fim h1')||{}).innerText||'');
+ ok('Regras antigas (trava recusada): o chamado abre mesmo assim, numerado sem trava', /Chamado aberto/.test(t2), t2);
+ // 3) a própria gravação do chamado é recusada → a tela diz o motivo
+ await p.evaluate(()=>{ window.__dbRestaura(); const db=__T.S().db, d0=db.doc.bind(db); db.doc=pth=>{ const r=d0(pth); if(/^chamados\/os-/.test(pth)){ r.set=async()=>{ const e=new Error('Missing or insufficient permissions.'); e.code='permission-denied'; throw e; }; } return r; }; window.__dbRestaura=()=>{ db.doc=d0; }; });
+ await zera(); await ate(); await p.click('[data-act="cq-imp"][data-v="parou"]'); await H.dorme(2500);
+ const m3=await p.evaluate(()=>({msg:(document.querySelector('.cq-msg')||{}).innerText||'',env:__T.S().tt.enviando}));
+ ok('Gravação recusada: a tela diz o motivo (sem permissão) e libera para tentar de novo', /permiss/.test(m3.msg)&&!m3.env, JSON.stringify(m3));
+ await p.evaluate(()=>window.__dbRestaura()); await zera();
+ await p.evaluate(()=>{ window.__dbRestaura(); const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(600);
+ const bts=await p.evaluate(()=>[...document.querySelectorAll('.cq-tema .cq-sec')].map(b=>b.innerText));
+ ok('Espera tem "Tela cheia" e "Sair"', bts.includes('Tela cheia')&&bts.includes('Sair'), bts.join(' · '));
+ p.once('dialog',dl=>dl.accept()); await p.click('[data-act="cq-sair"]'); await H.dorme(2500);
+ ok('"Sair" (com confirmação) encerra a sessão e volta para a entrada', await p.evaluate(()=>!!document.querySelector('#lg, .login, input[type=password]')));
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

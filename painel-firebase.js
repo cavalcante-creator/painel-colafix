@@ -80,7 +80,7 @@
             if (d && d.ate > agora && d.holder !== holder) return false;
             t.set(lk, { holder: holder || '', ate: agora + (ttlMs || 5000) }); return true; });
           return { acquired: ok };
-        } catch (e) { return { acquired: false }; }
+        } catch (e) { return { acquired: false, erro: (e && (e.code || e.message)) || 'erro' }; } /* erro (ex.: regras sem _travas) ≠ trava ocupada */
       },
       release: () => fs.doc('_travas/' + path.replace(/\//g, '__')).delete().catch(() => {})
     };

@@ -25,7 +25,7 @@ function vChamados(){ const T=S.tt, L=ttLinhas(), h=new Date(), esc_=cqEsc();
   if(T.fase==='espera'||!T.p){
     c=`<div class="cq-lns">${L.map(l=>{ const e=cqEstado(l); return `<section class="cq-ln ${e.c}${e.c==='crit'?' cq-pisca':''}"><div><h2>${esc(l)}</h2><i></i></div><b>${esc(e.t)}</b><span>${esc(e.s)}</span></section>`; }).join('')}</div>
       <section class="cq-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor</h1><p>Gestor da linha: abre chamado · Técnico: começa e termina o conserto</p><p class="cq-p2">${ttCam.erro?'Este computador não tem câmera: use o leitor de crachá.':'No tablet, aproxime o QR do crachá da câmera.'}</p>${msg}</div></section>
-      <div class="cq-tema"><button class="cq-sec" data-act="cq-tema">${esc_?'Tela clara':'Tela escura'}</button>${ttSemCrachaOk()?'<button class="cq-sec" data-act="tt-sem">Estou sem crachá</button>':''}</div>`; }
+      <div class="cq-tema">${ttSemCrachaOk()?'<button class="cq-sec" data-act="tt-sem">Estou sem crachá</button>':''}<button class="cq-sec" data-act="cq-tema">${esc_?'Tela clara':'Tela escura'}</button><button class="cq-sec" data-act="cq-cheia">${document.fullscreenElement?'Sair da tela cheia':'Tela cheia'}</button><button class="cq-sec" data-act="cq-sair">Sair</button></div>`; }
   else if(T.fase==='cqlinha'){ c=`<h1 class="cq-h">Em qual linha?</h1><div class="cq-g">${L.map(l=>cqBt('cq-linha',l,`data-l="${esc(l)}"`)).join('')}</div>${msg}${cqRod('Escolha a linha da máquina com problema.')}`; }
   else if(T.fase==='maquina'){ const l=T.linha||T.p.linha||''; if(!l){ T.fase='cqlinha'; return vChamados(); } T.linha=l;
     const es=mxEquips(l); c=`${cqEtapas(1)}<h1 class="cq-h">Qual máquina da <em>${esc(l)}</em>?${L.length>1?' <button class="cq-lk" data-act="cq-trocal">trocar linha</button>':''}</h1>
@@ -47,6 +47,12 @@ function vChamados(){ const T=S.tt, L=ttLinhas(), h=new Date(), esc_=cqEsc();
   else return null; /* outras fases (sem crachá, ranchos…) usam a tela antiga */
   return `<div class="cq${esc_?' esc':''}">${cab}<main class="cq-main">${c}</main></div>`; }
 
+/* trava do número da OS: se a trava do Firebase falhar (regras antigas sem _travas) ou demorar mais de 4 s,
+   segue sem ela — quem chama ainda confere se o número está livre (get) antes de gravar. Trava ocupada de verdade continua respeitada. */
+async function manTrava(ref,ttl){ let r;
+  try{ r=await Promise.race([ref.acquire({holder:S.uid||('t'+Math.random()),ttlMs:ttl||5000}),new Promise(ok=>setTimeout(()=>ok({acquired:false,erro:'tempo'}),4000))]); }catch(e){ r={acquired:false,erro:String((e&&e.code)||e)}; }
+  if(r&&r.erro){ if(!manTrava._avisou){ manTrava._avisou=true; console.warn('[manutenção] trava indisponível ('+r.erro+'): numerando sem trava'); } return {acquired:true,semTrava:true}; }
+  return r||{acquired:false}; }
 /* motivo legível dos erros do Firebase (antes ficavam num aviso escondido atrás da tela) */
 function cqErroTxt(e){ const c=String((e&&e.code)||''), m=String((e&&e.message)||e||'');
   if(/permission|insufficient/i.test(c+m)) return 'sem permissão para gravar: confira o login deste computador';
@@ -54,12 +60,16 @@ function cqErroTxt(e){ const c=String((e&&e.code)||''), m=String((e&&e.message)|
   if(/unauthenticated/i.test(c+m)) return 'login expirado: entre de novo';
   return m.slice(0,140)||c; }
 { const _me=manErro; manErro=function(e,msg){ try{ if(S.man) S.man._ultErro=cqErroTxt(e); }catch(x){} return _me.apply(this,arguments); }; }
+/* no processo novo quem libera é o técnico: o gestor não cai mais na etapa antiga "a máquina voltou a funcionar?" */
+{ const _tp=ttPendentes; ttPendentes=function(p){ if(ttSoChamados()&&ttLiberaTec()) return []; return _tp.apply(this,arguments); }; }
 /* rota: no login "Chamados" a tela do tablet é esta */
 { const _vt=vTotem; vTotem=function(){ if(ttSoChamados()){ const h=vChamados(); if(h) return h; } return _vt.apply(this,arguments); }; }
 /* técnico: a fase "fim" antiga vira a escolha da causa */
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="cq-"]'); if(!b||!ttAtivo()) return; const a=b.dataset.act, T=S.tt; ev.preventDefault();
   const vai=f=>{ T.fase=f; T.msg=''; T.ult=Date.now(); render(); };
   if(a==='cq-tema'){ try{ localStorage.setItem('colafix.chEscuro',cqEsc()?'0':'1'); }catch(e){} render(); return; }
+  if(a==='cq-cheia'){ try{ if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }catch(e){ toast('Este navegador não deixou entrar em tela cheia (tecla F11 também funciona).'); } setTimeout(render,250); return; }
+  if(a==='cq-sair'){ if(!confirm('Sair do computador de chamados?\n\nPara voltar, será preciso entrar de novo com o usuário e a senha.')) return; ttCamDesliga(); const x=document.createElement('button'); x.dataset.act='sair-conta'; x.hidden=true; document.body.appendChild(x); x.click(); x.remove(); return; }
   if(a==='cq-cancel'){ ttVoltar(); return; }
   if(a==='cq-trocal'||a==='cq-abrir'){ T.linha=''; T.equip=''; T.equipId=''; T.defeito=''; vai('cqlinha'); return; }
   if(a==='cq-linha'){ T.linha=b.dataset.l; vai('maquina'); return; }
@@ -108,7 +118,7 @@ document.head.insertAdjacentHTML('beforeend',`<style id="cq-css">
 @keyframes cqPisca{0%,100%{background:var(--critbg)}50%{background:var(--pulso);box-shadow:0 0 0 3px var(--crit)}}.cq-pisca{animation:cqPisca 1.3s ease-in-out infinite;background:var(--critbg)}
 .cq-cta{flex:1;min-height:0;background:var(--card);box-shadow:var(--sombra);border-radius:22px;display:flex;align-items:center;justify-content:center;gap:clamp(20px,2.5vw,48px);padding:20px}.cq-cta svg{width:clamp(70px,11vh,120px);height:auto;fill:none;stroke:var(--tx);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .cq-cta h1{margin:0;font-size:clamp(30px,5.9vh,64px);font-weight:800}.cq-cta p{margin:8px 0 0;font-size:clamp(16px,2.6vh,28px);color:var(--tx2)}.cq-p2{font-size:clamp(14px,2vh,22px)!important}
-.cq-tema{display:flex;justify-content:flex-end;gap:10px}
+.cq-tema{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 .cq-h{margin:0;font-size:clamp(26px,4.8vh,52px);font-weight:800}.cq-h em{font-style:normal;color:var(--info)}.cq-h small{font-size:clamp(16px,2.4vh,26px);color:var(--tx2);font-weight:500}
 .cq-lk{font:inherit;font-size:clamp(14px,2vh,22px);font-weight:500;color:var(--info);background:none;border:0;text-decoration:underline;cursor:pointer}
 .cq-et{display:flex;gap:10px;list-style:none;margin:0;padding:0}.cq-et li{display:flex;align-items:center;gap:10px;font-size:clamp(15px,1.9vh,20px);color:var(--tx2)}.cq-et li span{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--linha);font-weight:800}
