@@ -698,7 +698,7 @@
   const okIso=s=>/^\d{4}-\d{2}-\d{2}$/.test(String(s||''));
   const ferDe=f=>R.fer.filter(x=>x.funcId===f._id&&x.status!=='cancelada');
   function periodos(f){ if(f.tipo==='PJ'||!okIso(f.admissao)) return []; const hj=P.hojeStr(), out=[], fs=ferDe(f);
-    for(let k=0;k<80;k++){ const ini=addMeses(f.admissao,12*k); if(ini>hj) break; const fim=addDias(addMeses(f.admissao,12*(k+1)),-1), lim=addDias(addMeses(f.admissao,12*(k+2)),-1);
+    for(let k=0;k<80;k++){ const ini=addMeses(f.admissao,12*k); if(ini>hj) break; const fim=addDias(addMeses(f.admissao,12*(k+1)),-1), lim=addDias(addMeses(f.admissao,12*(k+2)),-30); /* limite para gozo: começar até 30 dias antes do fim do período concessivo */
       const ps=fs.filter(x=>x.aquisitivo===ini), usados=ps.reduce((a,x)=>a+(+x.dias||0),0); out.push({k,ini,fim,lim,completo:fim<hj,ps,usados,saldo:Math.max(0,30-usados)}); }
     return out; }
   const plural=(n,s,p)=>n+' '+(n===1?s:p);
@@ -1353,9 +1353,29 @@
       tc.items.forEach(it=>{ if(!it.str||!it.str.trim()) return; const y=Math.round(it.transform[5]/2)*2; (g.get(y)||g.set(y,[]).get(y)).push(it); });
       [...g.keys()].sort((a,b)=>b-a).forEach(y=>out.push(g.get(y).sort((a,b)=>a.transform[4]-b.transform[4]).map(i=>i.str.trim()).join(' '))); }
     return out; }
+  function rhLev(a,b){ if(Math.abs(a.length-b.length)>3) return 9; const v=Array(b.length+1).fill(0).map((_,j)=>j);
+    for(let i=1;i<=a.length;i++){ let ant=v[0]; v[0]=i; for(let j=1;j<=b.length;j++){ const t=v[j]; v[j]=Math.min(v[j]+1,v[j-1]+1,ant+(a[i-1]===b[j-1]?0:1)); ant=t; } } return v[b.length]; }
+  /* cadastros em dobro: um criado pela importação da folha e outro antigo da mesma pessoa (mesma admissão + primeiro nome, ou nome quase igual) */
+  function rhDuplos(){ const fs=R.func.filter(f=>f.status!=='Desligado'), out=[];
+    fs.filter(f=>f.origem==='folha').forEach(nv=>{ const prim=norm(nv.nome).split(' ')[0];
+      const ant=fs.find(x=>x!==nv&&x.origem!=='folha'&&((x.admissao&&x.admissao===nv.admissao&&norm(x.nome).split(' ')[0]===prim)||rhLev(norm(x.nome),norm(nv.nome))<=3));
+      if(ant) out.push({nv,ant}); }); return out; }
+  async function rhJunta(nvId,antId){ const nv=R.func.find(x=>x._id===nvId), ant=R.func.find(x=>x._id===antId); if(!nv||!ant||R.salv) return;
+    if(!confirm('Juntar os cadastros?\n\nFica: '+ant.nome+' (cadastro antigo, com CPF/função/setor)\nRecebe os dados da folha de: '+nv.nome+'\nO cadastro duplicado é apagado.')) return;
+    R.salv=true; P.render();
+    try{ const up={ferFolha:nv.ferFolha||null,codFolha:nv.codFolha||ant.codFolha||null}; if(!okIso(ant.admissao)&&nv.admissao) up.admissao=nv.admissao; await grava(COL.func+'/'+ant._id,up); Object.assign(ant,up);
+      for(const x of R.fer.filter(x=>x.funcId===nv._id)) await P.db().doc(COL.ferias+'/'+x._id).set({funcId:ant._id,funcionario:ant.nome},{merge:true});
+      await P.db().doc(COL.func+'/'+nv._id).delete(); R.func=R.func.filter(x=>x!==nv); P.toast('Cadastros juntados: '+ant.nome+' ficou com os dados da folha.'); }
+    catch(err){ P.toast('Não foi possível juntar: '+((err&&err.message)||err)); }
+    R.salv=false; P.render(); }
+  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="rh-junta"]'); if(b) rhJunta(b.dataset.nv,b.dataset.ant); });
   function rhFolhaPrevia(dados){ const fsAll=R.func.filter(f=>f.status!=='Desligado'), enc=[], nao=[];
     const parte=n=>{ const w=norm(n).split(' ').filter(Boolean); return w[0]+' '+w[w.length-1]; };
-    dados.emps.forEach(e=>{ let f=fsAll.find(x=>norm(x.nome)===norm(e.nome)); if(!f){ const c=fsAll.filter(x=>parte(x.nome)===parte(e.nome)); if(c.length===1) f=c[0]; } if(f) enc.push({f,e}); else nao.push(e); });
+    dados.emps.forEach(e=>{ let f=fsAll.find(x=>norm(x.nome)===norm(e.nome)); const un=c=>c.length===1?c[0]:null;
+      if(!f) f=un(fsAll.filter(x=>parte(x.nome)===parte(e.nome)));
+      if(!f&&e.adm) f=un(fsAll.filter(x=>x.admissao===e.adm&&norm(x.nome).split(' ')[0]===norm(e.nome).split(' ')[0]));
+      if(!f) f=un(fsAll.filter(x=>rhLev(norm(x.nome),norm(e.nome))<=3));
+      if(f&&enc.some(o=>o.f===f)) f=null; if(f) enc.push({f,e}); else nao.push(e); });
     R.ffi={dados,enc,nao}; P.render(); }
   window.rhFolhaPreviaLinhas=linhas=>rhFolhaPrevia(rhFolhaParse(linhas));
   window.rhFerDbg=fid=>{ const f=R.func.find(x=>x._id===fid); return f?({periodos:periodos(f).map(p=>({ini:p.ini,fim:p.fim,lim:p.lim,saldo:p.saldo})),sit:sitFer(f)}):null; }; /* conferência (testes) */
@@ -1375,13 +1395,15 @@
       const hj=P.hojeStr(), fs=ferDe(f), emis=FF.emissao||FF.dataBase||'', conta=x=>!x.anterior&&(x.origem==='folha'||String(x.inicio||'')>emis);
       const mk=(k,p)=>{ const ps=fs.filter(x=>x.aquisitivo===p.ini&&conta(x)), usados=ps.reduce((a,x)=>a+(+x.dias||0),0); return {k,ini:p.ini,fim:p.fim,lim:p.lim,completo:p.fim<hj,ps,usados,saldo:Math.max(0,Math.floor((p.rest!=null?+p.rest:30)-usados)),folha:p.folha?p:p.dir!=null?p:null}; };
       const out=FF.periodos.map((p,k)=>mk(k,p)); let ult=FF.periodos[FF.periodos.length-1];
-      for(let k=out.length;k<out.length+3;k++){ const ini=addDias(ult.fim,1); if(ini>hj) break; const p={ini,fim:addDias(addMeses(ini,12),-1),lim:addDias(addMeses(ini,24),-1),rest:30}; out.push(mk(k,p)); ult=p; }
+      for(let k=out.length;k<out.length+3;k++){ const ini=addDias(ult.fim,1); if(ini>hj) break; const p={ini,fim:addDias(addMeses(ini,12),-1),lim:addDias(addMeses(ini,24),-30),rest:30}; out.push(mk(k,p)); ult=p; }
       return out; }; }
   { const _sit=sitFer; sitFer=function(f){ const s=_sit(f), fp=s&&s.p&&s.p.folha; if(fp&&(+fp.afast||0)>=30&&s.c==='crit') return {c:'neu',t:'Afastado '+fp.afast+' dias no período · conferir na folha',n:5,p:s.p,d:s.d}; return s; }; }
   function ffiCard(){ const X=R.ffi, com=clts().filter(f=>f.ferFolha), ult=com.reduce((a,f)=>String(f.ferFolha.importadoEm||'')>String(a.importadoEm||'')?f.ferFolha:a,{});
     const topoC=`<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 style="margin:0">Sistema de folha</h2><div class="sub" style="margin:2px 0 0">${com.length?`Situação da folha de ${com.length} funcionário(s) · relatório de ${br(ult.emissao)} (data base ${br(ult.dataBase)})`:'Importe o relatório "Programação de férias" do sistema de folha para os prazos usarem os dados oficiais (faltas, afastamentos, dias gozados).'}</div></div>
       <label class="btn" style="cursor:pointer">${P.ic('folha',16,2)}Importar relatório de férias (PDF)<input type="file" id="rh-ffi-file" accept=".pdf,application/pdf" hidden></label></div>`;
-    if(!X) return topoC+'</section>';
+    const dup=rhDuplos(), dupH=dup.length?`<div class="banner" style="margin-top:12px"><b>Possíveis cadastros em dobro (${dup.length})</b> — a mesma pessoa foi cadastrada de novo pela importação. Junte para ficar um cadastro só, com os dados da folha:
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${dup.map(({nv,ant})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span><b>${esc(ant.nome)}</b> (cadastro antigo) e <b>${esc(nv.nome)}</b> (da folha) · admissão ${br(nv.admissao||ant.admissao)}</span><button class="btn rh-sm" data-act="rh-junta" data-nv="${nv._id}" data-ant="${ant._id}" ${R.salv?'disabled':''}>Juntar</button></div>`).join('')}</div></div>`:'';
+    if(!X) return topoC+dupH+'</section>';
     const lin=({f,e})=>{ const p0=e.periodos[0], prog=e.periodos.filter(p=>p.inicioGozo), ultP=e.periodos[e.periodos.length-1];
       return `<tr><td><b>${esc(f.nome)}</b>${norm(f.nome)!==norm(e.nome)?`<small style="display:block;color:var(--muted)">na folha: ${esc(e.nome)}</small>`:''}</td><td class="num">${br(p0.ini)} a ${br(p0.fim)}${e.periodos.length>1?`<small style="display:block;color:var(--muted)">+ ${br(ultP.ini)} a ${br(ultP.fim)}</small>`:''}</td>
         <td class="num">${p0.rest} dias${p0.goz?` <small style="color:var(--muted)">(gozou ${p0.goz})</small>`:''}</td><td class="num">${br(p0.lim)}${e.ferVenc?' <span class="pill warn">vencida</span>':''}</td>

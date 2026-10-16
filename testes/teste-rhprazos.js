@@ -6,7 +6,7 @@ const dias=n=>{ const d=hoje(); d.setDate(d.getDate()+n); return iso(d); }, mese
 const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 (async()=>{ const {d}=seedManut(); const D=d.docs;
   d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
-  const F={f0:['ANA SOUZA','52998224725','CLT',meses(-24,10)],f1:['CARLOS LIMA','11144477735','CLT',meses(-25)],f2:['BRUNO ROCHA','60759545077','CLT',meses(-6)],
+  const F={f0:['ANA SOUZA','52998224725','CLT',meses(-24,39)] /* limite para gozo = admissão + 24 meses − 30 dias → daqui a 9 dias */,f1:['CARLOS LIMA','11144477735','CLT',meses(-25)],f2:['BRUNO ROCHA','60759545077','CLT',meses(-6)],
     f3:['PEDRO ALVES','86288366757','PJ',meses(-3,10)],f4:['RAFAEL NUNES','04589523061','PJ',meses(-12)],f5:['JOAO PJ','28625587041','PJ',meses(-4)]};
   Object.entries(F).forEach(([k,[n,c,t,a]])=>D['rh/dados/funcionarios/'+k]={nome:n,cpf:c,tipo:t,empresa:t==='PJ'?'NEXUS':'COLAFIX',status:'Ativo',admissao:a,funcao:'Operador de produção',setor:'Linha 1'});
   D['rh/dados/funcionarios/f4'].ultimaTroca=meses(-2);
