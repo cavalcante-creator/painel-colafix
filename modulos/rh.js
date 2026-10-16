@@ -1387,9 +1387,21 @@
         <td class="num">${p0.rest} dias${p0.goz?` <small style="color:var(--muted)">(gozou ${p0.goz})</small>`:''}</td><td class="num">${br(p0.lim)}${e.ferVenc?' <span class="pill warn">vencida</span>':''}</td>
         <td>${prog.map(p=>`<span class="pill ok">${br(p.inicioGozo)} · ${p.diasGozo} dias</span>`).join(' ')||'—'}</td><td class="num">${[p0.faltas?p0.faltas+' falta(s)':'',e.periodos.some(p=>p.afast)?Math.max(...e.periodos.map(p=>p.afast))+' dias afastado':''].filter(Boolean).join(' · ')||'—'}</td></tr>`; };
     return topoC+`<div style="margin-top:14px"><div class="label">CONFERÊNCIA · ${X.enc.length} de ${X.dados.emps.length} funcionário(s) encontrados no cadastro · data base ${br(X.dados.dataBase)}</div>
-      ${X.nao.length?`<div class="banner" style="margin-top:8px">Não encontrados no cadastro (cadastre ou confira o nome): <b>${X.nao.map(e=>esc(e.nome)).join(', ')}</b></div>`:''}
+      ${X.nao.length?`<div class="banner" style="margin-top:8px"><div><b>${X.nao.length} não encontrado(s) no cadastro.</b> Marque quem deve ser cadastrado no RH com os dados do relatório (nome, admissão, código na folha); CPF, função e setor você completa depois.</div>
+        <div class="rh-ffi-nao">${X.nao.map((e,i)=>`<label class="ck"><input type="checkbox" data-ffi-cad="${i}" ${X.desm&&X.desm[i]?'':'checked'}> ${esc(e.nome)} <small style="color:var(--muted)">· admissão ${br(e.adm)}</small></label>`).join('')}</div>
+        <button class="btn" data-act="rh-ffi-cad" style="margin-top:8px" ${R.salv?'disabled':''}>Cadastrar ${X.nao.filter((e,i)=>!(X.desm&&X.desm[i])).length} no RH</button></div>`:''}
       <div class="rh-tw" style="margin-top:8px"><table class="rh-t"><thead><tr><th>Funcionário</th><th>Período aquisitivo</th><th>Saldo</th><th>Limite p/ gozo</th><th>Programadas na folha</th><th>Faltas · afastamento</th></tr></thead><tbody>${X.enc.map(lin).join('')}</tbody></table></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px"><button class="btn sec" data-act="rh-ffi-x">Cancelar</button><button class="btn" data-act="rh-ffi-ok" ${R.salv?'disabled':''}>${R.salv?'Aplicando…':'Aplicar '+X.enc.length+' funcionário(s)'}</button></div></div></section>`; }
+  try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-ffi-css">.rh-ffi-nao{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:4px 16px;margin-top:8px}</style>'); }catch(e){}
+  async function rhFolhaCadastra(){ const X=R.ffi; if(!X||R.salv) return; const xs=X.nao.filter((e,i)=>!(X.desm&&X.desm[i])); if(!xs.length) return;
+    R.salv=true; P.render(); let n=0;
+    try{ for(const e of xs){ const fid=id(), doc={nome:e.nome,tipo:'CLT',empresa:'COLAFIX',status:'Ativo',admissao:e.adm||'',codFolha:e.cod,origem:'folha',criadoEm:agora()};
+        await grava(COL.func+'/'+fid,doc); if(!R.func.some(x=>x._id===fid)) R.func.push(Object.assign({_id:fid},doc)); n++; }
+      P.toast(n+' funcionário(s) cadastrados. Confira a conferência e aplique.'); }
+    catch(err){ P.toast('Não foi possível cadastrar: '+((err&&err.message)||err)); }
+    R.salv=false; rhFolhaPrevia(X.dados); }
+  document.addEventListener('change',ev=>{ const t=ev.target; if(!t||t.dataset.ffiCad==null||!R.ffi) return; R.ffi.desm=R.ffi.desm||{}; R.ffi.desm[+t.dataset.ffiCad]=!t.checked; P.render(); });
+  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="rh-ffi-cad"]'); if(b) rhFolhaCadastra(); });
   document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="rh-ffi-ok"],[data-act="rh-ffi-x"]'); if(!b) return; if(b.dataset.act==='rh-ffi-x'){ R.ffi=null; P.render(); } else rhFolhaAplica(); });
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!t||t.id!=='rh-ffi-file'||!t.files||!t.files[0]) return; const fl=t.files[0]; t.value='';
     try{ P.toast('Lendo o relatório…'); const d=rhFolhaParse(await rhPdfLinhas(fl)); if(!d.emps.length){ P.toast('Não encontrei funcionários nesse PDF. É o relatório "Programação de férias" do sistema de folha?'); return; } rhFolhaPrevia(d); }

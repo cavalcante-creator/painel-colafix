@@ -9,7 +9,7 @@ const LINHAS=fs.readFileSync(__dirname+'/dados-ferias-folha.txt','utf8').split('
  ok('Férias e prazos mostra "Importar relatório de férias (PDF)"', await p.evaluate(()=>!!document.getElementById('rh-ffi-file')));
  await p.evaluate(l=>window.rhFolhaPreviaLinhas(l),LINHAS); await H.dorme(800);
  const prev=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Conferência: 5 de 38 encontrados no cadastro, lista quem não foi encontrado', /5 de 38 funcionário/.test(prev)&&/Não encontrados no cadastro/.test(prev)&&/SIDNEI/.test(prev), (prev.match(/CONFERÊNCIA[^\n]*/)||[''])[0]);
+ ok('Conferência: 5 de 38 encontrados no cadastro, lista quem não foi encontrado', /5 de 38 funcionário/.test(prev)&&/não encontrado\(s\) no cadastro/.test(prev)&&/SIDNEI/.test(prev), (prev.match(/CONFERÊNCIA[^\n]*/)||[''])[0]);
  await p.click('[data-act="rh-ffi-ok"]'); await H.dorme(2500);
  const r=await p.evaluate(()=>({f3:window.rhFerDbg('f3'),f4:window.rhFerDbg('f4'),f5:window.rhFerDbg('f5'),f2:window.rhFerDbg('f2'),f6:window.rhFerDbg('f6'),
    prog:(__T.S().db,null)}));
@@ -21,4 +21,11 @@ const LINHAS=fs.readFileSync(__dirname+'/dados-ferias-folha.txt','utf8').split('
  const marcadas=async()=>p.evaluate(()=>[...document.querySelectorAll('#view table tbody tr')].filter(tr=>/Paulo Roberto/i.test(tr.innerText)&&/01\/10\/2026/.test(tr.innerText)).length);
  const n1=await marcadas(); await p.evaluate(l=>window.rhFolhaPreviaLinhas(l),LINHAS); await H.dorme(600); await p.click('[data-act="rh-ffi-ok"]'); await H.dorme(2500); const n2=await marcadas();
  ok('Férias do Paulo aparecem em "Férias marcadas" e reimportar não duplica', n1===1&&n2===1, n1+' → '+n2);
+ // cadastrar os não encontrados direto da conferência (desmarcando um)
+ await p.evaluate(l=>window.rhFolhaPreviaLinhas(l),LINHAS); await H.dorme(600);
+ const nNao=await p.evaluate(()=>document.querySelectorAll('[data-ffi-cad]').length);
+ await p.uncheck('[data-ffi-cad="0"]'); await H.dorme(300); const rot=await p.evaluate(()=>document.querySelector('[data-act="rh-ffi-cad"]').innerText);
+ await p.click('[data-act="rh-ffi-cad"]'); await H.dorme(3000);
+ const conf=await p.evaluate(()=>(document.getElementById('view').innerText.match(/CONFERÊNCIA[^\n]*/)||[''])[0]);
+ ok('Cadastra os não encontrados marcados (com a admissão do relatório) e refaz a conferência', nNao===33&&/Cadastrar 32 no RH/.test(rot)&&/37 de 38/.test(conf), nNao+' · '+rot+' · '+conf);
  await p.screenshot({path:'/tmp/rh-ferias-folha.png',fullPage:false}); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
