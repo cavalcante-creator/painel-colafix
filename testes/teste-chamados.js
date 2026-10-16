@@ -1,0 +1,28 @@
+/* Processo simplificado dos chamados no "Computador de chamados" (coletor): gestor abre, técnico começa, termina e libera. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(x=>x); const D=d.docs, t=new Date().toISOString();
+ D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
+ D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',ativo:true,adesivo:'777888',criadoEm:t};
+ d.users['chamados@painel-colafix.app']={uid:'uCH',pass:'ch1234',nome:'Chamados'}; D['perfis/uCH']={nome:'Computador de chamados',usuario:'chamados'}; D['acessos/uCH']={perfil:'chamados',mods:['tablet'],locais:[],ativo:true};
+ const B=await H.abrir({viewport:{width:1600,height:900}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'chamados','ch1234'); await H.dorme(2500);
+ const bip=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); };
+ const zera=async()=>{ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(700); };
+ const tela=await p.evaluate(()=>({v:__T.S().view,txt:document.getElementById('view').innerText}));
+ ok('O login "Computador de chamados" abre direto na tela de chamados, pedindo o crachá no leitor e sem a parte de ranchos', tela.v==='mantotem'&&/Passe seu crachá no leitor/.test(tela.txt)&&!/conferir um rancho/i.test(tela.txt)&&!/ramal/.test(tela.txt), tela.v+' · '+tela.txt.slice(0,140).replace(/\n/g,' | '));
+ await bip('000123'); let T=await p.evaluate(()=>({f:__T.S().tt.fase,n:(__T.S().tt.p||{}).nome}));
+ ok('Gestor da linha passa o adesivo no coletor e escolhe a máquina', T.f==='maquina'&&T.n==='Ana Souza', JSON.stringify(T));
+ await p.click('[data-act="tt-eq"]'); await H.dorme(500); await p.click('[data-act="tt-def"]'); await H.dorme(300); await p.click('[data-act="tt-def-ok"]'); await H.dorme(500);
+ const imps=await p.evaluate(()=>[...document.querySelectorAll('[data-act="tt-imp"]')].map(b=>b.dataset.v)); await p.click(`[data-act="tt-imp"][data-v="${imps.includes('parou')?'parou':imps[0]}"]`); await H.dorme(1800);
+ let ch=await p.evaluate(()=>{ const c=(__T.S().chamados||[]).slice().sort((a,b)=>(+b.numero||0)-(+a.numero||0))[0]; return c?{n:c.numero,st:c.status,imp:c.impacto,par:!!c.paradaId,nome:c.nome}:null; });
+ ok('Chamado aberto no nome do gestor, com a máquina parada registrada', ch&&ch.nome==='Ana Souza'&&ch.st&&ch.imp==='parou'&&ch.par, JSON.stringify(ch));
+ await zera(); await bip('777888'); T=await p.evaluate(()=>({f:__T.S().tt.fase,n:(__T.S().tt.p||{}).nome}));
+ ok('Técnico passa o adesivo e vê o chamado', T.f==='tecnico'&&T.n==='Bruno Lima', JSON.stringify(T));
+ await p.click(`[data-act="tt-cheguei"][data-n="${ch.n}"]`); await H.dorme(1500);
+ let c2=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,tec:c.exec&&c.exec.tecnico}; },ch.n);
+ ok('"Cheguei" começa o atendimento no nome do técnico', /execu/i.test(c2.st||'')&&c2.tec==='Bruno Lima', JSON.stringify(c2));
+ await zera(); await bip('777888'); const bt=await p.evaluate(()=>{ const b=document.querySelector('[data-act="tt-fim"]'); return b?b.innerText:''; });
+ ok('Botão do técnico diz "Terminei · liberar a máquina"', /Terminei · liberar a máquina/.test(bt), bt);
+ await p.click(`[data-act="tt-fim"][data-n="${ch.n}"]`); await H.dorme(600); await p.click('[data-act="tt-causa"]'); await H.dorme(300); await p.fill('#tt-serv','Troca do rolamento do motor'); await p.click('[data-act="tt-fim-ok"]'); await H.dorme(2500);
+ const fim=await p.evaluate(n=>{ const S=__T.S(), c=S.chamados.find(x=>x.numero===n), par=c.paradaId&&S.paradas.find(x=>x._id===c.paradaId); return {st:c.status,lib:c.liberadoPor,parFim:!!(par&&par.fim),txt:document.getElementById('view').innerText.slice(0,200).replace(/\n/g,' | ')}; },ch.n);
+ ok('"Terminei" conclui, libera a máquina no nome do técnico e encerra a parada', fim.st==='Concluída'&&fim.lib==='Bruno Lima'&&fim.parFim&&/Máquina liberada/.test(fim.txt), JSON.stringify(fim));
+ await p.screenshot({path:'/tmp/chamados-fim.png'}); console.log('erros:',B.erros.filter(x=>!/404/.test(x)).slice(0,3)); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

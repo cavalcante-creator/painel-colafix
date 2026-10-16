@@ -220,7 +220,8 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
       await S.db.doc('chamados/'+c._id).update({exec:E,hist,concluidoPorNome:T.p.nome,concluidoPorCracha:T.p.codigo}); c.exec=E; c.hist=hist;
       c._mzOk=true; try{ await manStatus(c,'Concluída'); } finally { delete c._mzOk; }
       T.enviando=false; if(c.status!=='Concluída'){ T.msg='Não foi possível concluir agora. Verifique a internet e tente de novo.'; render(); return; }
-      T.recente[T.p.codigo]=Date.now()+22000; toast('OS '+manNum(c.numero)+' concluída por '+T.p.nome+'.'); T.numero=c.numero; T.fase='fimok'; T.ult=Date.now(); render(); }
+      if(typeof ttLiberaPorTecnico==='function'&&ttLiberaTec()) await ttLiberaPorTecnico(c,T.p);
+      T.recente[T.p.codigo]=Date.now()+22000; toast('OS '+manNum(c.numero)+' concluída por '+T.p.nome+(c.liberadoEm?' · máquina liberada':'')+'.'); T.numero=c.numero; T.fase='fimok'; T.ult=Date.now(); render(); }
     catch(e){ T.enviando=false; console.warn('[tablet] concluir',e); T.msg='Não foi possível concluir agora. Verifique a internet e tente de novo.'; render(); }
     return; }
   if(a==='tt-cheguei'){ const c=manDoc(+b.dataset.n); if(!c||T.enviando) return; T.enviando=true; render();
