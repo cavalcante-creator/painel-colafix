@@ -42,7 +42,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const tvs=await p.evaluate(()=>[...document.querySelectorAll('.gs-tvc > b')].map(b=>b.innerText));
  await H.dorme(700);
  const viv=await p.evaluate(()=>[...document.querySelectorAll('.gs-live')].map(b=>({k:b.dataset.k,len:b.innerText.length,esc:(b.querySelector('.gs-in')||{style:{}}).style.transform||''})));
- ok('Todas as TVs em destaque, ao vivo e em tamanho pequeno (a tela de verdade reduzida)', tvs.length===9&&['Produção do dia','Previsto × Realizado','Detalhamento do Previsto × Realizado','Previsão mensal por item','Nível dos silos','Monitor do almoxarifado','Silos','Calendário da semana','Manutenção'].every(n=>tvs.includes(n))&&viv.length===9&&viv.every(v=>v.len>30&&/scale/.test(v.esc)), viv.map(v=>v.k+':'+v.len+':'+v.esc).join(' '));
+ ok('Todas as TVs em destaque, ao vivo e em tamanho pequeno (a tela de verdade reduzida)', tvs.length===10&&['Produção do dia','Previsto × Realizado','Detalhamento do Previsto × Realizado','Previsão mensal por item','Indicadores da manutenção','Nível dos silos','Monitor do almoxarifado','Silos','Calendário da semana','Manutenção'].every(n=>tvs.includes(n))&&viv.length===10&&viv.every(v=>v.len>30&&/scale/.test(v.esc)), viv.map(v=>v.k+':'+v.len+':'+v.esc).join(' '));
  await p.evaluate(()=>{ const v=JSON.parse(localStorage.getItem('__srv')); v.docs['chamados/os-00077']={numero:77,linha:'Linha 1',defeito:'Correia arrebentou agora',impacto:'parou',nome:'Ana',status:'Aberta',criado:new Date().toISOString()}; localStorage.setItem('__srv',JSON.stringify(v)); window.__mockReconnect(); }); await H.dorme(900);
  ok('Miniatura da TV da manutenção atualiza sozinha', /Correia arrebentou|00077/.test(await p.evaluate(()=>(document.querySelector('.gs-live[data-k="manut"]')||{}).innerText||'')));
  await p.screenshot({path:'/tmp/gestor-tvs.png'});
@@ -51,6 +51,6 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Toque numa TV: abre só ela em tela cheia; Esc volta para o resumo', a1.on&&a1.v==='tvnman'&&a1.n===1&&!a2.on&&a2.v==='gestao', JSON.stringify([a1,a2]));
  await p.click('[data-act="gs-tv-todas"]'); await H.dorme(600); const a3=await p.evaluate(()=>({on:__T.S().apres.on,n:__T.S().apres.lista.length,v:__T.S().view}));
  await p.screenshot({path:'/tmp/gestor-tv-cheia.png'}); await p.keyboard.press('Escape'); await H.dorme(500);
- ok('"Passar todas as TVs" passa as 9 telas em sequência', a3.on&&a3.n===9, JSON.stringify(a3));
+ ok('"Passar todas as TVs" passa as 10 telas em sequência', a3.on&&a3.n===10, JSON.stringify(a3));
  await p.screenshot({path:'/tmp/gestor-pc2.png'});
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

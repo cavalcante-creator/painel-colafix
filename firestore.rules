@@ -21,7 +21,7 @@ service cloud.firestore {
       return logado() && provedor() != 'anonymous' && exists(caminhoAcs())
         && acs().get('ativo', true) != false && acs().get('apagado', false) != true;
     }
-    function soVer() { return acs().get('perfil', '') in ['ver', 'tv', 'cal', 'silosver', 'consulta', 'tvtodas', 'rh']; }
+    function soVer() { return acs().get('perfil', '') in ['ver', 'tv', 'cal', 'silosver', 'consulta', 'tvtodas', 'rh', 'producao', 'auditor', 'tvman']; } // consultas e TVs não gravam (revisão de acessos)
     function le() { return dono() || liberado(); }
     function grava() { return dono() || (liberado() && !soVer()); }
     // Ajuste por pessoa (Equipe e cargos → Ajustar acesso): coleções em que ela não pode gravar (ex.: módulo "só ver").

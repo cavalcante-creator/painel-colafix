@@ -61,9 +61,7 @@ function tvnCfgCard(){ const A=S.apres, sg=tvnSegs(), pad=tvnSegPad(), ts=aprTel
     <div class="tvn-cfgg">${ts.map(t=>`<label><span>${esc(t.nome)}</span><select class="txt" data-tvn-seg="${t.k}">${opts(t.k)}</select></label>`).join('')||'<span class="sub">Marque as telas acima.</span>'}</div>
     <div class="label" style="margin-top:14px">CALENDÁRIO DA TV</div>
     <label class="tvn-cfgl">Destacar o dia seguinte a partir de <select class="txt" data-tvn-vira ${adm?'':'disabled'}>${[12,13,14,15,16,17,18,19,20,21,22].map(h=>`<option value="${h}" ${h===vira?'selected':''}>${h}:00</option>`).join('')}</select></label>
-    <div class="label" style="margin-top:14px">RECADOS NO RODAPÉ DAS TVS <span style="font-weight:400;text-transform:none;letter-spacing:0">· aparecem em todas as telas até a data escolhida</span></div>
-    <div id="tvn-recs">${(rec.length?rec:[{t:'',ate:''}]).map((r,i)=>`<div class="tvn-recl"><input class="txt" data-tvn-rt="${i}" value="${esc(r.t||'')}" placeholder="Ex.: Reunião de segurança hoje às 15:00" ${adm?'':'disabled'}><input class="txt" type="date" data-tvn-ra="${i}" value="${esc(r.ate||'')}" ${adm?'':'disabled'} aria-label="Válido até"><button class="lnk" data-act="tvn-recx" data-i="${i}" ${adm?'':'disabled'}>Remover</button></div>`).join('')}</div>
-    ${adm?`<div style="display:flex;gap:10px;margin-top:8px"><button class="btn sec" data-act="tvn-reca">Adicionar recado</button><button class="btn" data-act="tvn-recs">Salvar recados</button></div>`:'<div class="sub">Só a administradora altera recados e o horário do calendário.</div>'}
+    ${typeof avEditor==='function'?avEditor():''}
   </section>`; }
 function tvnCfgPoe(){ if(S.view!=='tvapres') return; const v=document.getElementById('view'); if(!v||document.getElementById('tvn-cfg')) return; const ref=v.querySelector('.apr-cfg'); if(ref) ref.insertAdjacentHTML('afterend',tvnCfgCard()); }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ tvnCfgPoe(); }catch(e){ console.warn('[TV cfg]',e); } return x; }; }

@@ -1,0 +1,50 @@
+/* Painel Colafix · visual novo (padrão aprovado nas TVs e nos chamados): fonte Archivo, pesos mais leves,
+   fundo cinza-azulado claro e cores de status sóbrias. Carregado depois de painel.css; o tema escuro continua o de painel.css. */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400;100,500;100,600;100,700&display=swap');
+:root:not([data-theme="dark"]){
+  --ground:#EDF1F4; --surface:#FFFFFF; --surface-2:#F4F6F8; --sunken:#E6EBEF;
+  --ink:#1C2B33; --ink-2:#44545D; --muted:#5E6E77; --faint:#A3B0B7; --line:#DDE3E8; --line-2:#EDF1F4;
+  --teal:#2B6A87; --teal-strong:#143F54; --teal-tint:#E2ECF1; --teal-wash:#EEF4F7;
+  --ok:#5E9C7A; --ok-ink:#3C8A63; --ok-tint:#E3F0E9; --warn:#C9A55E; --warn-ink:#8A6A2A; --warn-tint:#F6EEDC;
+  --crit:#C2615A; --crit-ink:#B5473F; --crit-tint:#F6E8E6; --tank:#E3E8EC; --tank-line:#5E6E77; --leg:#A3B0B7;
+  --shadow:0 2px 8px rgba(20,63,84,.07);
+}
+/* fonte única em todo o painel (código e campos de código continuam monoespaçados) */
+html body, html body :where(button,input,select,textarea,h1,h2,h3,h4,h5,h6,p,span,div,a,label,li,td,th,b,strong,small,em,i,section,header,footer,nav,main,article,aside):not(code):not(pre):not(kbd):not(samp):not(.cr-ad){
+  font-family:Archivo,"Segoe UI",system-ui,-apple-system,sans-serif!important;
+}
+body{font-weight:400;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-variant-numeric:tabular-nums}
+b,strong{font-weight:600}
+h1{font-weight:700;letter-spacing:-.01em}h2,h3{font-weight:600}
+
+/* ===== Peças comuns no padrão aprovado (protótipos de Chamados, Manutenção e Produção).
+   Valem para todos os módulos, inclusive Ajustes. Só aparência: nenhuma função muda. ===== */
+.top{box-shadow:none;border-bottom:1px solid var(--line)}
+.brand{box-shadow:none}
+.navbtn{border-radius:10px}
+h1{font-size:30px;line-height:36px}
+.eyebrow{font-size:12px;letter-spacing:.12em}
+.sub{font-size:14.5px}
+.label{letter-spacing:.1em}
+.card{border-radius:14px;padding:20px 22px;box-shadow:0 2px 8px rgba(20,63,84,.07)}
+:root[data-theme="dark"] .card{box-shadow:none}
+.btn{height:44px;padding:0 18px;border-radius:10px;font-size:14.5px;background:var(--teal-strong)}
+:root[data-theme="dark"] .btn{background:var(--teal)}
+.btn:hover:not(:disabled){filter:brightness(1.08)}
+.btn.sec{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.sec:hover:not(:disabled){filter:none;border-color:var(--teal)}
+.txt{height:44px;border-width:1px;border-radius:10px}
+.txt:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-tint)}
+textarea.txt{height:auto;min-height:88px;padding:10px 12px;line-height:1.45}
+.tab{padding:0 4px;margin-right:18px;border-bottom:3px solid transparent;font-size:14.5px}
+.tab[aria-current="page"]{color:var(--ink);border-bottom-color:var(--teal-strong);font-weight:600}
+:root[data-theme="dark"] .tab[aria-current="page"]{border-bottom-color:var(--teal)}
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;background:var(--sunken);border-radius:10px;padding:3px}
+.seg button{border-radius:8px;border:0}
+.chip{border-radius:999px}
+.pill{font-size:12.5px;padding:4px 10px}
+.banner{border-radius:12px;font-size:13.5px;line-height:1.45}
+.empty{font-size:14.5px}
+th{background:var(--surface);border-bottom:1px solid var(--line);font-size:11.5px;padding-top:10px;padding-bottom:10px}
+td{padding-top:9px;padding-bottom:9px}
+tbody tr:hover>td{background:var(--surface-2)}

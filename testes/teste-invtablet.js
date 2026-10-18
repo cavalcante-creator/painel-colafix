@@ -1,0 +1,40 @@
+/* Inventário · modo tablet. (cenário de teste-inventario.js) Inventário = o programa "Gestão de Almoxarifado" dentro do painel (pedido de 13/10).
+   Quem só tem o Inventário vê o programa em tela cheia; os outros, dentro do painel. Os dados vão para o banco do painel. */
+const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=H.seed(); const D=d.docs;
+  const it=(cod,desc,locais,grupos)=>({codigo:cod,descricao:desc,ativo:true,linhas:[],almox:{locais,grupos:grupos||['COLAFIX'],un:null,conv:null}});
+  D['itens/AC0001']=Object.assign(it('AC0001','ARGAMASSA AC1 20 KG',['a3','a30']),{linhas:['Linha 1']}); D['config/geral'].paletes={'Linha 1':96}; /* múltiplo de palete da configuração */ D['itens/AC0002']=it('AC0002','ARGAMASSA AC2 20 KG',['a3','a30']); D['itens/RJ0001']=it('RJ0001','REJUNTE CINZA 1 KG',['rej'],['BAUTECH']);
+  D['pcpbase/itens']={em:'2026-10-13T08:00:00.000Z',atual:{},l:{AC0001:{a3:100,a30:50,d:'ARGAMASSA AC1 20 KG'},AC0002:{a3:20,a30:0,d:'ARGAMASSA AC2 20 KG'}}};
+  D['conferencias/CONF-1-1']={numero:'CONF-1-1',em:new Date(Date.now()-3600e3).toISOString(),dia:'2026-10-13',por:null,porNome:'CONFERENTE',local:'Almox 3',origem:'planilha',itens:{AC0002:{nome:'ARGAMASSA AC2 20 KG',almox3:30,almox30:0,total:30,pal3:0,sac3:30,pal30:0,sac30:0},XX9999:{nome:'ITEM FORA DO CADASTRO',almox3:12,almox30:0,total:12}}};
+  d.users['conf@painel-colafix.app']={uid:'uCONF',pass:'conf123',nome:'Carla'}; D['perfis/uCONF']={nome:'Carla',usuario:'conf'}; D['acessos/uCONF']={perfil:'conf',mods:['almox'],locais:['a3'],contar:true,receber:true,ativo:true};
+  d.users['sis@painel-colafix.app']={uid:'uSIS',pass:'sis123',nome:'Sara'}; D['perfis/uSIS']={nome:'Sara',usuario:'sis'}; D['acessos/uSIS']={perfil:'supsis',mods:['almox'],locais:['a3','a30','rej','sep','a1','a2'],contar:true,receber:true,auditar:true,verAud:true,ativo:true};
+  const B=await H.abrir({viewport:{width:800,height:1280}}); const p=B.page; p.on('dialog',x=>x.accept());
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500);
+  const frame=async()=>{ for(let i=0;i<60;i++){ const f=p.frames().find(x=>x.url().includes('inventario/index.html')); if(f&&await f.evaluate(()=>typeof USUARIO_LOGADO!=='undefined'&&!!USUARIO_LOGADO&&!!document.getElementById('confItemSelList')).catch(()=>false)) return f; await H.dorme(250); } return null; };
+  let f=await frame(); await H.dorme(1200);
+  await f.evaluate(()=>{ confToggleItem('AC0001'); confToggleItem('AC0002'); confIniciarConferencia(); }); await H.dorme(700);
+  let b=await f.evaluate(()=>({bar:(document.getElementById('invBar')||{}).innerText||'',cont:document.body.classList.contains('inv-contando'),hist:(()=>{ const c=[...document.querySelectorAll('.card')].find(x=>x.querySelector('#confHistList')); return c?getComputedStyle(c).display:'?'; })()}));
+  ok('Ao iniciar: barra fixa "0 de 2 itens contados" com Itens, Só os que faltam, Próximo e Salvar; histórico sai da frente', /0 de 2/.test(b.bar)&&/Salvar conferência/.test(b.bar)&&/Próximo que falta/.test(b.bar)&&b.cont&&b.hist==='none', JSON.stringify(b).slice(0,200));
+  const alto=await f.evaluate(()=>{ const i=document.querySelector('#confCard_AC0001 input[type=number]'); const r=i.getBoundingClientRect(); return {h:Math.round(r.height),fs:getComputedStyle(i).fontSize}; });
+  ok('Campos de contagem grandes para o dedo (≥ 56 px, número ≥ 28 px)', alto.h>=56&&parseFloat(alto.fs)>=28, JSON.stringify(alto));
+  const inp=await f.$('#confCard_AC0001 input[type=number]'); await inp.click(); await p.keyboard.type('3'); await p.keyboard.press('Enter'); await H.dorme(600);
+  b=await f.evaluate(()=>({bar:(document.getElementById('invBar')||{}).innerText||'',ok:document.getElementById('confCard_AC0001').classList.contains('inv-ok'),foco:document.activeElement&&document.activeElement.closest&&!!document.activeElement.closest('#confGrid')}));
+  ok('Digitar a contagem: "1 de 2", o cartão fica verde (✓ contado) e Enter vai para o próximo campo', /1 de 2/.test(b.bar)&&b.ok&&b.foco, JSON.stringify(b).slice(0,160));
+  await f.click('#invBar [data-a="faltam"]'); await H.dorme(300);
+  const esc=await f.evaluate(()=>getComputedStyle(document.getElementById('confCard_AC0001')).display);
+  ok('"Só os que faltam" esconde o item já contado', esc==='none', esc);
+  await f.click('#invBar [data-a="faltam"]'); await H.dorme(200);
+  /* o tablet recarrega no meio da contagem */
+  await p.reload(); await H.dorme(2500); f=await frame(); await H.dorme(1500);
+  const rt=await f.evaluate(()=>(document.getElementById('invRetoma')||{}).innerText||'');
+  ok('Depois de recarregar: "Contagem em andamento · 2 itens · 1 já contado · Continuar a contagem"', /Contagem em andamento/.test(rt)&&/2 itens/.test(rt)&&/1 já contados/.test(rt), rt.replace(/\n/g,' | '));
+  await f.click('#invRetoma [data-a="sim"]'); await H.dorme(800);
+  const vt=await f.evaluate(()=>({modo:CONF_MODO,v:(document.querySelector('#confCard_AC0001 input[type=number]')||{}).value,bar:(document.getElementById('invBar')||{}).innerText||''}));
+  ok('"Continuar a contagem" volta com os itens e o número digitado', vt.modo==='conferencia'&&vt.v==='3'&&/1 de 2/.test(vt.bar), JSON.stringify(vt).slice(0,160));
+  await f.evaluate(()=>{ setConfirmarZeroConf('AC0002',true); }); await H.dorme(300);
+  await f.click('#invBar [data-a="salvar"]'); await H.dorme(3500);
+  const fim=await f.evaluate(()=>({modo:CONF_MODO,sel:localStorage.getItem('conf_temp_sel'),bar:!!document.getElementById('invBar')}));
+  const banco=await p.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('__srv')).docs).filter(k=>k.startsWith('conferencias/')).length);
+  ok('Salvar conferência grava no banco, apaga a contagem guardada e tira a barra', banco>=2&&!fim.sel&&!fim.bar, JSON.stringify({banco,...fim}));
+  await p.screenshot({path:'/tmp/invt-fim.png'});
+  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

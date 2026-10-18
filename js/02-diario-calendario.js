@@ -1326,14 +1326,14 @@ header{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:18px 24px
 table{border-collapse:separate;border-spacing:0;background:var(--sf);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);width:100%;min-width:${150+nd*190}px;table-layout:fixed}
 th,td{border-right:1px solid var(--ln2);border-bottom:1px solid var(--ln2);vertical-align:top;padding:8px;text-align:left}
 thead th{position:sticky;top:0;z-index:2;background:var(--sf);padding:10px}
-.dh{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mu)}.dh span{font-weight:600;letter-spacing:0}.dh small{display:block;margin-top:2px;font-size:11.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--mu)}
+.dh{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mu)}.dh span{font-weight:600;letter-spacing:0}.dh small{display:block;margin-top:2px;font-size:11.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--mu)}
 .dh em{font-style:normal;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--tl);color:#fff;font-size:9.5px;letter-spacing:.08em;vertical-align:1px}
 thead th.hj .dh{color:var(--tls)}thead th.hj{box-shadow:inset 0 -3px 0 var(--tl)}
 th.l{position:sticky;left:0;z-index:1;width:150px;background:var(--sf2);font-size:14px}th.l small{display:block;margin-top:2px;font-weight:500;font-size:11.5px;color:var(--mu)}thead th.l{z-index:3}
 td.hj{background:var(--tlw)}td.vz .nada{color:var(--fa);text-align:center;padding:10px 0}.dm{display:none}
 .c{position:relative;padding:7px 9px 8px;border:1px solid var(--ln);border-radius:9px;margin-bottom:7px;background:var(--sf);break-inside:avoid;transition:box-shadow .12s}.c:hover{box-shadow:0 3px 10px rgba(0,0,0,.08)}
-.c1{display:flex;align-items:baseline;gap:6px}.sq{flex-shrink:0;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--tlt);color:var(--tls);font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;align-self:center}
-.cd{font-size:13px;letter-spacing:.02em}.q{margin-left:auto;font-size:14px;font-weight:800;white-space:nowrap}.q small{font-size:10.5px;font-weight:600;color:var(--mu);margin-left:3px}
+.c1{display:flex;align-items:baseline;gap:6px}.sq{flex-shrink:0;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--tlt);color:var(--tls);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;align-self:center}
+.cd{font-size:13px;letter-spacing:.02em}.q{margin-left:auto;font-size:14px;font-weight:700;white-space:nowrap}.q small{font-size:10.5px;font-weight:600;color:var(--mu);margin-left:3px}
 .nm{margin-top:2px;font-size:12px;color:var(--ink2);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .mt{display:flex;flex-wrap:wrap;gap:3px 8px;margin-top:5px;font-size:11px;color:var(--mu)}.hr{color:var(--tls);font-weight:700}.hr::before{content:"◷ ";font-weight:400}
 .tg{font-weight:700;color:var(--wn)}.tg.at{color:var(--cri)}
@@ -1347,7 +1347,7 @@ footer{padding:0 20px 24px;color:var(--mu);font-size:12px}
  .w{padding:0 16px 16px;overflow:visible}table,tbody,tr{display:block;min-width:0!important;width:100%;background:transparent;box-shadow:none}thead{display:none}
  tr{margin-bottom:14px;background:var(--sf);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden}
  th.l{display:block;position:static;width:auto;padding:10px 12px;border:0;border-bottom:1px solid var(--ln2)}td{display:block;border:0;border-bottom:1px solid var(--ln2);padding:8px 12px}td.hj{background:transparent}
- .dm{display:block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);margin:2px 0 6px}td.hj .dm{color:var(--tls)}td.vz{padding:6px 12px}td.vz .nada{display:inline;padding:0;margin-left:6px}td.vz .dm{display:inline}
+ .dm{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);margin:2px 0 6px}td.hj .dm{color:var(--tls)}td.vz{padding:6px 12px}td.vz .nada{display:inline;padding:0;margin-left:6px}td.vz .dm{display:inline}
 }
 @media print{
  @page{size:A4 landscape;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}

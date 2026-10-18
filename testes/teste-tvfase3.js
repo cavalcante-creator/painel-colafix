@@ -3,13 +3,12 @@ const run=require('./tv-cenario-8linhas'); const res=[]; const ok=(n,c,d)=>{ res
 (async()=>{
  await run({width:1920,height:1080},'/tmp/f3.png',async p=>{ const dorme=ms=>new Promise(x=>setTimeout(x,ms));
   await p.keyboard.press('Escape'); await dorme(500); await p.evaluate(()=>__T.go('tvapres')); await dorme(600);
-  ok('Telas de TV mostra a configuração nova (rodízio, tempo por tela, calendário, recados)', await p.evaluate(()=>!!document.querySelector('#tvn-cfg [data-act="tvn-inteli"]')&&!!document.querySelector('[data-tvn-vira]')&&!!document.querySelector('[data-tvn-rt]')));
-  await p.fill('[data-tvn-rt="0"]','Reunião de segurança às 15:00'); await p.click('[data-act="tvn-recs"]'); await dorme(800);
+  ok('Telas de TV mostra a configuração nova (rodízio, tempo por tela, calendário, e onde publicar os avisos)', await p.evaluate(()=>!!document.querySelector('#tvn-cfg [data-act="tvn-inteli"]')&&!!document.querySelector('[data-tvn-vira]')&&/AVISOS NAS TVS/.test(document.getElementById('tvn-cfg').innerText)&&!!document.querySelector('[data-act="av-novo"]')));
   await p.selectOption('[data-tvn-vira]','14'); await dorme(800);
-  const cfg=await p.evaluate(()=>({r:(__T.S().cfg.tvRecados||[]).map(x=>x.t),v:__T.S().cfg.tvVira}));
-  ok('Recado e horário do calendário salvos na configuração', cfg.r[0]==='Reunião de segurança às 15:00'&&cfg.v===14, JSON.stringify(cfg));
+  await p.evaluate(()=>{ __T.S().avTV=[{id:'x',t:'Reunião de segurança às 15:00',tipo:'seg'}]; }); const cfg=await p.evaluate(()=>({r:(__T.S().avTV||[]).map(x=>x.t),v:__T.S().cfg.tvVira}));
+  ok('Aviso disponível e horário do calendário salvo na configuração', cfg.r[0]==='Reunião de segurança às 15:00'&&cfg.v===14, JSON.stringify(cfg));
   await p.click('[data-act="apr-abre"][data-v="tvfab"]'); await dorme(1500);
-  ok('Recado aparece no rodapé da TV', await p.evaluate(()=>/Reunião de segurança/.test((document.querySelector('.tvn-rec')||{}).innerText||'')));
+  ok('Recado aparece no rodapé da TV', await p.evaluate(()=>/Reunião de segurança/.test((document.querySelector('.tva')||{}).innerText||'')));
   await p.keyboard.press('Escape'); await dorme(600); await p.evaluate(()=>__T.go('tvapres')); await dorme(600);
   await p.selectOption('[data-tvn-seg="ritmo"]','5'); await dorme(300);
   ok('Tempo por tela guardado no aparelho', await p.evaluate(()=>JSON.parse(localStorage.getItem('colafix.aprSegs')||'{}').ritmo===5));

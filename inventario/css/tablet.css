@@ -1,0 +1,54 @@
+/* Inventário · modo tablet e visual novo do painel (Archivo, cores sóbrias, alvos grandes para o dedo).
+   Só aparência: a lógica da conferência (conferencia.js) não muda. Os campos têm estilos fixos no HTML, por isso !important. */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400;100,500;100,600;100,700&display=swap');
+:root{--bg:#EDF1F4;--bg2:#FFFFFF;--bg3:#F4F6F8;--bg4:#E6EBEF;--border:#DDE3E8;--border2:#C9D2D9;--text:#1C2B33;--text2:#44545D;--text3:#5E6E77;
+  --accent:#143F54;--accent2:#2B6A87;--green:#3C8A63;--yellow:#8A6A2A;--red:#B5473F;--orange:#AD6A32;--purple:#6B5A9E;--radius:14px;--shadow:0 2px 8px rgba(20,63,84,.07)}
+html body,html body :where(button,input,select,textarea,div,span,label,b,strong,small,p,h1,h2,h3,td,th){font-family:Archivo,"Segoe UI",system-ui,sans-serif!important}
+body{-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.card{border-radius:14px!important;box-shadow:var(--shadow)!important}
+button,.btn{min-height:44px}
+input[type=text],input[type=number],input[type=date],select{min-height:44px!important;font-size:16px!important;border-radius:10px!important}
+
+/* ---------- escolher os itens ---------- */
+#confItemSelList>div{min-height:64px!important;padding:12px 14px!important;font-size:16px!important;border-radius:12px!important;margin-bottom:6px!important}
+#confItemSelList input[type=checkbox]{width:28px!important;height:28px!important;flex:none}
+#btnIniciarConf{min-height:56px!important;font-size:18px!important;padding:0 26px!important;border-radius:12px!important}
+
+/* ---------- contar ---------- */
+.conf-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px!important}
+@media (max-width:860px){.conf-grid{grid-template-columns:1fr!important}}
+#confGrid .card{padding:18px!important;border:2px solid var(--border)!important;transition:border-color .2s,background .2s;position:relative}
+#confGrid .card.inv-ok{border-color:var(--green)!important;background:#F2F8F4!important}
+#confGrid .card.inv-ok::after{content:"✓ contado";position:absolute;top:12px;right:46px;font-size:13px;font-weight:700;color:var(--green)}
+#confGrid .card input[type=number]{height:60px!important;min-height:60px!important;font-size:30px!important;font-weight:700!important;text-align:center!important;border-radius:12px!important;border:2px solid var(--border2)!important}
+#confGrid .card input[type=number]:focus{border-color:var(--accent2)!important;box-shadow:0 0 0 4px rgba(43,106,135,.18)!important;outline:none}
+#confGrid .card input[id^=confAdd_],#confGrid .card input[placeholder*=somar],#confGrid .card input[id^=confRasg]{height:48px!important;min-height:48px!important;font-size:22px!important}
+#confGrid .card button{min-width:48px!important;min-height:48px!important;font-size:20px!important;border-radius:10px!important}
+#confGrid .card input[type=checkbox]{width:26px!important;height:26px!important}
+#confGrid .card label{font-size:15px!important}
+#confGrid .card [style*="font-size:9px"],#confGrid .card [style*="font-size:10px"],#confGrid .card [style*="font-size:11px"]{font-size:13px!important}
+#confGrid .card [style*="font-size:12px"],#confGrid .card [style*="font-size:13px"]{font-size:15px!important}
+#confGrid .card [style*="font-size:14px"],#confGrid .card [style*="font-size:15px"]{font-size:18px!important}
+#btnSalvarConf{min-height:48px!important}
+/* enquanto conta: o histórico sai da frente; a barra fixa embaixo tem progresso e salvar */
+body.inv-contando .card:has(#confHistList){display:none!important}
+body.inv-contando{padding-bottom:110px}
+body.inv-so-faltam #confGrid .card.inv-ok{display:none!important}
+.inv-bar{position:fixed;left:0;right:0;bottom:0;z-index:900;background:#FFFFFF;border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(20,63,84,.10);padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.inv-prog{flex:1;min-width:200px}.inv-prog b{font-size:20px}.inv-prog span{font-size:14px;color:var(--text3)}
+.inv-prog i{display:block;height:10px;border-radius:5px;background:var(--bg4);margin-top:6px;overflow:hidden}.inv-prog i u{display:block;height:100%;background:var(--green);border-radius:5px;transition:width .3s}
+.inv-bar button{min-height:52px;padding:0 18px;border-radius:12px;font-size:16px;font-weight:600;border:1px solid var(--border);background:#FFFFFF;color:var(--text);cursor:pointer}
+.inv-bar button[aria-pressed=true]{background:var(--accent);color:#FFFFFF;border-color:var(--accent)}
+.inv-bar .inv-salvar{background:var(--green);color:#FFFFFF;border:0;padding:0 24px;font-size:17px}
+@media (max-width:700px){.inv-bar button{flex:1}.inv-prog{flex-basis:100%}}
+/* continuar a contagem que ficou aberta */
+.inv-retoma{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#FFF7E6;border:2px solid #E2B95A;border-radius:14px;padding:16px 18px;margin:0 0 14px}
+.inv-retoma div{flex:1;min-width:220px}.inv-retoma b{display:block;font-size:18px}.inv-retoma span{font-size:14px;color:var(--text2)}
+.inv-retoma button{min-height:52px;padding:0 20px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:#FFFFFF}
+.inv-retoma .inv-sim{background:var(--accent);color:#FFFFFF;border:0}
+/* campos auxiliares: tamanho de palete e "+ somar" (cabem inteiros) */
+#confGrid .card input[onchange*="mudarPalete"],#confGrid .card input[oninput*="mudarPalete"]{width:84px!important;height:48px!important;min-height:48px!important;font-size:20px!important;padding:0 6px!important}
+#confGrid .card input[id^=confAdd_],#confGrid .card input[placeholder*=somar]{font-size:18px!important;min-width:0}
+/* celular: a barra de modos (Conferência · Auditoria · Recebimento) cabe na largura */
+:has(> [id^=btnModo]){flex-wrap:wrap!important}
+@media (max-width:520px){[id^=btnModo]{padding:0 10px!important;font-size:13px!important;min-width:0!important}}

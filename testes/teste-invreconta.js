@@ -1,0 +1,31 @@
+/* Inventário · recontagem guiada. (cenário de teste-inventario.js) Inventário = o programa "Gestão de Almoxarifado" dentro do painel (pedido de 13/10).
+   Quem só tem o Inventário vê o programa em tela cheia; os outros, dentro do painel. Os dados vão para o banco do painel. */
+const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=H.seed(); const D=d.docs;
+  const it=(cod,desc,locais,grupos)=>({codigo:cod,descricao:desc,ativo:true,linhas:[],almox:{locais,grupos:grupos||['COLAFIX'],un:null,conv:null}});
+  D['itens/AC0001']=Object.assign(it('AC0001','ARGAMASSA AC1 20 KG',['a3','a30']),{linhas:['Linha 1']}); D['config/geral'].paletes={'Linha 1':96}; /* múltiplo de palete da configuração */ D['itens/AC0002']=it('AC0002','ARGAMASSA AC2 20 KG',['a3','a30']); D['itens/RJ0001']=it('RJ0001','REJUNTE CINZA 1 KG',['rej'],['BAUTECH']);
+  D['pcpbase/itens']={em:'2026-10-13T08:00:00.000Z',atual:{},l:{AC0001:{a3:100,a30:50,d:'ARGAMASSA AC1 20 KG'},AC0002:{a3:20,a30:0,d:'ARGAMASSA AC2 20 KG'}}};
+  D['conferencias/CONF-1-1']={numero:'CONF-1-1',em:new Date(Date.now()-3600e3).toISOString(),dia:'2026-10-13',por:null,porNome:'CONFERENTE',local:'Almox 3',origem:'planilha',itens:{AC0002:{nome:'ARGAMASSA AC2 20 KG',almox3:30,almox30:0,total:30,pal3:0,sac3:30,pal30:0,sac30:0},XX9999:{nome:'ITEM FORA DO CADASTRO',almox3:12,almox30:0,total:12}}};
+  d.users['conf@painel-colafix.app']={uid:'uCONF',pass:'conf123',nome:'Carla'}; D['perfis/uCONF']={nome:'Carla',usuario:'conf'}; D['acessos/uCONF']={perfil:'conf',mods:['almox'],locais:['a3'],contar:true,receber:true,ativo:true};
+  d.users['sis@painel-colafix.app']={uid:'uSIS',pass:'sis123',nome:'Sara'}; D['perfis/uSIS']={nome:'Sara',usuario:'sis'}; D['acessos/uSIS']={perfil:'supsis',mods:['almox'],locais:['a3','a30','rej','sep','a1','a2'],contar:true,receber:true,auditar:true,verAud:true,ativo:true};
+  const B=await H.abrir({viewport:{width:800,height:1280}}); const p=B.page; p.on('dialog',x=>x.accept());
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500);
+  const frame=async()=>{ for(let i=0;i<60;i++){ const f=p.frames().find(x=>x.url().includes('inventario/index.html')); if(f&&await f.evaluate(()=>typeof USUARIO_LOGADO!=='undefined'&&!!USUARIO_LOGADO&&!!document.getElementById('confItemSelList')).catch(()=>false)) return f; await H.dorme(250); } return null; };
+  let f=await frame(); await H.dorme(1200);
+  const conta=async(vals)=>{ await f.evaluate(v=>{ Object.keys(v).forEach(c=>confToggleItem(c)); confIniciarConferencia(); Object.entries(v).forEach(([c,q])=>updateConf(c,q,'sac3')); },vals); await H.dorme(400); };
+  await conta({AC0001:40,AC0002:20}); await f.click('#invBar [data-a="salvar"]'); await H.dorme(3500);
+  let m=await f.evaluate(()=>(document.getElementById('invRec')||{}).innerText||'');
+  ok('Ao salvar: "Recontagem recomendada" só com o AC0001 (contou 40 · sistema 100); o AC0002 que bateu não aparece', /Recontagem recomendada/.test(m)&&/AC0001/.test(m)&&/contou 40/.test(m)&&/sistema 100/.test(m)&&!/AC0002/.test(m), m.replace(/\n/g,' | ').slice(0,220));
+  await p.screenshot({path:'/tmp/inv-rec.png'}); await f.click('#invRec [data-a="sim"]'); await H.dorme(800);
+  const rc=await f.evaluate(()=>({modo:CONF_MODO,sel:[...CONF_ITENS_SEL],bar:(document.getElementById('invBar')||{}).innerText||''}));
+  ok('"Recontar agora" abre a contagem só com o AC0001', rc.modo==='conferencia'&&rc.sel.join()==='AC0001'&&/0 de 1/.test(rc.bar), JSON.stringify(rc).slice(0,160));
+  await f.evaluate(()=>updateConf('AC0001',100,'sac3')); await H.dorme(300); await f.click('#invBar [data-a="salvar"]'); await H.dorme(3500);
+  m=await f.evaluate(()=>(document.getElementById('invRec')||{}).innerText||'');
+  ok('Resultado da recontagem: "1 item bateu com o sistema · 0 continuam diferentes"', /Resultado da recontagem/.test(m)&&/1\s*item bateu/.test(m)&&/0\s*continuam diferentes/.test(m), m.replace(/\n/g,' | ').slice(0,200));
+  await f.evaluate(()=>{ const x=document.getElementById('invRec'); if(x) x.remove(); MODO_CEGO=true; }); 
+  await conta({AC0002:2}); await f.click('#invBar [data-a="salvar"]'); await H.dorme(3500);
+  m=await f.evaluate(()=>(document.getElementById('invRec')||{}).innerText||'');
+  ok('Contagem cega: a recontagem lista o item sem mostrar os números do sistema', /Recontagem recomendada/.test(m)&&/AC0002/.test(m)&&!/sistema \d/.test(m)&&!/contou/.test(m), m.replace(/\n/g,' | ').slice(0,200));
+  const banco=await p.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('__srv')).docs).filter(k=>k.startsWith('conferencias/')).length);
+  ok('Cada contagem e recontagem foi salva no banco (histórico completo para a auditoria)', banco>=4, 'conferências: '+banco);
+  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

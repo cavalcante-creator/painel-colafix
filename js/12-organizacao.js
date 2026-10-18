@@ -138,7 +138,7 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 /* calendário no celular */
 .calm{display:flex;flex-direction:column;gap:10px;padding:12px 14px}
 .calm .cm1{display:flex;align-items:center;gap:8px}
-.calm .cm1 .sem{flex:1;text-align:center;font-weight:800;font-size:15px;line-height:1.2}
+.calm .cm1 .sem{flex:1;text-align:center;font-weight:700;font-size:15px;line-height:1.2}
 .calm .cm1 .btn{height:40px;min-width:40px;padding:0 12px}
 .calm .cm2{display:flex;gap:8px;align-items:center}
 .calm .cm2 select{flex:1;height:40px}

@@ -1,0 +1,33 @@
+/* Manutenção organizada: menu na ordem aprovada, Painel do dia, Indicadores (números conferidos), TV e Configurações. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,260):'')); };
+const ago=m=>new Date(Date.now()-m*60000).toISOString();
+(async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
+ Object.keys(D).filter(k=>k.startsWith('chamados/')).forEach(k=>delete D[k]);
+ D['chamados/os-00001']={numero:1,linha:'Linha 2',equip:'Compressor',defeito:'Compressor desarmou',impacto:'parou',status:'Aberta',criado:ago(20),nome:'Carlos'};
+ D['chamados/os-00002']={numero:2,linha:'Linha 3',equip:'Ensacadeira',defeito:'Barulho',impacto:'reduziu',status:'Em execução',criado:ago(120),nome:'Júlia',exec:{tecnico:'Pedro Alves'},hist:[{em:ago(100),o:'Aberta → Em execução'}]};
+ D['chamados/os-00003']={numero:3,linha:'Linha 1',equip:'Esteira',defeito:'Travou',impacto:'parou',status:'Concluída',criado:ago(300),nome:'Ana',exec:{tecnico:'Pedro Alves',causa:'Mecânica'},hist:[{em:ago(270),o:'Aberta → Em execução'}],concluidoEm:ago(240),liberadoEm:ago(240)};
+ const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
+ const abas=await p.evaluate(()=>{ __T.go('manpainel'); return [...document.querySelectorAll('.tabs a, .tabs button, [role=tab]')].map(x=>(x.innerText||'').trim()).filter(Boolean); });
+ await H.dorme(1200);
+ const abas2=await p.evaluate(()=>[...document.querySelectorAll('.tabs a, .tabs button, nav.tabs *')].map(x=>(x.innerText||'').trim()).filter(Boolean).slice(0,10));
+ ok('Menu da Manutenção na ordem aprovada (Painel, Chamados, Preventivas, Máquinas, Peças, Pessoas e crachás, Indicadores, Configurações)', /Painel[\s\S]*Chamados[\s\S]*Preventivas[\s\S]*Máquinas[\s\S]*(Peças|Materiais)[\s\S]*Pessoas e crachás[\s\S]*Indicadores[\s\S]*Configurações/.test(abas2.join(' ')), abas2.join(' · '));
+ const pn=await p.evaluate(()=>[...document.querySelectorAll('.mo-k')].map(k=>k.innerText.replace(/\n/g,' ')));
+ ok('Painel do dia: 2 abertos, 1 máquina parada, 1 em conserto, 1 concluído hoje, conserto médio 30 min', pn.some(x=>/^2 Chamados abertos/.test(x))&&pn.some(x=>/^1 Máquina parada/.test(x))&&pn.some(x=>/^1 Em conserto/.test(x))&&pn.some(x=>/^1 Concluídos hoje/.test(x))&&pn.some(x=>/^30 min Tempo médio/.test(x)), pn.join(' | '));
+ const ag=await p.evaluate(()=>[...document.querySelectorAll('.mo-ln')].map(x=>x.innerText.replace(/\n/g,' ')));
+ ok('"Agora": o da máquina parada vem primeiro', ag.length===2&&/OS 0*1/.test(ag[0])&&/Máquina parada/.test(ag[0]), ag.join(' || '));
+ await p.evaluate(()=>__T.go('manind')); await H.dorme(900);
+ const ind=await p.evaluate(()=>[...document.querySelectorAll('.mo-k')].map(k=>k.innerText.replace(/\n/g,' ')));
+ ok('Indicadores: 3 chamados, conserto médio 30 min, 1,3 h de máquina parada, espera média 25 min', ind.some(x=>/^3 Chamados no mês/.test(x))&&ind.some(x=>/^30 min Tempo médio/.test(x))&&ind.some(x=>/^1,3 h Máquina parada/.test(x))&&ind.some(x=>/^25 min Espera/.test(x)), ind.join(' | '));
+ ok('Gráficos: horas paradas por linha, máquinas e causas (Mecânica)', await p.evaluate(()=>{ const t=document.getElementById('view').innerText; return /Horas de máquina parada por linha/.test(t)&&/Linha 1/.test(t)&&/Causas mais comuns[\s\S]*Mecânica/.test(t); }));
+ const pop=p.waitForEvent('popup',{timeout:5000}).catch(()=>null); await p.click('[data-act="mz-pdf"]'); const rel=await pop;
+ ok('"Relatório do mês (PDF)" abre o relatório para imprimir', !!rel&&/Relatório da manutenção/.test(await rel.evaluate(()=>document.body.innerText)));
+ if(rel) await rel.close();
+ await p.evaluate(()=>__T.go('tvapres')); await H.dorme(500);
+ const tem=await p.evaluate(()=>!!document.querySelector('[data-act="apr-abre"][data-v="manind"]'));
+ if(tem){ await p.click('[data-act="apr-abre"][data-v="manind"]'); await H.dorme(1500); }
+ const tv=await p.evaluate(()=>({v:__T.S().view,t:(document.querySelector('.tvn-tt h1')||{}).innerText||''}));
+ ok('Indicadores da manutenção na lista de Telas de TV e abrindo na TV', tem&&tv.v==='tvnmanind'&&/Manutenção/.test(tv.t), JSON.stringify(tv));
+ await p.keyboard.press('Escape'); await H.dorme(600); await p.evaluate(()=>__T.go('mancfg')); await H.dorme(700);
+ await p.fill('#mz-caus','Mecânica\nElétrica\nPneumática\nDesgaste de peça\nOutra'); await p.click('[data-act="mz-cfgok"]'); await H.dorme(1000);
+ ok('Configurações: salva a lista de causas que o técnico vê', await p.evaluate(()=>(__T.S().cfg.manCausas||[]).length===5&&__T.S().cfg.manCausas[2]==='Pneumática'));
+ await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
