@@ -53,7 +53,7 @@
   R.fmodo=lsGet('rh.fichas.modo')==='setor'?'setor':'lista';
   const ativos=()=>R.func.filter(x=>x.status!=='Desligado');
   const funcaoDe=f=>R.funcoes.find(x=>norm(x.nome)===norm(f&&f.funcao));
-  const semEpi=f=>{ const fc=funcaoDe(f); return !fc||!(fc.epis||[]).length; };
+  const semEpi=f=>{ const fc=funcaoDe(f); if(fc&&fc.naoUsaEpi) return false; return !fc||!(fc.epis||[]).length; }; /* função marcada "não usa EPI" não é pendência */
 
   /* ---------- leitura ---------- */
   function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); if(k==='funcoes'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(funcoesPadrao,0); if(k==='modelos'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(consertarNomesModelos,0); });
@@ -91,10 +91,11 @@
   function fSit(f,m){ const d=R.fm[m]||{}; const a=(d.assinadas||{})[f._id]||escDe(m,f);
     if(a) return {k:'ass',t:'Assinada'+(a.em?' · '+(/^\d{2}\/\d{2}/.test(a.em)?a.em.slice(0,5):dmIso(a.em)):''),c:'ok',a};
     const i=(d.impressas||{})[f._id];
+    { const fc=funcaoDe(f); if(fc&&fc.naoUsaEpi&&!(fc.uniformes||[]).length) return {k:'disp',t:'Não usa EPI',c:'ok',i}; }
     if(semEpi(f)) return {k:'semepi',t:'Função sem EPI',c:'crit',i};
     if(i) return {k:'imp',t:'Falta assinar',c:'warn',i};
     return {k:'nao',t:'Não gerada',c:'crit'}; }
-  function fResumo(m){ const xs=R.func.filter(f=>noMes(f,m)).map(f=>({f,s:fSit(f,m)})); const c={ass:0,imp:0,nao:0}; xs.forEach(o=>{ c[o.s.k==='semepi'?(o.s.i?'imp':'nao'):o.s.k]++; }); return {xs,c,tot:xs.length}; }
+  function fResumo(m){ const xs=R.func.filter(f=>noMes(f,m)).map(f=>({f,s:fSit(f,m)})); const c={ass:0,imp:0,nao:0,disp:0}; xs.forEach(o=>{ c[o.s.k==='semepi'?(o.s.i?'imp':'nao'):o.s.k]++; }); return {xs,c,tot:xs.length-c.disp}; } /* quem não usa EPI não entra no total a assinar */
 
   /* ---------- ponte para o sistema de fichas (as mesmas funções que o Apps Script tinha) ---------- */
   const DIAS=d=>d?br(d):'';
@@ -471,7 +472,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       +`<section class="card"><div class="rh-cadt">${cadBusca('Buscar função, EPI, CBO ou setor')}</div>
         ${xs.length?`<div class="rh-tw"><table class="rh-t rh-ct"><thead><tr><th>Função</th><th>CBO</th><th class="num">Pessoas</th><th>EPIs</th><th>Uniforme</th><th></th></tr></thead><tbody>${xs.map(x=>`<tr data-b="${cadB(x.nome,x.cbo,x.setor,(x.epis||[]).map(e=>e.nome+' '+(e.ca||'')).join(' '),(x.uniformes||[]).map(e=>e.nome).join(' '))}">
           <td><button class="rh-nm" data-act="rh-fed" data-id="${x._id}">${esc(x.nome)}</button>${x.setor||x.desc?`<small style="display:block;color:var(--muted)" class="rh-cl">${esc([x.setor,x.desc].filter(Boolean).join(' · '))}</small>`:''}</td>
-          <td class="num">${esc(x.cbo||'')}</td><td class="num">${qt(x.nome)}</td><td>${itChips(x.epis)}</td><td>${itChips(x.uniformes)}</td><td class="rh-cact"><button class="lnk" data-act="rh-fed" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma função cadastrada.</div>'}</section>`; }
+          <td class="num">${esc(x.cbo||'')}</td><td class="num">${qt(x.nome)}</td><td>${x.naoUsaEpi?'<small style="color:var(--muted)">não usa EPI</small>':itChips(x.epis)}</td><td>${itChips(x.uniformes)}</td><td class="rh-cact"><button class="lnk" data-act="rh-fed" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma função cadastrada.</div>'}</section>`; }
   function formFuncao(){ const ff=R.ff, cat=(R.epis||[]).filter(e=>!e.inativo).slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
     const lin=(k,mx,ph2)=>{ const its=(ff[k]||[]).slice(0,mx), xs=its.length<mx?its.concat([{}]):its;
       return xs.map((x,i)=>`<div class="rh-it"><span class="rh-itn num">${i+1}</span><input class="txt" data-rh-it="${k}" data-i="${i}" data-c="nome" ${k==='epis'?'list="rh-epil"':''} placeholder="${k==='epis'?'EPI':'Peça do uniforme'}" value="${esc(x.nome||'')}"><input class="txt" data-rh-it="${k}" data-i="${i}" data-c="${k==='epis'?'ca':'tam'}" placeholder="${ph2}" value="${esc(x[k==='epis'?'ca':'tam']||'')}">${x.nome?`<button class="rh-itx" data-act="rh-itrem" data-k="${k}" data-i="${i}" aria-label="Tirar ${esc(x.nome)}" title="Tirar">×</button>`:'<span></span>'}</div>`).join('')
@@ -485,7 +486,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         <label><span class="label">Setor</span><select class="txt" data-rh-ff="setor"><option value="">—</option>${setoresCad().map(x=>`<option ${x===ff.setor?'selected':''}>${esc(x)}</option>`).join('')}</select></label></div>
       <label style="display:block;margin-top:10px"><span class="label">O que faz (descrição das atividades)</span><textarea class="txt" data-rh-ff="desc" rows="2" maxlength="600">${esc(ff.desc||'')}</textarea></label>
       ${nP?`<div class="sub" style="margin-top:8px">${plural(nP,'pessoa tem','pessoas têm')} esta função.${ff._id?' Se mudar o nome, o painel muda no cadastro delas também.':''}</div>`:''}
-      <div class="rh-ffi"><div><div class="rh-ffh"><span class="label">EPIs · ${nE} de ${MAX_EPI}</span>${cat.length?'':'<small class="sub">Cadastre os EPIs em Cadastros › EPIs para escolher da lista.</small>'}</div>${lin('epis',MAX_EPI,'CA')}</div>
+      <label class="ck rh-noepi"><input type="checkbox" data-rh-ffne="1" ${ff.naoUsaEpi?'checked':''}> <b>Esta função não usa EPI</b> <span class="sub" style="margin:0">ex.: administrativo, escritório · não aparece como pendente nas fichas nem no Início</span></label>
+      <div class="rh-ffi${ff.naoUsaEpi?' rh-ffi-ne':''}"><div><div class="rh-ffh"><span class="label">EPIs · ${nE} de ${MAX_EPI}</span>${cat.length?'':'<small class="sub">Cadastre os EPIs em Cadastros › EPIs para escolher da lista.</small>'}</div>${lin('epis',MAX_EPI,'CA')}</div>
         <div><div class="rh-ffh"><span class="label">Uniforme · ${nU} de ${MAX_UNI}</span></div>${lin('uniformes',MAX_UNI,'Tamanho')}</div></div>
       ${outras.length?`<div class="rh-ffc"><span class="sub">Copiar EPIs e uniforme de:</span><select class="txt" id="rh-ffcopia"><option value="">escolha a função…</option>${outras.map(x=>`<option value="${x._id}">${esc(x.nome)}</option>`).join('')}</select><button class="btn sec rh-sm" data-act="rh-ffcopia">Copiar</button></div>`:''}
       <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap">${ff._id?'<button class="lnk" data-act="rh-fdel" style="color:var(--crit-ink)">Apagar função</button>':'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="rh-ffx">Cancelar</button><button class="btn" data-act="rh-fsalvar">Salvar</button></div></div></div></div>`; }
@@ -1679,6 +1681,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const mid=id(); const d={nome:'Aviso de férias (padrão)',html:limpar(txt),padraoFerias:true,criadoEm:agora(),porNome:eu()};
     await P.db().doc(COL.modelos+'/'+mid).set(d); if(!R.modelos.some(m=>m._id===mid)) R.modelos.push(Object.assign({_id:mid},d)); P.toast('Criado o modelo "Aviso de férias (padrão)". Você pode editá-lo em Documentos e contratos → Modelos.'); return mid; }
   try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-pro-css">.rh-icf{vertical-align:-3px;margin-right:2px}.alm-top{background:transparent!important;box-shadow:none!important;border:0!important;padding:0 0 4px!important}.alm-top h2{font-size:30px!important;line-height:36px!important;font-weight:700!important;margin:0!important}</style>'); }catch(e){}
+  document.addEventListener('change',ev=>{ const t=ev.target; if(t&&t.dataset&&t.dataset.rhFfne&&R.ff){ R.ff.naoUsaEpi=t.checked; const b=document.querySelector('.rh-ffi'); if(b) b.classList.toggle('rh-ffi-ne',t.checked); } });
+  try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-ne-css">.rh-noepi{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}.rh-noepi input{width:20px;height:20px}.rh-ffi-ne>div:first-child{opacity:.45}</style>'); }catch(e){}
   P.registrarModulo({ id:'rh', nome:'RH', ic:'equipe', telas:TELAS, iniciar });
   P.registrarPerfil('rh',{ nome:'RH (funcionários, fichas, documentos, terceirizados)', mods:['rh'], soVer:true, pos:2, desc:'Só o módulo RH: funcionários, fichas de EPI e uniforme do mês, documentos e contratos, funções e EPIs e terceirizados. Não vê nem muda nada da fábrica.' });
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
@@ -1888,7 +1892,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         if(R.funcoes.some(x=>x._id!==R.ff._id&&norm(x.nome)===norm(nome))) return P.toast('Essa função já existe.');
         const it=lerItens(); if(it.epis.length>MAX_EPI) return P.toast('No máximo '+MAX_EPI+' EPIs.'); if(it.uniformes.length>MAX_UNI) return P.toast('No máximo '+MAX_UNI+' peças de uniforme.'); const iD=R.ff._id||id();
         const vv=k=>String((document.querySelector(`[data-rh-ff="${k}"]`)||{}).value||'').trim(), velho=R.ff._id?R.ff.nome0:null;
-        await grava(COL.funcoes+'/'+iD,{nome,cbo:vv('cbo'),setor:vv('setor'),desc:vv('desc'),epis:it.epis,uniformes:it.uniformes}); let n=0;
+        const ne=!!(document.querySelector('[data-rh-ffne]')||{}).checked;
+        await grava(COL.funcoes+'/'+iD,{nome,cbo:vv('cbo'),setor:vv('setor'),desc:vv('desc'),epis:it.epis,uniformes:it.uniformes,naoUsaEpi:ne}); let n=0;
         if(velho&&norm(velho)!==norm(nome)) for(const f of R.func.filter(f=>norm(f.funcao)===norm(velho))){ await grava(COL.func+'/'+f._id,{funcao:nome}); n++; }
         R.ff=null; R.prev={}; P.toast('Função salva.'+(n?' '+plural(n,'pessoa atualizada','pessoas atualizadas')+'.':'')); P.render(); try{ const F=fichasApi(); if(F) F.recarregar(); }catch(e){} return; }
       if(a==='rh-fdel'){ const nP=R.func.filter(f=>f.status!=='Desligado'&&norm(f.funcao)===norm(R.ff.nome0||R.ff.nome)).length; if(!confirm('Apagar a função '+R.ff.nome+'?'+(nP?' '+plural(nP,'pessoa ainda tem','pessoas ainda têm')+' esta função (o cadastro delas não muda, mas a ficha fica sem EPI).':''))) return; await P.db().doc(COL.funcoes+'/'+R.ff._id).delete(); R.ff=null; P.render(); return; }
