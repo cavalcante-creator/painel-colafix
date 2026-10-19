@@ -1,0 +1,20 @@
+/* Faixa da TV: aviso que não cabe rola de lado (parado no começo, desliza, para no fim); o que cabe fica parado. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+const hj=new Date().toISOString().slice(0,10);
+(async()=>{ const {d}=seedManut(x=>x);
+ d.docs['config/feriados']={avisos:[{id:'l1',t:'Atenção: a partir de segunda-feira o protetor auricular é obrigatório em todas as linhas de produção, inclusive para visitantes e prestadores',sub:'Retire o seu no almoxarifado com o crachá · dúvidas com a segurança do trabalho ou com o seu gestor de linha',tipo:'atencao',de:hj,ate:hj}]};
+ const B=await H.abrir({viewport:{width:1920,height:1080}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
+ await p.evaluate(()=>__T.go('tvapres')); await H.dorme(600); await p.click('[data-act="apr-abre"][data-v="tvfab"]'); await H.dorme(2500);
+ const r=await p.evaluate(()=>{ const el=document.querySelector('.tvb'), mv=[...el.querySelectorAll('.tvb-mv')]; return {dur:+el.dataset.dur,mv:mv.map(m=>({rola:m.classList.contains('rola'),dx:parseFloat(m.style.getPropertyValue('--dx'))||0,cabe:m.scrollWidth<=m.parentElement.clientWidth}))}; });
+ const t0=r.mv[0], vel=t0&&t0.rola?Math.abs(t0.dx)/(r.dur*0.64):0;
+ ok('Título comprido rola; detalhe só rola se não couber', t0&&t0.rola&&t0.dx<0&&r.mv.slice(1).every(m=>m.rola===!m.cabe), JSON.stringify(r));
+ ok('Aviso comprido fica mais tempo na tela e rola numa velocidade de leitura (≤ 250 px/s)', r.dur>8&&vel>0&&vel<=250, 'tempo '+r.dur+' s · '+Math.round(vel)+' px/s');
+ await p.screenshot({path:'/tmp/rola-1.png',clip:{x:0,y:900,width:1920,height:180}});
+ const t1=await p.evaluate(()=>getComputedStyle(document.querySelector('.tvb .tvb-mv')).transform); await H.dorme(3500);
+ const t2=await p.evaluate(()=>getComputedStyle(document.querySelector('.tvb .tvb-mv')).transform);
+ await p.screenshot({path:'/tmp/rola-2.png',clip:{x:0,y:900,width:1920,height:180}});
+ ok('O texto realmente anda (a posição muda com o tempo)', t1!==t2, t1+' → '+t2);
+ await p.evaluate(()=>{ __T.S().avTV=[{id:'c1',t:'Reunião às 15h',tipo:'seg'}]; document.querySelector('.tvb').outerHTML=window.avFaixaHtml(); }); await H.dorme(800);
+ const c=await p.evaluate(()=>[...document.querySelectorAll('.tvb .tvb-mv')].map(m=>m.classList.contains('rola')));
+ ok('Aviso curto, que cabe, fica parado', c.length>=1&&c.every(x=>!x), JSON.stringify(c));
+ await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
