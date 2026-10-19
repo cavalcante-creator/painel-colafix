@@ -1341,7 +1341,10 @@
     return n; }
 
   /* ---------- registro do módulo ---------- */
-  const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:()=>{ const h=vInicio(), i=h.indexOf('Próximos 7 dias'), k=i>0?h.lastIndexOf('<section',i):-1; return k>0?h.slice(0,k)+avCardRH()+h.slice(k):avCardRH()+h; }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
+  const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:()=>{ const h=vInicio(), i=h.indexOf('Próximos 7 dias'); if(i<0) return h+avCardRH();
+      /* fim do bloco dos 7 dias (conta seções abertas dentro dele) → os avisos entram logo depois, na largura toda */
+      let k=h.lastIndexOf('<section',i), d=0, j=k; const re=/<\/?section\b/g; re.lastIndex=k; let m; while((m=re.exec(h))){ if(m[0]==='<section') d++; else { d--; if(d===0){ j=h.indexOf('>',m.index)+1; break; } } }
+      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
     rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'}, rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros} };
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r()+modalConv()+modalFicha()+(window.RHCartao?RHCartao.modal({P,R,esc,baixar}):''); }; });
   /* tela Almoço (modulos/rh-almoco.js): controle do almoço pelo Face ID */
@@ -1465,7 +1468,7 @@
   const AVT={info:['Informativo','#3F6F93'],seg:['Segurança','#3C8A63'],festa:['Comemoração','#8C5BA8'],atencao:['Atenção','#B5473F']};
   function avCardRH(){ const h=P.hojeStr(), nomeA=a=>a.t.replace(/^Parabéns, |!$/g,'');
     const aniv={on:!R.avAnivOff,hoje:(R.avAuto||[]).filter(a=>a.de===h).map(nomeA),prox:avAnivLista().filter(a=>a.de>h).map(a=>nomeA(a)+' ('+br(a.de).slice(0,5)+')'),act:'rh-avaniv'};
-    if(window.avxRender) return window.avxRender({pre:'rh-av',idp:'rh-av-',avisos:R.avs,form:R.avf,linhas:window.avLinhas?window.avLinhas():[],aniv,hoje:h,autoHoje:R.avAnivOff?[]:(R.avAuto||[]).filter(a=>a.de===h)});
+    if(window.avxRender) return window.avxRender({pre:'rh-av',idp:'rh-av-',avisos:R.avs,form:R.avf,linhas:window.avLinhas?window.avLinhas():[],aniv,hoje:h,compacto:true,autoHoje:R.avAnivOff?[]:(R.avAuto||[]).filter(a=>a.de===h)});
     return '<section class="card"><div class="label">AVISOS NAS TVS</div><div class="sub">Atualize a página para ver os avisos.</div></section>'; }
   /* interruptor dos parabéns automáticos (data-avx-aniv: fora do roteador de cliques, que redesenhava antes do change) */
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!t||!t.dataset||t.dataset.avxAniv!=='rh-avaniv') return; R.avAnivOff=!t.checked;

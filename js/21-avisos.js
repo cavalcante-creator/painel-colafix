@@ -99,9 +99,9 @@ window.avxRender=function(o){ const P=o.pre, I=o.idp, h=o.hoje||hojeStr(), F=o.f
       <label class="avx-sw"><input type="checkbox" data-avx-aniv="${A.act}" ${A.on?'checked':''} aria-label="Parabéns dos aniversariantes nas TVs"><span></span><em>${A.on?'Ligado':'Desligado'}</em></label></div>`:'';
   const noAr=(o.autoHoje||[]).concat(xs.filter(a=>!a.de||a.de<=h)); /* a prévia sai da lista do próprio quadro (já atualizada ao salvar) */
   const prev=noAr.length?`<div class="avx-prev"><span>Assim aparece na TV agora</span><div class="avx-tv">${avFaixa(noAr)}</div></div>`:'';
-  return `<section class="card avx"><div class="avx-cab"><div><h2>Avisos nas TVs</h2><p>${esc(o.sub||'Passam no rodapé de todas as TVs da fábrica, um atrás do outro.')}</p></div>${F?'':`<button class="btn" data-act="${P}novo">+ Novo aviso</button>`}</div>
+  return `<section class="card avx${o.compacto?' avx-mini':''}"><div class="avx-cab"><div><h2>Avisos nas TVs</h2><p>${esc(o.sub||'Passam no rodapé de todas as TVs da fábrica, um atrás do outro.')}</p></div>${F?'':`<button class="btn" data-act="${P}novo">+ Novo aviso</button>`}</div>
     ${form}${prev}${aniv}
-    ${xs.length?`<div class="avx-grid">${xs.map(cartao).join('')}</div>`:(F?'':`<div class="avx-vz"><b>Nenhum aviso nas TVs</b><span>Publique um recado para a fábrica: reunião, segurança, comemoração ou atenção.</span></div>`)}</section>`; };
+    ${xs.length?`<div class="avx-grid">${xs.map(cartao).join('')}</div>`:(F?'':o.compacto?`<div class="avx-vz1">Nenhum aviso publicado. Use <b>+ Novo aviso</b> para mandar um recado para a fábrica.</div>`:`<div class="avx-vz"><b>Nenhum aviso nas TVs</b><span>Publique um recado para a fábrica: reunião, segurança, comemoração ou atenção.</span></div>`)}</section>`; };
 const avxPer=(per,h)=>per==='3d'?addDias(h,2):per==='7d'?addDias(h,6):h;
 window.avxPer=avxPer;
 document.head.insertAdjacentHTML('beforeend',`<style id="avx-css">
@@ -131,4 +131,12 @@ document.head.insertAdjacentHTML('beforeend',`<style id="avx-css">
 .avx-fb{display:flex;justify-content:flex-end;gap:10px}
 .avx-vz{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;padding:26px 12px;border:2px dashed var(--line);border-radius:14px;color:var(--muted)}.avx-vz b{color:var(--ink);font-size:16px}
 @media (max-width:600px){.avx-grid{grid-template-columns:1fr}}
+/* versão compacta (Início do RH) */
+.avx-mini{padding:14px 18px!important}.avx-mini .avx-cab{margin-bottom:8px;align-items:center}.avx-mini .avx-cab h2{font-size:17px}.avx-mini .avx-cab p{font-size:13px}.avx-mini .avx-cab .btn{height:38px;padding:0 14px;font-size:14px}
+.avx-mini .avx-prev{padding:6px 8px 8px;margin-bottom:8px;border-radius:10px}.avx-mini .avx-prev>span{font-size:10px;margin-bottom:4px}.avx-mini .avx-tv{zoom:.4}
+.avx-mini .avx-aniv{grid-template-columns:34px minmax(0,1fr) auto;gap:10px;padding:7px 10px;margin-bottom:8px;border-radius:10px}.avx-mini .avx-aniv .avx-ic{width:34px;height:34px;border-radius:9px}.avx-mini .avx-aniv .avx-ic svg{width:19px;height:19px}
+.avx-mini .avx-aniv b{font-size:14px}.avx-mini .avx-aniv small{font-size:12.5px}.avx-mini .avx-sw span{width:38px;height:22px}.avx-mini .avx-sw span::after{width:16px;height:16px}.avx-mini .avx-sw input:checked+span::after{left:19px}
+.avx-mini .avx-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px}.avx-mini .avx-c{grid-template-columns:38px minmax(0,1fr);padding:10px 12px;gap:2px 10px}.avx-mini .avx-ic{width:38px;height:38px;border-radius:10px}.avx-mini .avx-ic svg{width:21px;height:21px}
+.avx-mini .avx-tx b{font-size:14.5px}.avx-mini .avx-tx small{font-size:12.5px}.avx-mini .avx-tags{margin-top:5px;gap:4px}.avx-mini .avx-tags span{font-size:11px;padding:2px 7px}.avx-mini .avx-ac{margin-top:2px}
+.avx-vz1{font-size:13.5px;color:var(--muted);padding:8px 2px}
 </style>`);

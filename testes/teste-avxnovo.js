@@ -3,7 +3,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
 (async()=>{ const {d}=seedManut(x=>x);
  const B=await H.abrir({viewport:{width:1440,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1200);
- ok('Quadro vazio convida a publicar', await p.evaluate(()=>/Nenhum aviso nas TVs/.test((document.querySelector('.avx')||{}).innerText||'')));
+ ok('Quadro vazio convida a publicar (versão compacta no RH)', await p.evaluate(()=>/Nenhum aviso publicado/.test((document.querySelector('.avx')||{}).innerText||'')));
  await p.click('[data-act="rh-avnovo"]'); await H.dorme(300); await p.fill('#rh-av-t','Troca de cor às 14h'); await p.click('[data-act="rh-avtipo"][data-v="atencao"]'); await H.dorme(200);
  await p.click('[data-act="rh-avln"][data-v="Linha 2"]'); await H.dorme(200); await p.click('[data-act="rh-avper"][data-v="3d"]'); await H.dorme(200);
  const pv=await p.evaluate(()=>(document.querySelector('.avx-pv')||{}).innerText||'');

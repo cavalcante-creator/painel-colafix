@@ -35,5 +35,5 @@ const mm=(iso,n)=>{ const d=new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+n
  ok('Exames e NRs: "+ Registrar" na própria aba, escolhendo a pessoa, grava o ASO', q.includes('ASO'), q.join(','));
  await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1000);
  const pos=await p.evaluate(()=>{ const t=document.getElementById('view').innerText; return {av:t.search(/Avisos nas TVs/i),prox:t.indexOf('Próximos 7 dias')}; });
- ok('Avisos nas TVs no alto do Início (antes dos Próximos 7 dias)', pos.av>=0&&pos.prox>pos.av, JSON.stringify(pos));
+ ok('Avisos nas TVs logo abaixo dos Próximos 7 dias', pos.av>0&&pos.prox>=0&&pos.av>pos.prox, JSON.stringify(pos));
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
