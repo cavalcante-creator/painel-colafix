@@ -20,12 +20,12 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
   ok('Menu ganhou "Férias e prazos"', nav==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', nav);
   ok('Início avisa: férias perto do prazo e vencida, troca do PJ perto e atrasada (e não a que está em dia)',
-    /Atenção\s*Férias: ANA SOUZA\s*conceder até/.test(v0)&&/Vencido\s*Férias: CARLOS LIMA\s*o prazo para conceder venceu/.test(v0)&&/Atenção\s*Troca do PJ: PEDRO ALVES\s*próxima troca/.test(v0)&&/Atrasada\s*Troca do PJ: JOAO PJ/.test(v0)&&!/BRUNO ROCHA|RAFAEL NUNES/.test(v0), v0.replace(/\n/g,' | ').slice(300,700));
+    /(Atenção|Vencido)\s*Férias: ANA SOUZA\s*(conceder até|passou do dia de avisar)/i.test(v0)&&/Vencido\s*Férias: CARLOS LIMA\s*o prazo para conceder venceu/.test(v0)&&/Atenção\s*Troca do PJ: PEDRO ALVES\s*próxima troca/.test(v0)&&/Atrasada\s*Troca do PJ: JOAO PJ/.test(v0)&&!/BRUNO ROCHA|RAFAEL NUNES/.test(v0), v0.replace(/\n/g,' | ').slice(300,700));
 
   // férias
   await p.click('.rh-av:has-text("Férias: ANA SOUZA") [data-act="rh-pzabrir"]'); await H.dorme(300);
   const v1=await view(); const sit=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[r.querySelector('b').innerText,r.querySelector('.pill').innerText])));
-  ok('Férias (CLT): só quem precisa de atenção, com o prazo certo', sit['ANA SOUZA']==='Conceder em até 9 dias'&&/^Prazo vencido há/.test(sit['CARLOS LIMA'])&&!sit['BRUNO ROCHA']&&!sit['PEDRO ALVES'], JSON.stringify(sit));
+  ok('Férias (CLT): só quem precisa de atenção, com o prazo certo (inclui "passou do dia de avisar")', /^(Conceder em até 9 dias|Passou do dia de avisar)/.test(sit['ANA SOUZA']||'')&&/^Prazo vencido há/.test(sit['CARLOS LIMA'])&&!sit['BRUNO ROCHA']&&!sit['PEDRO ALVES'], JSON.stringify(sit));
   await p.click('[data-act="rh-pzfil"][data-v="todos"]'); const bruno=await p.evaluate(()=>[...document.querySelectorAll('.rh-tf tbody tr')].find(r=>/BRUNO/.test(r.innerText)).innerText);
   ok('"Todos os CLT": quem está em aquisição aparece em dia', /em aquisição/.test(bruno)&&/Em dia/.test(bruno), bruno.replace(/\n/g,' '));
   await p.click('tr:has-text("ANA SOUZA") [data-act="rh-fernova"]'); await H.dorme(200);

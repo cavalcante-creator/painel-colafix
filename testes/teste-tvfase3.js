@@ -3,7 +3,7 @@ const run=require('./tv-cenario-8linhas'); const res=[]; const ok=(n,c,d)=>{ res
 (async()=>{
  await run({width:1920,height:1080},'/tmp/f3.png',async p=>{ const dorme=ms=>new Promise(x=>setTimeout(x,ms));
   await p.keyboard.press('Escape'); await dorme(500); await p.evaluate(()=>__T.go('tvapres')); await dorme(600);
-  ok('Telas de TV mostra a configuração nova (rodízio, tempo por tela, calendário, e onde publicar os avisos)', await p.evaluate(()=>!!document.querySelector('#tvn-cfg [data-act="tvn-inteli"]')&&!!document.querySelector('[data-tvn-vira]')&&/AVISOS NAS TVS/.test(document.getElementById('tvn-cfg').innerText)&&!!document.querySelector('[data-act="av-novo"]')));
+  ok('Telas de TV mostra a configuração nova (rodízio, tempo por tela, calendário, e onde publicar os avisos)', await p.evaluate(()=>!!document.querySelector('#tvn-cfg [data-act="tvn-inteli"]')&&!!document.querySelector('[data-tvn-vira]')&&/Avisos nas TVs/i.test(document.getElementById('tvn-cfg').innerText)&&!!document.querySelector('[data-act="av-novo"]')));
   await p.selectOption('[data-tvn-vira]','14'); await dorme(800);
   await p.evaluate(()=>{ __T.S().avTV=[{id:'x',t:'Reunião de segurança às 15:00',tipo:'seg'}]; }); const cfg=await p.evaluate(()=>({r:(__T.S().avTV||[]).map(x=>x.t),v:__T.S().cfg.tvVira}));
   ok('Aviso disponível e horário do calendário salvo na configuração', cfg.r[0]==='Reunião de segurança às 15:00'&&cfg.v===14, JSON.stringify(cfg));

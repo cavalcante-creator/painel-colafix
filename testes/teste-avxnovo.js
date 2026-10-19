@@ -1,0 +1,22 @@
+/* Quadro de avisos novo (RH): "Por quanto tempo" (3 dias), "Para" (linha), Editar sem duplicar, prévia da TV e cartões. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(x=>x);
+ const B=await H.abrir({viewport:{width:1440,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
+ await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1200);
+ ok('Quadro vazio convida a publicar', await p.evaluate(()=>/Nenhum aviso nas TVs/.test((document.querySelector('.avx')||{}).innerText||'')));
+ await p.click('[data-act="rh-avnovo"]'); await H.dorme(300); await p.fill('#rh-av-t','Troca de cor às 14h'); await p.click('[data-act="rh-avtipo"][data-v="atencao"]'); await H.dorme(200);
+ await p.click('[data-act="rh-avln"][data-v="Linha 2"]'); await H.dorme(200); await p.click('[data-act="rh-avper"][data-v="3d"]'); await H.dorme(200);
+ const pv=await p.evaluate(()=>(document.querySelector('.avx-pv')||{}).innerText||'');
+ ok('Prévia do cartão enquanto escreve (com a etiqueta da linha)', /LINHA 2/.test(pv)&&/Troca de cor/.test(pv), pv.replace(/\n/g,' '));
+ await p.click('[data-act="rh-avok"]'); await H.dorme(1200);
+ const a1=await p.evaluate(()=>{ const x=(__T.S().avTV||[])[0]||{}; return {n:(__T.S().avTV||[]).length,t:x.t,l:(x.linhas||[]).join(),de:x.de,ate:x.ate,tipo:x.tipo,id:x.id}; });
+ const hoje=new Date().toISOString().slice(0,10), mais2=(()=>{ const x=new Date(); x.setDate(x.getDate()+2); return x.toISOString().slice(0,10); })();
+ ok('"3 dias" + "Linha 2" + Atenção: publicado de hoje até daqui a 2 dias, só para a Linha 2', a1.n===1&&a1.l==='Linha 2'&&a1.de===hoje&&a1.ate===mais2&&a1.tipo==='atencao', JSON.stringify(a1));
+ const card=await p.evaluate(()=>({c:(document.querySelector('.avx-c')||{}).innerText||'',tv:!!document.querySelector('.avx-prev .tva')}));
+ ok('Cartão com tipo, linha, validade e "No ar agora", e a prévia "Assim aparece na TV"', /Atenção/.test(card.c)&&/Linha 2/.test(card.c)&&/até /.test(card.c)&&/No ar agora/.test(card.c)&&card.tv, card.c.replace(/\n/g,' | '));
+ await p.click('[data-act="rh-aved"]'); await H.dorme(300); await p.fill('#rh-av-t','Troca de cor às 15h'); await p.click('[data-act="rh-avok"]'); await H.dorme(1200);
+ const a2=await p.evaluate(()=>({n:(__T.S().avTV||[]).length,t:((__T.S().avTV||[])[0]||{}).t,id:((__T.S().avTV||[])[0]||{}).id}));
+ ok('Editar atualiza o mesmo aviso (sem duplicar)', a2.n===1&&a2.t==='Troca de cor às 15h'&&a2.id===a1.id, JSON.stringify(a2));
+ await p.screenshot({path:'/tmp/avx-rh.png',fullPage:false});
+ await p.click('[data-act="rh-avnovo"]'); await H.dorme(300); await p.fill('#rh-av-t','Exemplo'); await p.screenshot({path:'/tmp/avx-form.png'});
+ await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

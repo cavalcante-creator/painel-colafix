@@ -1,0 +1,26 @@
+/* RH · gerar documento: "Preencher o que falta" (só neste documento) e "Editar texto" antes de imprimir. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+const tk=k=>`<span class="rh-tk" data-k="${k}"></span>`;
+(async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
+ D['rh/dados/funcionarios/b']={nome:'BRUNO FERNANDES DA SILVA',tipo:'PJ',empresa:'ZENITH',cnpj:'59981219000161',status:'Ativo',admissao:'2026-06-16',setor:'PRODUÇÃO',funcao:'AJUDANTE'};
+ D['rh/dados/modelos/m1']={nome:'Distrato zenith',vale:'ZENITH',html:`<p>CONTRATADO: ${tk('NOME')}, com sede na ${tk('ENDERECO')}.</p><p>Encerrando a partir de ${tk('DESLIGAMENTO')}.</p><p>Serviços prestados até ${tk('PAGO_ATE')}. Saldo do dia ${tk('SALDO_INICIO')} ao dia ${tk('DESLIGAMENTO')}.</p>`};
+ const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
+ await p.evaluate(()=>__T.go('rhferias')); await H.dorme(800); await p.evaluate(()=>{ const b=document.querySelector('[data-act="rh-pzv"][data-v="pj"]'); if(b) b.click(); }); await H.dorme(500);
+ await p.click('[data-act="rh-dgpara"][data-id="b"]'); await H.dorme(1200); await p.selectOption('#rh-dgm','m1'); await H.dorme(800);
+ const ks=await p.evaluate(()=>[...document.querySelectorAll('[data-rh-do]')].map(x=>x.dataset.rhDo));
+ ok('"Preencher o que falta" mostra Endereço, Data do desligamento, Pago até e Início do saldo', ['ENDERECO','DESLIGAMENTO','PAGO_ATE','SALDO_INICIO'].every(k=>ks.includes(k)), ks.join(','));
+ await p.fill('[data-rh-do="ENDERECO"]','Rua das Acácias, 120 · Gravataí/RS'); await H.dorme(700); await p.fill('[data-rh-do="DESLIGAMENTO"]','2026-10-19'); await H.dorme(900);
+ const doc=await p.evaluate(()=>document.getElementById('rh-dgdoc').innerText);
+ ok('O documento mostra o que foi preenchido e calcula pago até (30/09/2026) e início do saldo (01/10/2026)', /Rua das Acácias, 120/.test(doc)&&/a partir de 19\/10\/2026/.test(doc)&&/até 30\/09\/2026/.test(doc)&&/dia 01\/10\/2026 ao dia 19\/10\/2026/.test(doc)&&!/\[/.test(doc), doc.replace(/\n/g,' | ').slice(0,240));
+ await p.click('[data-act="rh-dged"]'); await H.dorme(500);
+ const ed=await p.evaluate(()=>document.getElementById('rh-dgdoc').getAttribute('contenteditable'));
+ await p.click('#rh-dgdoc p:last-of-type'); await p.keyboard.press('End'); await p.keyboard.type(' Cláusula extra combinada.'); await H.dorme(300);
+ await p.click('[data-act="rh-dged"]'); await H.dorme(600);
+ const doc2=await p.evaluate(()=>({t:document.getElementById('rh-dgdoc').innerText,ce:document.getElementById('rh-dgdoc').getAttribute('contenteditable'),desf:!!document.querySelector('[data-act="rh-dgedx"]')}));
+ ok('"Editar texto": dá para escrever no documento; ao concluir, o texto fica e aparece "Desfazer edições"', ed==='true'&&/Cláusula extra combinada/.test(doc2.t)&&doc2.ce!=='true'&&doc2.desf, JSON.stringify({ed,ce:doc2.ce,desf:doc2.desf}));
+ await p.click('[data-act="rh-dgo"][data-v="imprimir"]'); await H.dorme(1500);
+ const imp=await p.evaluate(()=>{ const fr=[...document.querySelectorAll('iframe[aria-hidden="true"]')].pop(); const b=fr&&fr.contentWindow&&fr.contentWindow.document.body; return b?{t:b.innerText,amarelo:b.querySelectorAll('.rh-v').length,html:b.innerHTML.length}:null; });
+ ok('Imprimir sai com o texto editado, sem a marcação amarela da prévia', imp&&/Cláusula extra combinada/.test(imp.t)&&/Rua das Acácias/.test(imp.t)&&imp.amarelo===0, JSON.stringify(imp&&{amarelo:imp.amarelo,t:imp.t.slice(0,120)}));
+ const reg=await p.evaluate(async()=>{ const q=await __T.S().db.collection('rh/dados/docsgerados').get(); return q.size; }).catch(()=>-1);
+ ok('Fica no histórico de documentos da pessoa', reg>=1, 'docs: '+reg);
+ await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
