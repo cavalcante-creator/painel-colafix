@@ -9,8 +9,8 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  const ir=async()=>{ await p.evaluate(()=>{ __T.S().siloSel='c2'; __T.go('silos'); }); await H.dorme(700); };
  await apontar('7001',50); await H.dorme(800); await ir();
  let c=await p.evaluate(()=>(document.querySelector('.sa')||{}).innerText||'');
- ok('Sem configuração: "O nível dos silos ainda não baixa sozinho" com os passos (silo da linha e kg do AC0007)', /ainda não baixa sozinho/.test(c)&&/Escolha o silo de cada linha/.test(c)&&/AC0007/.test(c), c.replace(/\n/g,' | ').slice(0,220));
- await p.selectOption('[data-sa-linha="Linha 1"]','c2'); for(const l of await p.evaluate(()=>[...document.querySelectorAll('[data-sa-linha]')].map(x=>x.dataset.saLinha).filter(x=>x!=='Linha 1'))) await p.selectOption(`[data-sa-linha="${l}"]`,'-');
+ ok('Sem configuração: "O nível dos silos ainda não baixa sozinho" com o passo dos silos de cada linha', /ainda não baixa sozinho/.test(c)&&/Escolha os silos de cada linha/.test(c), c.replace(/\n/g,' | ').slice(0,220));
+ await p.selectOption('[data-sa-silo="cim"][data-l="Linha 1"]','c2'); for(const sel of await p.evaluate(()=>[...document.querySelectorAll('[data-sa-silo]')].filter(x=>!(x.dataset.l==='Linha 1'&&x.dataset.saSilo==='cim')).map(x=>`[data-sa-silo="${x.dataset.saSilo}"][data-l="${x.dataset.l}"]`))) await p.selectOption(sel,'-');
  await p.click('[data-act="sa-linhas"]'); await H.dorme(800);
  const cfg=(await srv())['config/geral'].siloConsumo;
  ok('Passo 1 pelo quadro: Linha 1 → Silo Grande salvo (as outras marcadas "não usa")', cfg&&cfg['Linha 1']==='c2', JSON.stringify(cfg));

@@ -1178,6 +1178,7 @@ function itemForm(i){ const f=S.it.f; const L=linhasOrd();
    <label><span class="sub" id="it-f-pal-lab">${(()=>{ const u=v('unidade','')||unidCod(String(v('codigo','')).toUpperCase()); return (UNID[u]?UNID[u].p[0].toUpperCase()+UNID[u].p.slice(1):'Unidades')+' em 1 palete'; })()}</span><input class="txt num" id="it-f-palete" inputmode="numeric" value="${esc(v('palete','')??'')}" placeholder="ex.: 88 (vazio = padrão da linha)"></label>
    <label><span class="sub" id="it-f-fd-lab">${(()=>{ const u=v('unidade','')||unidCod(String(v('codigo','')).toUpperCase()); return 'Unidades em 1 fardo'; })()}</span><input class="txt num" id="it-f-fardo" inputmode="numeric" value="${esc(v('fardo','')??'')}" placeholder="ex.: 20 (se vai em fardo)"></label>
    <label><span class="sub">Kg de cimento por saco</span><input class="txt num" id="it-f-kgCimento" inputmode="decimal" value="${esc(String(v('kgCimento','')??'').replace('.',','))}" placeholder="se usa cimento"></label>
+   <label><span class="sub">Kg de areia por saco</span><input class="txt num" id="it-f-kgAreia" inputmode="decimal" value="${esc(String(v('kgAreia','')??'').replace('.',','))}" placeholder="se usa areia"></label>
   </div>
   <div class="sub" style="margin:12px 0 6px;font-size:12px">Linhas onde roda</div>
   <div class="chips">${L.map(l=>`<button class="chip" data-act="it-lin" data-v="${esc(l)}" aria-pressed="${f.linhas.includes(l)}">${esc(l)}</button>`).join('')}</div>
@@ -1209,15 +1210,15 @@ document.addEventListener('click',async ev=>{
     if(!id&&itemDe(cod)){ toast('O item '+cod+' já está cadastrado.'); return; }
     const desc=String(f.descricao||'').trim().replace(/\s+/g,' '); if(!desc){ toast('Informe a descrição.'); return; }
     const pal=parseInt(String(f.palete||'').replace(/\D/g,''),10); const fdn=parseInt(String(f.fardo||'').replace(/\D/g,''),10);
-    const kgc=numIn(String(f.kgCimento!=null?f.kgCimento:'').trim()); const ai=id?S.itens.find(x=>x._id===id):null; const aLoc=f.alxLocais||alxLocsIt(ai); const aUn=String(f.alxUn!=null?f.alxUn:((ai&&ai.almox&&ai.almox.un)||'')).trim().toUpperCase(); const aCv=numIn(String(f.alxConv!=null?f.alxConv:((ai&&ai.almox&&ai.almox.conv)||'')).trim());
+    const kgc=numIn(String(f.kgCimento!=null?f.kgCimento:'').trim()), kga=numIn(String(f.kgAreia!=null?f.kgAreia:'').trim()); const ai=id?S.itens.find(x=>x._id===id):null; const aLoc=f.alxLocais||alxLocsIt(ai); const aUn=String(f.alxUn!=null?f.alxUn:((ai&&ai.almox&&ai.almox.un)||'')).trim().toUpperCase(); const aCv=numIn(String(f.alxConv!=null?f.alxConv:((ai&&ai.almox&&ai.almox.conv)||'')).trim());
     const alxDados={almox:{locais:ALX_LOCS.filter(l=>aLoc.includes(l)),un:aUn||null,conv:aCv>1?aCv:null,grupos:f.alxGrupos||((ai&&ai.almox&&ai.almox.grupos)||[])},tipo:!(f.linhas||[]).length&&aLoc.length&&aLoc.every(l=>l==='a1'||l==='a2')?'mp':null};
-    const d={codigo:cod,descricao:desc.toUpperCase(),linhas:f.linhas||[],unidade:UNID[f.unidade]?f.unidade:null,palete:isNaN(pal)||pal<=0?null:pal,fardo:isNaN(fdn)||fdn<=0?null:fdn,kgCimento:kgc>0?kgc:null,obs:String(f.obs||'').trim(),alteradoEm:new Date().toISOString(),alteradoPor:S.uid}; Object.assign(d,alxDados);
+    const d={codigo:cod,descricao:desc.toUpperCase(),linhas:f.linhas||[],unidade:UNID[f.unidade]?f.unidade:null,palete:isNaN(pal)||pal<=0?null:pal,fardo:isNaN(fdn)||fdn<=0?null:fdn,kgCimento:kgc>0?kgc:null,kgAreia:kga>0?kga:null,obs:String(f.obs||'').trim(),alteradoEm:new Date().toISOString(),alteradoPor:S.uid}; Object.assign(d,alxDados);
     if(!S.db){ toast('Sem conexão com o armazenamento.'); return; }
     try{ if(id) await S.db.doc('itens/'+id).update(d); else await S.db.doc('itens/'+cod).set(Object.assign(d,{ativo:true,criadoEm:d.alteradoEm,origem:'manual'}));
       toast('Item '+cod+(id?' atualizado':' cadastrado')); I.f={}; I.novo=false; I.aberto=null; render(); }catch(e){ erro(e); } return; }
 });
 document.addEventListener('change',ev=>{ const t=ev.target; if(t.id!=='it-f-unidade') return; const lb=$('#it-f-pal-lab'); if(!lb) return; const cod=String(($('#it-f-codigo')||{}).value||'').toUpperCase(); const u=t.value||unidCod(cod); const bn=UNID[u]?UNID[u].p[0].toUpperCase()+UNID[u].p.slice(1):'Unidades'; lb.textContent=bn+' em 1 palete'; const lf=$('#it-f-fd-lab'); if(lf) lf.textContent='Unidades em 1 fardo'; });
-function itLerForm(){ const f=S.it.f; ['codigo','descricao','unidade','palete','fardo','kgCimento','obs','alxUn','alxConv'].forEach(k=>{ const el=$('#it-f-'+k); if(el) f[k]=el.value; }); }
+function itLerForm(){ const f=S.it.f; ['codigo','descricao','unidade','palete','fardo','kgCimento','kgAreia','obs','alxUn','alxConv'].forEach(k=>{ const el=$('#it-f-'+k); if(el) f[k]=el.value; }); }
 document.addEventListener('input',ev=>{ const t=ev.target;
   if(t.id==='it-busca'){ S.it.busca=t.value; clearTimeout(S.it._bt); S.it._bt=setTimeout(()=>{ const pos=t.selectionStart; render(); const n=$('#it-busca'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } },250); return; }
   if(t.id&&t.id.startsWith('it-f-')) S.it.f[t.id.slice(5)]=t.value;
