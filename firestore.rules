@@ -45,7 +45,7 @@ service cloud.firestore {
       allow read: if le();
       // a dona também cria (importar a cópia de segurança num projeto novo traz o histórico com os usuários antigos)
       allow create: if dono() || grava() && !bloq('silomov') && request.resource.data.porUid == request.auth.uid
-        && request.resource.data.tipo in ['consumo', 'estorno', 'medicao', 'recusado'];
+        && request.resource.data.tipo in ['consumo', 'estorno', 'medicao', 'recusado', 'entrada']; // entrada = recebimento pela nota
       allow update, delete: if false;
     }
 

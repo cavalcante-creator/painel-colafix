@@ -4,6 +4,7 @@ const res = []; const ok = (n, c, det) => { res.push({ n, ok: !!c, det }); conso
 (async () => {
   const { browser, page, erros } = await H.abrir();
   const { d } = H.seed();
+  d.docs['config/geral'].siloComparar = false; /* este teste confere o modo em que a medição corrige o saldo (o modo comparação tem teste próprio: teste-silomais.js) */
   await H.preparar(page, d); await page.goto(H.BASE);
   await H.entrar(page, 'iasmyn', 'senha123'); await H.dorme(1800);
   const srv = () => page.evaluate(() => JSON.parse(localStorage.getItem('__srv')).docs);
@@ -18,8 +19,8 @@ const res = []; const ok = (n, c, det) => { res.push({ n, ok: !!c, det }); conso
 
   // 0) configuração: Linha 1 → Silo Grande (c2), Linha 2 → Silo Pequeno (c1) pela tela
   await irSilo('c2');
-  await page.selectOption('select[data-silo-linha="Linha 1"]', 'c2'); await page.selectOption('select[data-silo-linha="Linha 2"]', 'c1');
-  await page.click('[data-act="sm-cfg"]'); await H.dorme(400);
+  await page.click('[data-act="smf-tg"][data-m="cim"][data-l="Linha 1"][data-sid="c2"]'); await H.dorme(150); await page.click('[data-act="smf-tg"][data-m="cim"][data-l="Linha 2"][data-sid="c1"]'); await H.dorme(150);
+  await page.click('[data-act="smf-ok"]'); await H.dorme(400); /* editor novo (um ou vários silos por linha) */
   const cfg = (await srv())['config/geral'].siloConsumo;
   ok('Configuração: silo de consumo por linha salva', cfg && cfg['Linha 1'] === 'c2' && cfg['Linha 2'] === 'c1', JSON.stringify(cfg));
 

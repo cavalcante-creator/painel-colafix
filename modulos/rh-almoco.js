@@ -233,7 +233,7 @@
     const blSim=bloco('sim','ALMOÇARAM',sim,x=>lin(x,'',`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="nao">não almoçou</button>`),'Ninguém.');
     const blNao=bloco('nao','NÃO ALMOÇARAM · SEM JUSTIFICATIVA',nao,x=>lin(x,'',`<button class="btn sec rh-sm" data-act="alm-jus" data-k="${x.k}" data-d="${d}">Justificar</button><button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="sim">almoçou</button>`),'Ninguém. Tudo justificado.'), blJus=bloco('just','JUSTIFICADOS',jus,x=>lin(x,jtx(x),`<button class="lnk" data-act="alm-jus" data-k="${x.k}" data-d="${d}">alterar</button>`),'Nenhuma justificativa neste dia.'), blMais=(!A.sit||A.sit==='fora'?`<details class="alm-bl fora" ${A.sit==='fora'?'open':''}><summary class="label">NÃO ALMOÇAM NA EMPRESA <b>(${fora.length})</b></summary>${fora.map(x=>lin(x,`<span class="alm-jt">${esc(foraDe(x.k).mot||'Não almoça na empresa')}</span>`,'')).join('')||'<div class="sub">Ninguém marcado. Para marcar, clique no nome da pessoa.</div>'}</details>`:'')
       +(!A.sit?`<details class="alm-bl aus"><summary class="label">AUSÊNCIAS PROGRAMADAS <b>(${ausAtivas().length})</b></summary>${ausLista(c,null)}</details>`:'');
-    return `${tira}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram</span><span class="pill warn">${nao.length} sem justificativa</span>${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>
+    return `${tira}${folhaCard(c,d)}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram</span><span class="pill warn">${nao.length} sem justificativa</span>${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>
       <div class="alm-g2">${blNao}${blJus}</div>${blSim}<div class="alm-g2 alm-mais">${blMais}</div>`; }
   /* ---------- justificativa (janela) ---------- */
   function vJust(c){ const J=A.jus; if(!J) return ''; const esc=c.esc, aj=((A.aj[J.d.slice(0,7)]||{}).aj||{})[J.d+'_'+J.k], cur=aj&&aj.v==='just'?aj:null; const tipos=cfg().just||JUST_PADRAO;
@@ -417,5 +417,85 @@
 .alm-pt{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.alm-pt span{font-size:12.5px;background:var(--surface-2,#f6f4ee);border-radius:8px;padding:3px 8px}.alm-pt span.r{background:var(--teal-wash,#e4eef3)}
 @media (max-width:760px){.alm-kpi{grid-template-columns:1fr 1fr}.alm-g{grid-template-columns:1fr}.alm-dir{grid-template-columns:1fr}.alm-hbr{grid-template-columns:90px 1fr 90px}}
 </style>`);
+
+  /* ---------- folha de assinatura do almoço (garantia quando o Face ID falhar) ----------
+     A folha sai NORMAL (todos livres para assinar). Antes de emitir, o painel pergunta se o CSV do Face ID do dia já foi importado;
+     com ele, mostra quem está na lista e não passou no Face ID — o RH CONFIRMA quem não veio (nada é marcado sozinho).
+     O RH também marca à mão. Marcados: linha cinza + "Não veio" (ou "Férias"). Guardado em rh/dados/almocofolha/<dia>. */
+  const fNorm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\b(da|de|do|das|dos|e)\b/g,' ').replace(/\s+/g,' ').trim();
+  function fMesma(a,b){ const A1=fNorm(a).split(' ').filter(Boolean), B1=fNorm(b).split(' ').filter(Boolean); if(!A1.length||!B1.length||A1[0]!==B1[0]) return false;
+    const [cu,lo]=A1.length<=B1.length?[A1,B1]:[B1,A1]; if(cu.length===1) return lo.length===1; return cu.slice(1).every(t=>lo.includes(t)); }
+  const semPref=n=>String(n||'').replace(/^\s*(terceiros?|motorista)\s*-\s*/i,'');
+  function folhaPessoas(c,d){ const m=d.slice(0,7), Dm=A.dados[m]||{}, dia=(Dm.dias||{})[d]||null, P0=Dm.pessoas||{};
+    const fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
+    const L=[]; const add=(nome,k,f,ord)=>{ const j=L.find(x=>fMesma(semPref(x.nome),semPref(nome))||(k&&x.k===k)); if(j){ if(k&&!j.k) j.k=k; if(f&&!j.f) j.f=f; return; } L.push({nome:ord!=null?String(nome).trim():titulo(f?f.nome:nome),k:k||'',f:f||null,ord}); };
+    (cfg().listaFolha||[]).forEach((n,i)=>{ if(String(n).trim()) add(String(n).trim(),'',null,i); }); /* nomes e ordem da planilha */
+    Object.keys(P0).forEach(k=>add(fx[k]?fx[k].nome:(P0[k].n||''),k,fx[k]||null));
+    (c.R.func||[]).filter(f=>!/deslig|inativ/i.test(f.status||'')&&(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); add(f.nome,k?k.padStart(11,'0'):'',f); });
+    const fer=(c.R.fer||c.R.ferias||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
+    L.forEach(x=>{ x.fid=!!(x.k&&P0[x.k]); x.passou=!!(x.k&&dia&&dia[x.k]); x.ferias=!!(x.f&&fer.some(y=>y.funcId===x.f._id)); x.prog=x.k?ausDe(x.k,d):null; });
+    L.sort((a,b)=>(a.ord!=null?a.ord:1e6)-(b.ord!=null?b.ord:1e6)||a.nome.localeCompare(b.nome,'pt-BR'));
+    return {L,temDia:!!dia}; }
+  function folhaEst(c,d){ A.fol=A.fol||{}; let F=A.fol[d]; if(F) return F; F=A.fol[d]={nv:{},desm:{},resp:null,emit:null,carregando:true};
+    c.P.db().doc('rh/dados/almocofolha/'+d).get().then(g=>{ const x=g&&g.exists?g.data():{}; F.nv=x.nv||{}; F.desm=x.desm||{}; F.resp=x.resp||null; F.emit=x.emit||null; F.carregando=false; c.P.rerender(); }).catch(()=>{ F.carregando=false; }); return F; }
+  async function folhaSalvar(c,d){ const F=A.fol[d]; try{ await c.P.db().doc('rh/dados/almocofolha/'+d).set({dia:d,nv:F.nv,desm:F.desm||{},resp:F.resp||null,emit:F.emit||null,em:new Date().toISOString(),por:(c.P.S&&c.P.S.perfil&&c.P.S.perfil.nome)||''}); }catch(e){ c.P.toast('Não foi possível guardar a marcação: '+((e&&e.message)||e)); } }
+  const PROG_T='Não almoça (programado)';
+  const fMarca=(F,x)=>F.nv[x.nome]||(x.prog&&!(F.desm||{})[x.nome]?PROG_T:''); /* o que sai na folha para essa pessoa */
+  function folhaCard(c,d){ const esc=c.esc, F=folhaEst(c,d), {L,temDia}=folhaPessoas(c,d), nv=F.nv, n=L.filter(x=>fMarca(F,x)).length, brD=c.br(d);
+    const ck=(x,mot)=>`<label class="alm-fk ${nv[x.nome]?'on':''}"><input type="checkbox" data-alm-fnv="${esc(x.nome)}" data-mot="${mot}" ${nv[x.nome]?'checked':''}> <span>${esc(x.nome)}</span>${nv[x.nome]?`<em>${esc(nv[x.nome])}</em>`:''}</label>`;
+    let corpo='';
+    if(F.carregando) corpo='<div class="sub">Carregando…</div>';
+    else if(!temDia&&F.resp!=='sem') corpo=`<div class="alm-fq"><b>O CSV do Face ID de ${esc(brD)} já foi importado?</b><span>Ainda não aparece nenhum registro do Face ID neste dia. Com ele, o painel mostra quem está na lista e não passou na catraca, para você confirmar quem não veio.</span>
+        <div class="alm-fa"><button class="btn" data-act="alm-fimp">Importar o CSV agora</button><button class="btn sec" data-act="alm-fsem">Emitir sem conferir pelo Face ID</button></div></div>`;
+    else { const prog=L.filter(x=>x.prog), nao=L.filter(x=>x.fid&&!x.passou&&!x.ferias&&!x.prog), fer=L.filter(x=>x.ferias&&!x.prog), semFid=L.filter(x=>!x.fid&&!x.ferias&&!x.prog);
+      const ckp=x=>{ const on=!(F.desm||{})[x.nome]; return `<label class="alm-fk ${on?'on':''}"><input type="checkbox" data-alm-fprog="${esc(x.nome)}" ${on?'checked':''}> <span>${esc(x.nome)}</span><em>${esc(ausTxt(x.prog))}</em></label>`; };
+      corpo=(prog.length?`<div class="alm-fg"><b>Ausência programada em ${esc(brD)} (${prog.length})</b><span>Cadastrado em “Ausência no almoço”: já vem marcado e sai como “${PROG_T}”. Desmarque se a pessoa for almoçar hoje.</span><div class="alm-fks">${prog.map(ckp).join('')}</div></div>`:'')
+        +(temDia?`<div class="alm-fg"><b>Na lista, mas não passaram no Face ID em ${esc(brD)} (${nao.length})</b><span>Marque quem realmente não veio. Quem você não marcar fica normal na folha, para assinar.</span>
+          ${nao.length?`<div class="alm-fks">${nao.map(x=>ck(x,'Não veio')).join('')}</div>`:'<div class="sub">Todos da lista passaram pelo Face ID.</div>'}</div>`:`<div class="alm-fg"><b>Sem conferência pelo Face ID</b><span>Marque à mão quem não veio.</span></div>`)
+        +(fer.length?`<div class="alm-fg"><b>De férias em ${esc(brD)} (${fer.length})</b><span>Marque para sair “Férias” na folha.</span><div class="alm-fks">${fer.map(x=>ck(x,'Férias')).join('')}</div></div>`:'')
+        +`<div class="alm-fg"><b>Marcar outra pessoa à mão</b>${semFid.length&&temDia?`<span>${semFid.length} pessoa(s) da lista não passam pela catraca (sem Face ID): marque aqui se alguma não veio.</span>`:''}
+          <div class="alm-fa"><select class="txt" id="alm-fsel"><option value="">Escolha um nome da lista…</option>${L.filter(x=>!fMarca(F,x)).map(x=>`<option value="${esc(x.nome)}">${esc(x.nome)}</option>`).join('')}</select><button class="btn sec" data-act="alm-fadd">Marcar como não veio</button></div>
+          ${n?`<div class="alm-fks">${L.filter(x=>nv[x.nome]&&!x.prog&&!(temDia&&x.fid&&!x.passou&&!x.ferias)&&!x.ferias).map(x=>ck(x,nv[x.nome])).join('')}</div>`:''}</div>`
+        +(F.emit?`<div class="alm-fe ${F.emit.mudou?'mud':''}">${F.emit.mudou?'<b>Marcação alterada depois de emitida</b> — imprima de novo para a folha ficar certa. ':''}Emitida em ${esc(new Date(F.emit.em).toLocaleDateString('pt-BR'))} às ${esc(new Date(F.emit.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))}${F.emit.por?' por '+esc(F.emit.por):''}${F.emit.n>1?' ('+F.emit.n+' vezes)':''}. Pode mudar as marcações e imprimir de novo.</div>`:'')
+        +`<div class="alm-fz"><span><b>${L.length}</b> na lista · <b>${n}</b> marcado${n===1?'':'s'} (não veio / férias) · <b>${L.length-n}</b> para assinar</span><button class="btn" data-act="alm-folha">${F.emit?'Imprimir de novo':'Imprimir folha'}</button></div>`; }
+    return `<section class="card alm-folha"><div class="alm-fh"><div><b>Folha de assinatura do almoço · ${esc(brD)}</b><span>A folha sai normal, para todos assinarem; só quem você marcar sai em cinza.</span></div>
+      <div class="alm-fa">${!F.carregando&&(temDia||F.resp==='sem')&&!temDia?'<button class="lnk" data-act="alm-fvolta">Voltar à pergunta do Face ID</button>':''}<button class="btn sec" data-act="alm-flista">${(A.folha||{}).ed?'Fechar a lista fixa':'Lista fixa ('+(cfg().listaFolha||[]).length+')'}</button></div></div>
+      ${(A.folha||{}).ed?`<div class="alm-fl"><div class="sub" style="margin:0 0 6px">Quem precisa estar na folha, na ordem da planilha (um nome por linha). Dá para colar a coluna de nomes direto do Excel.</div>
+        <textarea class="txt" id="alm-flt" rows="8" placeholder="Adriano Reus&#10;Alexandre Teixeira&#10;…">${esc((cfg().listaFolha||[]).join('\n'))}</textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" data-act="alm-flsalva">Salvar lista fixa</button><label class="btn sec" style="cursor:pointer">Importar da planilha (.xlsx)<input type="file" accept=".xlsx,.xls" data-alm-fxls hidden></label></div></div>`:''}
+      ${corpo}</section>`; }
+  function folhaImprimir(c,d){ const F=folhaEst(c,d), {L}=folhaPessoas(c,d), w=window.open('','_blank'); if(!w){ c.P.toast('Libere as janelas (pop-up) para imprimir.'); return; }
+    const e=s=>String(s==null?'':s).replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x])), brB=d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4), mk=x=>fMarca(F,x), n=L.filter(mk).length;
+    const linhas=L.map(x=>`<tr class="${mk(x)?'cz':''}"><td class="nm">${e(x.nome)}</td><td class="as">${mk(x)?e(mk(x)):''}</td><td class="ex"></td><td class="ex"></td></tr>`).join('')+Array.from({length:4},()=>'<tr><td class="nm"></td><td class="as"></td><td class="ex"></td><td class="ex"></td></tr>').join('');
+    /* modelo da planilha do RH: A4 retrato, Calibri negrito, cabeçalho cinza em itálico, grade fina; quem não veio fica em cinza */
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>ALMOÇO - ${brB}</title><style>@page{size:A4 portrait;margin:19mm 14mm 19mm 14mm}
+      body{margin:0;font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      table{border-collapse:collapse;width:160mm;table-layout:fixed}thead{display:table-header-group}tr{page-break-inside:avoid}
+      th,td{border:0.6pt solid #000;height:5.5mm;padding:0 3px;font-size:11pt;font-weight:700;vertical-align:middle;white-space:nowrap;overflow:hidden}
+      th{background:#BFBFBF;font-style:italic;text-align:center}th.nm,td.nm{width:66mm}th.as,td.as{width:70mm}td.as{text-align:center;font-weight:400;font-style:italic;font-size:10pt}th.ex,td.ex{width:12mm}
+      tr.cz td{background:#BFBFBF}</style></head><body>
+      <table><thead><tr><th class="nm">ALMOÇO - ${brB} - ${L.length-n}</th><th class="as">Assinatura</th><th class="ex"></th><th class="ex"></th></tr></thead><tbody>${linhas}</tbody></table></body></html>`);
+    w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch(x){} },350);
+    F.emit={em:new Date().toISOString(),por:(c.P.S&&c.P.S.perfil&&c.P.S.perfil.nome)||'',n:((F.emit&&F.emit.n)||0)+1,mudou:false}; folhaSalvar(c,d); c.P.rerender(); }
+  async function folhaXls(c,file){ try{ if(!window.XLSX) await new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=ok; s.onerror=no; document.head.appendChild(s); });
+      const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}), ws=wb.Sheets[wb.SheetNames[0]], rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});
+      const ns=[...new Set(rows.map(r=>String((r||[])[0]||'').trim()).filter(n=>n&&!/almo[cç]o|assinatura|^\d|^nome$/i.test(n)&&/[a-zà-ú]{2,}[^a-zà-ú]+[a-zà-ú]{2,}/i.test(n)))];
+      const ta=document.getElementById('alm-flt'); if(ta) ta.value=ns.join('\n'); c.P.toast(ns.length+' nomes lidos da planilha ('+wb.SheetNames[0]+'). Confira e clique em “Salvar lista fixa”.'); }
+    catch(e){ console.warn('[almoço folha]',e); c.P.toast('Não consegui ler a planilha.'); } }
+  document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!A.ctx||!t.dataset) return; const c=A.ctx, d=A.dia;
+    if(t.dataset.almFnv!=null){ const F=folhaEst(c,d); if(t.checked) F.nv[t.dataset.almFnv]=t.dataset.mot||'Não veio'; else delete F.nv[t.dataset.almFnv]; if(F.emit) F.emit.mudou=true; folhaSalvar(c,d); (c.P.render||c.P.rerender)(); } /* caixinha em foco: redesenha já */
+    if(t.dataset.almFprog!=null){ const F=folhaEst(c,d); F.desm=F.desm||{}; if(t.checked) delete F.desm[t.dataset.almFprog]; else F.desm[t.dataset.almFprog]=true; if(F.emit) F.emit.mudou=true; folhaSalvar(c,d); (c.P.render||c.P.rerender)(); } /* caixinha em foco: redesenha já */
+    if(t.dataset.almFxls!=null&&t.files&&t.files[0]) folhaXls(c,t.files[0]); });
+  document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="alm-f"]'); if(!b||!A.ctx) return; const a=b.dataset.act; if(!['alm-folha','alm-flista','alm-flsalva','alm-fimp','alm-fsem','alm-fvolta','alm-fadd'].includes(a)) return;
+    const c=A.ctx, P=c.P, d=A.dia; A.folha=A.folha||{}; const F=folhaEst(c,d);
+    if(a==='alm-folha') return folhaImprimir(c,d);
+    if(a==='alm-flista'){ A.folha.ed=!A.folha.ed; P.rerender(); return; }
+    if(a==='alm-fimp'){ const i=document.querySelector('.alm-top input[type=file]'); if(i) i.click(); else P.toast('Use “Importar do Face ID” no alto da tela.'); return; }
+    if(a==='alm-fsem'){ F.resp='sem'; folhaSalvar(c,d); P.rerender(); return; }
+    if(a==='alm-fvolta'){ F.resp=null; folhaSalvar(c,d); P.rerender(); return; }
+    if(a==='alm-fadd'){ const v=(document.getElementById('alm-fsel')||{}).value; if(!v) return P.toast('Escolha um nome da lista.'); F.nv[v]='Não veio'; if(F.emit) F.emit.mudou=true; folhaSalvar(c,d); P.rerender(); return; }
+    const ns=[...new Set(String((document.getElementById('alm-flt')||{}).value||'').split(/\r?\n/).map(x=>x.replace(/\t.*$/,'').trim()).filter(Boolean))];
+    try{ const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{},{listaFolha:ns}); await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; A.folha.ed=false; P.toast('Lista fixa salva: '+ns.length+' nomes.'); P.rerender(); }catch(e){ P.toast('Não foi possível salvar: '+((e&&e.message)||e)); } });
+  try{ document.head.insertAdjacentHTML('beforeend','<style id="alm-folha-css">.alm-folha{display:flex;flex-direction:column;gap:12px;margin:10px 0}.alm-fh{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.alm-fh b{display:block;font-size:16px}.alm-fh span,.alm-fg>span,.alm-fq>span{display:block;font-size:13.5px;color:var(--muted)}.alm-fa{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.alm-fl textarea{width:100%;font:inherit;font-size:14px}.alm-fq,.alm-fg{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;background:var(--surface-2)}.alm-fq b,.alm-fg b{font-size:15px}.alm-fks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;margin-top:4px}.alm-fk{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:14px}.alm-fk input{width:18px;height:18px}.alm-fk.on{background:#E3E6E9;border-color:#9AA5AD}.alm-fk em{margin-left:auto;font-size:12px;color:var(--muted)}.alm-fe{font-size:13.5px;color:var(--muted);padding:8px 12px;border-radius:10px;background:var(--surface-2)}.alm-fe.mud{background:var(--warn-tint);color:var(--warn-ink)}.alm-fe b{color:inherit}.alm-fz{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.alm-fz span{font-size:14px}#alm-fsel{min-width:260px}</style>'); }catch(e){}
   window.RHAlmoco={ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,_A:A};
 })();

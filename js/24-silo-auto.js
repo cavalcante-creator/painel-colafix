@@ -50,7 +50,7 @@ const SA_MAT=[{k:'cim',nome:'Cimento',grupo:'Cimento',map:'siloConsumo',sem:'lin
   {k:'are',nome:'Areia',grupo:'Areia',map:'siloConsumoAreia',sem:'linhasSemAreia',usa:l=>usaAreiaFab(l),kg:c=>kgAreia(c),campo:'kgAreia'}];
 function saDiag(){ const LS=linhasOrd(), an=anuladas(), lim=addDias(hojeStr(),-30), mats=SA_MAT.filter(M=>(S.cfg.silos||[]).some(s=>s.grupo===M.grupo));
   const semSilo=[], sids=new Set(), semKg={};
-  mats.forEach(M=>{ const map=S.cfg[M.map]||{}; LS.filter(M.usa).forEach(l=>{ if(map[l]) sids.add(map[l]); else semSilo.push({M,l}); }); });
+  mats.forEach(M=>{ LS.filter(M.usa).forEach(l=>{ const xs=typeof smSilos==='function'?smSilos(M.map,l):((S.cfg[M.map]||{})[l]?[{sid:S.cfg[M.map][l]}]:[]); if(xs.length) xs.forEach(x=>sids.add(x.sid)); else semSilo.push({M,l}); }); });
   const semSaldo=[...sids].filter(id=>{ const d=S.siloSaldo[id]; return !d||d.saldoKg==null; });
   (S.entregas||[]).forEach(e=>{ if(e.anula||an.has(e._id)||!e.em||hojeStr(new Date(e.em))<lim) return; const o=ordById(e.ordem), l=(o&&o.linha)||e.linha, cod=o?String(codigoDe(o)||'').toUpperCase():''; if(!l||!cod) return;
     let conta=false; mats.forEach(M=>{ if(!M.usa(l)||!(S.cfg[M.map]||{})[l]||M.kg(cod)>0) return; const x=(semKg[cod]=semKg[cod]||{cod,n:0,desc:(itemDe(cod)||{}).descricao||'',falta:{}}); x.falta[M.k]=true; conta=true; }); if(conta) semKg[cod].n++; });
@@ -62,7 +62,7 @@ function saCard(){ if(!S.siloLido) return ''; const D=saDiag(), pode=siloPodeCon
   const passos=[];
   if(D.semSilo.length){ const ls=[...new Set(D.semSilo.map(x=>x.l))];
     passos.push(`<div class="sa-p"><b>${passos.length+1}. Escolha os silos de cada linha</b><span>De qual silo cada linha puxa o cimento e a areia. Sem isso, o apontamento não sabe de onde descontar.</span>
-      <div class="sa-tab">${ls.map(l=>`<div class="sa-tr"><b>${esc(l)}</b>${D.mats.map(M=>{ const precisa=D.semSilo.some(x=>x.l===l&&x.M.k===M.k); if(!precisa) return `<span class="sa-okc">${M.nome}: ${(S.cfg[M.map]||{})[l]?esc(siloNome(S.cfg[M.map][l])):'não usa'}</span>`;
+      <div class="sa-tab">${ls.map(l=>`<div class="sa-tr"><b>${esc(l)}</b>${D.mats.map(M=>{ const precisa=D.semSilo.some(x=>x.l===l&&x.M.k===M.k); if(!precisa){ const xs=typeof smSilos==='function'?smSilos(M.map,l):[]; return `<span class="sa-okc">${M.nome}: ${xs.length?esc(xs.map(x=>siloNome(x.sid)).join(' + ')):'não usa'}</span>`; }
         const cs=(S.cfg.silos||[]).filter(s=>s.grupo===M.grupo); return pode?`<label><span>${M.nome}</span><select class="txt" data-sa-silo="${M.k}" data-l="${esc(l)}"><option value="">— escolha —</option>${cs.map(s=>`<option value="${esc(s.id)}">${esc(s.nome)}</option>`).join('')}<option value="-">Esta linha não usa ${M.nome.toLowerCase()} do silo</option></select></label>`:`<em>${M.nome}: peça a quem configura</em>`; }).join('')}</div>`).join('')}</div>
       ${pode?'<button class="btn sec" data-act="sa-linhas">Salvar silos das linhas</button>':''}</div>`); }
   if(D.semSaldo.length) passos.push(`<div class="sa-p"><b>${passos.length+1}. Registre o saldo de partida</b><span>O desconto começa a partir de uma medição feita no painel.</span>
