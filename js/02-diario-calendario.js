@@ -83,6 +83,7 @@ document.addEventListener('click',async ev=>{
     if(!S.db){ toast('Sem conexão com o armazenamento.'); return; }
     const fila=S.ordens.find(o=>String(o.num)===num&&!o.linha);
     const d={num,produto:f.produto.trim().replace(/\s+/g,' '),linha:f.linha||linhasOrd()[0],data:f.data||hojeStr(),turno:f.turno||'Dia todo',total,status:'aberta',origem:'manual',criadaEm:new Date().toISOString(),por:S.uid};
+    if(f.ate&&f.ate>(d.data||'')){ d.ate=f.ate; d.hist=histAdd({},'Vai produzir por vários dias, até '+dm(f.ate)); } /* ordem de vários dias já na criação (o painel de cada ordem também tem "Vários dias") */
     const ens=String(f.ensaca||'').replace(/\D/g,''); if(ens) d.ensaca=ens;
     try{ if(fila) await S.db.doc('ordens/'+fila._id).update(Object.assign(d,{hist:histAdd(fila,'Programada na '+d.linha+' para '+dm(d.data))}));
       else { const id=S.ordens.some(o=>o._id===num)?num+'-'+Date.now().toString(36):num; await S.db.doc('ordens/'+id).set(d); }
@@ -370,7 +371,7 @@ async function anexarRanchos(files){ const R=S.rch; if(R.lendo) return; if(!S.db
         if(asset) d.asset=asset; else if(ant.asset) d.asset=ant.asset; if(its[r.numero]&&its[r.numero].length) d.itens=its[r.numero];
         if(semOrdem.length) d.semOrdem=semOrdem;
         const base=Object.assign({},ant); delete base._id; if(!semOrdem.length) base.semOrdem=null;
-        await S.db.doc('ranchos/'+r.numero).set(Object.assign(base,ant._id?{enviadoEm:ant.enviadoEm||null,enviadoPor:ant.enviadoPor||null}:{},d));
+        await S.db.doc('ranchos/'+r.numero).set(Object.assign(base,{enviadoEm:ant.enviadoEm||agora,enviadoPor:ant.enviadoPor||S.uid,envAuto:!ant.enviadoEm||!!ant.envAuto},d)); /* anexou = já vai para o almox (eles têm login próprio) */
         ok++; R.msgs.push('Rancho '+r.numero+': '+r.ordens.map(o=>o.num).join(', ')+(ensMsg.length?' · '+ensMsg.join(', '):'')+(semOrdem.length?' · não estão no painel: '+semOrdem.join(', '):'')+(asset?'':' · PDF não guardado'));
       }
     }catch(e){ R.msgs.push(f.name+': erro ao processar.'); }

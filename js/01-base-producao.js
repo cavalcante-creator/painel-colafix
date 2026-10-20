@@ -1203,6 +1203,7 @@ function novaPainel(){ const f=S.ord.nf;
    <label style="grid-column:1/-1"><span class="sub">Produto (código - descrição)</span><input class="txt" id="o-n-produto" placeholder="AC0005 - ARGAMASSA CINZA AC3 EMB PAPEL 20 KG" value="${esc(f.produto||'')}" list="o-prods"><span id="o-n-aviso">${avisoProdLinha(f)}</span></label>
    <label><span class="sub">Linha</span><select class="txt" id="o-n-linha">${linhasOrd().map(l=>`<option ${f.linha===l?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
    <label><span class="sub">Data</span><input type="date" class="txt" id="o-n-data" value="${esc(f.data||hojeStr())}"></label>
+   ${f.tipo==='prev'?'':`<label><span class="sub">Vai até <small style="font-weight:400">(se durar mais de 1 dia)</small></span><input type="date" class="txt" id="o-n-ate" min="${esc(addDias(f.data||hojeStr(),1))}" value="${esc(f.ate||'')}"></label>`}
    <label><span class="sub">Turno</span><select class="txt" id="o-n-turno">${TURNOS.map(t=>`<option ${f.turno===t?'selected':''}>${t}</option>`).join('')}</select></label>
    ${f.tipo==='prev'?`<label><span class="sub">Observação</span><input class="txt" id="o-n-obs" placeholder="opcional" value="${esc(f.obs||'')}"></label>`:`<label><span class="sub">Ordem de ensacado</span><input class="txt num" id="o-n-ensaca" inputmode="numeric" placeholder="se houver" value="${esc(f.ensaca||'')}"></label>`}
   </div>

@@ -12,7 +12,7 @@ function pmxAvisoSujo(){ toast('Há uma ficha aberta com alterações. Salve ou 
 function pmxId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function pmxOp(f){ return String(f.num||'').trim()||f.numProv||'—'; }
 function pmxPendSis(f){ return f.status!=='excluida'&&!f.sis&&(!String(f.num||'').trim()||(pmxEnc(f)&&f.origem!=='programa-antigo')); }
-function pmxSt(f){ return f.sis?{t:'Apontada no sistema',c:'ok'}:pmxEnc(f)?(f.origem==='programa-antigo'?{t:'Encerrada',c:'ok'}:{t:'Feita · falta PCP',c:'warn'}):{t:'Em produção',c:'prod'}; }
+function pmxSt(f){ return f.sis?{t:'Apontada no sistema'+(f.sis.em?' · '+dataBR(hojeStr(new Date(f.sis.em))).slice(0,5)+' às '+hora(f.sis.em):''),c:'ok'}:pmxEnc(f)?(f.origem==='programa-antigo'?{t:'Encerrada',c:'ok'}:{t:'Feita · falta PCP',c:'warn'}):{t:'Em produção',c:'prod'}; }
 function pmxNumProv(){ let mx=0; S.pmx.fichas.forEach(f=>{ const m=String(f.numProv||'').match(/^PMX-(\d+)$/); if(m) mx=Math.max(mx,+m[1]); }); return 'PMX-'+String(mx+1).padStart(4,'0'); }
 function pmxAvisoMeuDia(){ if(!pmxPodeEd()) return ''; const xs=pmxFichasVis().filter(pmxPendSis); if(!xs.length) return ''; const nf=xs.filter(pmxEnc).length, no=xs.length-nf; return `<div class="av warn"><b>Premix: ${[no?no+' ficha'+(no===1?'':'s')+' sem OP do sistema':'',nf?nf+' feita'+(nf===1?'':'s')+' para apontar no sistema':''].filter(Boolean).join(' · ')}</b><span>Coloque a OP do sistema e confirme o apontamento.</span><button class="lnk" data-act="pmx-ir-pend">Ver fila</button></div>`; }
 function pmxProd(f){ return (f.aponts||[]).reduce((a,x)=>a+pmxNum(x.qtd),0); }

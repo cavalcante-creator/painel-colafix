@@ -1,0 +1,22 @@
+/* Análise → Estoques: capacidade física dos almoxarifados em paletes (pedido 8). */
+const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=H.seed(); const D=d.docs;
+ D['itens/AC3001']=Object.assign({},D['itens/AC3001']||{},{codigo:'AC3001',descricao:'ARGAMASSA AC3 20KG',palete:96});
+ D['itens/AC0005']={codigo:'AC0005',descricao:'ARGAMASSA CINZA 20KG',palete:80};
+ D['itens/XX0001']={codigo:'XX0001',descricao:'ITEM SEM PALETE'};
+ D['config/geral']=Object.assign({},D['config/geral']||{},{paletes:{},paleteProd:{}});
+ D['pcpbase/meta']={em:new Date().toISOString(),hist:[]}; D['pcpbase/perfil']={}; D['pcpbase/vendas']={}; D['pcpbase/prev']={};
+ D['pcpbase/itens']={l:{AC3001:{d:'ARGAMASSA AC3 20KG',sal:1,a3:960,a30:480},AC0005:{d:'ARGAMASSA CINZA 20KG',sal:1,a3:400,a30:0},XX0001:{d:'ITEM SEM PALETE',sal:1,a3:50,a30:0}},atual:{SALDO:new Date().toISOString()},em:new Date().toISOString()};
+ const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
+ await p.evaluate(()=>__T.go('anlest')); await H.dorme(1500);
+ let c=await p.evaluate(()=>(document.querySelector('.aj-capw')||{}).innerText||'');
+ ok('Quadro "Capacidade física dos almoxarifados" na tela de Estoques', /CAPACIDADE FÍSICA DOS ALMOXARIFADOS/.test(c), c.replace(/\n/g,' | ').slice(0,200));
+ const caps=await p.evaluate(()=>[...document.querySelectorAll('.aj-cap')].map(x=>x.innerText.replace(/\n/g,' | ')));
+ ok('Almox 3: 15 paletes ocupados (960÷96=10 + 400÷80=5); Almox 30: 5', /Almox 3[\s\S]*?\| 15 \|/.test(caps[0]||'')&&/\| 5 \|/.test(caps[1]||''), JSON.stringify(caps).slice(0,240));
+ ok('Item sem padrão de palete é avisado (não entra na conta)', /sem padrão de palete/.test(caps[0]||'')&&/XX0001/.test(caps[0]||''));
+ await p.fill('[data-aj-cap="a3"]','100'); await p.fill('[data-aj-cap="a30"]','40'); await p.click('[data-act="aj-capok"]'); await H.dorme(1000);
+ const cfg=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['config/geral'].almoxCap);
+ const c2=await p.evaluate(()=>[...document.querySelectorAll('.aj-cap')].map(x=>x.innerText.replace(/\n/g,' | ')));
+ ok('Salvar capacidades: Almox 3 com 100 → 15% ocupado e 85 livres', cfg&&cfg.a3===100&&cfg.a30===40&&/15% ocupado/.test(c2[0])&&/\| 85 \|/.test(c2[0]), JSON.stringify(c2).slice(0,240));
+ const el=await p.$('.aj-capw'); if(el) await el.screenshot({path:'/tmp/ajcap.png'});
+ await browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

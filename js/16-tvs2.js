@@ -8,7 +8,7 @@ const tvnGrid=(cards,linhas)=>{ const n=cards.length, cols=Math.max(1,Math.ceil(
 /* ---------- 3 · Monitor do almoxarifado ---------- */
 function tvnRanSit(o){ const e=dbEt(o), agora=Date.now(), min=iso=>(agora-new Date(iso).getTime())/6e4;
   const n=e.ent?4:e.sep?3:e.env?2:o.rancho?1:0, atr=!e.ent&&((e.env&&!e.sep&&min(e.env)>DB_PRAZO.sep)||(o.rancho&&dbPrazoMin(o)<0));
-  return {n,c:e.ent?'ok':atr?'crit':o.rancho?'info':'warn',t:e.ent?'ENTREGUE '+hm(e.ent):atr?'ATRASADO':e.sep?'SEPARADO':e.env?'ENVIADO':o.rancho?'ANEXADO':'SEM RANCHO',ent:!!e.ent,sep:!!e.sep&&!e.ent,env:!!e.env&&!e.sep}; }
+  return {n,c:e.ent?'ok':atr?'crit':o.rancho?'info':'warn',t:e.ent?'ENTREGUE'+((e.ent&&(e.ent.em||typeof e.ent==='string'))?' '+hm(e.ent.em||e.ent):''):atr?'ATRASADO':e.sep?'SEPARADO':e.env?'ENVIADO':o.rancho?'ANEXADO':'SEM RANCHO',ent:!!e.ent,sep:!!e.sep&&!e.ent,env:!!e.env&&!e.sep}; }
 function vTvnMon(){ const h=hojeStr(); let aSep=0,aEnt=0,atr=0,ent=0;
   const cards=linhasOrd().map(l=>{ const os=corLista(l,h).filter(x=>!x._pv); if(!os.length) return '';
     const rs=os.map(o=>({o,s:tvnRanSit(o)})); rs.forEach(({s})=>{ if(s.ent) ent++; else if(s.c==='crit') atr++; else if(s.sep) aEnt++; else if(s.env) aSep++; });
@@ -68,7 +68,7 @@ function vTvnCal(){ const h=hojeStr(), hr=new Date().getHours(), util=d=>anlUtil
   const d2=tvfProxUtil(foco), d3=tvfProxUtil(d2), cols=[ant,foco,d2,d3], nomeD=d=>new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','').toUpperCase()+' '+dm(d);
   const pend=x=>x._pv?(+x.qtd||0):Math.max(0,(+x.total||0)-entregueDe(x)), cod=x=>x._pv?(x.codigo||codigoDe(x)):codigoDe(x), qt=x=>x._pv?(+x.qtd||0):(+x.total||0);
   const nome=x=>{ const n=String(x.produto||x.descricao||'').replace(/^[A-Z0-9]+\s*[-—]\s*/,'').trim(); return n||((typeof itemDe==='function'&&itemDe(cod(x)))||{}).descricao||''; };
-  const lin=(x,ok)=>`<div class="tvn-cx">${ok?'<b class="okm">✓</b> ':''}<b>${esc(cod(x))}</b> <span class="tvn-pn">${esc(nome(x))}</span> <span class="tvn-pq">· ${f0(qt(x))}</span></div>`;
+  const lin=(x,ok)=>`<div class="tvn-cx">${ok?'<b class="okm">✓</b> ':''}<b>${esc(cod(x))}</b> <span class="tvn-pn">${esc(nome(x))}</span> <span class="tvn-pq"><i class="tvn-pqd">· </i>${f0(qt(x))}</span></div>`;
   let nSem=0, nConc=0, nAtr=0, nFoco=0;
   const ran=x=>{ const m=x._pv?null:tvMat(x); if(!m) return ''; const c=/linha/.test(m.t)?'ok':/separ|caminho/.test(m.t)?'info':'warn'; return `<span class="tvn-rs ${c}"><i></i>${c==='ok'?'rancho entregue':c==='info'?'rancho separado':'sem rancho'}</span>`; };
   const rows=linhasOrd().map(l=>{ const cap=capDe(l);
@@ -80,7 +80,7 @@ function vTvnCal(){ const h=hojeStr(), hr=new Date().getHours(), util=d=>anlUtil
         const x=cur.x, e=x._pv?0:entregueDe(x), tot=qt(x), pc=tot?Math.min(100,e/tot*100):0, atr=!x._pv&&ordAtras(x,h), k=atr?'crit':e>0?'info':'neu', nx=ab[1];
         const troca=nx&&nx.p&&nx.p.t?' <b class="warnm">↻ troca de cor</b>':'';
         return `<div class="tvn-cc foco${atr?' tvn-pisca':''}"><div class="tvn-oh"><div class="tvn-cx"><b>${esc(cod(x))}</b> <span class="tvn-pn">${esc(nome(x))}</span> <span class="tvn-pq">· ${f0(e)} de ${f0(tot)}</span></div>${tvnEtq(k,atr?'ATRASADA':e>0?'EM PRODUÇÃO':'A INICIAR')}</div><div class="tvn-bar"><i class="${k}" style="width:${pc}%"></i></div>${nx?`<div class="tvn-mut">A seguir: <b>${esc(cod(nx.x))}</b> ${esc(nome(nx.x))} · ${f0(pend(nx.x))} ${ran(nx.x)}${troca}</div>`:''}</div>`; }
-      return `<div class="tvn-cc">${xs.slice(0,2).map(x=>`<div class="tvn-cx2">${lin(x)}${ran(x)}</div>`).join('')||'<span class="tvn-mut">—</span>'}</div>`; }).join('');
+      return `<div class="tvn-cc">${xs.slice(0,3).map(x=>`<div class="tvn-cx2">${lin(x)}${ran(x)}</div>`).join('')+(xs.length>3?`<span class="tvn-mut">+${xs.length-3} ordem(ns)</span>`:'')||'<span class="tvn-mut">—</span>'}</div>`; }).join(''); /* até 3 ordens, texto inteiro (26-ajustes.js) */
     const tF=corLista(l,foco).reduce((a,x)=>a+qt(x),0), pc=cap?Math.round(tF/cap*100):null;
     return `<div class="tvn-cl"><b>${esc(l)}</b>${pc!=null?`<span class="${pc>100?'warn':''}">${foco===h?'hoje':'amanhã'} ${pc}% da capacidade</span>`:''}</div>${cel}`; }).join('');
   const hd=cols.map((d,i)=>`<div class="tvn-ch3${i===1?' foco':''}">${i===1?(foco===h?'HOJE':'AMANHÃ')+' · ':''}${nomeD(d)}${i===1&&foco===h?` <span>às ${tvnViraH()}:00 o destaque passa para amanhã</span>`:''}</div>`).join('');
