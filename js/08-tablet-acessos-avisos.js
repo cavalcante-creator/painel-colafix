@@ -57,7 +57,8 @@ async function crPdf(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível
   /* tamanho de crachá padrão (CR80): 85,6 × 54 mm · QR de 30 mm · 10 por folha A4, com linhas de corte */
   const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=85.6, Hc=54, gx=8, x0=(210-2*W-gx)/2, y0=12, gy=4.5; const logo=(document.querySelector('.brand img')||{}).src;
   cs.forEach((c,i)=>{ const k=i%10; if(i&&k===0) pdf.addPage(); const x=x0+(k%2)*(W+gx), y=y0+Math.floor(k/2)*(Hc+gy);
-    pdf.setDrawColor(170); pdf.setLineDashPattern([1,1],0); pdf.roundedRect(x,y,W,Hc,3,3); pdf.setLineDashPattern([],0);
+    /* sem contorno no crachá: só marcas de corte nos cantos, do lado de fora (somem ao cortar) */
+    pdf.setDrawColor(150); pdf.setLineWidth(0.2); [[x,y,-1,-1],[x+W,y,1,-1],[x,y+Hc,-1,1],[x+W,y+Hc,1,1]].forEach(([cx,cy,sx,sy])=>{ pdf.line(cx+sx*0.8,cy,cx+sx*2.8,cy); pdf.line(cx,cy+sy*0.8,cx,cy+sy*2.8); });
     /* sem faixa e sem título: logo da Colafix no alto à esquerda, sobre o branco */
     if(logo&&/^data:image\/png/.test(logo)){ try{ pdf.addImage(logo,'PNG',x+4,y+4,24,6); }catch(e){} } else { pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(227,49,45); pdf.text('Colafix',x+4,y+9); }
     /* QR de 30 mm, centralizado na altura, com margem branca em volta */ desenharQR(pdf,crQrTexto(c.codigo),x+W-35,y+(Hc-30)/2-1,30);
