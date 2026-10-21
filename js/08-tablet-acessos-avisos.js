@@ -58,11 +58,11 @@ async function crPdf(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível
   const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=85.6, Hc=54, gx=8, x0=(210-2*W-gx)/2, y0=12, gy=4.5; const logo=(document.querySelector('.brand img')||{}).src;
   cs.forEach((c,i)=>{ const k=i%10; if(i&&k===0) pdf.addPage(); const x=x0+(k%2)*(W+gx), y=y0+Math.floor(k/2)*(Hc+gy);
     pdf.setDrawColor(170); pdf.setLineDashPattern([1,1],0); pdf.roundedRect(x,y,W,Hc,3,3); pdf.setLineDashPattern([],0);
-    pdf.setFillColor(20,63,84); pdf.rect(x,y,W,9,'F'); pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(255,255,255); pdf.text('COLAFIX · MANUTENÇÃO',x+4,y+6);
-    if(logo&&/^data:image\/png/.test(logo)){ try{ pdf.setFillColor(255,255,255); pdf.roundedRect(x+W-24,y+1.5,21,6,1,1,'F'); pdf.addImage(logo,'PNG',x+W-23.5,y+2,20,5); }catch(e){} }
-    /* QR de 30 mm com ~5 mm de margem branca em volta (a faixa de cima e a borda não encostam) */ pdf.setFillColor(255,255,255); pdf.rect(x+W-40,y+9.5,40,Hc-9.5,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+W-35,y+14.5,30);
+    /* sem faixa e sem título: logo da Colafix no alto à esquerda, sobre o branco */
+    if(logo&&/^data:image\/png/.test(logo)){ try{ pdf.addImage(logo,'PNG',x+4,y+4,24,6); }catch(e){} } else { pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(227,49,45); pdf.text('Colafix',x+4,y+9); }
+    /* QR de 30 mm, centralizado na altura, com margem branca em volta */ desenharQR(pdf,crQrTexto(c.codigo),x+W-35,y+(Hc-30)/2-1,30);
     pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(14); const nm=pdf.splitTextToSize(String(c.nome||''),W-44); pdf.text(nm.slice(0,2),x+4,y+18);
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(60,60,60); pdf.text(TT_PAPEL[c.papel]||'',x+4,y+(nm.length>1?31:26)); pdf.text(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas',x+4,y+(nm.length>1?36:31));
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(60,60,60); pdf.text(TT_PAPEL[c.papel]||'',x+4,y+(nm.length>1?30:25)); pdf.text(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas',x+4,y+(nm.length>1?35:30));
     pdfCode128(pdf,crBarras(c.codigo),x+3,y+36,W-45,9); pdf.setFontSize(6.5); pdf.setTextColor(90,90,90); pdf.text(crBarras(c.codigo)+' · QR na câmera do tablet ou barras no coletor',x+4,y+Hc-3.5); pdf.setTextColor(0,0,0); });
   await manBaixar(pdf,cs.length===1?'Cracha_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Crachas_manutencao.pdf','PDF com '+cs.length+' crachá(s). Imprima em 100% (sem ajustar à página) para o QR sair com 3 cm.'); }
 document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='cr-nome') S.cr.f.nome=t.value; });
