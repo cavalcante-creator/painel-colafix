@@ -2,7 +2,7 @@
 const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
 (async()=>{ const {d}=H.seed(); const D=d.docs, hj=new Date().toISOString().slice(0,10);
  D['itens/AC0009']={codigo:'AC0009',descricao:'ARGAMASSA BRANCA 20KG'}; D['ordens/7009']={num:'7009',produto:'AC0009 - ARGAMASSA BRANCA 20KG',linha:'Linha 1',data:hj,turno:'Dia todo',total:1000,status:'aberta',criadaEm:new Date().toISOString()};
- const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); p.on('dialog',x=>x.accept()); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
+ const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); p.on('dialog',x=>x.accept()); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800); await (typeof page!=='undefined'?page:p).evaluate(()=>{ __T.S()._ajCfgAb=true; }); /* configurações dos silos abertas (o editor fica no recolhido) */
  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), kg=async s=>((await srv())['silos/'+s]||{}).saldoKg;
  const ir=async()=>{ await p.evaluate(()=>{ __T.S().siloSel='c2'; __T.go('silos'); }); await H.dorme(700); };
  const apontar=(o,q)=>p.evaluate(([o,q])=>__T.salvar('entregas',{ordem:o,num:o,linha:'Linha 1',em:new Date().toISOString(),por:__T.S().uid,qtd:q}),[o,q]);

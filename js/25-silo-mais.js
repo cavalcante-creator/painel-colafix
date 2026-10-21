@@ -52,7 +52,7 @@ async function smReconciliar(){ if(!S.db||!siloFs()||!S.siloSub||S._smRec||(type
 siloReconciliarAreia=smReconciliar; setInterval(()=>{ smReconciliar().catch(()=>{}); },45000);
 
 /* ---------- (1) medição manual × automático ---------- */
-const smComparar=()=>S.cfg.siloComparar!==false;
+const smComparar=()=>S.cfg.siloComparar===true; /* padrão: a medição acerta o saldo (vale sempre o mais recente); comparar só se ligado */
 { const _rm=siloRegistrarMedicao; siloRegistrarMedicao=async function(p){ const fs=siloFs(); if(!fs) throw {code:'sem-db'}; const d=S.siloSaldo[p.sid];
     if(!smComparar()||p.usarComoSaldo||p.corrige||!d||d.saldoKg==null) return _rm.apply(this,arguments); /* sem saldo ainda: a medição é o saldo de partida */
     const agora=new Date().toISOString(), eu=siloEu(), em=p.em||agora, movId='m_'+p.medicaoId+'_'+p.sid;

@@ -11,12 +11,16 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  const outro=hj.slice(8)==='01'?addD(hj,1):m+'-01'; function addD(x,n){ const y=new Date(x+'T12:00'); y.setDate(y.getDate()+n); return iso(y); }
  D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ADRIANO REUS DA SILVA'},'22222222222':{n:'ALEXANDRE TEIXEIRA'}},dias:{[hj]:{'11111111111':{a:'11:40'}},[outro]:{'22222222222':{a:'11:50'}}},imp:[]};
  const B=await H.abrir({viewport:{width:1440,height:1100}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
- const dia=async x=>{ await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; },x); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1400); };
+ const dia=async x=>{ await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; },x); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1000); const ab=await p.$('[data-act="alm-fabre"]'); if(ab&&!(await p.$('.alm-fm'))){ await ab.click(); await H.dorme(600); } };
  const card=()=>p.evaluate(()=>(document.querySelector('.alm-folha')||{}).innerText||'');
  const imprimir=async()=>{ const pop=p.context().waitForEvent('page'); await p.click('[data-act="alm-folha"]'); const w=await pop; await w.waitForLoadState(); await H.dorme(400);
    const t=await w.evaluate(()=>({h:[...document.querySelectorAll('thead th')].map(t=>t.innerText.trim()),rows:[...document.querySelectorAll('tbody tr')].map(r=>({c:[...r.children].map(td=>td.innerText.trim()),cz:r.classList.contains('cz')}))})); await w.close(); return t; };
  const row=(t,n)=>t.rows.find(r=>r.c[0]===n)||{c:[]}, tot=t=>+(/ - (\d+)$/.exec(t.h[0])||[])[1];
+ await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; a.folhaAb=false; },hj); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1200);
+ ok('Na tela do dia a folha fica FECHADA: só a faixa com o resumo e "Abrir a folha de assinatura"', await p.evaluate(()=>!!document.querySelector('.alm-fbar [data-act="alm-fabre"]')&&!document.querySelector('.alm-fm')&&!document.querySelector('.alm-folha')));
  await dia(hj); let c=await card();
+ const pv=await p.evaluate(()=>({t:(document.querySelector('.alm-fmr')||{}).innerText||'',cz:document.querySelectorAll('.alm-pvt tr.cz').length,n:document.querySelectorAll('.alm-pvt tbody tr').length}));
+ ok('Painel aberto: conferência à esquerda e "Como vai sair" (prévia no modelo do Excel) à direita', /Como vai sair/.test(pv.t)&&pv.n===67&&pv.cz===2, JSON.stringify({n:pv.n,cz:pv.cz}));
  ok('Lista fixa: os 67 nomes da aba 20/10', /Lista fixa \(67\)/.test(c), c.match(/Lista fixa \(\d+\)/)?.[0]);
  ok('"Não almoçam hoje": a Iasmyn (programada) e o Alisson (não almoça na empresa) juntos, já marcados', /Não almoçam hoje \(2\)/.test(c)&&await p.evaluate(()=>!!document.querySelector('[data-alm-fprog="Iasmyn Cavalcante"]:checked')&&!!document.querySelector('[data-alm-fprog="Alisson Santos"]:checked')), c.match(/Não almoçam hoje[^|]*/)?.[0]);
  ok('Com o Face ID: "Na lista, mas não passaram" com o Alexandre, sem nada marcado', /não passaram no Face ID/.test(c)&&/Alexandre Teixeira/.test(c)&&await p.evaluate(()=>!document.querySelector('[data-alm-fnv]:checked')));
@@ -41,6 +45,8 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  ok('Editar depois de emitir (desmarcar a Iasmyn): avisa "alterada depois de emitida"', /Marcação alterada depois de emitida/.test(c)&&/Imprimir de novo/.test(c));
  t=await imprimir(); c=await card();
  ok('Reimprimir: a Iasmyn sai normal e o aviso some', !row(t,'Iasmyn Cavalcante').cz&&!/alterada depois de emitida/.test(c));
+ await p.click('[data-act="alm-ffecha"]'); await H.dorme(400);
+ ok('Fechar o painel volta para a faixa', await p.evaluate(()=>!document.querySelector('.alm-fm')&&!!document.querySelector('.alm-fbar')));
  await p.evaluate(()=>{ window.RHAlmoco._A.fol={}; }); await dia(hj);
  ok('Reabrindo a tela, as marcações do dia continuam', await p.evaluate(()=>!!document.querySelector('[data-alm-fnv="Alexandre Teixeira"]:checked')));
  { const el=await p.$('.alm-folha'); if(el) await el.screenshot({path:'/tmp/folha-quadro.png'}); }

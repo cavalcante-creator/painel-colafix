@@ -1,7 +1,7 @@
 /* Silos: linha com 2 silos (%), comparação medição manual × automático, recebimento pela nota, desfazer em vários silos. */
 const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
-(async()=>{ const {d}=H.seed(); d.docs['itens/AC3001'].kgAreia=14;
- const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); p.on('dialog',x=>x.accept()); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
+(async()=>{ const {d}=H.seed(); d.docs['itens/AC3001'].kgAreia=14; d.docs['config/geral'].siloComparar=true; /* este teste confere o modo comparação (agora desligado por padrão) */
+ const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); p.on('dialog',x=>x.accept()); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800); await (typeof page!=='undefined'?page:p).evaluate(()=>{ __T.S()._ajCfgAb=true; }); /* configurações dos silos abertas (o editor fica no recolhido) */
  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const kg=async s=>((await srv())['silos/'+s]||{}).saldoKg;
  const ir=async sid=>{ await p.evaluate(sid=>{ __T.S().siloSel=sid; __T.go('silos'); },sid); await H.dorme(700); };
  const medir=async(sid,v,viaQuadro)=>{ await ir(sid); if(viaQuadro) await p.click(`[data-act="sa-medir"][data-sa-sel="${sid}"]`); else await p.click('[data-act="sm-abrir"]'); await H.dorme(300); await p.fill('#sm-kg',String(v)); await p.click('[data-act="sm-salvar"]'); await H.dorme(900); };

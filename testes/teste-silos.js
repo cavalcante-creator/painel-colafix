@@ -6,7 +6,7 @@ const res = []; const ok = (n, c, det) => { res.push({ n, ok: !!c, det }); conso
   const { d } = H.seed();
   d.docs['config/geral'].siloComparar = false; /* este teste confere o modo em que a medição corrige o saldo (o modo comparação tem teste próprio: teste-silomais.js) */
   await H.preparar(page, d); await page.goto(H.BASE);
-  await H.entrar(page, 'iasmyn', 'senha123'); await H.dorme(1800);
+  await H.entrar(page, 'iasmyn', 'senha123'); await H.dorme(1800); await (typeof page!=='undefined'?page:p).evaluate(()=>{ __T.S()._ajCfgAb=true; }); /* configurações dos silos abertas (o editor fica no recolhido) */
   const srv = () => page.evaluate(() => JSON.parse(localStorage.getItem('__srv')).docs);
   const saldo = async sid => { const x = (await srv())['silos/' + sid]; return x ? x.saldoKg : null; };
   const irSilo = async sid => { await page.evaluate(sid => { const S = __T.S(); S.siloSel = sid; __T.go('silos'); }, sid); await H.dorme(300); };

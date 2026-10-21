@@ -18,5 +18,14 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  const cfg=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['config/geral'].almoxCap);
  const c2=await p.evaluate(()=>[...document.querySelectorAll('.aj-cap')].map(x=>x.innerText.replace(/\n/g,' | ')));
  ok('Salvar capacidades: Almox 3 com 100 → 15% ocupado e 85 livres', cfg&&cfg.a3===100&&cfg.a30===40&&/15% ocupado/.test(c2[0])&&/\| 85 \|/.test(c2[0]), JSON.stringify(c2).slice(0,240));
+ const ic=await p.evaluate(()=>[...document.querySelectorAll('.aj-ict tbody tr')].map(r=>r.innerText.replace(/\s+/g,' ')));
+ ok('Capacidade por item: AC3001 com 10 (Almox 3) + 5 (Almox 30) = 15 paletes, e o item sem padrão avisado', ic.some(x=>/^AC3001 .* 96 10 5 15/.test(x))&&ic.some(x=>/XX0001 .*sem padrão/.test(x)), JSON.stringify(ic).slice(0,240));
+ await p.fill('[data-aj-icap="AC3001"]','12'); await p.click('[data-act="aj-icok"]'); await H.dorme(900);
+ const u=await p.evaluate(()=>{ const r=[...document.querySelectorAll('.aj-ict tbody tr')].find(x=>/AC3001/.test(x.innerText)); return r?r.innerText.replace(/\s+/g,' '):''; });
+ const ci=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['config/geral'].almoxCapItem);
+ ok('Capacidade de 12 paletes para o AC3001: 125% · acima do espaço (e o aviso no topo)', ci&&ci.AC3001===12&&/125% · acima do espaço/.test(u)&&/1 item\(ns\) acima do espaço reservado/.test(await p.evaluate(()=>document.querySelector('.aj-ic').innerText)), u);
+ await p.fill('#aj-cq','cinza'); await H.dorme(700);
+ const f=await p.evaluate(()=>[...document.querySelectorAll('.aj-ict tbody tr')].map(r=>r.innerText.split(/\s/)[0]));
+ ok('Busca por nome ("cinza") mostra só o AC0005', f.length===1&&f[0]==='AC0005', JSON.stringify(f));
  const el=await p.$('.aj-capw'); if(el) await el.screenshot({path:'/tmp/ajcap.png'});
  await browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

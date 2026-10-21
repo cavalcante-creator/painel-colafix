@@ -1,0 +1,21 @@
+/* Silos: vale sempre o mais recente (medição manual acerta o saldo; o apontamento seguinte desconta a partir dela) e a tela reorganizada. */
+const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=H.seed(); d.docs['config/geral'].siloConsumo={'Linha 1':'c2'}; d.docs['config/geral'].linhasSemAreia=['Linha 1','Linha 2','Fixcol'];
+ const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); p.on('dialog',x=>x.accept()); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
+ const kg=async s=>(((await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs)))['silos/'+s]||{}).saldoKg;
+ const ir=async()=>{ await p.evaluate(()=>{ __T.S().siloSel='c2'; __T.go('silos'); }); await H.dorme(800); };
+ const medir=async v=>{ await ir(); await p.click('[data-act="sm-abrir"]'); await H.dorme(300); await p.fill('#sm-kg',String(v)); await p.click('[data-act="sm-salvar"]'); await H.dorme(900); };
+ const apontar=q=>p.evaluate(q=>__T.salvar('entregas',{ordem:'5001',num:'5001',linha:'Linha 1',em:new Date().toISOString(),por:__T.S().uid,qtd:q}),q);
+ await medir(10000); await apontar(100); await H.dorme(1800);
+ ok('Automático: 10.000 − 100 sacos × 5 kg = 9.500', await kg('c2')===9500, String(await kg('c2')));
+ await medir(9200);
+ ok('Medição manual mais recente ACERTA o nível (9.200)', await kg('c2')===9200, String(await kg('c2')));
+ await apontar(100); await H.dorme(1800);
+ ok('Apontamento seguinte desconta a partir da medição (9.200 − 500 = 8.700)', await kg('c2')===8700, String(await kg('c2')));
+ await ir(); const c=await p.evaluate(()=>(document.querySelector('.smc')||{}).innerText||'');
+ ok('"Última medição": 9.200 medido, o automático marcava 9.500, diferença −300', /vale sempre o mais recente/.test(c)&&/Última medição manual/i.test(c)&&/9\.200 kg/.test(c)&&/marcava 9\.500 kg/.test(c)&&/−300 kg/.test(c), c.replace(/\n/g,' | ').slice(0,240));
+ const ordem=await p.evaluate(()=>[...document.getElementById('view').children].map(e=>e.classList.contains('head')?'head':e.classList.contains('sa')?'sa':/^AGORA/.test((e.innerText||'').trim())?'agora':e.classList.contains('aj-g2')?'dupla':e.classList.contains('aj-cfg')?'cfg':e.tagName==='DIV'&&!e.className?'sel':'').filter(Boolean));
+ ok('Tela reorganizada: título, escolha do silo, status, nível agora, medição + consumo lado a lado, configurações recolhidas no fim', ordem.join(',').startsWith('head,sel,sa,agora,dupla')&&ordem[ordem.length-1]==='cfg', ordem.join(','));
+ ok('Configurações recolhidas (abrem com um clique)', await p.evaluate(()=>{ const d=document.querySelector('details.aj-cfg'); return !!d&&!d.open&&!!d.querySelector('.smf'); }));
+ await p.screenshot({path:'/tmp/silo-novo.png',fullPage:true});
+ await browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
