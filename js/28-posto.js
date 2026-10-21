@@ -107,7 +107,7 @@ function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
   if(f==='pook') return poPagina('Posto · '+L.join(' e '),`<section class="cq-fim"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg><h1>${esc(T.okTit||'')}</h1><p>${esc(T.okTxt||'')}</p><p class="cq-p2">Esta tela volta para o início sozinha.</p></section>
       <div class="cq-rod"><button class="cq-sec" data-act="po-outra">Fazer outra coisa (mesmo crachá)</button><button class="cq-bt pri po-ok" data-act="po-fim"><b>Pronto (Enter)</b></button></div>`);
   /* chamado e técnico: a tela de chamados aprovada, com o título do posto */
-  const h=vChamados(); if(h) return h.replace('<div class="cq-tt">Chamados da manutenção</div>','<div class="cq-tt">'+(T.p&&T.p.papel==='tecnico'?'Manutenção · consertos':'Chamar a manutenção')+'</div>');
+  const h=vChamados(); if(h) return h.replace('<div class="cq-tt">Chamados da manutenção</div>','<div class="cq-tt">'+(T.p&&T.p.papel==='tecnico'?'Manutenção · consertos':'Chamar a manutenção')+'</div>').replace('<small>Gestor','<small>Operador');
   return null; }
 { const _vt=vTotem; vTotem=function(){ if(poOn()){ S.tt.ocioso=60000; const h=vPosto(); if(h) return h; } return _vt.apply(this,arguments); }; }
 function poFoco(){ if(!ttAtivo()||!poOn()) return; const f=S.tt.fase, id=f==='poap'?'po-av':f==='popm'?(S.tt.pm&&S.tt.pm.cod==='__outro'&&!String(S.tt.pm.txt||'').trim()?'po-pmt':'po-pmq'):''; const i=id&&document.getElementById(id);
