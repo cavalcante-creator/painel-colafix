@@ -54,18 +54,20 @@ function vCrachas(){ const F=S.cr.f, LT=linhasOrd(); const xs=S.cr.lista.slice()
     <select class="txt" id="cr-papel"><option value="operador" ${F.papel==='operador'?'selected':''}>Operador(a) da linha</option><option value="tecnico" ${F.papel==='tecnico'?'selected':''}>Técnico(a) da manutenção</option></select><button class="btn" data-act="cr-add" ${S.cr.salv?'disabled':''}>${ic('mais',18,2.4)}${S.cr.salv?'Salvando…':'Criar crachá'}</button></div></section>
    <section class="card"><div class="head" style="align-items:baseline"><h2>Funcionários com crachá</h2><span class="sub" style="margin:0">${xs.filter(c=>c.ativo!==false).length} ativo(s)</span></div>${xs.length?xs.map(row).join(''):'<div class="empty">Nenhum crachá ainda.</div>'}</section>`; }
 async function crPdf(cs){ if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; } if(!cs.length){ toast('Nenhum crachá para imprimir.'); return; }
-  /* tamanho de crachá padrão (CR80): 85,6 × 54 mm · QR de 30 mm · 10 por folha A4, com linhas de corte */
-  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const W=85.6, Hc=54, gx=8, x0=(210-2*W-gx)/2, y0=12, gy=4.5; const logo=(document.querySelector('.brand img')||{}).src;
-  cs.forEach((c,i)=>{ const k=i%10; if(i&&k===0) pdf.addPage(); const x=x0+(k%2)*(W+gx), y=y0+Math.floor(k/2)*(Hc+gy);
-    /* sem contorno no crachá: só marcas de corte nos cantos, do lado de fora (somem ao cortar) */
-    pdf.setDrawColor(150); pdf.setLineWidth(0.2); [[x,y,-1,-1],[x+W,y,1,-1],[x,y+Hc,-1,1],[x+W,y+Hc,1,1]].forEach(([cx,cy,sx,sy])=>{ pdf.line(cx+sx*0.8,cy,cx+sx*2.8,cy); pdf.line(cx,cy+sy*0.8,cx,cy+sy*2.8); });
+  /* o impresso vai colado POR CIMA do crachá de 86 × 54 mm: corte de 87 × 55 mm (0,5 mm de sobra em cada lado, para cobrir mesmo com o corte um pouco torto);
+     o desenho fica dentro dos 86 × 54. Fileiras encostadas (um corte só entre elas), para as 10 caberem inteiras na A4 · QR de 30 mm */
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'); const CW=87, CH=55, F=0.5, W=CW-2*F, Hc=CH-2*F, gx=8, x0=(210-2*CW-gx)/2, y0=(297-5*CH)/2; const logo=(document.querySelector('.brand img')||{}).src;
+  cs.forEach((c,i)=>{ const k=i%10; if(i&&k===0) pdf.addPage(); const cx0=x0+(k%2)*(CW+gx), cy0=y0+Math.floor(k/2)*CH, x=cx0+F, y=cy0+F;
+    /* marcas de corte do lado de fora: nos lados sempre; em cima só na 1ª fileira e embaixo só na última da folha */
+    const temCima=k<2, temBaixo=k>=8||i+2>=cs.length||k+2>=10; pdf.setDrawColor(150); pdf.setLineWidth(0.2);
+    [[cx0,cy0,-1,-1],[cx0+CW,cy0,1,-1],[cx0,cy0+CH,-1,1],[cx0+CW,cy0+CH,1,1]].forEach(([mx,my,sx,sy])=>{ pdf.line(mx+sx*0.8,my,mx+sx*2.8,my); if(sy<0?temCima:temBaixo) pdf.line(mx,my+sy*0.8,mx,my+sy*2.8); });
     /* sem faixa e sem título: logo da Colafix no alto à esquerda, sobre o branco */
     if(logo&&/^data:image\/png/.test(logo)){ try{ pdf.addImage(logo,'PNG',x+4,y+4,24,6); }catch(e){} } else { pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(227,49,45); pdf.text('Colafix',x+4,y+9); }
     /* QR de 30 mm, centralizado na altura, com margem branca em volta */ desenharQR(pdf,crQrTexto(c.codigo),x+W-35,y+(Hc-30)/2-1,30);
     pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(14); const nm=pdf.splitTextToSize(String(c.nome||''),W-44); pdf.text(nm.slice(0,2),x+4,y+18);
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(60,60,60); pdf.text(TT_PAPEL[c.papel]||'',x+4,y+(nm.length>1?30:25)); pdf.text(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas',x+4,y+(nm.length>1?35:30));
     pdfCode128(pdf,crBarras(c.codigo),x+3,y+36,W-45,9); pdf.setFontSize(6.5); pdf.setTextColor(90,90,90); pdf.text(crBarras(c.codigo)+' · QR na câmera do tablet ou barras no coletor',x+4,y+Hc-3.5); pdf.setTextColor(0,0,0); });
-  await manBaixar(pdf,cs.length===1?'Cracha_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Crachas_manutencao.pdf','PDF com '+cs.length+' crachá(s). Imprima em 100% (sem ajustar à página) para o QR sair com 3 cm.'); }
+  await manBaixar(pdf,cs.length===1?'Cracha_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Crachas_manutencao.pdf','PDF com '+cs.length+' crachá(s). Imprima em 100% (sem ajustar à página): corte nas marcas (8,7 × 5,5 cm) e cole por cima do crachá de 8,6 × 5,4 cm.'); }
 document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='cr-nome') S.cr.f.nome=t.value; });
 document.addEventListener('change',async ev=>{ const t=ev.target; if(t.id==='cr-semcr'){ if(!crPodeGerir()){ t.checked=!t.checked; return; } const v=!!t.checked; t.disabled=true;
     try{ await S.db.doc('config/geral').update({totemSemCracha:v}); S.cfg.totemSemCracha=v; toast(v?'Tablet aceita chamado sem crachá (marcado como "sem crachá").':'Tablet exige crachá para abrir chamado.'); }catch(e){ t.checked=!v; manErro(e,'Não foi possível salvar a opção.'); } t.disabled=false; return; }
