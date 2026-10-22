@@ -174,8 +174,11 @@ async function poParou(l,motivo){ const T=S.tt; if(T.enviando||!T.p) return; if(
   if(!ok){ T.msg='Não foi possível salvar. Confira a internet e tente de novo.'; render(); return; }
   SOMpo('ok'); poVai('pook',{okTit:l+' parada às '+hora(doc.inicio),okTxt:(motivo==='A definir'?'Motivo a definir (o PCP completa depois)':motivo)+' · registrada por '+T.p.nome}); }
 async function poVoltou(id){ const T=S.tt, p=(S.paradas||[]).find(x=>x._id===id); if(!p||T.enviando||!T.p) return; T.enviando=true; render();
-  try{ const em=new Date().toISOString(); await S.db.doc('paradas/'+p._id).update({fim:em,porFim:S.uid||null,fimPor:T.p.nome,fimCracha:T.p.codigo||null,fimOrigem:'posto'}); p.fim=em; T.enviando=false; SOMpo('ok');
-    poVai('pook',{okTit:p.linha+' voltou a produzir',okTxt:'Parada de '+dur(new Date(em)-new Date(p.inicio))+' ('+(p.motivo==='A definir'?'motivo a definir':p.motivo)+') · fechada por '+T.p.nome}); }
+  try{ const em=new Date().toISOString(), todas=(S.paradas||[]).filter(x=>x.linha===p.linha&&!x.fim&&!x.anulada); if(!todas.includes(p)) todas.push(p);
+    /* fecha TODAS as paradas abertas da linha (às vezes ficam duas: uma da tela de paradas e outra do chamado) */
+    await Promise.all(todas.map(x=>S.db.doc('paradas/'+x._id).update({fim:em>x.inicio?em:x.inicio,porFim:S.uid||null,fimPor:T.p.nome,fimCracha:T.p.codigo||null,fimOrigem:'posto'}).then(()=>{ x.fim=em; })));
+    const ini0=todas.map(x=>x.inicio).sort()[0]||p.inicio; T.enviando=false; SOMpo('ok');
+    poVai('pook',{okTit:p.linha+' voltou a produzir',okTxt:'Parada de '+dur(new Date(em)-new Date(ini0))+(todas.length>1?' ('+todas.length+' registros fechados)':'')+' ('+(p.motivo==='A definir'?'motivo a definir':p.motivo)+') · fechada por '+T.p.nome}); }
   catch(e){ T.enviando=false; console.warn('[posto] voltou',e); T.msg='Não foi possível salvar. Confira a internet e tente de novo.'; render(); } }
 async function poAbrirChamado(){ const T=S.tt, C=T.ch; if(!C||!C.tipo||!C.imp||T.enviando||!T.p) return; T.enviando=true; T.msg=''; render();
   if(S.man.salv&&Date.now()-(S.man._salvDesde||0)>30000) S.man.salv=false;

@@ -62,6 +62,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await bip('000123'); await p.keyboard.press('4'); await H.dorme(600); await p.click('[data-act="po-voltou"]'); await H.dorme(1500);
  par=await p.evaluate(()=>(__T.S().paradas||[]).filter(x=>x.origem==='posto').map(x=>({l:x.linha,f:!!x.fim,fp:x.fimPor})));
  ok('"A Linha 1 voltou a produzir" fecha a parada no nome da Ana', par.some(x=>x.l==='Linha 1'&&x.f&&x.fp==='Ana Souza'), JSON.stringify(par));
+ { await p.keyboard.press('Enter'); await H.dorme(500);
+   await p.evaluate(()=>{ const db=__T.S().db, i0=new Date(Date.now()-20*6e4).toISOString(), i1=new Date(Date.now()-5*6e4).toISOString();
+     return Promise.all([db.collection('paradas').add({linha:'Linha 2',motivo:'Manutenção',inicio:i0,fim:null}),db.collection('paradas').add({linha:'Linha 2',motivo:'Outros',inicio:i1,fim:null})]); }); await H.dorme(1200);
+   await bip('000123'); await p.keyboard.press('4'); await H.dorme(600); await p.click('[data-act="po-voltou"]'); await H.dorme(1800);
+   const ab=await p.evaluate(()=>(__T.S().paradas||[]).filter(x=>x.linha==='Linha 2'&&!x.fim).length);
+   await p.keyboard.press('Enter'); await H.dorme(600); const l2=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.cq-ln')].find(x=>/Linha 2/.test(x.textContent)); return e?e.innerText.replace(/\n/g,' | '):''; });
+   ok('Linha com DUAS paradas abertas: "voltou" fecha as duas e a linha volta', ab===0&&!/Parada desde/.test(l2), ab+' · '+l2); }
  await p.keyboard.press('Enter'); await H.dorme(500); await bip('000123'); await p.keyboard.press('1'); await H.dorme(600); s=await st();
  const tit=await p.evaluate(()=>(document.querySelector('.cq-tt')||{}).innerText);
  ok('Tecla 1: "Abrir chamado da Linha 1" (linha do crachá), sem escolher máquina: Elétrico/Mecânico e parou?', s.f==='poch'&&tit==='Chamar a manutenção'&&/Abrir chamado da Linha 1/.test(s.txt)&&/Mecânico/.test(s.txt)&&/Parou em parte/.test(s.txt)&&/Não interferiu/.test(s.txt)&&!/máquina da/i.test(s.txt), s.txt.slice(0,160).replace(/\n/g,' | '));
