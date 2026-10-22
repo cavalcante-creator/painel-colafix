@@ -80,7 +80,7 @@ function ofCardTarefa(c){ const pr=typeof gchPrio==='function'?gchPrio(c.priorid
 function ofCardPrev(c){ const n=(c.chkItens||[]).length, k=c.chk||{}, f=(c.chkItens||[]).filter(i=>k[i.id]&&k[i.id].s).length, atr=String(c.criado||'').slice(0,10)<hojeStr();
   return `<div class="of-c"><div class="of-ch"><b>${esc(ofPrevTxt(c).slice(0,70))}</b>${atr?ofTag('ATRASADA','warn'):''}</div><span class="of-s">${n?n+' itens no checklist · ':''}${ofTec(c)?'com '+esc(tecNomes(c))+(n?' · '+f+' de '+n:''):'ninguém começou'}</span></div>`; }
 function ofTecnicos(){ const tecs=(typeof gchTecs==='function'?gchTecs():[]), ab=ofAb();
-  return tecs.map(t=>{ const faz=ab.filter(c=>tecEh(c,t.nome)), dep=ab.filter(c=>!ofTec(c)&&ofAceito(c)&&ofN(c.exec.aceito.nome)===ofN(t.nome));
+  return tecs.map(t=>{ const faz=ab.filter(c=>tecEh(c,t.nome)&&!tfConf(c)), dep=ab.filter(c=>!ofTec(c)&&ofAceito(c)&&ofN(c.exec.aceito.nome)===ofN(t.nome));
     const c=faz[0]; return {t,c,dep,txt:c?((c.prevId?'Preventiva · ':'')+(c.linha||'')+(c.equip&&!c.tarefa&&!c.prevId?' · '+c.equip:'')+(c.tarefa||c.prevId?' · '+String(c.prevId?ofPrevTxt(c):c.defeito||'').slice(0,40):'')+(c.exec&&c.exec.inicio?' · há '+ofMin(String(c.exec.inicio).length<=16?new Date(c.exec.inicio).toISOString():c.exec.inicio):'')):'livre'+(dep.length?' · '+dep.length+(dep.length>1?' tarefas aceitas':' tarefa aceita')+' para depois':'')}; })
     .sort((a,b)=>(a.c?0:1)-(b.c?0:1)||String(a.t.nome).localeCompare(String(b.t.nome))); }
 function vOfEspera(){ const L=ofLinhas(), TF=ofTarefas().filter(ofPend), PV=ofPrevs(), h=hojeStr();
@@ -104,8 +104,8 @@ function vOfTec(){ const T=S.tt, eu=T.p.nome, ab=ofAb();
   const prev=ofPrevs().filter(c=>!ofMeu(c,eu)&&!(c.tarefa&&ofAceito(c))), lin=ofLinhas();
   const linPara=c=>`<div class="of-r ${c.prioridade==='urgente'?'crit':''}"><div><b>${ofOnde(c)} · ${esc(String(c.defeito||'').slice(0,60))}</b><small>${esc(c.prioridade==='urgente'?'Urgente':(typeof gchPrio==='function'?gchPrio(c.prioridade)[1]:'Normal'))}${c.tipo&&typeof gchTipoT==='function'?' · '+esc(gchTipoT(c.tipo).toLowerCase()):''} · ${c.paraTec?'para você':'qualquer técnico'}${c.prazo?' · prazo '+dm(c.prazo):''} · enviada às ${ofHm(c.criado)}</small></div>${ofBt('of-ver','Ver e aceitar',c.numero,c.prioridade==='urgente'?'':'sec')}</div>`;
   const linMeu=c=>{ const t=ofTec(c), chk=ofChk(c), k=c.chk||{}, n=(c.chkItens||[]).length, f=(c.chkItens||[]).filter(i=>k[i.id]&&k[i.id].s).length;
-    return `<div class="of-r ${t?'and':'dep'}"><div><b>${c.prevId?esc(ofPrevTxt(c).slice(0,70)):ofOnde(c)+' · '+esc(String(c.defeito||'').slice(0,60))}</b><small>${t?'Em andamento desde '+esc(String((c.exec||{}).inicio||'').slice(11,16))+(chk?' · '+f+' de '+n+' itens':'')+(c.exec&&c.exec.ajudante&&c.exec.ajudante.nome?' · junto com '+esc(tecNomes(c)):''):'Aceita às '+ofHm(c.exec.aceito.em)+' para depois'+(c.prazo?' · prazo '+dm(c.prazo):'')}${(c.exec&&c.exec.partes||[]).length?' · feito em parte':''}</small>${ofPecaDe(c)}</div>
-      ${t?(chk?`<button class="of-b ok" data-act="cq-terminar" data-n="${c.numero}">Fazer o checklist</button>`:ofBt('of-term','Terminar',c.numero,'ok')):ofBt('of-comecar','Começar agora',c.numero)}</div>`; };
+    return `<div class="of-r ${t?'and':'dep'}"><div><b>${c.prevId?esc(ofPrevTxt(c).slice(0,70)):ofOnde(c)+' · '+esc(String(c.defeito||'').slice(0,60))}</b><small>${tfConf(c)?'Feito às '+ofHm(c.feitoTec.em)+(c.feitoTec.obs?' · '+esc(c.feitoTec.obs):''):t?((c.exec&&c.exec.reaberta||[]).length?'<b class="crit">O Marcelo reabriu: '+esc(c.exec.reaberta[c.exec.reaberta.length-1].mot||'não está feito')+'</b> · ':'')+'Em andamento desde '+esc(String((c.exec||{}).inicio||'').slice(11,16))+(chk?' · '+f+' de '+n+' itens':'')+(c.exec&&c.exec.ajudante&&c.exec.ajudante.nome?' · junto com '+esc(tecNomes(c)):''):'Aceita às '+ofHm(c.exec.aceito.em)+' para depois'+(c.prazo?' · prazo '+dm(c.prazo):'')}${(c.exec&&c.exec.partes||[]).length?' · feito em parte':''}</small>${ofPecaDe(c)}</div>
+      ${tfConf(c)?'<span class="of-s warn">Esperando o Marcelo conferir</span>':t?(chk?`<button class="of-b ok" data-act="cq-terminar" data-n="${c.numero}">Fazer o checklist</button>`:ofBt('of-term','Terminar',c.numero,'ok')):ofBt('of-comecar','Começar agora',c.numero)}</div>`; };
   const linPrev=c=>{ const outro=ofTec(c), cheio=c.exec&&c.exec.ajudante&&c.exec.ajudante.nome, n=(c.chkItens||[]).length, k=c.chk||{}, f=(c.chkItens||[]).filter(i=>k[i.id]&&k[i.id].s).length;
     return `<div class="of-r"><div><b>${esc(ofPrevTxt(c).slice(0,70))}</b><small>${outro?'Com '+esc(tecNomes(c))+' desde '+esc(String((c.exec||{}).inicio||'').slice(11,16))+(n?' · '+f+' de '+n+' conferidos':''):(n?n+' itens · ':'')+'ninguém começou'}</small></div>
       ${outro?(cheio?'<span class="of-s">dois técnicos</span>':ofBt('of-junto','Entrar junto (2º técnico)',c.numero,'sec')):ofBt('of-comecar','Começar',c.numero,'sec')}</div>`; };
@@ -217,6 +217,8 @@ async function ofAcao(a,b){ const T=S.tt, O=S.of; if(!T.p) return; const n=b&&b.
       T.enviando=true; render(); const agora=new Date().toISOString();
       if(R.r==='parte'){ const E=Object.assign({},cc.exec||{}); E.partes=(E.partes||[]).concat([{nome:T.p.nome,obs,em:agora}]); if(!E.tecnico){ E.tecnico=T.p.nome; E.inicio=manAgoraLocal(); }
         await ofGrava(cc,{exec:E},'Feito em parte por '+T.p.nome+(obs?': '+obs:'')); T.enviando=false; ofOk('Anotado: feito em parte','OS '+manNum(cc.numero)+(obs?' · '+obs:''),'A tarefa continua com você.'); return; }
+      if(cc.tarefa){ await tfFeitoTec(cc,T.p,obs); if(cc.paradaId) await ttLiberaPorTecnico(cc,T.p);
+        T.enviando=false; ofOk('Feito · OS '+manNum(cc.numero),(cc.linha||'')+' · '+String(cc.defeito||'').slice(0,80),'Fica "esperando o Marcelo conferir". Fecha quando ele confirmar.'); return; }
       const E=Object.assign({},cc.exec||{},{servicos:obs||((cc.prevId&&!cc.tarefa)?'Preventiva feita':'Tarefa concluída')+' no computador da manutenção',tecnico:(cc.exec&&cc.exec.tecnico)||T.p.nome,tecnicoCracha:T.p.codigo||null}); if(!E.inicio) E.inicio=manAgoraLocal();
       await ofGrava(cc,{exec:E,concluidoPorNome:T.p.nome,concluidoPorCracha:T.p.codigo||null},'Concluído por '+T.p.nome+' no computador da manutenção'+(obs?': '+obs:''));
       cc._mzOk=true; cc._ppOk=true; try{ await manStatus(cc,'Concluída'); } finally { delete cc._mzOk; delete cc._ppOk; }
@@ -251,6 +253,43 @@ document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!ofOn()||!ttAtiv
 
 /* ---------- monitor da TV: tarefa aceita já tem dono (para o alarme) ---------- */
 { const _mt=mm2Tec; mm2Tec=function(c){ return _mt.apply(this,arguments)||ofAceito(c); }; }
+
+/* ===================== tarefa do Marcelo: o técnico marca feita, o Marcelo confere e fecha (pedido de 22/10) =====================
+   feitoTec {nome,cracha,em,obs} no chamado; continua "Em execução" até o gestor confirmar (gchFeito fecha no nome do técnico,
+   com conferidoPor) ou reabrir ("Não está feito" → exec.reaberta[] {mot,por,em}, feitoTec:null). */
+function tfConf(c){ return !!(c&&c.tarefa&&c.feitoTec&&c.feitoTec.nome&&!manFechada(c)); }
+async function tfFeitoTec(c,p,obs){ const agora=new Date().toISOString(), E=Object.assign({},c.exec||{});
+  if(!E.tecnico) E.tecnico=p.nome; if(!E.inicio) E.inicio=manAgoraLocal(); E.tecnicoCracha=p.codigo||null; E.fim=manAgoraLocal(); E.servicos=obs||E.servicos||'Tarefa feita';
+  const ft={nome:p.nome,cracha:p.codigo||null,em:agora,obs:obs||''}, hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Tarefa feita por '+p.nome+(obs?': '+obs:'')+' · esperando o gestor conferir'}]).slice(-200);
+  await S.db.doc('chamados/'+c._id).update({exec:E,feitoTec:ft,hist}); Object.assign(c,{exec:E,feitoTec:ft,hist}); if(c.status!=='Em execução') await manStatus(c,'Em execução'); }
+async function tfReabre(c,mot){ const agora=new Date().toISOString(), nome=(typeof gchNome==='function'?gchNome():'Gestor'), E=Object.assign({},c.exec||{});
+  E.reaberta=(E.reaberta||[]).concat([{mot,por:nome,em:agora,feitoPor:c.feitoTec&&c.feitoTec.nome}]); delete E.fim;
+  const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Gestor ('+nome+') reabriu: não está feito'+(mot?' — '+mot:'')}]).slice(-200);
+  await S.db.doc('chamados/'+c._id).update({exec:E,feitoTec:null,hist}); Object.assign(c,{exec:E,feitoTec:null,hist}); }
+/* computador de chamados / posto: tarefa feita não mostra mais "Terminar" */
+{ const _vc=vChamados; vChamados=function(){ let h=_vc.apply(this,arguments); if(!h) return h; try{ (S.chamados||[]).filter(tfConf).forEach(c=>{
+    h=h.replace(new RegExp('<button class="cq-bt [^"]*" data-act="cq-terminar" data-n="'+c.numero+'"[^>]*>[\\s\\S]*?</button>'),'<div class="cq-vz" style="padding:0;font-size:clamp(16px,2.2vh,22px)">Feita · esperando o gestor conferir</div>'); }); }catch(e){} return h; }; }
+/* tela Chamados do gestor: "Para conferir" */
+{ const _gl=gchLista; gchLista=function(){ const r=_gl.apply(this,arguments); try{ r.m.conf=(S.chamados||[]).filter(tfConf); if(S.gch.f==='conf') r.xs=r.m.conf.slice().sort((a,b)=>String(a.feitoTec.em).localeCompare(String(b.feitoTec.em))); }catch(e){} return r; }; }
+{ const _gs=gchSit; gchSit=function(c){ if(tfConf(c)) return ['Feita por '+c.feitoTec.nome+' às '+ofHm(c.feitoTec.em)+(c.feitoTec.obs?' · '+c.feitoTec.obs:'')+' · falta você conferir','and']; const r=_gs.apply(this,arguments);
+    try{ if(!manFechada(c)&&c.exec&&(c.exec.reaberta||[]).length&&c.exec.tecnico) return [r[0]+' · reaberta por você','and']; }catch(e){} return r; }; }
+{ const _v=S.extViews.gxch; S.extViews.gxch=function(){ let h=_v.apply(this,arguments); try{ const G=S.gch, n=(S.chamados||[]).filter(tfConf);
+    const chip=`<button class="gx-chip" data-act="gch-f" data-v="conf" aria-pressed="${G.f==='conf'}">Para conferir (${n.length})</button>`;
+    h=h.replace(/(<button class="gx-chip" data-act="gch-f" data-v="abertos"[^>]*>[^<]*<\/button>)/,'$1'+chip);
+    n.forEach(c=>{ const id=esc(c._id);
+      h=h.replace(`<button class="btn gch-bf" data-act="gch-feito" data-id="${id}">Marcar como feito</button>`,`<button class="btn gch-bf" data-act="gch-feito" data-id="${id}">Conferi: está feito</button><button class="btn sec gx-bs" data-act="tf-reab" data-id="${id}">Não está feito</button>`);
+      if(G.reab===c._id){ const i=h.indexOf(`data-act="tf-reab" data-id="${id}"`), j=i>=0?h.indexOf('</article>',i):-1;
+        if(j>=0) h=h.slice(0,j)+`<div class="gch-cf"><label class="gx-f">O que falta? (o técnico vê)<input id="tf-mot" maxlength="160" placeholder="Ex.: o portão ainda arrasta"></label><div class="gch-cfb"><button class="btn sec" data-act="tf-reab-nao">Voltar</button><button class="btn" data-act="tf-reab-ok" data-id="${id}" ${G.busy?'disabled':''}>Devolver para o técnico</button></div></div>`+h.slice(j); } }); }catch(e){} return h; }; }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="tf-reab"]'); if(!b) return; const G=S.gch, a=b.dataset.act;
+  if(a==='tf-reab'){ G.reab=b.dataset.id; G.feito=null; render(); setTimeout(()=>{ const i=document.getElementById('tf-mot'); i&&i.focus(); },50); return; }
+  if(a==='tf-reab-nao'){ G.reab=null; render(); return; }
+  if(a==='tf-reab-ok'){ const c=(S.chamados||[]).find(x=>x._id===b.dataset.id); if(!c||G.busy) return; const mot=String((document.getElementById('tf-mot')||{}).value||'').trim(); G.busy=true; render();
+    try{ await tfReabre(c,mot); toast('OS '+manNum(c.numero)+' voltou para '+(c.exec.tecnico||'o técnico')+'.'); }catch(e){ toast('Não foi possível gravar. Verifique a internet.'); } G.busy=false; G.reab=null; render(); } });
+/* contador e sino do gestor */
+{ const _b=gxnBadges; gxnBadges=function(){ const b=_b.apply(this,arguments); try{ const n=(S.chamados||[]).filter(tfConf).length; if(n) b.gxch=(b.gxch||0)+n; }catch(e){} return b; }; }
+{ const _al=gxAlertas; gxAlertas=function(){ let out=_al.apply(this,arguments); try{ const xs=(S.chamados||[]).filter(tfConf);
+    out=out.filter(a=>!(a.n&&tfConf(manDoc(a.n)))&&!(/passou do prazo|passaram do prazo/.test(a.t||'')&&xs.length&&!(S.chamados||[]).some(c=>c.tarefa&&!manIgnorar(c)&&!manFechada(c)&&!tfConf(c)&&c.prazo&&c.prazo<hojeStr())));
+    if(xs.length) out.unshift({c:'warn',t:xs.length===1?'Tarefa '+manNum(xs[0].numero)+' feita por '+xs[0].feitoTec.nome+': falta você conferir':xs.length+' tarefas feitas esperando você conferir',d:xs.slice(0,3).map(c=>(c.linha||'')+' · '+String(c.defeito||'').slice(0,40)).join(' · '),go:'gxch'}); }catch(e){} return out; }; }
 
 /* ===================== lado do Marcelo: Pedidos de peça ===================== */
 S.gpc=S.gpc||{f:'abertos',ed:null,busy:false,vistos:new Set()};

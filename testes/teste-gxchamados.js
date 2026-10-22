@@ -49,8 +49,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await zera(); await bip('777888'); const bt=await p.evaluate(()=>{ const b=document.querySelector('[data-act="cq-terminar"]'); return b?b.innerText:''; });
  ok('Depois de começar: botão "Terminar a tarefa"', /Terminar a tarefa/.test(bt), bt);
  await p.click('[data-act="cq-terminar"]'); await H.dorme(2200);
- const fim=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,por:c.concluidoPorNome,tec:c.exec&&c.exec.tecnico,causa:c.exec&&c.exec.causa,f:__T.S().tt.fase,h:(document.querySelector('.cq-fim h1')||{}).innerText}; },c1.n);
- ok('"Terminar a tarefa" conclui direto (sem perguntar causa) e mostra "Tarefa concluída"', fim.st==='Concluída'&&fim.por==='Bruno Lima'&&fim.tec==='Bruno Lima'&&!fim.causa&&/Tarefa concluída/.test(fim.h||''), JSON.stringify(fim));
+ const fim=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,ft:c.feitoTec&&c.feitoTec.nome,tec:c.exec&&c.exec.tecnico,causa:c.exec&&c.exec.causa,f:__T.S().tt.fase,h:(document.querySelector('.cq-fim h1')||{}).innerText}; },c1.n);
+ ok('"Terminar a tarefa" (sem perguntar causa) marca como feita e espera o gestor conferir', fim.st==='Em execução'&&fim.ft==='Bruno Lima'&&fim.tec==='Bruno Lima'&&!fim.causa&&/Tarefa feita/.test(fim.h||''), JSON.stringify(fim));
+ await zera(); await bip('777888'); const esp=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
+ ok('Depois de feita: no lugar do botão, "Feita · esperando o gestor conferir"', /Feita · esperando o gestor conferir/.test(esp), esp.slice(0,300));
  await B.browser.close();
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU tudo ('+res.length+')'); process.exit(f?1:0); })().catch(e=>{ console.log('FALHOU',e); process.exit(1); });

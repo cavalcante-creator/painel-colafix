@@ -63,6 +63,11 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const c
  c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===34); return {e:c.exec,f:__T.S().tt.fase}; });
  ok('"Entrar junto (2º técnico)" na preventiva do Carlos', c.e.tecnico==='Carlos Souza'&&c.e.ajudante&&c.e.ajudante.nome==='Bruno Lima'&&c.f==='oftec', JSON.stringify(c));
  t=await txt(); ok('A preventiva vai para "Comigo" com "Fazer o checklist"', !!(await p.$('[data-act="cq-terminar"][data-n="34"]')), t.slice(0,300));
+ /* tarefa feita: só fecha quando o Marcelo conferir */
+ for(const n of [35,32]){ await p.click(`[data-act="of-ver"][data-n="${n}"]`); await H.dorme(400); await p.click('[data-act="of-ag"]'); await H.dorme(1300);
+   await p.click(`[data-act="of-term"][data-n="${n}"]`); await H.dorme(300); await p.fill('#of-tobs',n===35?'limpei o dreno':'portão regulado'); await p.click('[data-act="of-term-ok"]'); await H.dorme(1300); await p.keyboard.press('Escape'); await H.dorme(300); }
+ c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===35); return {st:c.status,ft:c.feitoTec,sv:c.exec&&c.exec.servicos}; }); t=await txt();
+ ok('Técnico marca "Feito": a tarefa NÃO fecha; fica "esperando o Marcelo conferir"', c.st==='Em execução'&&c.ft&&c.ft.nome==='Bruno Lima'&&c.sv==='limpei o dreno'&&/Esperando o Marcelo conferir/.test(t), JSON.stringify(c));
  /* quadro da semana */
  await p.click('[data-act="of-sem"]'); await H.dorme(500); t=await txt(); const nd=await p.$$eval('.of-sd',x=>x.length);
  ok('Quadro da semana: 5 dias, filtros e a tarefa com prazo', nd===5&&/Hoje ·/.test(t)&&/Só os meus/.test(t)&&/Sem ninguém/.test(t), nd+' '+t.slice(0,300).replace(/\n/g,'|'));
@@ -80,7 +85,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const c
  const nav=await p.evaluate(()=>document.getElementById('navlist').innerText);
  ok('Menu do Marcelo tem "Pedidos de peça"', /Pedidos de peça/.test(nav), nav.replace(/\n/g,'|'));
  const alt=await p.evaluate(()=>{ document.querySelector('#tp-sino').click(); return new Promise(r=>setTimeout(()=>r(document.getElementById('tp-pop').innerText),300)); });
- ok('Sino: peça urgente e tarefa devolvida', /Peça urgente: Graxa de lítio/.test(alt)&&/devolvida por Bruno Lima/.test(alt), alt.replace(/\n/g,'|'));
+ ok('Sino: peça urgente e tarefas para conferir', /Peça urgente: Graxa de lítio/.test(alt)&&/2 tarefas feitas esperando você conferir/.test(alt), alt.replace(/\n/g,'|'));
  await p.keyboard.press('Escape');
  await p.click('#navlist [data-go="gxpec"]'); await H.dorme(1200); t=await p.evaluate(()=>document.getElementById('view').innerText);
  let pp=await p.evaluate(()=>(__T.S().pedpecas||[])[0]);
@@ -90,7 +95,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const c
  ok('"Comprado" com a data de chegada', pp.status==='comprado'&&pp.prev==='2026-12-01', JSON.stringify({st:pp.status,prev:pp.prev}));
  await p.screenshot({path:'/tmp/of-gxpec.png',fullPage:true});
  await p.click('#navlist [data-go="gxch"]'); await H.dorme(800); t=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Chamados do Marcelo: "Devolvida por Bruno Lima: Falta peça ou material"', /Devolvida por Bruno Lima: Falta peça ou material/.test(t), t.slice(0,600).replace(/\n/g,'|'));
+ ok('Chamados do Marcelo: "Para conferir (2)" e "Feita por Bruno Lima … falta você conferir"', /Para conferir \(2\)/.test(t)&&/Feita por Bruno Lima às .*falta você conferir/.test(t)&&/Conferi: está feito/.test(t), t.slice(0,800).replace(/\n/g,'|'));
+ await p.click('[data-act="tf-reab"][data-id="os-00035"]'); await H.dorme(300); await p.fill('#tf-mot','ainda pingando'); await p.click('[data-act="tf-reab-ok"]'); await H.dorme(1300);
+ c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===35); return {st:c.status,ft:c.feitoTec,re:c.exec&&c.exec.reaberta}; });
+ ok('"Não está feito" devolve para o técnico com o motivo', c.st==='Em execução'&&!c.ft&&c.re&&c.re[0].mot==='ainda pingando', JSON.stringify(c));
+ await p.click('[data-act="gch-feito"][data-id="os-00032"]'); await H.dorme(300); await p.click('[data-act="gch-feito-ok"]'); await H.dorme(1500);
+ c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===32); return {st:c.status,por:c.concluidoPorNome,cf:c.conferidoPor,sv:c.exec&&c.exec.servicos}; });
+ ok('"Conferi: está feito" fecha no nome do Bruno, conferida pelo Marcelo, mantendo o que ele escreveu', c.st==='Concluída'&&c.por==='Bruno Lima'&&/Marcelo/.test(c.cf||'')&&c.sv==='portão regulado', JSON.stringify(c));
  await B.browser.close();
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU tudo ('+res.length+')'); process.exit(f?1:0); })().catch(e=>{ console.log('FALHOU',e); process.exit(1); });

@@ -83,11 +83,13 @@ async function gchFeito(id){ const G=S.gch, c=(S.chamados||[]).find(x=>x._id===i
   const obs=String((document.getElementById('gch-obs')||{}).value||'').trim(), nome=gchNome(), agora=new Date().toISOString();
   G.busy=true; render();
   try{ const E=Object.assign({},c.exec||{}); E.servicos=obs||E.servicos||'Marcado como feito pelo gestor'; if(!E.fim) E.fim=manAgoraLocal(); if(!E.inicio) E.inicio=E.fim;
-    const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Marcado como feito pelo gestor ('+nome+')'+(obs?': '+obs:'')}]).slice(-200);
-    await S.db.doc('chamados/'+c._id).update({exec:E,hist,concluidoPorNome:nome,feitoPeloGestor:true}); Object.assign(c,{exec:E,hist,concluidoPorNome:nome,feitoPeloGestor:true});
+    const ft=c.feitoTec&&c.feitoTec.nome?c.feitoTec:null; /* técnico já marcou como feita: o gestor só confere */
+    const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:(ft?'Conferido e fechado pelo gestor ('+nome+') · feito por '+ft.nome:'Marcado como feito pelo gestor ('+nome+')')+(obs?': '+obs:'')}]).slice(-200);
+    const up=ft?{exec:E,hist,concluidoPorNome:ft.nome,concluidoPorCracha:ft.cracha||null,conferidoPor:nome,conferidoEm:agora}:{exec:E,hist,concluidoPorNome:nome,feitoPeloGestor:true};
+    await S.db.doc('chamados/'+c._id).update(up); Object.assign(c,up);
     c._mzOk=true; try{ await manStatus(c,'Concluída'); } finally { delete c._mzOk; }
     if(c.status==='Concluída'&&!c.liberadoEm&&c.impacto==='parou'){ try{ await S.db.doc('chamados/'+c._id).update({liberadoEm:agora,liberadoPor:nome}); c.liberadoEm=agora; c.liberadoPor=nome; }catch(e){} }
-    G.feito=null; toast('OS '+manNum(c.numero)+' marcada como feita.'); }
+    G.feito=null; toast('OS '+manNum(c.numero)+(ft?' conferida e fechada.':' marcada como feita.')); }
   catch(e){ console.warn('[chamados do gestor] feito',e); toast('Não foi possível marcar como feito. Verifique a internet.'); }
   G.busy=false; render(); }
 
@@ -128,13 +130,10 @@ S.extViews=S.extViews||{}; S.extViews.gxch=vGxChamados;
 /* computador de chamados: tarefa termina sem perguntar a causa (não é máquina quebrada) */
 window.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cq-terminar"]'); if(!b) return; const c=manDoc(+b.dataset.n); if(!c||!c.tarefa) return;
   ev.stopPropagation(); ev.preventDefault(); const T=S.tt; if(!T||!T.p||T.enviando) return; T.enviando=true; T.msg=''; render();
-  try{ const agora=new Date().toISOString(); const E=Object.assign({},c.exec||{},{servicos:'Tarefa concluída no computador de chamados',tecnico:(c.exec&&c.exec.tecnico)||T.p.nome,tecnicoCracha:T.p.codigo||null}); if(!E.inicio) E.inicio=manAgoraLocal();
-    const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Tarefa concluída por '+T.p.nome}]).slice(-200);
-    await S.db.doc('chamados/'+c._id).update({exec:E,hist,concluidoPorNome:T.p.nome,concluidoPorCracha:T.p.codigo||null}); c.exec=E; c.hist=hist;
-    c._mzOk=true; try{ await manStatus(c,'Concluída'); } finally { delete c._mzOk; }
-    if(c.status!=='Concluída'){ T.enviando=false; T.msg='Não foi possível concluir. Verifique a internet e toque de novo.'; render(); return; }
+  try{ /* tarefa do gestor: o técnico marca como feita e ela só fecha quando o gestor confere (feitoTec) */
+    await tfFeitoTec(c,T.p,'');
     if(c.paradaId) await ttLiberaPorTecnico(c,T.p);
-    T.enviando=false; if(T.p.codigo) T.recente[T.p.codigo]=Date.now()+15000; T.numero=c.numero; T.causa=''; toast('OS '+manNum(c.numero)+' · tarefa concluída.'); T.fase='fimok'; T.ult=Date.now(); render(); }
+    T.enviando=false; if(T.p.codigo) T.recente[T.p.codigo]=Date.now()+15000; T.numero=c.numero; T.causa=''; toast('OS '+manNum(c.numero)+' · tarefa feita, esperando o gestor conferir.'); T.fase='fimok'; T.ult=Date.now(); render(); }
   catch(e){ T.enviando=false; console.warn('[chamados] concluir tarefa',e); T.msg='Não foi possível concluir: '+((e&&e.message)||'verifique a internet')+'.'; render(); } },true);
 /* textos da tela de chamados para as tarefas */
 { const _vc=vChamados; vChamados=function(){ let h=_vc.apply(this,arguments); if(!h) return h; try{ const T=S.tt;
@@ -142,7 +141,7 @@ window.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target
     tfs.forEach(c=>{ const k='data-n="'+c.numero+'"';
       h=h.replace(new RegExp('(data-act="cq-terminar" '+k+'[^>]*><b>)Terminar e liberar a máquina'),'$1Terminar a tarefa');
       h=h.replace(/<section class="cq-ch[\s\S]*?<\/section>/g,s=>s.includes('>OS '+manNum(c.numero)+'<')?s.replace(/>(Ainda funciona|Máquina parada) </,'>'+(c.impacto==='parou'?'Linha parada · ':'')+'Tarefa do gestor · '+gchPrio(c.prioridade)[1].toLowerCase()+(c.prazo?' · prazo '+dm(c.prazo):'')+(c.paraTec?' · para '+esc(c.paraTec):'')+' <').replace('Começar o conserto','Começar a tarefa'):s); });
-    if(T&&T.fase==='fimok'){ const c=manDoc(T.numero); if(c&&c.tarefa) h=h.replace(/<h1>Máquina liberada · OS (\d+)<\/h1><p>[\s\S]*?<\/p><p class="cq-p2">[\s\S]*?<\/p>/,`<h1>Tarefa concluída · OS $1</h1><p>${esc(c.linha||'')}${c.local?' · '+esc(c.local):''} · ${esc(String(c.defeito||'').slice(0,80))}</p><p class="cq-p2">O gestor já vê como feita. Esta tela volta para o início sozinha.</p>`); }
+    if(T&&T.fase==='fimok'){ const c=manDoc(T.numero); if(c&&c.tarefa) h=h.replace(/<h1>Máquina liberada · OS (\d+)<\/h1><p>[\s\S]*?<\/p><p class="cq-p2">[\s\S]*?<\/p>/,`<h1>Tarefa feita · OS $1</h1><p>${esc(c.linha||'')}${c.local?' · '+esc(c.local):''} · ${esc(String(c.defeito||'').slice(0,80))}</p><p class="cq-p2">Ela fecha quando o gestor conferir. Esta tela volta para o início sozinha.</p>`); }
   }catch(e){} return h; }; }
 /* monitor da manutenção: tarefa mostra a urgência; só a urgente toca o alarme */
 { const _mi=mm2Imp; mm2Imp=function(c){ if(c&&c.tarefa&&c.impacto!=='parou'){ const p=gchPrio(c.prioridade); return ['tarefa · '+p[1].toLowerCase(),p[2]==='crit'?'crit':p[2]==='warn'?'warn':'neu']; } return _mi.apply(this,arguments); }; }
