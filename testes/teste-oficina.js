@@ -35,37 +35,38 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const c
  await p.screenshot({path:'/tmp/of-tec.png'});
  /* aceitar para depois */
  await p.click('[data-act="of-ver"][data-n="33"]'); await H.dorme(400); await p.click('[data-act="of-ad"]'); await H.dorme(1300);
- let c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===33); return {ac:c.exec&&c.exec.aceito,st:c.status,f:__T.S().tt.fase}; }); t=await txt();
+ let c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===33); return {ac:c.exec&&c.exec.aceito,st:c.status,f:__T.S().tt.fase}; });
+ ok('Depois de aceitar, volta para a tela principal (como o computador de chamados)', c.f==='espera', c.f); c.f='oftec'; await bip('777888'); t=await txt();
  ok('"Aceitar para depois": fica com o Bruno (aceito) e aparece em Comigo com "Começar agora"', c.ac&&c.ac.nome==='Bruno Lima'&&c.st==='Aberta'&&c.f==='oftec'&&!!(await p.$('[data-act="of-comecar"][data-n="33"]')), JSON.stringify(c));
  /* devolver a urgente */
  await p.click('[data-act="of-ver"][data-n="32"]'); await H.dorme(400); await p.click('[data-act="of-nao"]'); await H.dorme(300);
  await p.click('[data-act="of-mot"][data-v="Falta peça ou material"]'); await H.dorme(300); await p.fill('#of-dobs','sem roldana'); await p.click('[data-act="of-dev-ok"]'); await H.dorme(1300);
  c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===32); return {dv:c.devolvidas,f:__T.S().tt.fase}; });
  ok('"Não consigo" + motivo devolve para o Marcelo (devolvidas com motivo e explicação)', c.dv&&c.dv[0].nome==='Bruno Lima'&&c.dv[0].mot==='Falta peça ou material'&&c.dv[0].obs==='sem roldana'&&c.f==='ofok', JSON.stringify(c));
- await p.keyboard.press('Escape'); await H.dorme(400);
+ await p.keyboard.press('Escape'); await H.dorme(400); await bip('777888');
  /* começar, feito em parte, falta peça */
- await p.click('[data-act="of-comecar"][data-n="33"]'); await H.dorme(1500);
+ await p.click('[data-act="of-comecar"][data-n="33"]'); await H.dorme(1500); await bip('777888');
  c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===33); return {st:c.status,tec:c.exec&&c.exec.tecnico}; });
  ok('"Começar agora": em execução com o Bruno', c.st==='Em execução'&&c.tec==='Bruno Lima', JSON.stringify(c));
  await p.click('[data-act="of-term"][data-n="33"]'); await H.dorme(300); await p.click('[data-act="of-tr"][data-v="parte"]'); await H.dorme(200); await p.fill('#of-tobs','limpei o trilho'); await p.click('[data-act="of-term-ok"]'); await H.dorme(1300);
  c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===33); return {st:c.status,pt:c.exec&&c.exec.partes}; });
  ok('"Feito em parte": anota e continua em execução', c.st==='Em execução'&&c.pt&&c.pt[0].obs==='limpei o trilho', JSON.stringify(c));
- await p.keyboard.press('Escape'); await H.dorme(300);
+ await p.keyboard.press('Escape'); await H.dorme(300); await bip('777888');
  await p.click('[data-act="of-term"][data-n="33"]'); await H.dorme(300); await p.click('[data-act="of-tr"][data-v="peca"]'); await H.dorme(200); await p.fill('#of-tobs','Graxa de lítio'); await p.click('[data-act="of-term-ok"]'); await H.dorme(500);
  s=await p.evaluate(()=>({f:__T.S().tt.fase,t:(document.getElementById('of-pt')||{}).value,o:(document.getElementById('of-po')||{}).value}));
  ok('"Falta peça" abre o pedido de peça já com a peça e a OS escolhidas', s.f==='ofpeca'&&s.t==='Graxa de lítio'&&s.o==='33', JSON.stringify(s));
  await p.fill('#of-pq','1 balde'); await p.click('[data-act="of-urg"][data-v="hoje"]'); await H.dorme(200); await p.click('[data-act="of-peca-ok"]'); await H.dorme(1500);
  c=await p.evaluate(()=>{ const S=__T.S(), pp=(S.pedpecas||[])[0], c=S.chamados.find(x=>x.numero===33); return {pp:pp&&{t:pp.t,q:pp.qtd,os:pp.os,u:pp.urg,st:pp.status,por:pp.porNome},ep:c.esperaPeca&&c.esperaPeca.t,f:S.tt.fase}; });
  ok('Pedido de peça gravado (texto, quantidade, OS, urgente, enviado) e a OS fica "esperando peça"', c.pp&&c.pp.t==='Graxa de lítio'&&c.pp.q==='1 balde'&&c.pp.os===33&&c.pp.u==='hoje'&&c.pp.st==='enviado'&&c.pp.por==='Bruno Lima'&&c.ep==='Graxa de lítio'&&c.f==='ofok', JSON.stringify(c));
- await p.keyboard.press('Escape'); await H.dorme(300);
+ await p.keyboard.press('Escape'); await H.dorme(300); await bip('777888');
  /* entrar junto na preventiva */
  await p.click('[data-act="of-junto"][data-n="34"]'); await H.dorme(1300);
  c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===34); return {e:c.exec,f:__T.S().tt.fase}; });
- ok('"Entrar junto (2º técnico)" na preventiva do Carlos', c.e.tecnico==='Carlos Souza'&&c.e.ajudante&&c.e.ajudante.nome==='Bruno Lima'&&c.f==='oftec', JSON.stringify(c));
+ ok('"Entrar junto (2º técnico)" na preventiva do Carlos', c.e.tecnico==='Carlos Souza'&&c.e.ajudante&&c.e.ajudante.nome==='Bruno Lima'&&c.f==='espera', JSON.stringify(c)); await bip('777888');
  t=await txt(); ok('A preventiva vai para "Comigo" com "Fazer o checklist"', !!(await p.$('[data-act="cq-terminar"][data-n="34"]')), t.slice(0,300));
  /* tarefa feita: só fecha quando o Marcelo conferir */
- for(const n of [35,32]){ await p.click(`[data-act="of-ver"][data-n="${n}"]`); await H.dorme(400); await p.click('[data-act="of-ag"]'); await H.dorme(1300);
-   await p.click(`[data-act="of-term"][data-n="${n}"]`); await H.dorme(300); await p.fill('#of-tobs',n===35?'limpei o dreno':'portão regulado'); await p.click('[data-act="of-term-ok"]'); await H.dorme(1300); await p.keyboard.press('Escape'); await H.dorme(300); }
+ for(const n of [35,32]){ await p.click(`[data-act="of-ver"][data-n="${n}"]`); await H.dorme(400); await p.click('[data-act="of-ag"]'); await H.dorme(1300); await bip('777888');
+   await p.click(`[data-act="of-term"][data-n="${n}"]`); await H.dorme(300); await p.fill('#of-tobs',n===35?'limpei o dreno':'portão regulado'); await p.click('[data-act="of-term-ok"]'); await H.dorme(1300); await p.keyboard.press('Escape'); await H.dorme(300); await bip('777888'); }
  c=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===35); return {st:c.status,ft:c.feitoTec,sv:c.exec&&c.exec.servicos}; }); t=await txt();
  ok('Técnico marca "Feito": a tarefa NÃO fecha; fica "esperando o Marcelo conferir"', c.st==='Em execução'&&c.ft&&c.ft.nome==='Bruno Lima'&&c.sv==='limpei o dreno'&&/Esperando o Marcelo conferir/.test(t), JSON.stringify(c));
  /* quadro da semana */

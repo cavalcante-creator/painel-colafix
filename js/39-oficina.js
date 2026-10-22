@@ -142,7 +142,7 @@ function vOfPeca(){ const T=S.tt, P=S.of.peca||(S.of.peca={t:'',qtd:'1',os:'',ur
     <section class="of-col"><h2>Seus pedidos</h2>${meus.map(p=>{ const s=OF_PST[p.status]||OF_PST.enviado; return `<div class="of-c"><b>${esc(p.t.slice(0,60))}${p.qtd?' · '+esc(p.qtd):''}</b><span class="of-s ${s[1]}">${s[0]}${p.status==='comprado'&&p.prev?' · chega '+dm(p.prev):''}${p.status==='nao'&&p.mot?' · '+esc(p.mot):''}</span><small>${dm(hojeStr(new Date(p.em)))} ${ofHm(p.em)}${p.os?' · OS '+manNum(p.os):''}</small></div>`; }).join('')||'<p class="of-vz">Você ainda não pediu nada.</p>'}
      <small class="of-p">O Marcelo recebe o pedido no painel dele e marca: vai comprar, comprado, chegou ou não vai comprar (com o motivo).</small></section></div>`;
   return ofPagina('Pedir peça',corpo); }
-function vOfOk(){ const T=S.tt, o=S.of.ok||{}; return ofPagina('Manutenção · oficina',`<section class="cq-fim"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg><h1>${esc(o.t||'Pronto')}</h1><p>${esc(o.d||'')}</p><p class="cq-p2">${esc(o.s||'')}</p><button class="cq-sec" data-act="of-volta">Voltar às minhas tarefas</button></section>`); }
+function vOfOk(){ const T=S.tt, o=S.of.ok||{}; return ofPagina('Manutenção · oficina',`<section class="cq-fim"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg><h1>${esc(o.t||'Pronto')}</h1><p>${esc(o.d||'')}</p><p class="cq-p2">${esc(o.s||'')}</p><p class="cq-p2">Esta tela volta para o início sozinha.</p><button class="cq-sec" data-act="of-sai">Voltar ao início</button></section>`); }
 /* quadro da semana: hoje + 4 dias úteis */
 function ofSemDias(){ const out=[hojeStr()]; let d=hojeStr(); while(out.length<5){ d=ppUtil(addDias(d,1)); out.push(d); } return out; }
 function ofSemItens(d,ate){ const out=[], h=hojeStr();
@@ -177,7 +177,7 @@ function vOficina(){ const T=S.tt; T.ocioso=60000;
     if(p.papel!=='tecnico'){ T.p=null; ttMsg('Este computador é da equipe de manutenção. Para chamar a manutenção, use o posto da linha.'); return; }
     Object.assign(T,{p,outra:false,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:'oftec',ult:Date.now()}); Object.assign(S.of,{acc:null,dev:null,term:null,peca:null,ok:null}); ttCamDesliga(); render(); }; }
 { const _tv=ttVoltar; ttVoltar=function(){ if(ofOn()&&S.tt.p&&S.tt.p.codigo&&S.tt.recente) delete S.tt.recente[S.tt.p.codigo]; return _tv.apply(this,arguments); }; }
-setInterval(()=>{ const T=S.tt; if(ofOn()&&ttAtivo()&&T.fase==='ofok'&&Date.now()-T.ult>9000){ if(T.p){ T.fase='oftec'; T.ult=Date.now(); render(); } else ttVoltar(); } },700);
+setInterval(()=>{ const T=S.tt; if(ofOn()&&ttAtivo()&&T.fase==='ofok'&&Date.now()-T.ult>8000) ttVoltar(); },700);
 
 /* ---------- gravar ---------- */
 function ofVai(f){ const T=S.tt; T.fase=f; T.msg=''; T.ult=Date.now(); render(); }
@@ -202,11 +202,11 @@ async function ofAcao(a,b){ const T=S.tt, O=S.of; if(!T.p) return; const n=b&&b.
     if(T.enviando) return;
     if(a==='of-ag'||a==='of-ad'||a==='of-comecar'){ if(!c) return; if(a!=='of-comecar'&&!ofPend(c)){ T.msg='Outro técnico já pegou esta tarefa.'; render(); return; }
       T.enviando=true; render();
-      if(a==='of-ad'){ const E=Object.assign({},c.exec||{},{aceito:{nome:T.p.nome,cracha:T.p.codigo||null,em:new Date().toISOString(),depois:true}}); await ofGrava(c,{exec:E},'Tarefa aceita por '+T.p.nome+' para depois'); T.enviando=false; toast('OS '+manNum(c.numero)+': aceita para depois. Fica em "Comigo".'); ofVai('oftec'); return; }
-      await ofComeca(c); T.enviando=false; toast('OS '+manNum(c.numero)+': começada por '+T.p.nome+'.'); ofVai('oftec'); return; }
+      if(a==='of-ad'){ const E=Object.assign({},c.exec||{},{aceito:{nome:T.p.nome,cracha:T.p.codigo||null,em:new Date().toISOString(),depois:true}}); await ofGrava(c,{exec:E},'Tarefa aceita por '+T.p.nome+' para depois'); T.enviando=false; toast('OS '+manNum(c.numero)+': aceita para depois por '+T.p.nome+'.'); ttVoltar(); return; }
+      await ofComeca(c); T.enviando=false; toast('OS '+manNum(c.numero)+': começada por '+T.p.nome+'.'); ttVoltar(); return; }
     if(a==='of-junto'){ if(!c||tecEh(c,T.p.nome)) return; if(c.exec&&c.exec.ajudante&&c.exec.ajudante.nome){ T.msg='Este serviço já tem dois técnicos.'; render(); return; } T.enviando=true; render();
       const E=Object.assign({},c.exec||{},{ajudante:{nome:T.p.nome,cracha:T.p.codigo||null,em:new Date().toISOString()}}); await ofGrava(c,{exec:E},'Segundo técnico entrou: '+T.p.nome+(T.p.codigo?' (crachá)':''));
-      T.enviando=false; toast('OS '+manNum(c.numero)+': você entrou junto com '+(E.tecnico||'o técnico')+'.'); ofVai('oftec'); return; }
+      T.enviando=false; toast('OS '+manNum(c.numero)+': '+T.p.nome+' entrou junto com '+(E.tecnico||'o técnico')+'.'); ttVoltar(); return; }
     if(a==='of-dev-ok'){ const cc=manDoc(O.acc), D=O.dev; if(!cc||!D||!D.mot) return; ofLe(); T.enviando=true; render();
       const agora=new Date().toISOString(), dv=(cc.devolvidas||[]).concat([{nome:T.p.nome,cracha:T.p.codigo||null,mot:D.mot,obs:String(D.obs||'').trim(),em:agora}]);
       const up={devolvidas:dv,devolvidaEm:agora}; if(cc.paraTec&&ofN(cc.paraTec)===ofN(T.p.nome)) up.paraTec=null;
@@ -248,7 +248,8 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
   if(a==='of-volta'&&!T.p){ ttVoltar(); return; }
   ofAcao(a,b); },true);
 document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!ofOn()||!ttAtivo()||document.getElementById('trava-m')) return; const T=S.tt;
-  if(['ofacc','ofterm','ofpeca','ofok','cqchk'].includes(T.fase)||(T.fase==='ofsem'&&T.p)){ ev.preventDefault(); S.of.dev=null; T.fase='oftec'; T.msg=''; T.ult=Date.now(); render(); return; }
+  if(T.fase==='ofok'){ ev.preventDefault(); ttVoltar(); return; }
+  if(['ofacc','ofterm','ofpeca','cqchk'].includes(T.fase)||(T.fase==='ofsem'&&T.p)){ ev.preventDefault(); S.of.dev=null; T.fase='oftec'; T.msg=''; T.ult=Date.now(); render(); return; }
   if(T.fase==='oftec'||T.fase==='ofsem'){ ev.preventDefault(); ttVoltar(); } });
 
 /* ---------- monitor da TV: tarefa aceita já tem dono (para o alarme) ---------- */
