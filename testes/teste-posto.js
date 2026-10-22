@@ -91,8 +91,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('"Começar atendimento" grava o técnico e volta ao início', /execu/i.test(cc2.st||'')&&cc2.tec==='Bruno Lima'&&cc2.f==='espera', JSON.stringify(cc2));
  { await H.dorme(400); const ln=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.cq-ln')].find(x=>/Linha 1/.test(x.textContent)); return e?{c:e.className,t:e.textContent,bc:getComputedStyle(e).borderColor}:null; });
  ok('Na espera, a Linha 1 fica LARANJA: "Sendo arrumada · Bruno Lima"', ln&&/\barr\b/.test(ln.c)&&/Sendo arrumada · Bruno Lima/.test(ln.t)&&ln.bc==='rgb(217, 121, 43)', JSON.stringify(ln)); }
- await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; }); await bip('000123'); await p.keyboard.press('1'); await H.dorme(600); s=await st(); await p.screenshot({path:'/tmp/po-liberar.png'});
- ok('Operador volta ao chamado: "A máquina já voltou? Confira e libere."', /A máquina já voltou/.test(s.txt)&&!!(await p.$(`[data-act="po-lib"][data-n="${nCh}"]`)), s.txt.slice(0,200).replace(/\n/g,' | '));
+ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; }); await bip('000123'); const mn4=await p.evaluate(()=>document.querySelector('[data-act="po-op"][data-n="4"]').innerText); await p.keyboard.press('4'); await H.dorme(600); s=await st(); await p.screenshot({path:'/tmp/po-liberar.png'});
+ ok('Liberar fica no 4: o menu avisa "sendo arrumada" e a Linha 1 aparece laranja com "A máquina voltou · liberar"', /sendo arrumada/.test(mn4)&&/sendo arrumada/.test(s.txt)&&/A máquina voltou · liberar/.test(s.txt)&&!!(await p.$('.po-pl.arr'))&&!!(await p.$(`[data-act="po-lib"][data-n="${nCh}"]`)), s.txt.slice(0,200).replace(/\n/g,' | '));
  await p.click(`[data-act="po-lib"][data-n="${nCh}"]`); await H.dorme(2000); s=await st();
  const c3=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,lib:c.liberadoPor,op:c.liberadoPeloOperador}; },nCh);
  ok('"Liberar e fechar chamado": o operador fecha o chamado e libera a máquina', c3.st==='Concluída'&&c3.lib==='Ana Souza'&&c3.op===true&&/Máquina liberada/.test(s.txt), JSON.stringify(c3));
@@ -100,7 +100,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
    await p.evaluate(()=>{ const db=__T.S().db, t=new Date(Date.now()-30*6e4).toISOString(), lib=new Date(Date.now()-5*6e4).toISOString();
      return db.doc('chamados/os-00777').set({numero:777,linha:'Linha 2',defeito:'Elétrico',impacto:'parou',status:'Em execução',criado:t,quando:t.slice(0,16),nome:'Teste',exec:{tecnico:'Bruno Lima',inicio:t.slice(0,16)},liberadoEm:lib,liberadoPor:'Alguém',hist:[]}); }); await H.dorme(1200);
    const esp=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.cq-ln')].find(x=>/Linha 2/.test(x.textContent)); return e?e.innerText.replace(/\n/g,' | '):''; });
-   await bip('000123'); await p.keyboard.press('1'); await H.dorme(700); const tem=!!(await p.$('[data-act="po-lib"][data-n="777"]'));
+   await bip('000123'); await p.keyboard.press('4'); await H.dorme(700); const tem=!!(await p.$('[data-act="po-lib"][data-n="777"]'));
    ok('Chamado "sendo arrumado" que já tinha liberação pela metade aparece para liberar no posto', /Sendo arrumada/.test(esp)&&tem, esp+' · botão:'+tem);
    if(tem){ await p.click('[data-act="po-lib"][data-n="777"]'); await H.dorme(2000); }
    const st7=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===777); return c&&c.status; });
