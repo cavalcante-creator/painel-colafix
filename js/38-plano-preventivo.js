@@ -66,8 +66,13 @@ function ppMonta(tarefas,antigo){ const velho={}; ((antigo&&antigo.rot)||[]).for
   rot.sort((a,b)=>String(a.prox).localeCompare(String(b.prox)));
   const ativos={}; tarefas.forEach(t=>{ const k=t.cod||t.ativo; if(k&&!ativos[k]) ativos[k]={cod:t.cod,nome:t.ativo,area:t.area}; });
   return {tarefas,rot,ativos:Object.values(ativos),novos:novos.length}; }
+/* reimportar respeita o que foi mexido no painel: tarefa editada/criada à mão fica, apagada não volta, roteiro manual fica */
+function ppMescla(tarefas,cur){ cur=cur||{}; const keep=(cur.tarefas||[]).filter(t=>t.manual||t.editado).map(t=>Object.assign({},t)), apag=new Set(cur.apagados||[]), kid=new Set(keep.map(t=>t.id));
+  const M=ppMonta(tarefas.filter(t=>!apag.has(t.id)&&!kid.has(t.id)).map(t=>Object.assign({},t)),cur), ids=new Set(M.rot.map(r=>r.id));
+  (cur.rot||[]).filter(r=>!ids.has(r.id)&&(r.manual||keep.some(t=>t.rot===r.id))).forEach(r=>M.rot.push(Object.assign({},r)));
+  M.tarefas=M.tarefas.concat(keep); return M; }
 async function ppGravar(){ const P=S.pp, I=P.imp; if(!I||!I.tarefas||P.busy) return; P.busy=true; render();
-  try{ const M=ppMonta(I.tarefas.map(t=>Object.assign({},t)),P.plano);
+  try{ const M=ppMescla(I.tarefas,P.plano);
     await S.db.doc('config/manutplano').set({tarefas:M.tarefas,rot:M.rot,ativos:M.ativos,em:new Date().toISOString(),por:S.uid||null,arquivo:I.nome},{merge:true});
     P.plano=Object.assign({},P.plano||{},{tarefas:M.tarefas,rot:M.rot,ativos:M.ativos,em:new Date().toISOString(),arquivo:I.nome}); P.imp=null;
     toast('Plano importado: '+M.rot.length+' roteiros da manutenção e '+M.tarefas.filter(t=>!t.rot).length+' itens do checklist do operador.'); }
@@ -199,8 +204,8 @@ window.addEventListener('keydown',ev=>{ if(typeof ttAtivo!=='function'||!ttAtivo
 
 /* ---------- tela "Plano preventivo" (Manutenção) ---------- */
 function vManPlano(emb){ const P=S.pp, PL=P.plano;
-  const topo=emb?`<div class="pp-emb"><span class="sub" style="margin:0">Os roteiros da planilha: cada um abre uma OS com checklist no dia marcado. As diárias do operador são o checklist do posto.</span><label class="btn sec" style="cursor:pointer">${ic('folha',18,2)}${PL?'Importar planilha de novo':'Importar planilha do plano'}<input type="file" accept=".xlsx,.xls" data-pp-arq hidden></label></div>`:`${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Plano preventivo</h1><div class="sub">As tarefas do plano viram roteiros (área + periodicidade + equipe). No dia, abre uma OS com o checklist; o técnico confere item a item e a próxima data é marcada sozinha. As diárias do operador são o checklist do posto.</div></div>
-    <div class="pg-acts" style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn ${PL?'sec':''}" style="cursor:pointer">${ic('folha',18,2)}${PL?'Importar planilha de novo':'Importar planilha do plano'}<input type="file" accept=".xlsx,.xls" data-pp-arq hidden></label></div></div>`;
+  const topo=emb?`<div class="pp-emb"><span class="sub" style="margin:0">Os roteiros da planilha: cada um abre uma OS com checklist no dia marcado. As diárias do operador são o checklist do posto.</span><div style="display:flex;gap:8px;flex-wrap:wrap">${(typeof soVer==='function'&&soVer())?'':'<button class="btn" data-act="ppe-novo">'+ic('mais',18,2)+'Novo roteiro</button>'}<label class="btn sec" style="cursor:pointer">${ic('folha',18,2)}${PL?'Importar planilha de novo':'Importar planilha do plano'}<input type="file" accept=".xlsx,.xls" data-pp-arq hidden></label></div></div>`:`${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Plano preventivo</h1><div class="sub">As tarefas do plano viram roteiros (área + periodicidade + equipe). No dia, abre uma OS com o checklist; o técnico confere item a item e a próxima data é marcada sozinha. As diárias do operador são o checklist do posto.</div></div>
+    <div class="pg-acts" style="display:flex;gap:8px;flex-wrap:wrap">${(typeof soVer==='function'&&soVer())?'':'<button class="btn" data-act="ppe-novo">'+ic('mais',18,2)+'Novo roteiro</button>'}<label class="btn sec" style="cursor:pointer">${ic('folha',18,2)}${PL?'Importar planilha de novo':'Importar planilha do plano'}<input type="file" accept=".xlsx,.xls" data-pp-arq hidden></label></div></div>`;
   const imp=P.imp?ppImpHtml():'';
   if(!P.lido) return topo+'<section class="card"><div class="empty">Carregando…</div></section>';
   if(!PL||!(PL.tarefas||[]).length) return topo+imp+`<section class="card"><div class="empty">Nenhum plano importado ainda. Use "Importar planilha do plano" (abas Plano e Ativos: ID, Área, Ativo, Tarefa, Periodicidade, Responsável, Última execução).</div></section>`;
@@ -212,12 +217,12 @@ function vManPlano(emb){ const P=S.pp, PL=P.plano;
       <div class="pp-rt"><b>${esc(r.area)} · ${esc(r.per)}</b><small>${esc(r.resp)} · ${n} ite${n>1?'ns':'m'} · a cada ${r.freq} dia${r.freq>1?'s':''}${r.ult?' · última '+dm(r.ult):' · sem histórico'}</small></div>
       <span class="pill ${c}">${l}</span>
       <div class="pp-ra">${os?`<button class="btn sec" data-act="man-abrir" data-n="${os.numero}" data-ir="1">OS ${manNum(os.numero)}</button>`:`<button class="eq-lk" data-act="pp-gerar" data-id="${esc(r.id)}">${ic('play',15,2)}Gerar OS agora</button>`}
-        <button class="eq-lk" data-act="pp-ver" data-id="${esc(r.id)}" aria-expanded="${!!ab}">${ab?'Esconder itens':'Ver itens'}</button>${os?'':`<label class="pp-dt"><span>mudar data</span><input type="date" data-pp-data="${esc(r.id)}" value="${esc(r.prox||'')}"></label>`}</div>
+        <button class="eq-lk" data-act="pp-ver" data-id="${esc(r.id)}" aria-expanded="${!!ab}">${ab?'Esconder itens':'Ver itens'}</button>${os?'':`<label class="pp-dt"><span>mudar data</span><input type="date" data-pp-data="${esc(r.id)}" value="${esc(r.prox||'')}"></label>`}${(typeof soVer==='function'&&soVer())?'':`<span class="pp-sp"></span><button class="eq-lk" data-act="ppe-ed" data-id="${esc(r.id)}">${ic('editar',15,2)}Editar</button><button class="eq-lk del" data-act="ppe-apagar" data-id="${esc(r.id)}">${ic('lixo',15,2)}${P.apg===r.id?'Toque de novo para apagar':'Apagar'}</button>`}</div>
       ${ab?`<div class="pp-its">${ppItens(r).map(t=>`<div><b>${esc(t.ativo||t.cod)}</b> ${esc(t.t)}${t.cod?` <small>${esc(t.cod)}</small>`:''}</div>`).join('')}</div>`:''}</div>`; };
   /* checklist do operador hoje, por área */
   const h=hojeStr(), k=((P.ck[h]||{}).it)||{}, ops=(PL.tarefas||[]).filter(t=>!t.rot&&ppOp(t)), porA={}; ops.forEach(t=>{ (porA[t.area]=porA[t.area]||[]).push(t); });
   const pbs=ops.filter(t=>k[t.id]&&k[t.id].s==='pb');
-  const opCard=ops.length?`<section class="card"><div class="head" style="align-items:baseline"><h2>Checklist do operador · hoje</h2><span class="sub" style="margin:0">feito no posto da linha (tecla 5)</span></div>
+  const opCard=ops.length?`<section class="card"><div class="head" style="align-items:baseline"><h2>Checklist do operador · hoje</h2><span class="sub" style="margin:0">feito no posto da linha (tecla 5)${(typeof soVer==='function'&&soVer())?'':' · <button class="lnk" data-act="ppe-op">Editar os itens</button>'}</span></div>
     <div class="pp-opg">${Object.keys(porA).map(a=>{ const xs=porA[a], f=xs.filter(t=>k[t.id]&&k[t.id].s).length; return `<div class="pp-op"><b>${esc(a)}</b><div class="pp-bar"><i style="width:${f/xs.length*100}%"></i></div><small>${f} de ${xs.length}${xs.some(t=>k[t.id]&&k[t.id].s==='pb')?' · <span class="pp-pbt">com problema</span>':''}</small></div>`; }).join('')}</div>
     ${pbs.length?`<div class="pp-pbl">${pbs.map(t=>`<div><b>${esc(t.area)} · ${esc(t.ativo||'')}</b> ${esc(t.t)} <small>· ${esc(k[t.id].por||'')}${k[t.id].os?` · <button class="lnk" data-act="man-abrir" data-n="${k[t.id].os}" data-ir="1">chamado ${manNum(k[t.id].os)}</button>`:''}</small></div>`).join('')}</div>`:''}</section>`:'';
   return topo+imp+`<div class="mp-k mx-k"><div class="${cnt('atrasada')?'crit':''}"><span>Atrasados</span><b class="num">${cnt('atrasada')}</b><small>passou da data sem OS</small></div><div class="${cnt('hoje')?'warn':''}"><span>Hoje</span><b class="num">${cnt('hoje')}</b><small>a OS abre sozinha</small></div><div><span>OS abertas</span><b class="num">${cnt('aberta')}</b><small>checklist em andamento</small></div><div><span>Esta semana</span><b class="num">${cnt('semana')}</b><small>próximos 7 dias</small></div><div class="ok"><span>Em dia</span><b class="num">${cnt('ok')}</b><small>${rots.length} roteiros</small></div></div>
@@ -228,7 +233,7 @@ function vManPlano(emb){ const P=S.pp, PL=P.plano;
    <p class="sub" style="font-size:12.5px">Plano importado de ${esc(PL.arquivo||'planilha')}${PL.em?' em '+dm(String(PL.em).slice(0,10)):''} · ${(PL.tarefas||[]).length} tarefas · ${(PL.ativos||[]).length} ativos. Importar de novo atualiza as tarefas e mantém as datas dos roteiros que já existiam.</p>`; }
 function ppImpHtml(){ const I=S.pp.imp; if(I.lendo) return `<section class="card"><div class="empty">Lendo ${esc(I.nome)}…</div></section>`;
   if(I.erro) return `<section class="card pp-imp"><b>Não deu para ler ${esc(I.nome)}</b><p>${esc(I.erro)}</p><button class="btn sec" data-act="pp-imp-x">Fechar</button></section>`;
-  const M=ppMonta(I.tarefas.map(t=>Object.assign({},t)),S.pp.plano), op=M.tarefas.filter(t=>!t.rot).length, porP={}; M.rot.forEach(r=>{ porP[r.per]=(porP[r.per]||0)+1; });
+  const M=ppMescla(I.tarefas,S.pp.plano), op=M.tarefas.filter(t=>!t.rot).length, porP={}; M.rot.forEach(r=>{ porP[r.per]=(porP[r.per]||0)+1; });
   const prim=M.rot.slice().sort((a,b)=>String(a.prox).localeCompare(String(b.prox))).slice(0,6);
   return `<section class="card pp-imp"><h2>Conferir antes de importar · ${esc(I.nome)}</h2>
     <div class="pp-ig"><div><b class="num">${M.tarefas.length}</b><span>tarefas lidas (aba ${esc(I.aba)})</span></div><div><b class="num">${M.rot.length}</b><span>roteiros da manutenção (${Object.entries(porP).map(([p,n])=>n+' '+p.toLowerCase()).join(', ')})</span></div><div><b class="num">${op}</b><span>itens do checklist diário do operador (no posto)</span></div><div><b class="num">${M.ativos.length}</b><span>ativos</span></div></div>
@@ -406,4 +411,76 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 .pp-opr{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.pp-opr .pp-bar{flex:1 1 200px;margin:0}
 .pp-agf .gx-f input,.pp-agf .gx-f select{font:inherit;font-size:15px}
 :root[data-theme="dark"] .pp-tag.pp-tg-rot{background:#1E3A48;color:#CFE3EC}:root[data-theme="dark"] .pp-tag.pp-tg-av{background:#2A3236;color:#C9D3DA}:root[data-theme="dark"] .pp-tag.pp-tg-ag{background:#3D3220;color:#F1D9A8}
+`; document.head.appendChild(st); }
+
+/* ===================== Editar, apagar e criar roteiros (e os itens do operador) =====================
+   Grava em config/manutplano: tarefas mexidas ficam com editado:true, criadas com manual:true; roteiro criado/editado manual:true;
+   apagadas entram em apagados[] (reimportar a planilha não traz de volta). A OS já aberta segue com o checklist que tinha. */
+const PP_PERS=[['Diária',1],['Semanal',7],['Quinzenal',15],['Mensal',30],['Bimestral',60],['Trimestral',90],['Semestral',180],['Anual',365]];
+function ppEdLe(){ const E=S.pp.ed; if(!E) return; const v=id=>{ const e=document.getElementById(id); return e?e.value:null; };
+  [['area','ppe-area'],['per','ppe-per'],['resp','ppe-resp'],['prox','ppe-prox']].forEach(([k,id])=>{ const x=v(id); if(x!=null) E[k]=x; });
+  document.querySelectorAll('[data-ppe-i]').forEach(el=>{ const it=E.itens[+el.dataset.ppeI]; if(it) it[el.dataset.ppeK]=el.value; }); }
+function ppEdHtml(){ const E=S.pp.ed; if(!E) return ''; const PL=S.pp.plano||{}, op=E.op;
+  const areas=[...new Set([...(PL.rot||[]).map(r=>r.area),...(PL.tarefas||[]).map(t=>t.area),...linhasOrd()])].filter(Boolean).sort();
+  const eqs=[...new Set(['Mecânica','Elétrica','Automação',...(PL.rot||[]).map(r=>r.resp)])].filter(x=>x&&ppNorm(x)!=='operador');
+  const ativos=[...new Set((PL.tarefas||[]).map(t=>t.ativo).filter(Boolean))].sort();
+  return `<div class="gx-modal pp-edm" role="dialog" aria-modal="true" aria-labelledby="ppe-t"><div class="card gx-mc pp-edc"><h2 id="ppe-t">${op?'Checklist do operador (posto)':E.id?'Editar roteiro':'Novo roteiro'}</h2>
+   ${op?'<p class="sub" style="margin:0 0 6px">Itens que o operador confere todo dia no posto da linha (tecla 5). A área diz em qual posto aparece: "Linha 1", "Filtros de manga - Linha 1"… Área sem linha aparece em todos os postos.</p>':`
+   <div class="gx-f3"><label class="gx-f">Área<input id="ppe-area" list="ppe-al" maxlength="60" value="${esc(E.area||'')}" placeholder="Ex.: Linha 1, Descarga de areia"></label>
+    <label class="gx-f">Periodicidade<select id="ppe-per">${PP_PERS.filter(x=>x[1]>1||!op).map(([n,f])=>`<option value="${n}" ${E.per===n?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label class="gx-f">Equipe<input id="ppe-resp" list="ppe-el" maxlength="40" value="${esc(E.resp||'')}" placeholder="Mecânica, Elétrica…"></label>
+    <label class="gx-f">Próxima data<input id="ppe-prox" type="date" value="${esc(E.prox||'')}"></label></div>`}
+   <datalist id="ppe-al">${areas.map(a=>`<option value="${esc(a)}">`).join('')}</datalist><datalist id="ppe-el">${eqs.map(a=>`<option value="${esc(a)}">`).join('')}</datalist><datalist id="ppe-atl">${ativos.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
+   <div class="pp-edh"><b>${E.itens.length} ite${E.itens.length===1?'m':'ns'} no checklist</b><button class="btn sec" data-act="ppe-add">${ic('mais',16,2)}Acrescentar item</button></div>
+   <div class="pp-edl">${E.itens.map((it,i)=>`<div class="pp-edi">${op?`<input data-ppe-i="${i}" data-ppe-k="area" list="ppe-al" maxlength="60" value="${esc(it.area||'')}" placeholder="Área" aria-label="Área do item ${i+1}">`:''}<input data-ppe-i="${i}" data-ppe-k="ativo" list="ppe-atl" maxlength="80" value="${esc(it.ativo||'')}" placeholder="Máquina / ativo" aria-label="Máquina do item ${i+1}"><textarea data-ppe-i="${i}" data-ppe-k="t" maxlength="200" rows="2" placeholder="O que conferir ou fazer" aria-label="Tarefa do item ${i+1}">${esc(it.t||'')}</textarea><button class="pp-edx" data-act="ppe-x" data-i="${i}" aria-label="Tirar o item ${i+1}">×</button></div>`).join('')||'<div class="empty">Nenhum item. Use "Acrescentar item".</div>'}</div>
+   <div class="gx-ac pp-edb"><button class="btn sec" data-act="ppe-canc">Cancelar</button><button class="btn" data-act="ppe-salvar" ${S.pp.busy?'disabled':''}>${S.pp.busy?'Gravando…':'Salvar'}</button></div></div></div>`; }
+{ const _vp=vManPlano; vManPlano=function(){ return _vp.apply(this,arguments)+ppEdHtml(); }; S.extViews.manplano=vManPlano; }
+function ppEdAbre(r){ const PL=S.pp.plano||{};
+  if(r==='op'){ S.pp.ed={op:true,itens:(PL.tarefas||[]).filter(t=>!t.rot&&ppOp(t)).map(t=>({id:t.id,area:t.area,ativo:t.ativo||'',t:t.t,cod:t.cod||''}))}; }
+  else if(r){ S.pp.ed={id:r.id,area:r.area,per:r.per,resp:r.resp,prox:r.prox||'',itens:ppItens(r).map(t=>({id:t.id,ativo:t.ativo||'',t:t.t,cod:t.cod||''}))}; }
+  else S.pp.ed={id:null,area:'',per:'Mensal',resp:'Mecânica',prox:ppUtil(addDias(hojeStr(),1)),itens:[{ativo:'',t:''}]};
+  render(); }
+async function ppEdSalvar(){ const P=S.pp, E=P.ed; ppEdLe(); if(!E||P.busy) return;
+  const itens=E.itens.map(i=>Object.assign({},i,{t:String(i.t||'').trim(),ativo:String(i.ativo||'').trim(),area:String(i.area||'').trim()})).filter(i=>i.t);
+  if(!E.op){ if(!String(E.area||'').trim()){ toast('Escreva a área do roteiro.'); return; } if(!String(E.resp||'').trim()){ toast('Escreva a equipe.'); return; } if(ppNorm(E.resp)==='operador'){ toast('Item do operador fica no checklist do posto: use "Editar os itens" do checklist do operador.'); return; } if(!itens.length){ toast('Coloque pelo menos um item.'); return; } }
+  else if(itens.some(i=>!i.area)){ toast('Todo item do operador precisa da área.'); return; }
+  P.busy=true; render(); const em=new Date().toISOString();
+  try{ const g=await S.db.doc('config/manutplano').get(); const d=g.exists?(g.data()||{}):{}; let tar=(d.tarefas||[]).map(t=>Object.assign({},t)), rot=(d.rot||[]).map(r=>Object.assign({},r)); const apag=new Set(d.apagados||[]);
+    if(E.op){ const antes=tar.filter(t=>!t.rot&&ppOp(t)), fica=new Set(itens.filter(i=>i.id).map(i=>i.id)); antes.forEach(t=>{ if(!fica.has(t.id)) apag.add(t.id); });
+      tar=tar.filter(t=>!(!t.rot&&ppOp(t)));
+      itens.forEach(i=>{ const old=antes.find(t=>t.id===i.id); const mud=!old||old.t!==i.t||old.ativo!==i.ativo||old.area!==i.area;
+        tar.push(Object.assign({},old||{},{id:i.id||('M'+mxId()),area:i.area,ativo:i.ativo,cod:i.cod||'',t:i.t,per:'Diária',freq:1,resp:'Operador',rot:null},old?(mud?{editado:true,edEm:em}:{}):{manual:true,edEm:em})); }); }
+    else { const pr=PP_PERS.find(x=>x[0]===E.per)||['Mensal',30], area=String(E.area).trim(), resp=String(E.resp).trim(); let id=E.id;
+      if(!id){ id='m'+mxId(); rot.push({id,area,per:pr[0],freq:pr[1],resp,n:itens.length,prox:E.prox||ppUtil(addDias(hojeStr(),1)),ult:null,manual:true,em}); }
+      else { const r=rot.find(x=>x.id===id); if(r) Object.assign(r,{area,per:pr[0],freq:pr[1],resp,n:itens.length,manual:true,edEm:em},E.prox&&E.prox!==r.prox?{prox:E.prox,osDe:null}:{}); }
+      const antes=tar.filter(t=>t.rot===id), fica=new Set(itens.filter(i=>i.id).map(i=>i.id)); antes.forEach(t=>{ if(!fica.has(t.id)) apag.add(t.id); });
+      tar=tar.filter(t=>t.rot!==id);
+      itens.forEach(i=>{ const old=antes.find(t=>t.id===i.id); tar.push(Object.assign({},old||{},{id:i.id||('M'+mxId()),area,ativo:i.ativo,cod:i.cod||'',t:i.t,per:pr[0],freq:pr[1],resp,rot:id},old?{editado:true,edEm:em}:{manual:true,edEm:em})); }); }
+    await S.db.doc('config/manutplano').set({tarefas:tar,rot,apagados:[...apag]},{merge:true});
+    P.plano=Object.assign({},P.plano||{},{tarefas:tar,rot,apagados:[...apag]}); P.ed=null; toast(E.op?'Checklist do operador salvo.':E.id?'Roteiro salvo.':'Roteiro criado.'); }
+  catch(e){ console.warn('[plano] salvar roteiro',e); toast('Não foi possível salvar. Verifique a internet.'); }
+  P.busy=false; render(); }
+async function ppApagar(id){ const P=S.pp; try{ const g=await S.db.doc('config/manutplano').get(); const d=g.exists?(g.data()||{}):{};
+    const apag=new Set(d.apagados||[]); (d.tarefas||[]).filter(t=>t.rot===id).forEach(t=>apag.add(t.id));
+    const tar=(d.tarefas||[]).filter(t=>t.rot!==id), rot=(d.rot||[]).filter(r=>r.id!==id);
+    await S.db.doc('config/manutplano').set({tarefas:tar,rot,apagados:[...apag]},{merge:true}); P.plano=Object.assign({},P.plano||{},{tarefas:tar,rot,apagados:[...apag]}); toast('Roteiro apagado.'); }
+  catch(e){ toast('Não foi possível apagar.'); } render(); }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="ppe-"]'); if(!b) return; const P=S.pp, a=b.dataset.act;
+  if(a==='ppe-novo'){ ppEdAbre(null); setTimeout(()=>{ const i=document.getElementById('ppe-area'); i&&i.focus(); },50); return; }
+  if(a==='ppe-ed'){ const r=ppRotDe(b.dataset.id); if(r) ppEdAbre(r); return; }
+  if(a==='ppe-op'){ ppEdAbre('op'); return; }
+  if(a==='ppe-apagar'){ const id=b.dataset.id; if(P.apg!==id){ P.apg=id; render(); setTimeout(()=>{ if(P.apg===id){ P.apg=null; render(); } },5000); return; } P.apg=null; ppApagar(id); return; }
+  if(a==='ppe-add'){ ppEdLe(); P.ed.itens.push({ativo:'',t:'',area:P.ed.op?((P.ed.itens[P.ed.itens.length-1]||{}).area||''):''}); render(); setTimeout(()=>{ const xs=document.querySelectorAll('[data-ppe-k="t"]'); xs.length&&xs[xs.length-1].focus(); },50); return; }
+  if(a==='ppe-x'){ ppEdLe(); P.ed.itens.splice(+b.dataset.i,1); render(); return; }
+  if(a==='ppe-canc'){ P.ed=null; render(); return; }
+  if(a==='ppe-salvar'){ ppEdSalvar(); return; } });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.pp.ed){ S.pp.ed=null; render(); } });
+{ const st=document.createElement('style'); st.id='pp-css3'; st.textContent=`
+.pp-sp{flex:1}.pp-edc{width:min(900px,100%)}.pp-edh{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px}
+.pp-edl{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;padding-right:4px}
+.pp-edi{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,2fr) 40px;gap:8px;align-items:start}.pp-edm .pp-edi:has(input[data-ppe-k="area"]){grid-template-columns:minmax(0,.8fr) minmax(0,.9fr) minmax(0,2fr) 40px}
+.pp-edi input,.pp-edi textarea{resize:vertical;font:inherit;font-size:14.5px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--surface);color:inherit;min-width:0}
+.pp-edx{font:inherit;font-size:20px;line-height:1;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--crit);cursor:pointer}
+.pp-edb{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media (max-width:700px){.pp-edi,.pp-edm .pp-edi:has(input[data-ppe-k="area"]){grid-template-columns:1fr 40px}.pp-edi textarea{grid-column:1}}
 `; document.head.appendChild(st); }
