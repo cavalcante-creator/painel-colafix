@@ -68,6 +68,9 @@ function poEstLinha(l){ const par=poParAberta(l);
   return {c:ab?(ab.impacto==='parou'&&!(ab.exec&&ab.exec.tecnico)?'crit':'warn'):'ok',t:'Sem ordem programada agora',s:ab?'':'nenhum chamado aberto',ch:chTxt}; }
 function poOrdCab(o,folha){ return `<section class="po-ord"><div><small>${folha?'FOLHA BIPADA ✓ · ':''}ORDEM ${esc(o.num)} · ${esc((o.linha||'').toUpperCase())}${o.rancho?' · RANCHO '+esc(o.rancho):''}</small><b>${esc(o.produto||'')}</b></div>${ttProg(o).replace('class="tt-prog"','class="tt-prog po-prog"')}</section>`; }
 function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
+  if(f==='sem') return poPagina('Posto · '+L.join(' e '),`<section class="cq-cta po-sem"><div><h1>Sem crachá</h1><p>Escreva seu nome para o que você fizer sair no seu nome.</p>
+      <label class="po-lb" for="tt-nome">Seu nome</label><input id="tt-nome" class="po-in po-tx" maxlength="60" autocomplete="off" value="${esc(T.txtNome||'')}">${poMsg()}</div></section>
+      <div class="cq-rod"><span>Enter continua · Esc volta</span><div class="po-rbs"><button class="cq-bt pri po-ok" data-act="tt-sem-ok"><b>Continuar (Enter)</b></button><button class="cq-sec" data-act="po-sai">Voltar (Esc)</button></div></div>`);
   if(f==='espera'||!T.p){ const cfg=T.po&&T.po.cfgL;
     return poPagina('Posto · '+L.join(' e '),`<div class="cq-lns">${L.map(l=>{ const e=poEstLinha(l); return `<section class="cq-ln ${e.c}${e.c==='crit'?' cq-pisca':''}"><div><h2>${esc(l)}</h2><i></i></div><b>${esc(e.t)}</b><span>${esc(e.s)}</span>${e.ch?`<em class="po-lch">${esc(e.ch)}</em>`:''}</section>`; }).join('')}</div>
       <section class="cq-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor</h1><p>Operador: chamar a manutenção, apontar, pedir material ou registrar parada. Técnico da manutenção: começar o atendimento de um chamado.</p>${poMsg()}</div></section>
@@ -132,7 +135,7 @@ function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
 { const _vt=vTotem; vTotem=function(){ if(poOn()){ S.tt.ocioso=60000; const h=vPosto(); if(h) return h; } return _vt.apply(this,arguments); }; }
 /* câmera: no posto fica no canto esquerdo (não tapa os botões) e pode sumir da tela — continua lendo o QR escondida */
 function poCamOff(){ try{ return localStorage.getItem('colafix.posto.cam')==='0'; }catch(e){ return false; } }
-function poFoco(){ if(!ttAtivo()||!poOn()) return; const f=S.tt.fase, id=f==='poap'?'po-av':f==='popm'?(S.tt.pm&&S.tt.pm.cod==='__outro'&&!String(S.tt.pm.txt||'').trim()?'po-pmt':'po-pmq'):''; const i=id&&document.getElementById(id);
+function poFoco(){ if(!ttAtivo()||!poOn()) return; const f=S.tt.fase, id=f==='sem'?'tt-nome':f==='poap'?'po-av':f==='popm'?(S.tt.pm&&S.tt.pm.cod==='__outro'&&!String(S.tt.pm.txt||'').trim()?'po-pmt':'po-pmq'):''; const i=id&&document.getElementById(id);
   if(i&&document.activeElement!==i){ i.focus(); try{ const n=i.value.length; i.setSelectionRange(n,n); }catch(e){} } }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ const on=ttAtivo()&&poOn(); document.body.classList.toggle('po-on',on); document.body.classList.toggle('po-camoff',on&&poCamOff()); if(on) setTimeout(poFoco,0); }catch(e){} return x; }; }
 
@@ -200,7 +203,7 @@ function SOMpo(k){ try{ if(typeof SOM!=='undefined'&&SOM[k]) SOM[k](); else ttBi
 
 /* ---------- cliques ---------- */
 function poVolta(){ const T=S.tt, f=T.fase;
-  if(f==='pomenu'||f==='tecnico'||f==='potec'||f==='pook'){ ttVoltar(); return; }
+  if(f==='pomenu'||f==='tecnico'||f==='potec'||f==='pook'||f==='sem'){ ttVoltar(); return; }
   if(f==='poch'){ poVai('pomenu'); return; }
   if(f==='popar'&&T.po&&T.po.parL){ T.po.parL=''; render(); return; }
   if(f==='poap'||f==='popm'||f==='poesc'){ T.hub=null; poVai('pofolha'); return; }
@@ -258,6 +261,7 @@ document.addEventListener('keydown',ev=>{ if(!ttAtivo()||!poOn()||ev.ctrlKey||ev
     if(ev.key==='Enter'){ ev.preventDefault(); poApontar(); return; } }
   if(f==='popm'&&ev.key==='Enter'){ ev.preventDefault(); const bt=document.querySelector('[data-act="po-pm-ok"]'); if(bt&&!bt.disabled) poPedir(); return; }
   if(f==='poch'&&ev.key==='Enter'&&!(document.activeElement&&document.activeElement.matches('button'))){ ev.preventDefault(); poAbrirChamado(); return; }
+  if(f==='sem'&&ev.key==='Enter'){ ev.preventDefault(); const b=document.querySelector('[data-act="tt-sem-ok"]'); b&&b.click(); return; }
   if(f==='pook'&&ev.key==='Enter'){ ev.preventDefault(); ttVoltar(); return; }
   if(f==='popar'&&!T.po.parL&&/^[1-9]$/.test(ev.key)){ const l=ttLinhas()[+ev.key-1]; if(l){ ev.preventDefault(); const p=poParAberta(l); if(p) poVoltou(p._id); else { T.po.parL=l; render(); } } } });
 /* ---------- painel do PCP: aviso "Deu erro? Avisar o PCP" toca e aparece no topo ---------- */
@@ -332,6 +336,7 @@ body.po-on.po-camoff #tt-video{opacity:0;pointer-events:none}
 .pcp-av{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;align-items:center;background:#B5473F;color:#FFFFFF;border-radius:14px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pcpPisca 1s ease-in-out 4}
 .pcp-av b{font-size:17px}.pcp-av span{grid-column:1;font-size:14px;opacity:.95}.pcp-av button{grid-row:1/3;grid-column:2;font:inherit;font-weight:700;border:0;border-radius:10px;padding:10px 18px;background:#FFFFFF;color:#B5473F;cursor:pointer}
 @keyframes pcpPisca{50%{background:#E3312D}}
+.po-sem{justify-content:flex-start;padding:clamp(20px,4vh,40px) clamp(24px,4vw,60px)}.po-sem>div{width:min(100%,760px);display:flex;flex-direction:column;gap:12px}.po-sem p{margin:0 0 8px}
 .po-cfg{background:var(--card);border-radius:14px;padding:12px 18px;display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;font-size:17px}.po-cfg div{display:flex;flex-wrap:wrap;gap:6px 18px}.po-cfg span{color:var(--tx2);font-size:14px}
 @media (max-width:900px){.po-menu{grid-template-columns:1fr;grid-template-rows:none}.po-par{grid-template-columns:1fr}.po-ord{grid-template-columns:1fr}}
 </style>`);

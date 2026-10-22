@@ -4,7 +4,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
 (async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString(), hj=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10))(new Date()); /* data local (depois das 21h o UTC já é amanhã) */
  D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
  D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',ativo:true,adesivo:'777888',criadoEm:t};
- D['config/geral'].paletes={'Linha 1':88,'Linha 2':88}; D['config/geral'].linhasOrdem=['Linha 1','Linha 2','Linha 3']; D['config/geral'].motivos=['Falta de cimento','Falta de areia','Manutenção','Outros'];
+ D['config/geral'].paletes={'Linha 1':88,'Linha 2':88}; D['config/geral'].totemSemCracha=true; D['config/geral'].linhasOrdem=['Linha 1','Linha 2','Linha 3']; D['config/geral'].motivos=['Falta de cimento','Falta de areia','Manutenção','Outros'];
  D['ordens/5001'].rancho='4471230'; D['ordens/5001'].data=hj; D['ordens/5002'].data=hj;
  D['ordens/5003']={num:'5003',produto:'AC3001 - ARGAMASSA AC3 20KG',linha:'Linha 3',data:hj,turno:'Dia todo',total:500,status:'aberta',criadaEm:t};
  D['ranchos/4471230']={numero:'4471230',criadoEm:t,ordens:[{num:'5001'}],itens:[{c:'CIM01',d:'CIMENTO CINZA',um:'kg',q:500},{c:'SAC01',d:'SACO VALVULADO AC3',um:'un',q:1000}]};
@@ -91,6 +91,11 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); }); await H.dorme(300);
  await bip('000123'); await p.evaluate(()=>{ __T.S().tt.ult=Date.now()-61000; }); await H.dorme(1500); s=await st();
  ok('Sem uso por 1 minuto, volta ao início sozinho', s.f==='espera', s.f);
+ await p.click('[data-act="tt-sem"]'); await H.dorme(500); s=await st(); const fsem=await p.evaluate(()=>document.activeElement&&document.activeElement.id);
+ ok('"Estou sem crachá" abre a tela do nome no posto, com o cursor no campo', s.f==='sem'&&/Sem crachá/.test(s.txt)&&fsem==='tt-nome', s.f+' '+fsem);
+ await p.keyboard.type('Joao Teste',{delay:40}); await p.keyboard.press('Enter'); await H.dorme(600); s=await st();
+ ok('Nome + Enter entra no menu no nome digitado', s.f==='pomenu'&&s.n==='Joao Teste'&&/Olá, Joao/.test(s.txt), s.f+' '+s.n);
+ await p.keyboard.press('Escape'); await H.dorme(400);
  console.log('erros:',B.erros.filter(x=>!/404/.test(x)).slice(0,4));
  await p.setViewportSize({width:1920,height:1080}); await bip('000123'); await H.dorme(300); await p.screenshot({path:'/tmp/po-menu-1080.png'});
  const rol=await p.evaluate(()=>({x:document.documentElement.scrollWidth>innerWidth+2, cq:(()=>{ const c=document.querySelector('.cq-main'); return c.scrollHeight>c.clientHeight+4; })()}));
