@@ -31,12 +31,12 @@ service cloud.firestore {
 
     // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
     match /{col}/{id} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
     }
     match /{col}/{id}/{resto=**} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
     }
 
     // Silos: histórico do saldo (consumo, estorno, medição). Só inclusão: ninguém altera nem apaga uma movimentação.
@@ -117,6 +117,11 @@ service cloud.firestore {
     }
 
     // Calendário de feriados (RH + produção): todos os liberados leem (regra geral); o RH também grava.
+    // Presença do dia pelo Face ID (resumo SEM CPF, 22/10): o RH (ou a administradora) grava; lê quem tem o RH ou a Visão do gestor
+    match /presenca/{dia} {
+      allow read: if rhOk() || (liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])));
+      allow write: if rhOk();
+    }
     match /config/feriados {
       allow write: if rhOk();
     }
