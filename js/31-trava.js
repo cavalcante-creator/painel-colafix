@@ -47,14 +47,14 @@ window.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.close
 
 /* ---------- Manutenção › Configurações: definir a senha (só a administradora) ---------- */
 { const _v=S.extViews.mancfg; if(_v){ S.extViews.mancfg=function(){ let h=_v.apply(this,arguments); if(!dbMaster()) return h; const t=S.cfg.travaSenha;
-  return h+`<section class="card trava-cfg"><h2>Travar o computador de chamados e o posto</h2><p class="sub" style="margin:4px 0 10px">Com a senha definida, ninguém sai do painel nesses computadores sem a senha de administrador (botão Sair). Para travar o computador inteiro, abra o navegador em modo quiosque — veja o passo a passo no guia.</p>
+  return h+`<section class="card trava-cfg"><h2>Travar os computadores da fábrica (chamados, posto e oficina)</h2><p class="sub" style="margin:4px 0 10px">Com a senha definida, ninguém sai do painel nesses computadores sem a senha de administrador (botão Sair). Para travar o computador inteiro, abra o navegador em modo quiosque — veja o passo a passo no guia.</p>
    <div class="trava-row"><label for="trava-n">Senha de administrador (mínimo 4)</label><input id="trava-n" type="password" class="txt" autocomplete="new-password"><button class="btn" data-act="trava-salvar">${t&&t.h?'Trocar a senha':'Definir a senha'}</button>${t&&t.h?'<button class="btn sec" data-act="trava-tirar">Tirar a trava</button>':''}</div>
    <p class="sub" style="margin:8px 0 0">${t&&t.h?'Trava ligada'+(t.em?' desde '+new Date(t.em).toLocaleDateString('pt-BR'):'')+'.':'Trava desligada: qualquer pessoa pode sair do computador de chamados.'}</p></section>`; }; } }
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="trava-salvar"],[data-act="trava-tirar"]'); if(!b||!dbMaster()) return;
   if(b.dataset.act==='trava-tirar'){ try{ await S.db.doc('config/geral').update({travaSenha:null}); S.cfg.travaSenha=null; toast('Trava tirada.'); }catch(e){ toast('Não foi possível salvar.'); } render(); return; }
   const i=document.getElementById('trava-n'), v=String(i&&i.value||''); if(v.length<4){ toast('A senha precisa ter pelo menos 4 caracteres.'); return; }
   const s=Math.random().toString(36).slice(2,10)+Date.now().toString(36), t={s,h:await travaHash(s,v),em:new Date().toISOString(),por:S.uid||null};
-  try{ await S.db.doc('config/geral').update({travaSenha:t}); S.cfg.travaSenha=t; toast('Senha salva. O computador de chamados e o posto ficam travados.'); }catch(e){ toast('Não foi possível salvar.'); } render(); });
+  try{ await S.db.doc('config/geral').update({travaSenha:t}); S.cfg.travaSenha=t; toast('Senha salva. O computador de chamados, o posto e o da oficina ficam travados.'); }catch(e){ toast('Não foi possível salvar.'); } render(); });
 document.head.insertAdjacentHTML('beforeend',`<style id="trava-css">
 .trava-m{position:fixed;inset:0;z-index:3000;background:rgba(14,30,40,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Archivo,'Segoe UI',system-ui,sans-serif}
 .trava-c{background:#fff;color:#143F54;border-radius:18px;padding:24px 26px;width:min(440px,100%);display:flex;flex-direction:column;gap:8px}.trava-c h2{margin:0;font-size:24px}.trava-c p{margin:0;color:#55666F}
