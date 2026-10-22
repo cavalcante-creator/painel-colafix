@@ -1,0 +1,35 @@
+/* Modo escuro (botão no topo) e topo do gestor: sino com os avisos da Visão do gestor, ações rápidas do gestor, sem MODO TV. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
+ d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
+ const erros=[]; let B=await H.abrir({viewport:{width:1440,height:1000}}); let p=B.page; p.on('pageerror',e=>erros.push(e.message));
+ await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
+ const tv=await p.evaluate(()=>{ const b=document.getElementById('tvbtn'); return !b||b.hidden||getComputedStyle(b).display==='none'||!b.offsetParent; });
+ ok('Marcelo não vê o botão MODO TV', tv);
+ await p.click('#tp-sino'); await H.dorme(400);
+ let t=await p.evaluate(()=>document.getElementById('tp-pop').innerText);
+ const al=await p.evaluate(()=>[...document.querySelectorAll('#view .gxn-al b, #view .gxn-al strong')].map(x=>x.innerText.trim()).filter(Boolean));
+ ok('Sino do Marcelo = avisos da Visão do gestor', al.length>0&&al.every(x=>t.includes(x))&&/2 ordens atrasadas/.test(t), JSON.stringify(al)+' | '+t.replace(/\n/g,'|'));
+ await p.click('#tp-mais'); await H.dorme(400); t=await p.evaluate(()=>document.getElementById('tp-pop').innerText);
+ ok('Ações rápidas do gestor (plano de ação, segurança, relatório, quem está na empresa) e nada de "Nova ordem"', /Nova ação no plano/.test(t)&&/segurança de hoje/.test(t)&&/relatório do dia/i.test(t)&&/quem está na empresa/i.test(t)&&!/Nova ordem|apontamento|premix/i.test(t), t.replace(/\n/g,'|'));
+ await p.click('#tp-pop [data-v="gx-acao"]'); await H.dorme(1200);
+ const v=await p.evaluate(()=>({v:__T.S().view,f:!!document.querySelector('#view textarea, #view input[type=text], .modal input')}));
+ ok('"Nova ação no plano" abre o Plano de ação com o formulário', v.v==='gxacoes'&&v.f, JSON.stringify(v));
+ await p.keyboard.press('Escape').catch(()=>{});
+ const th0=await p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
+ await p.click('#tp-tema'); await H.dorme(300);
+ const th1=await p.evaluate(()=>({a:document.documentElement.getAttribute('data-theme'),ls:localStorage.getItem('colafix.tema'),bg:getComputedStyle(document.body).backgroundColor}));
+ ok('Botão do tema liga o modo escuro e lembra no aparelho', th1.a==='dark'&&th1.ls==='dark', th0+' → '+JSON.stringify(th1));
+ await p.reload(); await H.dorme(3500);
+ const th2=await p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
+ ok('Depois de recarregar continua escuro', th2==='dark', th2);
+ await p.click('#tp-tema'); await H.dorme(300); const th3=await p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
+ await p.click('#tp-tema'); await H.dorme(300); const th4=await p.evaluate(()=>document.documentElement.getAttribute('data-theme'));
+ ok('Escuro → claro → automático', th3==='light'&&th4===null, th3+' / '+th4);
+ await B.browser.close();
+ /* administradora continua com o topo dela */
+ B=await H.abrir({viewport:{width:1440,height:1000}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(3000);
+ await p.click('#tp-mais'); await H.dorme(400); t=await p.evaluate(()=>document.getElementById('tp-pop').innerText);
+ ok('Administradora continua com as ações rápidas de sempre', /Nova ordem/.test(t)&&!/Nova ação no plano/.test(t), t.replace(/\n/g,'|'));
+ ok('Sem erros no console', !erros.length, erros.join(' | '));
+ await B.browser.close(); const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU tudo ('+res.length+')'); process.exit(f?1:0); })().catch(e=>{ console.log('FALHOU',e); process.exit(1); });
