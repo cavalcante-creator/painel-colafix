@@ -109,13 +109,22 @@ function vOfTec(){ const T=S.tt, eu=T.p.nome, ab=ofAb();
   const linPrev=c=>{ const outro=ofTec(c), cheio=c.exec&&c.exec.ajudante&&c.exec.ajudante.nome, n=(c.chkItens||[]).length, k=c.chk||{}, f=(c.chkItens||[]).filter(i=>k[i.id]&&k[i.id].s).length;
     return `<div class="of-r"><div><b>${esc(ofPrevTxt(c).slice(0,70))}</b><small>${outro?'Com '+esc(tecNomes(c))+' desde '+esc(String((c.exec||{}).inicio||'').slice(11,16))+(n?' · '+f+' de '+n+' conferidos':''):(n?n+' itens · ':'')+'ninguém começou'}</small></div>
       ${outro?(cheio?'<span class="of-s">dois técnicos</span>':ofBt('of-junto','Entrar junto (2º técnico)',c.numero,'sec')):ofBt('of-comecar','Começar',c.numero,'sec')}</div>`; };
-  const corpo=`<div class="of-tg"><div class="of-tl">
-     <section class="of-col"><h2>Para você aceitar <small>· do Marcelo</small></h2>${para.map(linPara).join('')||'<p class="of-vz">Nenhuma tarefa nova para você.</p>'}</section>
-     <section class="of-col"><h2>Comigo <small>· aceitas por você</small></h2>${meus.map(linMeu).join('')||'<p class="of-vz">Nada com você agora.</p>'}</section></div>
-    <div class="of-tl"><section class="of-col"><h2>Preventivas <small>· de hoje e atrasadas</small></h2>${prev.map(linPrev).join('')||'<p class="of-vz">Nenhuma preventiva aberta.</p>'}</section>
-     <section class="of-col"><h2>Chamados das linhas</h2>${lin.slice(0,4).map(c=>ofCardLinha(c,true)).join('')||'<p class="of-vz">Nenhum chamado aberto nas linhas.</p>'}<small class="of-p">O chamado da linha é começado e liberado no posto da linha, com o operador junto.</small></section></div></div>
-   ${ofMsg()}<div class="cq-rod"><div class="of-rb">${ofBt('of-peca','Pedir peça',null,'')}${ofBt('of-sem','Quadro da semana',null,'sec')}<span>Sem uso por 1 minuto, a tela volta para a fila.</span></div><button class="cq-sec" data-act="of-sai">Sair (Esc)</button></div>`;
-  return ofPagina('Manutenção · oficina',corpo); }
+  /* menu igual ao do posto (pedido de 22/10): números grandes, teclas 1–5 */
+  const sec=T.fase==='oflista'?S.of.sec:'';
+  if(!sec){ const nome=String(eu||'').split(/\s+/)[0], urg=para.filter(c=>c.prioridade==='urgente').length, dep=meus.filter(c=>!ofTec(c)).length, and=meus.filter(c=>ofTec(c)&&!tfConf(c)).length;
+    const bt=(n,cls,t,s2)=>`<button class="po-op ${cls}" data-act="of-op" data-n="${n}"><span class="po-k">${n}</span><div><b>${t}</b><small>${s2}</small></div></button>`;
+    return ofPagina('Manutenção · oficina',`<h1 class="cq-h">Olá, ${esc(nome)}. O que você quer fazer?</h1><div class="po-menu of-menu">
+      ${bt(1,'crit','Tarefas do Marcelo',para.length?para.length+' para aceitar'+(urg?' · '+urg+(urg>1?' urgentes':' urgente'):''):'nada novo para aceitar')}
+      ${bt(2,'ok','Minhas tarefas',meus.length?(and?and+' em andamento':'')+(and&&dep?' · ':'')+(dep?dep+' para começar':'')+(meus.length>and+dep?' · '+(meus.length-and-dep)+' esperando o Marcelo conferir':''):'nada com você agora')}
+      ${bt(3,'pri','Preventivas e checklist',prev.length?prev.length+(prev.length>1?' abertas':' aberta')+' · de hoje e atrasadas':'nenhuma preventiva aberta')}
+      ${bt(4,'warn','Pedir peça','escreva o que precisa · vai para o Marcelo')}
+      ${bt(5,'pri','Quadro da semana','o que vem nos próximos dias')}</div>
+      ${ofMsg()}<div class="cq-rod"><span>Aperte o número no teclado ou clique.${lin.length?' Chamados das linhas: '+lin.length+(lin.length>1?' abertos':' aberto')+' (atender no posto da linha).':''} Sem uso por 1 minuto, a tela volta ao início.</span><button class="cq-sec" data-act="of-sai">Sair (Esc)</button></div>`); }
+  const LST={aceitar:['Tarefas do Marcelo','para você aceitar',para.map(linPara).join('')||'<p class="of-vz">Nenhuma tarefa nova para você.</p>'],
+    meus:['Minhas tarefas','aceitas por você',meus.map(linMeu).join('')||'<p class="of-vz">Nada com você agora.</p>'],
+    prev:['Preventivas e checklist','de hoje e atrasadas',prev.map(linPrev).join('')||'<p class="of-vz">Nenhuma preventiva aberta.</p>']}[sec]||['','',''];
+  return ofPagina(LST[0],`<section class="of-col of-lst"><h2>${LST[0]} <small>· ${LST[1]}</small></h2>${LST[2]}</section>
+   ${ofMsg()}<div class="cq-rod"><span>Sem uso por 1 minuto, a tela volta ao início.</span><div class="of-rb"><button class="cq-sec" data-act="of-menu">Voltar (Esc)</button><button class="cq-sec" data-act="of-sai">Sair</button></div></div>`); }
 function vOfAcc(){ const T=S.tt, c=manDoc(S.of.acc); if(!c||!ofPend(c)){ T.fase='oftec'; return vOfTec(); } const D=S.of.dev, pr=typeof gchPrio==='function'?gchPrio(c.prioridade):['','Normal'];
   const corpo=`<section class="of-big"><span class="of-ovk ${c.prioridade==='urgente'?'crit':''}">TAREFA DO MARCELO · ${esc(pr[1].toUpperCase())} · OS ${manNum(c.numero)}</span><h1 class="cq-h">${ofOnde(c)}</h1><p class="of-tx">${esc(c.defeito||'')}</p>
      <p class="of-s">${c.tipo&&typeof gchTipoT==='function'?esc(gchTipoT(c.tipo))+' · ':''}${c.paraTec?'para '+esc(c.paraTec):'qualquer técnico'}${c.prazo?' · prazo '+dm(c.prazo):''} · enviada por ${esc(c.nome||'Marcelo')} às ${ofHm(c.criado)}${(c.devolvidas||[]).length?' · já devolvida '+(c.devolvidas.length)+'×':''}</p></section>
@@ -164,9 +173,9 @@ function vOfSem(){ const T=S.tt, f=S.of.fil||'todos', eu=T.p&&T.p.nome, h=hojeSt
    <div class="cq-rod"><span>Só para ver: quem muda as datas e passa as tarefas é o Marcelo, em Preventivas.</span><button class="cq-sec" data-act="of-volta">Voltar (Esc)</button></div>`;
   return ofPagina('Quadro da semana',corpo); }
 function vOficina(){ const T=S.tt; T.ocioso=60000;
-  if(T.fase==='tecnico'&&T.p) T.fase='oftec';
+  if(T.fase==='tecnico'&&T.p) T.fase=S.of.sec?'oflista':'oftec';
   if(T.fase==='espera'||!T.p){ if(T.fase==='ofsem') return vOfSem(); if(T.fase!=='espera'&&T.fase!=='sem') T.fase='espera'; if(T.fase==='espera') return vOfEspera(); return null; }
-  if(T.fase==='oftec') return vOfTec(); if(T.fase==='ofacc') return vOfAcc(); if(T.fase==='ofterm') return vOfTerm(); if(T.fase==='ofpeca') return vOfPeca();
+  if(T.fase==='oftec'||T.fase==='oflista') return vOfTec(); if(T.fase==='ofacc') return vOfAcc(); if(T.fase==='ofterm') return vOfTerm(); if(T.fase==='ofpeca') return vOfPeca();
   if(T.fase==='ofsem') return vOfSem(); if(T.fase==='ofok') return vOfOk();
   /* checklist da preventiva e "concluída" ficam na tela de chamados (38) */
   const h=typeof vChamados==='function'?vChamados():null; return h?h.replace('>Chamados da manutenção<','>Manutenção · oficina<'):null; }
@@ -175,7 +184,7 @@ function vOficina(){ const T=S.tt; T.ocioso=60000;
 /* ---------- crachá ---------- */
 { const _ti=ttInicia; ttInicia=function(p){ if(!ofOn()) return _ti.apply(this,arguments); const T=S.tt;
     if(p.papel!=='tecnico'){ T.p=null; ttMsg('Este computador é da equipe de manutenção. Para chamar a manutenção, use o posto da linha.'); return; }
-    Object.assign(T,{p,outra:false,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:'oftec',ult:Date.now()}); Object.assign(S.of,{acc:null,dev:null,term:null,peca:null,ok:null}); ttCamDesliga(); render(); }; }
+    Object.assign(T,{p,outra:false,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:'oftec',ult:Date.now()}); Object.assign(S.of,{sec:'',acc:null,dev:null,term:null,peca:null,ok:null}); ttCamDesliga(); render(); }; }
 { const _tv=ttVoltar; ttVoltar=function(){ if(ofOn()&&S.tt.p&&S.tt.p.codigo&&S.tt.recente) delete S.tt.recente[S.tt.p.codigo]; return _tv.apply(this,arguments); }; }
 setInterval(()=>{ const T=S.tt; if(ofOn()&&ttAtivo()&&T.fase==='ofok'&&Date.now()-T.ult>8000) ttVoltar(); },700);
 
@@ -190,7 +199,9 @@ async function ofComeca(c){ const T=S.tt, agora=new Date().toISOString(), E=Obje
 async function ofAcao(a,b){ const T=S.tt, O=S.of; if(!T.p) return; const n=b&&b.dataset.n!=null?+b.dataset.n:null, c=n!=null?manDoc(n):null;
   try{
     if(a==='of-ver'){ O.acc=n; O.dev=null; ofVai('ofacc'); return; }
-    if(a==='of-volta'){ O.dev=null; ofVai('oftec'); return; }
+    if(a==='of-volta'){ O.dev=null; ofVai(O.sec&&['ofacc','ofterm'].includes(T.fase)?'oflista':'oftec'); return; }
+    if(a==='of-menu'){ O.sec=''; ofVai('oftec'); return; }
+    if(a==='of-op'){ ofMenuAcao(+b.dataset.n); return; }
     if(a==='of-sai'){ ttVoltar(); return; }
     if(a==='of-nao'){ O.dev={mot:'',obs:''}; ofVai('ofacc'); return; }
     if(a==='of-mot'){ ofLe(); O.dev.mot=b.dataset.v; T.ult=Date.now(); render(); return; }
@@ -249,8 +260,18 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
   ofAcao(a,b); },true);
 document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!ofOn()||!ttAtivo()||document.getElementById('trava-m')) return; const T=S.tt;
   if(T.fase==='ofok'){ ev.preventDefault(); ttVoltar(); return; }
-  if(['ofacc','ofterm','ofpeca','cqchk'].includes(T.fase)||(T.fase==='ofsem'&&T.p)){ ev.preventDefault(); S.of.dev=null; T.fase='oftec'; T.msg=''; T.ult=Date.now(); render(); return; }
+  if(['ofacc','ofterm','cqchk'].includes(T.fase)&&S.of.sec){ ev.preventDefault(); S.of.dev=null; T.fase='oflista'; T.msg=''; T.ult=Date.now(); render(); return; }
+  if(['ofacc','ofterm','ofpeca','cqchk','oflista'].includes(T.fase)||(T.fase==='ofsem'&&T.p)){ ev.preventDefault(); S.of.dev=null; S.of.sec=''; T.fase='oftec'; T.msg=''; T.ult=Date.now(); render(); return; }
   if(T.fase==='oftec'||T.fase==='ofsem'){ ev.preventDefault(); ttVoltar(); } });
+/* teclas 1–5 no menu (espera 120 ms: rajada do coletor não dispara) */
+function ofMenuAcao(n){ const T=S.tt; if(!T.p) return; T.ult=Date.now();
+  if(n===1||n===2||n===3){ S.of.sec=['','aceitar','meus','prev'][n]; ofVai('oflista'); return; }
+  if(n===4){ S.of.peca={t:'',qtd:'1',os:'',urg:'semana'}; ofVai('ofpeca'); setTimeout(()=>{ const i=document.getElementById('of-pt'); i&&i.focus(); },60); return; }
+  if(n===5){ S.of.fil='eu'; ofVai('ofsem'); } }
+let ofTecla=null;
+document.addEventListener('keydown',ev=>{ if(!ofOn()||!ttAtivo()||S.tt.fase!=='oftec'||!S.tt.p||document.getElementById('trava-m')) return; if(ev.target&&/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)&&ev.target.id!=='cr-cap') return;
+  if(ofTecla){ clearTimeout(ofTecla); ofTecla=null; return; }
+  if(/^[1-5]$/.test(ev.key)){ const n=+ev.key; ev.preventDefault(); ofTecla=setTimeout(()=>{ ofTecla=null; if(S.tt.fase==='oftec') ofMenuAcao(n); },120); } });
 
 /* ---------- monitor da TV: tarefa aceita já tem dono (para o alarme) ---------- */
 { const _mt=mm2Tec; mm2Tec=function(c){ return _mt.apply(this,arguments)||ofAceito(c); }; }
@@ -366,6 +387,7 @@ document.head.insertAdjacentHTML('beforeend',`<style id="of-css">
 .of-cta{flex:none;background:#143F54;color:#fff;border-radius:16px;padding:14px 22px;display:flex;align-items:center;gap:20px}.of-cta svg{width:52px;height:52px;fill:none;stroke:#fff;stroke-width:2.5;flex:none}
 .of-cta h1{margin:0;font-size:clamp(20px,3vh,30px)}.of-cta p{margin:2px 0 0;opacity:.85;font-size:clamp(14px,1.8vh,18px)}.of-cta>div:nth-child(2){flex:1}.of-ctab{display:flex;flex-direction:column;gap:8px}.of-cta .of-b{background:#fff;color:#143F54;border-color:#fff}.of-cta .of-b.sec{background:transparent;color:#fff;border-color:#fff}
 .of-cta .cq-msg{background:#fff}
+.of-menu{grid-template-rows:repeat(3,minmax(0,1fr))}.of-lst{flex:1}
 .of-tg{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}.of-tl{display:flex;flex-direction:column;gap:16px;min-height:0}.of-tl>.of-col{flex:1 1 auto}
 .of-r{border-radius:12px;background:var(--pag);padding:12px 14px;display:flex;align-items:center;gap:14px}.of-r>div{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}.of-r b{font-size:clamp(16px,2.2vh,21px)}.of-r small{color:var(--tx2);font-size:clamp(13px,1.7vh,16px)}
 .of-r.crit{background:var(--critbg);box-shadow:inset 5px 0 0 var(--crit)}.of-r.and{box-shadow:inset 5px 0 0 var(--ok)}.of-r.dep{box-shadow:inset 5px 0 0 var(--info)}
@@ -412,4 +434,8 @@ document.head.insertAdjacentHTML('beforeend',`<style id="of-cam-css">
 body.of-on #tt-video{border-radius:12px;border:2px solid #9FC3D3;box-shadow:none}
 @media (max-width:1100px){.of-camslot{width:150px}}
 </style>`);
+/* tela inteira (chamados, posto, oficina): ao focar um campo o navegador rolava a tela fixa e cortava o topo */
+function cqSemRolar(){ document.querySelectorAll('.cq').forEach(e=>{ if(e.scrollTop) e.scrollTop=0; }); }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ cqSemRolar(); }catch(e){} return x; }; }
+document.addEventListener('focusin',()=>setTimeout(cqSemRolar,0)); document.addEventListener('scroll',ev=>{ if(ev.target&&ev.target.classList&&ev.target.classList.contains('cq')) cqSemRolar(); },true);
 /* ===FIM OFICINA=== */
