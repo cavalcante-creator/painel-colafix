@@ -6,13 +6,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  D['rh/dados/funcoes/f1']={nome:'Analista de RH',epis:[],uniformes:[]};
  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1200);
- const antes=await p.evaluate(()=>/Função "Analista de RH" sem EPI/.test(document.getElementById('view').innerText));
+ const antes=await p.evaluate(()=>/Função "Analista de RH" sem EPI|funções sem EPI cadastrado\n[^\n]*Analista de RH/.test(document.getElementById('view').innerText));
  await p.evaluate(()=>__T.go('rhfuncoes')); await H.dorme(900); await p.click('[data-act="rh-fed"][data-id="f1"]'); await H.dorme(500);
  await p.check('[data-rh-ffne]'); await H.dorme(200); await p.click('[data-act="rh-fsalvar"]'); await H.dorme(1200);
  const fn=await p.evaluate(async()=>{ const g=await __T.S().db.doc('rh/dados/funcoes/f1').get(); return {ne:g.data().naoUsaEpi,cel:[...document.querySelectorAll('#view tr')].map(r=>r.innerText).find(t=>/Analista de RH/.test(t))||''}; });
  ok('Função marcada "Esta função não usa EPI" é gravada e a lista mostra "não usa EPI"', fn.ne===true&&/não usa EPI/.test(fn.cel), JSON.stringify(fn).slice(0,200));
  await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1000);
- const depois=await p.evaluate(()=>/Função "Analista de RH" sem EPI/.test(document.getElementById('view').innerText));
+ const depois=await p.evaluate(()=>/Função "Analista de RH" sem EPI|funções sem EPI cadastrado\n[^\n]*Analista de RH/.test(document.getElementById('view').innerText));
  ok('Some o aviso "Função sem EPI" do Início (antes aparecia)', antes&&!depois, JSON.stringify({antes,depois}));
  await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(1500);
  const fi=await p.evaluate(()=>{ const t=document.getElementById('view').innerText, tr=[...document.querySelectorAll('#view tr')].map(r=>r.innerText).find(x=>/ANA SOUZA/.test(x))||''; return {ana:tr.replace(/\s+/g,' '),res:(t.match(/\d+ de \d+ assinadas?/)||[''])[0]}; });
