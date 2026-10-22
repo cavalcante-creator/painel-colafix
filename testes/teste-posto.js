@@ -96,6 +96,15 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click(`[data-act="po-lib"][data-n="${nCh}"]`); await H.dorme(2000); s=await st();
  const c3=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,lib:c.liberadoPor,op:c.liberadoPeloOperador}; },nCh);
  ok('"Liberar e fechar chamado": o operador fecha o chamado e libera a máquina', c3.st==='Concluída'&&c3.lib==='Ana Souza'&&c3.op===true&&/Máquina liberada/.test(s.txt), JSON.stringify(c3));
+ { await p.keyboard.press('Enter'); await H.dorme(500);
+   await p.evaluate(()=>{ const db=__T.S().db, t=new Date(Date.now()-30*6e4).toISOString(), lib=new Date(Date.now()-5*6e4).toISOString();
+     return db.doc('chamados/os-00777').set({numero:777,linha:'Linha 2',defeito:'Elétrico',impacto:'parou',status:'Em execução',criado:t,quando:t.slice(0,16),nome:'Teste',exec:{tecnico:'Bruno Lima',inicio:t.slice(0,16)},liberadoEm:lib,liberadoPor:'Alguém',hist:[]}); }); await H.dorme(1200);
+   const esp=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.cq-ln')].find(x=>/Linha 2/.test(x.textContent)); return e?e.innerText.replace(/\n/g,' | '):''; });
+   await bip('000123'); await p.keyboard.press('1'); await H.dorme(700); const tem=!!(await p.$('[data-act="po-lib"][data-n="777"]'));
+   ok('Chamado "sendo arrumado" que já tinha liberação pela metade aparece para liberar no posto', /Sendo arrumada/.test(esp)&&tem, esp+' · botão:'+tem);
+   if(tem){ await p.click('[data-act="po-lib"][data-n="777"]'); await H.dorme(2000); }
+   const st7=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.numero===777); return c&&c.status; });
+   ok('… e "Liberar e fechar chamado" fecha esse chamado', st7==='Concluída', st7); }
  await p.keyboard.press('Enter'); await H.dorme(400);
  await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); }); await H.dorme(300);
  await bip('000123'); await p.evaluate(()=>{ __T.S().tt.ult=Date.now()-61000; }); await H.dorme(1500); s=await st();

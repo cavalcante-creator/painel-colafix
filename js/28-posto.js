@@ -30,7 +30,7 @@ const PO_IMP=[['parou','Parou completa','crit'],['reduziu','Parou em parte (semi
 const poImpTxt=v=>({parou:'parou completa',reduziu:'parou em parte',nao:'não interferiu'})[v]||v||'';
 function poChamado(linha,imp){ const T=S.tt; T.ch={linha,tipo:'',imp:imp||''}; poVai('poch'); }
 /* chamados com o técnico trabalhando, nas linhas do posto: o operador confere e libera */
-function poEmAtend(){ const L=ttLinhas(); return cqAbertos().filter(c=>L.includes(c.linha)&&c.exec&&c.exec.tecnico&&!c.liberadoEm).sort((a,b)=>String(a.criado).localeCompare(String(b.criado))); }
+function poEmAtend(){ const L=ttLinhas(); return cqAbertos().filter(c=>L.includes(c.linha)&&c.exec&&c.exec.tecnico).sort((a,b)=>String(a.criado).localeCompare(String(b.criado))); }
 function poMenuAcao(n){ const T=S.tt, L=ttLinhas(); if(!T.p) return;
   if(n===1){ poChamado(L.includes(T.p.linha)?T.p.linha:L[0],''); return; }
   if(n===2||n===3){ T.po={acao:n===2?'ap':'pm'}; T.hub=null; poVai('pofolha'); return; }
@@ -195,7 +195,12 @@ async function poLiberar(n){ const T=S.tt, c=manDoc(n); if(!c||T.enviando||!T.p)
     const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Operador conferiu e liberou a máquina no posto: '+T.p.nome+(T.p.codigo?' (crachá)':'')}]).slice(-200);
     await S.db.doc('chamados/'+c._id).update({exec:E,hist,liberadoEm:agora,liberadoPor:T.p.nome,liberadoCracha:T.p.codigo||null,liberadoPeloOperador:true}); Object.assign(c,{exec:E,hist,liberadoEm:agora,liberadoPor:T.p.nome});
     c._mzOk=true; try{ await manStatus(c,'Concluída'); } finally { delete c._mzOk; }
-    T.enviando=false; if(c.status!=='Concluída'){ T.msg='Não foi possível fechar o chamado. Confira a internet e tente de novo.'; render(); return; }
+    if(c.status!=='Concluída'){ /* o fechamento normal não gravou (ex.: ficou preso de uma tentativa anterior): fecha direto */
+      delete c._stGrav; const E2=Object.assign({},c.exec||{}); if(!E2.fim) E2.fim=manAgoraLocal().slice(0,16);
+      const h2=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:(c.status||'')+' → Concluída (liberado no posto)'}]).slice(-200);
+      await S.db.doc('chamados/'+c._id).update({status:'Concluída',exec:E2,hist:h2,concluidoEm:agora,concluidoPor:S.uid||null}); Object.assign(c,{status:'Concluída',exec:E2,hist:h2,concluidoEm:agora});
+      const pa=c.paradaId&&(S.paradas||[]).find(x=>x._id===c.paradaId); if(pa&&!pa.fim){ await S.db.doc('paradas/'+pa._id).update({fim:agora>pa.inicio?agora:pa.inicio,porFim:S.uid||null,fimPor:T.p.nome}); pa.fim=agora; } }
+    T.enviando=false;
     SOMpo('ok'); poVai('pook',{okTit:'Máquina liberada · chamado '+manNum(n)+' fechado',okTxt:(c.linha||'')+' · conserto de '+(c.exec&&c.exec.tecnico||'manutenção')+' · liberado por '+T.p.nome}); }
   catch(e){ T.enviando=false; console.warn('[posto] liberar',e); T.msg='Não foi possível fechar o chamado: '+cqErroTxt(e)+'.'; render(); } }
 async function poAinda(n){ const T=S.tt, c=manDoc(n); if(!c||!T.p) return;
