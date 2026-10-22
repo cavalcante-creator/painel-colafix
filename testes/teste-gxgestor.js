@@ -15,12 +15,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  for(let i=0;i<40&&!(await p.evaluate(()=>!!(window.__T&&__T.S()._chamLido&&__T.S().ordens.length&&__T.S().anl&&__T.S().anl.base&&__T.S().anl.base.prev)));i++) await H.dorme(250); await H.dorme(800);
  const tx=()=>p.evaluate(()=>document.getElementById('view').innerText);
  let e=await p.evaluate(()=>({v:__T.S().view,nav:document.getElementById('navlist').innerText+' || '+document.getElementById('view').innerText.slice(0,200)}));
- ok('Marcelo entra no Início novo; a Visão do gestor tem Início, Produção, Relatórios, Plano de ação, Pessoas e segurança, Calendário de preventivas, Turnos e TVs', e.v==='gxinicio'&&['Início','Produção','Relatórios','Plano de ação','Pessoas e segurança','Calendário de preventivas','Turnos','TVs'].every(x=>e.nav.includes(x))&&/Visão do gestor/.test(e.nav)&&!/Relatório do mês/.test(e.nav), e.v+' | '+e.nav.replace(/\n/g,'|'));
+ ok('Marcelo entra no Início novo; o menu da Visão do gestor tem Início, Produção, Relatórios, Plano de ação, Segurança, Preventivas, Turnos e TVs', e.v==='gxinicio'&&['Início','Produção','Relatórios','Plano de ação','Segurança','Preventivas','Turnos','TVs da fábrica'].every(x=>e.nav.includes(x))&&!/Relatório do mês/.test(e.nav), e.v+' | '+e.nav.replace(/\n/g,'|'));
  let t=await tx();
  ok('Início: "Precisa de você" com a Linha 2 parada e o chamado sem técnico', /Precisa de você/.test(t)&&/Linha 2 parada há/.test(t)&&/Chamado 00001 sem técnico/.test(t), t.slice(0,400).replace(/\n/g,'|'));
  /* 500 sacos de 20 kg + 400 de 25 kg = 10 t + 10 t = 20,0 t */
- ok('Início: produção até agora em toneladas pelo peso do saco (20,0 t)', /Produção até agora\s*20,0 t/i.test(t), (t.match(/Produção até agora[^\n]*\n[^\n]*/i)||[''])[0]);
- ok('Início: segurança ainda "Não preenchido"', /Não preenchido/.test(t));
+ ok('Início: produção até agora em toneladas pelo peso do saco (20,0 t)', /Produzido hoje\s*20,0 t/i.test(t), (t.match(/Produzido hoje[^\n]*\n[^\n]*/i)||[''])[0]);
+ ok('Início: segurança ainda "Falta preencher"', /Falta preencher/.test(t));
  await p.evaluate(()=>__T.go('gxdia')); await H.dorme(900); t=await tx();
  ok('Relatório do dia: produção 20,0 t, 900 sacos e a meta do dia da Curva S', /Produção do dia\s*20,0 t/i.test(t)&&/900 sacos/.test(t)&&!/Meta do dia\s*—/i.test(t), (t.match(/Produção do dia[\s\S]{0,140}/i)||[''])[0].replace(/\n/g,'|'));
  ok('Relatório do dia: paradas sem o setup (Linha 2 aberta + 30 min da Linha 1) e a tabela por linha', /Setup \(setup, não conta\)|setup, não conta/.test(t)&&/Linha 1\s*10,0\s*500/.test(t)&&/Linha 2\s*10,0\s*400/.test(t), (t.match(/Linha 1\s*10,0[^\n]*/)||[''])[0]);

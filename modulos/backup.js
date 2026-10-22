@@ -3,7 +3,7 @@
    Importar: grava esse arquivo num projeto Firebase NOVO (mudança de projeto). Não importa logins/permissões
    (acessos, pedidos): as pessoas são recriadas em Equipe e cargos. Os nomes (perfis) vão junto para o histórico. */
 (function(){ const P=window.Painel; if(!P) return;
-  const COLECOES=['config','ordens','entregas','entregasarq','previsoes','itens','paradas','ranchos','rancrec','diario','alxfila','medicoes','cargas','premix','silos','silomov',
+  const COLECOES=['config','presenca','ordens','entregas','entregasarq','previsoes','itens','paradas','ranchos','rancrec','diario','alxfila','medicoes','cargas','premix','silos','silomov',
     'chamados','chamfotos','pecasmov','pecafotos','crachas','conferencias','auditorias','recebimentos','pmxfichas','pmxrec','pmxbaixas','pcpbase','pcpsnap','pcpvendas',
     'ritplano','ritfech','sistema','perfis','acessos','pedidos','_arquivos','_arquivos_p','pedmat','pcpavisos','gxacoes','gxseg','apontpend','melhorias','exemplo'];
   const SUB={'rh':{docs:['config'],sub:{'rh/dados':['funcionarios','funcoes','retiradas','terceiros','presenca','fichasmes','modelos','docsgerados','ferias','ocorrencias','emprestimos','convites','fichascand','almoco','almocoaj','epis'],'rh/arquivos':['lista','partes']}}};
