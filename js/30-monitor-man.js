@@ -16,9 +16,11 @@ function mm2Sirene(){ try{ const A=window.AudioContext||window.webkitAudioContex
   for(let i=0;i<4;i++){ const o=c.createOscillator(), g=c.createGain(), t=c.currentTime+i*0.4; o.type='square'; o.frequency.value=i%2?660:990; o.connect(g); g.connect(c.destination);
     g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.45,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+0.36); o.start(t); o.stop(t+0.38); } }catch(e){} }
 /* quais chamados estão "tocando": abertos sem técnico, que chegaram depois que a tela abriu (ou há menos de 30 min) e não foram silenciados */
+/* tarefa do gestor que não é urgente não dispara a sirene (aparece na lista) */
+function mm2Alarma(c){ return !(c&&c.tarefa&&c.prioridade!=='urgente'&&c.impacto!=='parou'); }
 function mm2Vigia(){ if(S.view!=='manmon') return; const ab=mm2Abertos(), M=S.mm2, ids=ab.map(c=>c._id);
-  if(M.vistos===null){ M.vistos=new Set(ids); M.alerta=ab.filter(c=>!mm2Tec(c)&&Date.now()-new Date(c.criado||0).getTime()<30*6e4).map(c=>c._id); }
-  else { ab.forEach(c=>{ if(!M.vistos.has(c._id)){ M.vistos.add(c._id); if(!mm2Tec(c)) M.alerta.push(c._id); } }); }
+  if(M.vistos===null){ M.vistos=new Set(ids); M.alerta=ab.filter(c=>!mm2Tec(c)&&mm2Alarma(c)&&Date.now()-new Date(c.criado||0).getTime()<30*6e4).map(c=>c._id); }
+  else { ab.forEach(c=>{ if(!M.vistos.has(c._id)){ M.vistos.add(c._id); if(!mm2Tec(c)&&mm2Alarma(c)) M.alerta.push(c._id); } }); }
   M.alerta=M.alerta.filter(id=>{ const c=ab.find(x=>x._id===id); return c&&!mm2Tec(c)&&!M.cal.has(id); });
   const on=M.alerta.length>0; document.body.classList.toggle('mm2-al',on);
   if(on&&Date.now()-M.ultSom>2600){ M.ultSom=Date.now(); mm2Sirene(); }

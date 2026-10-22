@@ -23,14 +23,14 @@ document.addEventListener('click',ev=>{ if(!(ev.target.closest&&ev.target.closes
     if(s.startsWith('gx:')){ S.tp.pop=null; tpFechaPop(); go(s.slice(3)); return; } return _ir.apply(this,arguments); }; }
 { const _m=tpMais; tpMais=function(){ if(!(typeof gxSolo==='function'&&gxSolo())) return _m.apply(this,arguments); const ok=v=>{ try{ return viewOk(v); }catch(e){ return false; } }, xs=[];
     if(ok('gxacoes')) xs.push(['gx-acao','Nova ação no plano','']); if(ok('gxseg')) xs.push(['gx-seg','Preencher a segurança de hoje','']);
-    if(ok('manprev')||ok('gxcal')) xs.push(['gx-prev','Programar preventiva','']); if(ok('manch')) xs.push(['gx-os','Abrir chamado de manutenção','']);
+    if(ok('manprev')||ok('gxcal')) xs.push(['gx-prev','Programar preventiva','']); if(ok('gxch')) xs.push(['gx-os','Nova tarefa para a manutenção','']); else if(ok('manch')) xs.push(['gx-os','Abrir chamado de manutenção','']);
     if(ok('gxdia')) xs.push(['gx-pdf','Baixar o relatório do dia (PDF)','']); if(ok('gxpres')) xs.push(['gx-pres','Ver quem está na empresa','']); return xs; }; }
 { const _a=tpAcao; tpAcao=function(a){ if(!String(a).startsWith('gx-')) return _a.apply(this,arguments); S.tp.pop=null; tpFechaPop();
     const clica=(attrs)=>setTimeout(()=>{ const b=document.createElement('button'); Object.assign(b.dataset,attrs); b.hidden=true; document.body.appendChild(b); b.click(); b.remove(); },60);
     if(a==='gx-acao'){ go('gxacoes'); clica({act:'gx-ac-nova'}); return; }
     if(a==='gx-seg'){ clica({act:'gx-seg-ir',d:hojeStr()}); return; }
     if(a==='gx-prev'){ go(viewOk('manprev')?'manprev':'gxcal'); return; }
-    if(a==='gx-os'){ clica({act:'gx-novaos'}); return; }
+    if(a==='gx-os'){ if(viewOk('gxch')){ go('gxch'); clica({act:'gch-nova'}); } else clica({act:'gx-novaos'}); return; }
     if(a==='gx-pdf'){ S.gx.dia=hojeStr(); go('gxdia'); clica({act:'gx-pdf-dia'}); return; }
     if(a==='gx-pres'){ go('gxpres'); return; } }; }
 /* sem MODO TV para o gestor (as TVs dele ficam em "TVs da fábrica") */
