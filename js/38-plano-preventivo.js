@@ -257,7 +257,13 @@ S.extViews=S.extViews||{}; S.extViews.manplano=vManPlano;
       if(os&&r.osDe) add(r.osDe>=ini&&r.osDe<=fim?r.osDe:(r.osDe<ini?ini:fim),{st:os.exec&&os.exec.tecnico?'and':(r.osDe<h?'atr':'pen'),t,os});
       let d=r.prox; for(let i=0;i<400&&d<=fim;i++){ if(d>=ini&&!(os&&r.osDe===d)) add(d,{st:d<h?'atr':'pen',t}); d=ppUtil(addDias(d,fr)); } }); }catch(e){} return out; }; }
 { const _vc=vGxCal; vGxCal=function(){ let h=_vc.apply(this,arguments); try{ if(viewOk('manplano')) h=h.replace('<button class="btn sec" data-go="manprev">Lista de preventivas</button>','<button class="btn sec" data-go="manprev">Lista de preventivas</button><button class="btn sec" data-go="manplano">Plano preventivo</button>'); }catch(e){} return h; }; S.extViews.gxcal=vGxCal; }
-{ const _al=gxAlertas; gxAlertas=function(){ const out=_al.apply(this,arguments); try{ const PL=S.pp.plano; if(PL){ const atr=(PL.rot||[]).filter(r=>r.ativo!==false&&ppSt(r)==='atrasada'); if(atr.length) out.push({c:'warn',t:atr.length+' roteiro'+(atr.length>1?'s':'')+' do plano preventivo atrasado'+(atr.length>1?'s':''),d:atr.slice(0,3).map(ppNomeRot).join(' · '),go:'manplano'}); } }catch(e){} return out; }; }
+/* os roteiros entram na lista de preventivas usada no Início do gestor, nos avisos e no painel da manutenção
+   (não na tela "Preventivas", que tem ações só das preventivas avulsas) */
+let ppSemRot=false;
+{ const _ps=mxPrevStatus; mxPrevStatus=function(){ const out=_ps.apply(this,arguments); if(ppSemRot) return out; try{ const PL=S.pp.plano; if(!PL) return out;
+    (PL.rot||[]).filter(r=>r.ativo!==false).forEach(r=>{ const n=ppItens(r).length; out.push({p:{id:'rot-'+r.id,tarefa:ppNomeRot(r)+' ('+n+' itens)',prox:r.prox,freq:r.freq,ultima:r.ult||null,resp:r.resp,rot:r.id},e:{nome:r.area,linha:ppLinhaDe(r.area)||r.area},os:ppOs(r),st:ppSt(r)}); });
+    out.sort((a,b)=>String(a.p.prox||'9').localeCompare(String(b.p.prox||'9'))); }catch(e){} return out; }; }
+{ const _vp=vManPrev; vManPrev=function(){ ppSemRot=true; try{ let h=_vp.apply(this,arguments); if(S.pp.plano&&viewOk('manplano')) h=h.replace('<section class="card','<div class="pp-av"><b>Plano preventivo:</b> os '+((S.pp.plano.rot||[]).length)+' roteiros da planilha ficam em <button class="lnk" data-go="manplano">Plano preventivo</button>.</div><section class="card'); return h; } finally { ppSemRot=false; } }; }
 
 { const st=document.createElement('style'); st.id='pp-css'; st.textContent=`
 .pp-r{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:6px 14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.pp-r:last-child{border-bottom:0}
@@ -282,6 +288,7 @@ S.extViews=S.extViews||{}; S.extViews.manplano=vManPlano;
 .pp-cqr{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .pp-opg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.pp-op{display:flex;flex-direction:column;gap:2px}.pp-op .pp-bar{margin:4px 0}.pp-op small{color:var(--muted)}
 .pp-pbl{margin-top:10px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}.pp-pbl small{color:var(--muted)}
+.pp-av{background:var(--sunken,#F3F6F8);border-radius:12px;padding:10px 14px;font-size:14px;margin:0 0 14px}
 .pp-imp{display:flex;flex-direction:column;gap:8px}.pp-imp h2{margin:0}.pp-ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.pp-ig>div{background:var(--sunken,#F3F6F8);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}.pp-ig b{font-size:26px}.pp-ig span{font-size:13px;color:var(--muted)}
 .pp-pr{display:flex;flex-direction:column;gap:3px;font-size:13.5px}.pp-pr small{color:var(--muted)}.pp-ib{display:flex;justify-content:flex-end;gap:8px}
 @media (max-width:700px){.pp-r{grid-template-columns:52px minmax(0,1fr)}.pp-r .pill{grid-column:2}.pp-cqi{grid-template-columns:1fr 1fr}.pp-cqi>span{grid-column:1/-1}}
