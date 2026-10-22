@@ -71,14 +71,28 @@ const util=d=>{ for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00').getDay();
  /* calendário do gestor mostra os roteiros */
  await p.evaluate(()=>{ __T.S().gx=__T.S().gx||{}; __T.S().gx.cal=null; __T.go('gxcal'); }); await H.dorme(900);
  tx=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Calendário de preventivas mostra os roteiros do plano e o botão "Plano preventivo"', /Linha 1 · Mensal \(Elétrica\)|Linha 2 · Trimestral|Linha 1 · Semanal/.test(tx)&&/Plano preventivo/.test(tx), tx.slice(0,600).replace(/\n/g,'|'));
+ ok("Calendário de preventivas mostra os roteiros do plano e a aba do Plano", /Linha 1 · Mensal \(Elétrica\)|Linha 2 · Trimestral|Linha 1 · Semanal/.test(tx)&&/Plano \(roteiros\)/.test(tx), tx.slice(0,600).replace(/\n/g,'|'));
+ /* Preventivas do gestor: abas, planejar o dia, tarefa programada abre OS no dia e não entra em Chamados */
+ await p.evaluate(()=>{ __T.S().gx.pvTab='cal'; __T.go('gxcal'); }); await H.dorme(800);
+ tx=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Preventivas tem as abas Calendário · Planejar o dia · Plano (roteiros)', /Calendário/.test(tx)&&/Planejar o dia/.test(tx)&&/Plano \(roteiros\)/.test(tx), tx.slice(0,300).replace(/\n/g,'|'));
+ await p.click(`.pp-cdk[data-ppd="${rt.prox}"]`).catch(()=>{}); await H.dorme(700);
+ let pv=await p.evaluate(()=>({tab:__T.S().gx.pvTab,dia:__T.S().pp.dia,t:document.getElementById('view').innerText}));
+ ok('Tocar no dia do calendário abre "Planejar o dia" com o roteiro daquele dia', pv.tab==='dia'&&/Linha 2 · Trimestral/.test(pv.t)&&/Programar tarefa para/.test(pv.t), JSON.stringify({tab:pv.tab,dia:pv.dia})+' '+pv.t.slice(0,300).replace(/\n/g,'|'));
+ await p.click('[data-act="ppg-dia"][data-d="'+hj+'"]').catch(async()=>{ await p.evaluate(h=>{ __T.S().pp.dia=h; __T.render&&__T.render(); },hj); }); await H.dorme(600);
+ await p.evaluate(h=>{ __T.S().pp.dia=h; },hj); await p.click('[data-act="ppg-tab"][data-v="dia"]'); await H.dorme(600);
+ await p.fill('#ppg-t','Revisar o portão da portaria'); await p.selectOption('#ppg-o','Portaria'); await p.fill('#ppg-l','portão 2'); await p.selectOption('#ppg-tc','Bruno Lima'); await p.click('[data-act="ppg-add"]'); await H.dorme(12000);
+ let ag=await p.evaluate(()=>{ const S=__T.S(), a=((S.pp.plano||{}).agenda||[])[0], c=a&&(S.chamados||[]).find(x=>x.agId===a.id); return {a:a&&{dia:a.dia,t:a.t,onde:a.onde,tec:a.paraTec},c:c&&{n:c.numero,prev:c.prevId,tf:c.tarefa,l:c.linha,tec:c.paraTec}}; });
+ ok('Tarefa programada para hoje: grava na agenda e a OS abre sozinha (preventiva, para o Bruno)', ag.a&&ag.a.dia===hj&&ag.a.onde==='Portaria'&&ag.c&&/^ag-/.test(ag.c.prev)&&ag.c.tf&&ag.c.l==='Portaria'&&ag.c.tec==='Bruno Lima', JSON.stringify(ag));
+ await p.evaluate(()=>__T.go('gxch')); await H.dorme(700); tx=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('A tarefa programada NÃO aparece em Chamados (lá só o imediato)', !/Revisar o portão/.test(tx), tx.slice(0,300).replace(/\n/g,'|'));
  await salva(p); await B.browser.close();
  /* 2) computador de chamados: técnico começa e faz o checklist */
  ({B,p}=await abre('chamados','ch1234',1600));
  const bip=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); };
  const zera=async()=>{ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(700); };
  await bip('777888'); tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
- ok('Técnico vê a preventiva: "Preventiva do plano · 3 itens" e "Começar a preventiva"', /Preventiva do plano · 3 itens/.test(tx)&&/Começar a preventiva/.test(tx), tx.slice(0,500).replace(/\n/g,'|'));
+ ok('Técnico vê a preventiva ("Preventiva do plano · 3 itens", "Começar a preventiva") e a tarefa programada', /Preventiva do plano · 3 itens/.test(tx)&&/Começar a preventiva/.test(tx)&&/Revisar o portão da portaria/.test(tx), tx.slice(0,500).replace(/\n/g,'|'));
  await p.click(`[data-act="cq-comecar"][data-n="${os.n}"]`); await H.dorme(1500); await zera(); await bip('777888');
  const bt=await p.evaluate(n=>{ const b=document.querySelector(`[data-act="cq-terminar"][data-n="${n}"]`); return b?b.innerText:''; },os.n);
  ok('Depois de começar: "Fazer o checklist e concluir"', /Fazer o checklist e concluir/.test(bt), bt);

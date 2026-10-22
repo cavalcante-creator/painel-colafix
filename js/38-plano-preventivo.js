@@ -68,8 +68,8 @@ function ppMonta(tarefas,antigo){ const velho={}; ((antigo&&antigo.rot)||[]).for
   return {tarefas,rot,ativos:Object.values(ativos),novos:novos.length}; }
 async function ppGravar(){ const P=S.pp, I=P.imp; if(!I||!I.tarefas||P.busy) return; P.busy=true; render();
   try{ const M=ppMonta(I.tarefas.map(t=>Object.assign({},t)),P.plano);
-    await S.db.doc('config/manutplano').set({tarefas:M.tarefas,rot:M.rot,ativos:M.ativos,em:new Date().toISOString(),por:S.uid||null,arquivo:I.nome});
-    P.plano={tarefas:M.tarefas,rot:M.rot,ativos:M.ativos,em:new Date().toISOString(),arquivo:I.nome}; P.imp=null;
+    await S.db.doc('config/manutplano').set({tarefas:M.tarefas,rot:M.rot,ativos:M.ativos,em:new Date().toISOString(),por:S.uid||null,arquivo:I.nome},{merge:true});
+    P.plano=Object.assign({},P.plano||{},{tarefas:M.tarefas,rot:M.rot,ativos:M.ativos,em:new Date().toISOString(),arquivo:I.nome}); P.imp=null;
     toast('Plano importado: '+M.rot.length+' roteiros da manutenção e '+M.tarefas.filter(t=>!t.rot).length+' itens do checklist do operador.'); }
   catch(e){ console.warn('[plano] gravar',e); toast('Não foi possível gravar o plano: '+((e&&e.message)||e)); }
   P.busy=false; render(); }
@@ -198,12 +198,12 @@ window.addEventListener('keydown',ev=>{ if(typeof ttAtivo!=='function'||!ttAtivo
 { const _pv=poVolta; poVolta=function(){ if(S.tt&&S.tt.fase==='pochk'){ poVai('pomenu'); return; } return _pv.apply(this,arguments); }; }
 
 /* ---------- tela "Plano preventivo" (Manutenção) ---------- */
-function vManPlano(){ const P=S.pp, PL=P.plano;
-  const topo=`${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Plano preventivo</h1><div class="sub">As tarefas do plano viram roteiros (área + periodicidade + equipe). No dia, abre uma OS com o checklist; o técnico confere item a item e a próxima data é marcada sozinha. As diárias do operador são o checklist do posto.</div></div>
+function vManPlano(emb){ const P=S.pp, PL=P.plano;
+  const topo=emb?`<div class="pp-emb"><span class="sub" style="margin:0">Os roteiros da planilha: cada um abre uma OS com checklist no dia marcado. As diárias do operador são o checklist do posto.</span><label class="btn sec" style="cursor:pointer">${ic('folha',18,2)}${PL?'Importar planilha de novo':'Importar planilha do plano'}<input type="file" accept=".xlsx,.xls" data-pp-arq hidden></label></div>`:`${banner()}<div class="head"><div><div class="eyebrow">MANUTENÇÃO</div><h1>Plano preventivo</h1><div class="sub">As tarefas do plano viram roteiros (área + periodicidade + equipe). No dia, abre uma OS com o checklist; o técnico confere item a item e a próxima data é marcada sozinha. As diárias do operador são o checklist do posto.</div></div>
     <div class="pg-acts" style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn ${PL?'sec':''}" style="cursor:pointer">${ic('folha',18,2)}${PL?'Importar planilha de novo':'Importar planilha do plano'}<input type="file" accept=".xlsx,.xls" data-pp-arq hidden></label></div></div>`;
   const imp=P.imp?ppImpHtml():'';
   if(!P.lido) return topo+'<section class="card"><div class="empty">Carregando…</div></section>';
-  if(!PL) return topo+imp+`<section class="card"><div class="empty">Nenhum plano importado ainda. Use "Importar planilha do plano" (abas Plano e Ativos: ID, Área, Ativo, Tarefa, Periodicidade, Responsável, Última execução).</div></section>`;
+  if(!PL||!(PL.tarefas||[]).length) return topo+imp+`<section class="card"><div class="empty">Nenhum plano importado ainda. Use "Importar planilha do plano" (abas Plano e Ativos: ID, Área, Ativo, Tarefa, Periodicidade, Responsável, Última execução).</div></section>`;
   const rots=(PL.rot||[]).filter(r=>r.ativo!==false).map(r=>({r,st:ppSt(r),os:ppOs(r),n:ppItens(r).length}));
   const cnt=k=>rots.filter(x=>x.st===k).length, eqs=[...new Set(rots.map(x=>x.r.resp))].sort();
   const vis=rots.filter(x=>(P.f==='todos'||(P.f==='pend'?['atrasada','hoje','aberta'].includes(x.st):x.st===P.f))&&(!P.eq||x.r.resp===P.eq)).sort((a,b)=>String(a.r.prox).localeCompare(String(b.r.prox)));
@@ -256,7 +256,7 @@ S.extViews=S.extViews||{}; S.extViews.manplano=vManPlano;
     (PL.rot||[]).filter(r=>r.ativo!==false&&r.prox).forEach(r=>{ const os=ppOs(r), t=r.area+' · '+r.per+' ('+r.resp+')', fr=Math.max(1,+r.freq||30);
       if(os&&r.osDe) add(r.osDe>=ini&&r.osDe<=fim?r.osDe:(r.osDe<ini?ini:fim),{st:os.exec&&os.exec.tecnico?'and':(r.osDe<h?'atr':'pen'),t,os});
       let d=r.prox; for(let i=0;i<400&&d<=fim;i++){ if(d>=ini&&!(os&&r.osDe===d)) add(d,{st:d<h?'atr':'pen',t}); d=ppUtil(addDias(d,fr)); } }); }catch(e){} return out; }; }
-{ const _vc=vGxCal; vGxCal=function(){ let h=_vc.apply(this,arguments); try{ if(viewOk('manplano')) h=h.replace('<button class="btn sec" data-go="manprev">Lista de preventivas</button>','<button class="btn sec" data-go="manprev">Lista de preventivas</button><button class="btn sec" data-go="manplano">Plano preventivo</button>'); }catch(e){} return h; }; S.extViews.gxcal=vGxCal; }
+
 /* os roteiros entram na lista de preventivas usada no Início do gestor, nos avisos e no painel da manutenção
    (não na tela "Preventivas", que tem ações só das preventivas avulsas) */
 let ppSemRot=false;
@@ -292,4 +292,118 @@ let ppSemRot=false;
 .pp-imp{display:flex;flex-direction:column;gap:8px}.pp-imp h2{margin:0}.pp-ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.pp-ig>div{background:var(--sunken,#F3F6F8);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}.pp-ig b{font-size:26px}.pp-ig span{font-size:13px;color:var(--muted)}
 .pp-pr{display:flex;flex-direction:column;gap:3px;font-size:13.5px}.pp-pr small{color:var(--muted)}.pp-ib{display:flex;justify-content:flex-end;gap:8px}
 @media (max-width:700px){.pp-r{grid-template-columns:52px minmax(0,1fr)}.pp-r .pill{grid-column:2}.pp-cqi{grid-template-columns:1fr 1fr}.pp-cqi>span{grid-column:1/-1}}
+`; document.head.appendChild(st); }
+
+/* ===================== Preventivas do gestor: Calendário · Planejar o dia · Plano =====================
+   Para o Marcelo, "Preventivas" é onde ele organiza o que a manutenção faz em cada dia (planejado);
+   "Chamados" é o imediato. Tarefa programada para um dia fica em config/manutplano.agenda
+   [{id,dia,t,onde,local,tipo,paraTec,em,por,removido}] e no dia abre sozinha uma OS (prevId 'ag-<id>', agId, tarefa:true),
+   que NÃO aparece na tela Chamados do gestor (lá só entra o que não é preventiva). */
+S.gx.pvTab=S.gx.pvTab||'cal'; S.pp.dia=S.pp.dia||hojeStr(); S.pp.agf=S.pp.agf||{t:'',onde:'',local:'',tipo:'',tec:''};
+function ppAgenda(){ return ((S.pp.plano||{}).agenda||[]).filter(a=>!a.removido); }
+function ppAgOs(a){ return (S.chamados||[]).filter(c=>!manIgnorar(c)&&c.agId===a.id).sort((x,y)=>y.numero-x.numero)[0]||null; }
+function ppAgSt(a){ const os=ppAgOs(a), h=hojeStr(); if(os) return manFechada(os)?'feita':(os.exec&&os.exec.tecnico)?'and':'aberta'; return a.dia<h?'atrasada':a.dia===h?'hoje':'prog'; }
+async function ppGravaAg(muda){ const g=await S.db.doc('config/manutplano').get(); const d=g.exists?(g.data()||{}):{}; const ag=(d.agenda||[]).map(x=>Object.assign({},x)); muda(ag);
+  await S.db.doc('config/manutplano').set({agenda:ag},{merge:true}); S.pp.plano=Object.assign({},S.pp.plano||{},{agenda:ag}); }
+/* o que cai num dia: roteiros do plano, preventivas avulsas e tarefas programadas */
+function ppDoDia(d){ const out=[], PL=S.pp.plano||{};
+  (PL.rot||[]).filter(r=>r.ativo!==false&&r.prox).forEach(r=>{ const os=ppOs(r); if(os&&r.osDe===d){ out.push({k:'rot',r,os,prim:true}); return; }
+    let x=r.prox; for(let i=0;i<400&&x<=d;i++){ if(x===d){ out.push({k:'rot',r,os:null,prim:i===0&&!os}); break; } x=ppUtil(addDias(x,Math.max(1,+r.freq||30))); } });
+  ((S.mx&&S.mx.cfg&&S.mx.cfg.prev)||[]).filter(p=>p.ativo!==false&&p.prox).forEach(p=>{ const os=typeof mxOsPrev==='function'?mxOsPrev(p):null; if(os&&p.osDe===d){ out.push({k:'av',p,os,prim:true}); return; }
+    let x=p.prox; for(let i=0;i<400&&x<=d;i++){ if(x===d){ out.push({k:'av',p,os:null,prim:i===0&&!os}); break; } x=addDias(x,Math.max(1,+p.freq||30)); } });
+  ppAgenda().filter(a=>a.dia===d).forEach(a=>out.push({k:'ag',a,os:ppAgOs(a),prim:true}));
+  return out; }
+function ppDiaCont(d){ return ppDoDia(d).length; }
+const PP_AGST={feita:['Feita','ok'],and:['Em andamento','prod'],aberta:['OS aberta','warn'],atrasada:['Atrasada','crit'],hoje:['Hoje','warn'],prog:['Programada','neu']};
+function ppOndeSel(id,val){ const L=linhasOrd(), locs=(typeof GCH_LOCAIS!=='undefined'?GCH_LOCAIS:['Prédio / escritório','Pátio','Portaria','Almoxarifado','Refeitório','Oficina']);
+  return `<select id="${id}" class="txt"><option value="">Onde…</option><optgroup label="Linhas">${L.map(l=>`<option ${val===l?'selected':''}>${esc(l)}</option>`).join('')}</optgroup><optgroup label="Fora das linhas">${locs.map(l=>`<option ${val===l?'selected':''}>${esc(l)}</option>`).join('')}</optgroup></select>`; }
+function vPpDia(){ const d=S.pp.dia||hojeStr(), h=hojeStr(), xs=ppDoDia(d), F=S.pp.agf, w0=addDias(d,-((new Date(d+'T12:00:00').getDay()+6)%7));
+  const sem=Array.from({length:7},(_,i)=>addDias(w0,i)).map(x=>{ const n=ppDiaCont(x), fds=[0,6].includes(new Date(x+'T12:00:00').getDay()); return `<button class="pp-wd${x===d?' on':''}${x===h?' hoje':''}${fds?' fds':''}" data-act="ppg-dia" data-d="${x}"><span>${ppSemana(x)}</span><b>${+x.slice(8)}</b><small>${n?n+' ite'+(n>1?'ns':'m'):'—'}</small></button>`; }).join('');
+  const tecs=(typeof gchTecs==='function'?gchTecs():[]);
+  const lin=x=>{ if(x.k==='rot'){ const r=x.r, n=ppItens(r).length, st=x.os?(x.os.exec&&x.os.exec.tecnico?'and':'aberta'):(d<h?'atrasada':d===h?'hoje':'prog'), ab=S.pp.ab[r.id];
+      return `<div class="pp-dl"><span class="pp-tag pp-tg-rot">Plano</span><div class="pp-dt2"><b>${esc(r.area)} · ${esc(r.per)}</b><small>${esc(r.resp)} · ${n} itens no checklist${x.prim?'':' · repetição prevista'}</small>${ab?`<div class="pp-its">${ppItens(r).map(t=>`<div><b>${esc(t.ativo||t.cod)}</b> ${esc(t.t)}</div>`).join('')}</div>`:''}</div><span class="pill ${PP_AGST[st][1]}">${PP_AGST[st][0]}</span>
+        <div class="pp-da"><button class="eq-lk" data-act="pp-ver" data-id="${esc(r.id)}">${ab?'Esconder itens':'Ver itens'}</button>${x.os?`<button class="btn sec" data-act="man-abrir" data-n="${x.os.numero}" data-ir="1">OS ${manNum(x.os.numero)}</button>`:x.prim?`<label class="pp-dt"><span>passar para</span><input type="date" data-ppg-mv="rot|${esc(r.id)}" value="${d}"></label><button class="eq-lk" data-act="pp-gerar" data-id="${esc(r.id)}">${ic('play',15,2)}Gerar OS agora</button>`:''}</div></div>`; }
+    if(x.k==='av'){ const p=x.p, e=typeof mxEquip==='function'?mxEquip(p.equip):null, st=x.os?'aberta':(d<h?'atrasada':d===h?'hoje':'prog');
+      return `<div class="pp-dl"><span class="pp-tag pp-tg-av">Preventiva</span><div class="pp-dt2"><b>${esc(p.tarefa)}</b><small>${esc((e&&e.nome)||'')}${e&&e.linha?' · '+esc(e.linha):''}${p.resp?' · '+esc(p.resp):''} · a cada ${p.freq} dias</small></div><span class="pill ${PP_AGST[st][1]}">${PP_AGST[st][0]}</span>
+        <div class="pp-da">${x.os?`<button class="btn sec" data-act="man-abrir" data-n="${x.os.numero}" data-ir="1">OS ${manNum(x.os.numero)}</button>`:x.prim?`<label class="pp-dt"><span>passar para</span><input type="date" data-ppg-mv="av|${esc(p.id)}" value="${d}"></label>`:''}</div></div>`; }
+    const a=x.a, st=ppAgSt(a), cf=S.pp.agDel===a.id;
+    return `<div class="pp-dl"><span class="pp-tag pp-tg-ag">Tarefa</span><div class="pp-dt2"><b>${esc(a.t)}</b><small>${esc(a.onde||'')}${a.local?' · '+esc(a.local):''}${a.tipo&&typeof gchTipoT==='function'?' · '+esc(gchTipoT(a.tipo)):''}${a.paraTec?' · para '+esc(a.paraTec):' · qualquer técnico'}</small></div><span class="pill ${PP_AGST[st][1]}">${PP_AGST[st][0]}</span>
+      <div class="pp-da">${x.os?`<button class="btn sec" data-act="man-abrir" data-n="${x.os.numero}" data-ir="1">OS ${manNum(x.os.numero)}</button>`:`<label class="pp-dt"><span>passar para</span><input type="date" data-ppg-mv="ag|${esc(a.id)}" value="${d}"></label><button class="eq-lk del" data-act="ppg-tira" data-id="${esc(a.id)}">${cf?'Toque de novo para tirar':'Tirar'}</button>`}</div></div>`; };
+  const ordem={ag:0,rot:1,av:2};
+  const op=d===h?(()=>{ const k=((S.pp.ck[h]||{}).it)||{}, ops=((S.pp.plano||{}).tarefas||[]).filter(t=>!t.rot&&ppOp(t)); if(!ops.length) return ''; const f=ops.filter(t=>k[t.id]&&k[t.id].s).length, pb=ops.filter(t=>k[t.id]&&k[t.id].s==='pb').length;
+      return `<section class="card pp-opr"><b>Checklist do operador hoje</b><div class="pp-bar"><i style="width:${f/ops.length*100}%"></i></div><span>${f} de ${ops.length} itens feitos nos postos${pb?' · <span class="pp-pbt">'+pb+' com problema</span>':''}</span><button class="lnk" data-act="ppg-tab" data-v="plano">ver por área</button></section>`; })():'';
+  return `<section class="card pp-dhd"><div class="pp-dnav"><button class="btn sec" data-act="ppg-dia" data-d="${addDias(d,-1)}" aria-label="Dia anterior">‹</button><div><b>${(x=>x.charAt(0).toUpperCase()+x.slice(1))(new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}))}</b><small>${xs.length?xs.length+' programado'+(xs.length>1?'s':''):'nada programado'}${d===h?' · hoje':''}</small></div><button class="btn sec" data-act="ppg-dia" data-d="${addDias(d,1)}" aria-label="Próximo dia">›</button>
+      <input type="date" class="txt" data-ppg-ir value="${d}" aria-label="Ir para o dia">${d!==h?`<button class="lnk" data-act="ppg-dia" data-d="${h}">hoje</button>`:''}</div><div class="pp-wk">${sem}</div></section>
+    ${op}
+    <div class="pp-dg"><section class="card"><h2 class="pp-h2">O que a manutenção faz neste dia</h2>${xs.length?xs.sort((a,b)=>ordem[a.k]-ordem[b.k]).map(lin).join(''):'<div class="empty">Nada programado. Use "Programar tarefa" ao lado.</div>'}
+       <p class="sub" style="font-size:12.5px;margin:10px 0 0">No dia, cada item abre uma OS sozinho na fila da manutenção (computador de chamados, posto e Manutenção). Para algo imediato, use <button class="lnk" data-go="gxch">Chamados</button>.</p></section>
+     <section class="card pp-agf"><h2 class="pp-h2">Programar tarefa para ${dm(d)}</h2>
+       <label class="gx-f">O que fazer<input id="ppg-t" maxlength="200" value="${esc(F.t)}" placeholder="Ex.: pintar a faixa do pátio, revisar o portão"></label>
+       <label class="gx-f">Onde${ppOndeSel('ppg-o',F.onde)}</label>
+       <label class="gx-f">Detalhe do lugar (opcional)<input id="ppg-l" maxlength="60" value="${esc(F.local)}" placeholder="Ex.: máquina, portão 2"></label>
+       <div class="gx-f3"><label class="gx-f">Tipo<select id="ppg-tp"><option value="">—</option>${(typeof GCH_TIPOS!=='undefined'?GCH_TIPOS:[]).map(([k,t])=>`<option value="${k}" ${F.tipo===k?'selected':''}>${t}</option>`).join('')}</select></label>
+        <label class="gx-f">Para quem<select id="ppg-tc"><option value="">Qualquer técnico</option>${tecs.map(t=>`<option value="${esc(t.nome)}" ${F.tec===t.nome?'selected':''}>${esc(t.nome)}${t.area?' · '+esc(t.area):''}</option>`).join('')}</select></label></div>
+       <button class="btn" data-act="ppg-add" ${S.pp.busy?'disabled':''} style="margin-top:12px">${ic('mais',18,2)}Programar para ${dm(d)}</button></section></div>`; }
+function ppgLe(){ const F=S.pp.agf, v=id=>{ const e=document.getElementById(id); return e?e.value:null; }; [['t','ppg-t'],['onde','ppg-o'],['local','ppg-l'],['tipo','ppg-tp'],['tec','ppg-tc']].forEach(([k,id])=>{ const x=v(id); if(x!=null) F[k]=x; }); }
+/* abre a OS da tarefa programada no dia */
+async function ppAgGera(a){ if(typeof soVer==='function'&&soVer()) return null; let lk=null; try{ lk=S.db.doc('config/manut-ag-'+a.id); const r=await lk.acquire({holder:S.uid||('t'+Math.random()),ttlMs:9000}); if(!r.acquired) return null; }catch(e){ lk=null; }
+  try{ const g=await S.db.doc('config/manutplano').get(); const dd=g.exists?(g.data()||{}):{}; const aa=(dd.agenda||[]).find(x=>x.id===a.id); if(!aa||aa.removido||aa.osDe||ppAgOs(aa)) return null;
+    const agora=new Date(), loc=new Date(agora.getTime()-agora.getTimezoneOffset()*6e4).toISOString().slice(0,16), tp=aa.tipo&&typeof gchTipoT==='function'?gchTipoT(aa.tipo):'';
+    const doc=await mxNovaOS({linha:aa.onde||'Geral',local:aa.local||null,quando:loc,defeito:aa.t,tipo:aa.tipo||null,impacto:'nao',prioridade:'normal',prazo:aa.dia,paraTec:aa.paraTec||null,tarefa:true,nome:aa.porNome||'Gestor',equip:(aa.local?aa.local+' · ':'')+'Programada'+(tp?' · '+tp:''),equipId:null,status:'Aberta',criado:agora.toISOString(),por:S.uid||null,
+      prevId:'ag-'+aa.id,agId:aa.id,origem:'preventiva-agenda',exec:{tipo:'Preventiva'},hist:[{em:agora.toISOString(),por:S.uid||null,o:'Tarefa programada para '+dm(aa.dia)+' aberta'+(aa.paraTec?' para '+aa.paraTec:'')}]});
+    await ppGravaAg(ag=>{ const x=ag.find(y=>y.id===aa.id); if(x){ x.osDe=hojeStr(); x.os=doc.numero; } }); return doc; }
+  finally{ try{ lk&&await lk.release(); }catch(e){} } }
+setInterval(async()=>{ const P=S.pp; if(P.agGerando||!P.lido||!S.db) return; try{ if(!viewOk('manch')||(typeof soVer==='function'&&soVer())) return; }catch(e){ return; }
+  const h=hojeStr(), dev=ppAgenda().filter(a=>a.dia&&a.dia<=h&&!a.osDe&&!ppAgOs(a)).slice(0,6); if(!dev.length) return; P.agGerando=true;
+  try{ for(const a of dev) await ppAgGera(a); }catch(e){ console.warn('[plano] tarefa programada',e); } P.agGerando=false; },9000);
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="ppg-"]'); if(!b) return; const P=S.pp, a=b.dataset.act;
+  if(a==='ppg-tab'){ ppgLe(); S.gx.pvTab=b.dataset.v; render(); return; }
+  if(a==='ppg-dia'){ ppgLe(); P.dia=b.dataset.d; P.agDel=null; render(); return; }
+  if(a==='ppg-tira'){ const id=b.dataset.id; if(P.agDel!==id){ P.agDel=id; render(); setTimeout(()=>{ if(P.agDel===id){ P.agDel=null; render(); } },5000); return; }
+    P.agDel=null; try{ await ppGravaAg(ag=>{ const x=ag.find(y=>y.id===id); if(x){ x.removido=true; x.remEm=new Date().toISOString(); } }); toast('Tarefa tirada da programação.'); }catch(e){ toast('Não foi possível tirar.'); } render(); return; }
+  if(a==='ppg-add'){ ppgLe(); const F=P.agf, d=P.dia||hojeStr(), t=String(F.t||'').trim(); if(!t){ toast('Escreva o que a manutenção vai fazer.'); return; } if(!F.onde){ toast('Escolha onde é o serviço.'); return; } if(d<hojeStr()){ toast('Esse dia já passou. Escolha hoje ou um dia à frente.'); return; }
+    P.busy=true; render(); const nome=(()=>{ try{ return nomeDe(S.uid)||'Gestor'; }catch(e){ return 'Gestor'; } })();
+    try{ await ppGravaAg(ag=>{ ag.push({id:mxId(),dia:d,t:t.slice(0,200),onde:F.onde,local:String(F.local||'').trim()||null,tipo:F.tipo||null,paraTec:F.tec||null,em:new Date().toISOString(),por:S.uid||null,porNome:nome}); });
+      P.agf={t:'',onde:F.onde,local:'',tipo:F.tipo,tec:F.tec}; toast('Tarefa programada para '+dm(d)+'.'+(d===hojeStr()?' A OS abre em instantes.':'')); }
+    catch(e){ console.warn('[plano] programar',e); toast('Não foi possível programar. Verifique a internet.'); }
+    P.busy=false; render(); return; } });
+document.addEventListener('change',async ev=>{ const t=ev.target; if(!t||!t.dataset) return;
+  if(t.dataset.ppgIr!=null&&t.value){ ppgLe(); S.pp.dia=t.value; render(); return; }
+  if(t.dataset.ppgMv&&t.value){ const [k,id]=t.dataset.ppgMv.split('|'), d=t.value;
+    try{ if(k==='rot') await ppGravaRot(rot=>{ const x=rot.find(y=>y.id===id); if(x){ x.prox=d; x.osDe=null; } });
+      else if(k==='av') await mxGrava(cf=>{ const x=(cf.prev||[]).find(y=>y.id===id); if(x) x.prox=d; });
+      else if(k==='ag') await ppGravaAg(ag=>{ const x=ag.find(y=>y.id===id); if(x) x.dia=d; });
+      toast('Passou para '+dm(d)+'.'); }catch(e){ toast('Não foi possível mudar o dia.'); } render(); } });
+/* calendário: tarefas programadas também; tocar no dia abre "Planejar o dia" */
+{ const _pm=gxPrevMes; gxPrevMes=function(cp){ const out=_pm.apply(this,arguments); try{ ppAgenda().filter(a=>a.dia&&a.dia.slice(0,7)===cp).forEach(a=>{ const os=ppAgOs(a); if(os&&os.status==='Concluída') return; const st=ppAgSt(a); (out[a.dia]=out[a.dia]||[]).push({st:st==='and'?'and':st==='atrasada'?'atr':'pen',t:'Tarefa: '+a.t,os}); }); }catch(e){} return out; }; }
+{ const _ps=mxPrevStatus; mxPrevStatus=function(){ const out=_ps.apply(this,arguments); if(ppSemRot) return out; try{ const h=hojeStr();
+    ppAgenda().forEach(a=>{ const st=ppAgSt(a); if(st==='feita') return; out.push({p:{id:'ag-'+a.id,tarefa:'Tarefa: '+a.t,prox:a.dia,resp:a.paraTec||'',ag:a.id},e:{nome:a.onde+(a.local?' · '+a.local:''),linha:a.onde},os:ppAgOs(a),st:st==='and'||st==='aberta'?'aberta':st==='atrasada'?'atrasada':st==='hoje'?'hoje':a.dia<=addDias(h,7)?'semana':'ok'}); });
+    out.sort((x,y)=>String(x.p.prox||'9').localeCompare(String(y.p.prox||'9'))); }catch(e){} return out; }; }
+CRUMB.gxcal='Preventivas';
+{ const _vc=vGxCal; vGxCal=function(){ const tab=S.gx.pvTab||'cal', solo=typeof gxSolo==='function'&&gxSolo();
+  const tabs=`<div class="gx-rt pp-tabs" role="tablist" aria-label="Preventivas">${[['cal','Calendário'],['dia','Planejar o dia'],['plano','Plano (roteiros)']].map(([k,t])=>`<button role="tab" data-act="ppg-tab" data-v="${k}" class="${tab===k?'on':''}" aria-selected="${tab===k}">${t}</button>`).join('')}</div>`;
+  if(tab==='cal'){ let h=_vc.apply(this,arguments); h=h.replace('Calendário de preventivas','Preventivas'); if(solo) h=h.replace('<button class="btn sec" data-go="manprev">Lista de preventivas</button>','');
+    const cp=S.gx.cal||hojeStr().slice(0,7); h=h.replace(/<div class="gx-cd([^"]*)"><div class="gx-cdh"><b>(\d+)<\/b>/g,(m,c,n)=>`<div class="gx-cd${c} pp-cdk" data-ppd="${cp}-${pad(+n)}" title="Planejar o dia ${pad(+n)}"><div class="gx-cdh"><b>${n}</b>`);
+    const i=h.indexOf('<section'); return (i>=0?h.slice(0,i)+tabs+h.slice(i):h+tabs)+'<p class="sub" style="font-size:12.5px">Toque num dia para ver e organizar o que a manutenção faz nele.</p>'; }
+  const cab=`${banner()}${gxCab('MANUTENÇÃO','Preventivas','')}${tabs}`;
+  if(tab==='dia') return cab+vPpDia();
+  return cab+vManPlano(true); }; S.extViews.gxcal=vGxCal; }
+document.addEventListener('click',ev=>{ const c=ev.target.closest&&ev.target.closest('.pp-cdk[data-ppd]'); if(!c||ev.target.closest('button')) return; S.pp.dia=c.dataset.ppd; S.gx.pvTab='dia'; render(); window.scrollTo(0,0); });
+/* no login do gestor, "Programar preventiva" leva a Preventivas › Planejar o dia */
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-go="manprev"]'); if(!b||!(typeof gxSolo==='function'&&gxSolo())) return; ev.stopPropagation(); ev.preventDefault(); S.gx.pvTab='dia'; go('gxcal'); },true);
+{ const st=document.createElement('style'); st.id='pp-css2'; st.textContent=`
+.pp-tabs{margin:0}.pp-emb{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+.pp-cdk{cursor:pointer}.pp-cdk:hover{border-color:var(--teal-strong,#143F54)}
+.pp-dhd{display:flex;flex-direction:column;gap:12px}.pp-dnav{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.pp-dnav>div{display:flex;flex-direction:column;min-width:220px}.pp-dnav>div b{font-size:20px}.pp-dnav>div small{color:var(--muted)}.pp-dnav input{max-width:170px}
+.pp-wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.pp-wd{font:inherit;color:inherit;display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 4px;border-radius:12px;border:2px solid var(--line);background:var(--surface);cursor:pointer}
+.pp-wd span{font-size:12px;color:var(--muted);text-transform:uppercase}.pp-wd b{font-size:20px}.pp-wd small{font-size:12px;color:var(--muted)}.pp-wd.on{border-color:var(--teal-strong,#143F54);background:rgba(20,63,84,.07)}.pp-wd.hoje b{color:var(--crit)}.pp-wd.fds{opacity:.6}
+.pp-dg{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:18px;align-items:start}@media (max-width:1100px){.pp-dg{grid-template-columns:1fr}}
+.pp-h2{font-size:17px;margin:0 0 6px}
+.pp-dl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.pp-dl:last-of-type{border-bottom:0}
+.pp-dt2{display:flex;flex-direction:column;min-width:0}.pp-dt2 small{color:var(--muted);font-size:12.5px}.pp-da{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pp-tag{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:6px;padding:3px 8px;align-self:start;margin-top:2px}.pp-tag.pp-tg-rot{background:#E3EEF3;color:#1F5568}.pp-tag.pp-tg-av{background:#EEF2F4;color:#55666F}.pp-tag.pp-tg-ag{background:#F6EEDC;color:#8A5A12}
+.pp-opr{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.pp-opr .pp-bar{flex:1 1 200px;margin:0}
+.pp-agf .gx-f input,.pp-agf .gx-f select{font:inherit;font-size:15px}
+:root[data-theme="dark"] .pp-tag.pp-tg-rot{background:#1E3A48;color:#CFE3EC}:root[data-theme="dark"] .pp-tag.pp-tg-av{background:#2A3236;color:#C9D3DA}:root[data-theme="dark"] .pp-tag.pp-tg-ag{background:#3D3220;color:#F1D9A8}
 `; document.head.appendChild(st); }

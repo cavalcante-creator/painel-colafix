@@ -29,7 +29,7 @@ document.addEventListener('click',ev=>{ if(!(ev.target.closest&&ev.target.closes
     const clica=(attrs)=>setTimeout(()=>{ const b=document.createElement('button'); Object.assign(b.dataset,attrs); b.hidden=true; document.body.appendChild(b); b.click(); b.remove(); },60);
     if(a==='gx-acao'){ go('gxacoes'); clica({act:'gx-ac-nova'}); return; }
     if(a==='gx-seg'){ clica({act:'gx-seg-ir',d:hojeStr()}); return; }
-    if(a==='gx-prev'){ go(viewOk('manprev')?'manprev':'gxcal'); return; }
+    if(a==='gx-prev'){ if(viewOk('gxcal')){ S.gx.pvTab='dia'; go('gxcal'); } else go('manprev'); return; }
     if(a==='gx-os'){ if(viewOk('gxch')){ go('gxch'); clica({act:'gch-nova'}); } else clica({act:'gx-novaos'}); return; }
     if(a==='gx-pdf'){ S.gx.dia=hojeStr(); go('gxdia'); clica({act:'gx-pdf-dia'}); return; }
     if(a==='gx-pres'){ go('gxpres'); return; } }; }
