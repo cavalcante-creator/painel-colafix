@@ -60,6 +60,20 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  /* produção */
  await p.evaluate(()=>__T.go('gxprod')); await H.dorme(800); t=await tx();
  ok('Produção · visão do gestor: atenção, ritmo do mês, linhas, silos, diário, paradas e ordens atrasadas', ['O que precisa de atenção','Ritmo do mês','Todas as linhas','Silos','Diário de bordo','Paradas hoje','Ordens atrasadas'].every(x=>t.includes(x)), t.slice(0,300).replace(/\n/g,'|'));
+ /* paradas, cadastros e e-mail (o que faltou) */
+ await p.evaluate(()=>__T.go('gxpar')); await H.dorme(700); t=await tx();
+ ok('Paradas: Pareto por causa, motivo e linha, horas por semana e a lista', /Por causa/.test(t)&&/Por motivo/.test(t)&&/Por linha/.test(t)&&/Horas paradas por semana/.test(t)&&/Falta de cimento/.test(t)&&!/\bSetup\b/.test((t.match(/Todas as paradas[\s\S]*/)||[''])[0]), t.slice(0,240).replace(/\n/g,'|'));
+ await p.selectOption('[data-gxpar-c="p2"]','Operacional'); await H.dorme(700);
+ ok('Paradas: classificar a causa grava na parada', await p.evaluate(()=>(__T.S().paradas.find(x=>x._id==='p2')||{}).causa==='Operacional'));
+ await p.click('[data-act="gx-par-acao"][data-id="p1"]'); await H.dorme(400); const pre=await p.evaluate(()=>({t:(document.getElementById('gx-af-o')||{}).value,o:(document.getElementById('gx-af-g')||{}).value}));
+ await p.click('[data-act="gx-ac-salvar"]'); await H.dorme(900);
+ ok('Paradas: "Virar ação" abre a ação já preenchida (origem Parada) e salva no plano', /Falta de cimento na Linha 2/.test(pre.t)&&pre.o==='Parada'&&await p.evaluate(()=>__T.S().gxAcoes.some(a=>/Falta de cimento/.test(a.t)&&a.origem==='Parada')), JSON.stringify(pre));
+ await p.evaluate(()=>__T.go('gxcad')); await H.dorme(500); await p.fill('#gx-cad-motivos','Falta de embalagem'); await p.click('[data-act="gx-cad-add"][data-k="motivos"]'); await H.dorme(700);
+ await p.fill('#gx-cad-equipes','Equipe de solda'); await p.click('[data-act="gx-cad-add"][data-k="equipes"]'); await H.dorme(700);
+ const cf=await p.evaluate(()=>({m:__T.S().cfg.motivos,e:__T.S().cfg.manEquipes}));
+ ok('Cadastros: novo motivo de parada e nova equipe de manutenção salvos', cf.m.includes('Falta de embalagem')&&cf.e.includes('Equipe de solda')&&cf.e.includes('Equipe mecânica'), JSON.stringify(cf));
+ await p.evaluate(()=>__T.go('gxdia')); await H.dorme(600);
+ ok('Relatório do dia tem "Enviar por e-mail"', !!(await p.$('[data-act="gx-email"]')));
  const errs=(B.erros||[]).filter(x=>!/favicon|fonts\.g|Failed to load resource/i.test(x)); ok('Sem erros no console', !errs.length, errs.join(' | '));
  /* celular */
  await p.setViewportSize({width:390,height:800}); await p.evaluate(()=>__T.go('gxinicio')); await H.dorme(600);
