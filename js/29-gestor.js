@@ -509,3 +509,76 @@ button.gx-li{cursor:pointer}button.gx-li:hover{border-color:var(--teal)}.gx-li d
 .gx-cd small{font-size:11px;color:var(--muted)}.gx-calf{border:2px solid #143F54}
 @media (max-width:640px){.gx-g2,.gx-g3{grid-template-columns:minmax(0,1fr)}.gx-k b{font-size:22px}.gx-ks{grid-template-columns:repeat(2,minmax(0,1fr))}.gx-hd{margin-left:0;width:100%}.gx-hd .btn{flex:1}.gx-bp{height:130px}.gx-bp i{width:18px}.gx-dn .gx-mut{margin-left:0}}
 </style>`);
+
+/* ================= PARADAS (22/10, "o que faltou") ================= */
+const GX_CAUSAS=['Mecânica','Elétrica','Operacional','Falta de material','Qualidade / dosagem','Outra'];
+S.gx.parDias=S.gx.parDias||30;
+function gxCausaAuto(p){ const m=String(p.motivo||''); return p.causa||(/el[ée]tric/i.test(m)?'Elétrica':/manuten|mec[aâ]nic|quebr/i.test(m)?'Mecânica':/falta/i.test(m)?'Falta de material':/dosag|qualid/i.test(m)?'Qualidade / dosagem':''); }
+function vGxPar(){ gxAssina(); const n=S.gx.parDias, h=hojeStr(), ini=addDias(h,-(n-1)), t0=new Date(ini+'T00:00:00').getTime(), agora=Date.now();
+  const xs=(S.paradas||[]).filter(p=>p.inicio&&!p.anulada&&!gxSetup(p)&&gxDiaLocal(p.inicio)>=ini).map(p=>{ const a=Math.max(t0,new Date(p.inicio).getTime()), b=p.fim?new Date(p.fim).getTime():agora; return {p,min:Math.max(0,(b-a)/6e4),causa:gxCausaAuto(p)}; }).sort((a,b)=>String(b.p.inicio).localeCompare(String(a.p.inicio)));
+  const tot=xs.reduce((a,x)=>a+x.min,0), por=(f)=>{ const o={}; xs.forEach(x=>{ const k=f(x)||'Sem classificar'; o[k]=(o[k]||0)+x.min; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); };
+  const pareto=(t,arr,cor)=>{ const mx=Math.max(1,...arr.map(x=>x[1])); let ac=0; return `<section class="card"><div class="gx-ch"><h2>${t}</h2></div>${arr.length?arr.map(([k,v])=>{ ac+=v; return `<div class="gx-sl"><span>${esc(k)}</span><div class="gx-bar"><i class="${cor}" style="width:${(v/mx*100).toFixed(0)}%"></i></div><b>${gxDur(v)}</b><small>${gxPct(ac,tot)}% acum.</small></div>`; }).join(''):'<div class="gx-ok">Nenhuma parada no período.</div>'}</section>`; };
+  /* horas paradas por semana (segunda a domingo) */
+  const sem={}; xs.forEach(x=>{ const d=new Date(gxDiaLocal(x.p.inicio)+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); const k=hojeStr(d); sem[k]=(sem[k]||0)+x.min; });
+  const sk=Object.keys(sem).sort(), mxs=Math.max(1,...Object.values(sem));
+  const hoje=xs.filter(x=>gxDiaLocal(x.p.inicio)===h);
+  return `${banner()}${gxCab('PRODUÇÃO · PARADAS','Paradas',`<div class="gx-chips" role="group" aria-label="Período" style="margin:0">${[[7,'7 dias'],[30,'30 dias'],[60,'60 dias']].map(([k,t])=>`<button class="gx-chip" data-act="gx-par-n" data-v="${k}" aria-pressed="${n===k}">${t}</button>`).join('')}</div>`)}
+   <section class="gx-ks">${gxK('Tempo parado',gxDur(tot),'últimos '+n+' dias · sem setup',tot?'crit':'')}${gxK('Paradas',String(xs.length),gxN(xs.length/Math.max(1,n),1)+' por dia')}${gxK('Abertas agora',String(xs.filter(x=>!x.p.fim).length),'',xs.some(x=>!x.p.fim)?'crit':'ok')}${gxK('Hoje',gxDur(hoje.reduce((a,x)=>a+x.min,0)),hoje.length+' parada(s)')}${gxK('Sem classificar',String(xs.filter(x=>!x.causa).length),'escolha a causa na lista',xs.some(x=>!x.causa)?'warn':'ok')}</section>
+   <div class="gx-g3">${pareto('Por causa',por(x=>x.causa),'crit')}${pareto('Por motivo',por(x=>x.p.motivo),'warn')}${pareto('Por linha',por(x=>x.p.linha),'neu')}</div>
+   <section class="card"><div class="gx-ch"><h2>Horas paradas por semana</h2><span class="gx-mut">semana começando na segunda</span></div>
+    ${sk.length?`<div class="gx-pd" style="height:160px">${sk.map(k=>`<div class="gx-pdc" title="Semana de ${dm(k)}: ${gxDur(sem[k])}"><div class="gx-pdb"><i class="crit" style="height:${(sem[k]/mxs*100).toFixed(0)}%"></i></div><small>${dm(k)}</small></div>`).join('')}</div>`:'<div class="gx-ok">Nenhuma parada no período.</div>'}</section>
+   <section class="card"><div class="gx-ch"><h2>Todas as paradas</h2><span class="gx-mut">classifique a causa · "Virar ação" leva para o plano de ação</span></div>
+    ${xs.length?`<div class="gx-tb"><table><thead><tr><th>Dia</th><th>Início</th><th>Fim</th><th>Linha</th><th>Motivo</th><th class="n">Tempo</th><th>Quem apontou</th><th>Causa</th><th></th></tr></thead><tbody>
+     ${xs.slice(0,200).map(x=>`<tr><td>${dm(gxDiaLocal(x.p.inicio))}</td><td>${hora(x.p.inicio)}</td><td>${x.p.fim?hora(x.p.fim):'<b class="crit">aberta</b>'}</td><td>${esc(x.p.linha||'')}</td><td>${esc(x.p.motivo||'')}${x.p.obs?`<br><small class="gx-mut">${esc(String(x.p.obs).slice(0,70))}</small>`:''}</td><td class="n">${gxDur(x.min)}</td><td>${esc(x.p.porNome||nomeDe(x.p.por)||'')}</td>
+      <td><select class="gx-ss" data-gxpar-c="${esc(x.p._id)}" aria-label="Causa da parada de ${hora(x.p.inicio)} na ${esc(x.p.linha||'')}"><option value="">—</option>${GX_CAUSAS.map(c=>`<option ${x.causa===c?'selected':''}>${c}</option>`).join('')}</select>${x.causa&&!x.p.causa?'<br><small class="gx-mut">sugerida</small>':''}</td>
+      <td><button class="btn sec gx-bs" data-act="gx-par-acao" data-id="${esc(x.p._id)}">Virar ação</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="gx-ok">Nenhuma parada no período.</div>'}</section>
+   ${S.gx.acNova?gxAcForm(S.gx.acPre||{}):''}`; }
+
+/* ================= CADASTROS ================= */
+function gxEquipes(){ const e=S.cfg.manEquipes; return Array.isArray(e)&&e.length?e:['Equipe mecânica','Equipe elétrica','Terceirizado']; }
+function vGxCad(){ const pode=!(typeof soVer==='function'&&soVer()), mot=S.cfg.motivos||[], eq=gxEquipes(), L=linhasOrd(), nEq=(typeof mxEquips==='function'?mxEquips().length:0);
+  const lista=(id,t,sub,xs,ph)=>`<section class="card"><div class="gx-ch"><h2>${t}</h2><span class="gx-mut">${sub}</span></div>
+    <div class="gx-lista">${xs.map((x,i)=>`<div class="gx-li"><span>${esc(x)}</span>${pode?`<button class="btn sec gx-bs gx-del" data-act="gx-cad-x" data-k="${id}" data-i="${i}" aria-label="Tirar ${esc(x)}">Tirar</button>`:''}</div>`).join('')||'<div class="empty">Nada cadastrado.</div>'}</div>
+    ${pode?`<div class="gx-ac2"><input class="gx-in" id="gx-cad-${id}" maxlength="50" placeholder="${ph}" aria-label="Novo item em ${t}"><button class="btn" data-act="gx-cad-add" data-k="${id}">Acrescentar</button></div>`:''}</section>`;
+  return `${banner()}${gxCab('CADASTROS','Cadastros do gestor')}
+   <div class="gx-g2">
+    ${lista('motivos','Motivos de parada','aparecem no posto, na tela de paradas e na TV',mot,'Ex.: Falta de embalagem')}
+    ${lista('equipes','Equipes de manutenção','usadas em "Quem faz" das preventivas',eq,'Ex.: Equipe de solda')}
+    <section class="card"><div class="gx-ch"><h2>Máquinas</h2><span class="gx-mut">${nEq} cadastrada(s)</span></div><p class="gx-p">O cadastro de máquinas fica na Manutenção (linha, nome, código e QR). É dele que saem as preventivas e o histórico de cada máquina.</p><div class="gx-ac"><button class="btn" data-go="manequip">Abrir Máquinas</button></div></section>
+    <section class="card"><div class="gx-ch"><h2>Turnos e metas</h2></div><p class="gx-p">O tempo de cada linha vem dos Turnos. A meta de cada linha vem da Curva S (previsão do mês dividida pelos dias úteis), em Análise › Curva S.</p><div class="gx-ac2"><button class="btn sec" data-go="gxturnos">Turnos</button><button class="btn sec" data-go="anlrit">Curva S</button></div></section>
+   </div>`; }
+async function gxCadGrava(k,arr){ const campo=k==='motivos'?'motivos':'manEquipes'; try{ await S.db.doc('config/geral').update({[campo]:arr}); S.cfg[campo]=arr; toast('Salvo.'); }catch(e){ console.warn('[gestor] cadastro',e); toast('Não foi possível salvar.'); } }
+
+/* ================= ENVIAR POR E-MAIL (o texto do dia, pelo programa de e-mail do computador) ================= */
+function gxEmailDia(d){ const D=gxDados(d), T=D.tot, L=[];
+  L.push('Relatório do dia · '+gxDiaTxt(d)); L.push('');
+  L.push('Produção: '+gxT(T.t)+' t ('+gxN(T.sc)+' sacos)'+(T.mT?' · meta '+gxT(T.mT)+' t · '+gxPct(T.t,T.mT)+'%':''));
+  if(T.disp!=null) L.push('Disponibilidade: '+gxN(T.disp*100,1)+'%'); L.push('Paradas: '+gxDur(T.par)+' ('+D.par.filter(z=>!z.setup).length+')');
+  L.push(''); L.push('Por linha:'); D.lin.forEach(x=>L.push('- '+x.l+': '+gxT(x.t)+' t'+(x.mT?' de '+gxT(x.mT)+' t ('+gxPct(x.t,x.mT)+'%)':'')+(x.par?' · parada '+gxDur(x.par):'')));
+  if(D.par.length){ L.push(''); L.push('Paradas:'); D.par.filter(z=>!z.setup).forEach(z=>L.push('- '+hora(z.p.inicio)+' '+z.p.linha+' · '+(z.p.motivo||'')+' · '+gxDur(z.min)+(z.p.fim?'':' (aberta)'))); }
+  L.push(''); L.push('Manutenção: '+D.corr.length+' corretiva(s), '+D.prev.length+' preventiva(s)');
+  const s=D.seg; L.push('Segurança: '+(s?(+s.ocorr?s.ocorr+' ocorrência(s)':'sem ocorrências')+(s.pessoas?' · '+s.pessoas+' pessoas':''):'não preenchido'));
+  const ac=S.gxAcoes.filter(a=>a.st!=='ok'); if(ac.length){ L.push(''); L.push('Plano de ação (abertas):'); ac.slice(0,10).forEach(a=>L.push('- '+a.t+(a.quem?' · '+a.quem:'')+(a.prazo?' · até '+dm(a.prazo):''))); }
+  return L.join('\n'); }
+
+/* ---------- registro das telas novas ---------- */
+Object.assign(VIEWS,{gxpar:{nome:'Paradas',ic:'pausa',mob:'Paradas'},gxcad:{nome:'Cadastros',ic:'ajuste',mob:'Cadastros'}});
+Object.assign(CRUMB,{gxpar:'Paradas',gxcad:'Cadastros do gestor'}); Object.assign(S.extViews,{gxpar:vGxPar,gxcad:vGxCad});
+{ const M=MODS.find(m=>m.id==='gestor'); if(M){ const v=M.views; if(!v.includes('gxpar')) v.splice(v.indexOf('gxprod')+1,0,'gxpar'); if(!v.includes('gxcad')) v.splice(v.indexOf('gestao'),0,'gxcad'); } }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="gx-par-"],[data-act^="gx-cad-"],[data-act="gx-email"]'); if(!b) return; const a=b.dataset.act, G=S.gx;
+  if(a==='gx-par-n'){ G.parDias=+b.dataset.v; render(); return; }
+  if(a==='gx-par-acao'){ const p=(S.paradas||[]).find(x=>x._id===b.dataset.id); if(!p) return; G.acPre={t:'Resolver: '+(p.motivo||'parada')+' na '+(p.linha||''),origem:'Parada',obs:'Parada de '+dm(gxDiaLocal(p.inicio))+' às '+hora(p.inicio)+(p.obs?' · '+p.obs:'')}; G.acNova=true; G.acEd=null; render(); return; }
+  if(a==='gx-cad-add'){ const k=b.dataset.k, i=document.getElementById('gx-cad-'+k), v=String(i&&i.value||'').trim(); if(!v) return; const arr=(k==='motivos'?(S.cfg.motivos||[]):gxEquipes()).slice(); if(arr.some(x=>x.toLowerCase()===v.toLowerCase())){ toast('Já existe.'); return; } arr.push(v); await gxCadGrava(k,arr); render(); return; }
+  if(a==='gx-cad-x'){ const k=b.dataset.k, i=+b.dataset.i, arr=(k==='motivos'?(S.cfg.motivos||[]):gxEquipes()).slice(), x=arr[i]; if(x==null||!gxConfirma('Tirar "'+x+'"?')) return; arr.splice(i,1); await gxCadGrava(k,arr); render(); return; }
+  if(a==='gx-email'){ const d=G.dia||hojeStr(), txt=gxEmailDia(d); const assunto='Relatório do dia · '+dm(d)+'/'+d.slice(0,4);
+    try{ await navigator.clipboard.writeText(txt); }catch(e){}
+    location.href='mailto:?subject='+encodeURIComponent(assunto)+'&body='+encodeURIComponent(txt.slice(0,1800)); toast('Abrindo o e-mail com o resumo (o texto também foi copiado). Para mandar o PDF, use "Baixar PDF do dia" e anexe.'); return; }
+},true);
+document.addEventListener('change',async ev=>{ const t=ev.target; if(!t||!t.dataset||!t.dataset.gxparC) return; const id=t.dataset.gxparC, v=t.value;
+  try{ await S.db.doc('paradas/'+id).update({causa:v||null,causaPor:gxEu()||null}); const p=(S.paradas||[]).find(x=>x._id===id); if(p) p.causa=v||null; toast('Causa salva.'); }catch(e){ toast('Não foi possível salvar a causa.'); } });
+/* "Nova ação" vinda da parada já preenchida; ao fechar o formulário, some o pré-preenchimento */
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="gx-ac-x"],[data-act="gx-ac-salvar"],[data-act="gx-ac-nova"]'); if(b&&b.dataset.act!=='gx-ac-salvar') S.gx.acPre=null; if(b&&b.dataset.act==='gx-ac-salvar') setTimeout(()=>{ S.gx.acPre=null; },0); },true);
+/* "Quem faz" das preventivas usa as equipes cadastradas; botão de e-mail no relatório do dia */
+{ const _d=vGxDia; vGxDia=function(){ return _d().replace('<button class="btn" data-act="gx-pdf-dia">','<button class="btn sec" data-act="gx-email">'+ic('copiar',18,2)+'Enviar por e-mail</button><button class="btn" data-act="gx-pdf-dia">'); }; S.extViews.gxdia=vGxDia; }
+{ const _c=vGxCal; vGxCal=function(){ return _c().replace(/<datalist id="gx-pv-rl">[\s\S]*?<\/datalist>/,'<datalist id="gx-pv-rl">'+gxEquipes().map(x=>`<option value="${esc(x)}">`).join('')+'</datalist>'); }; S.extViews.gxcal=vGxCal; }
+document.head.insertAdjacentHTML('beforeend','<style>.gx-in{font:inherit;font-size:16px;border:2px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface);color:inherit;flex:1;min-width:160px;min-height:44px;box-sizing:border-box}</style>');
