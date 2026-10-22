@@ -404,7 +404,7 @@ async function crAdesivos(cs){ if(!window.jspdf){ toast('Gerador de PDF indispon
     pdf.setDrawColor(170); pdf.setLineDashPattern([1,1],0); pdf.roundedRect(x,y,W,H,2,2); pdf.setLineDashPattern([],0);
     pdf.setFillColor(255,255,255); pdf.rect(x+0.5,y+0.5,W-1,H-1,'F'); desenharQR(pdf,crQrTexto(c.codigo),x+(W-25)/2,y+3.5,25);
     pdf.setTextColor(0,0,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5); pdf.text(pdf.splitTextToSize(String(c.nome||''),W-3)[0],x+W/2,y+33,{align:'center'});
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(70,70,70); pdf.text((c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas')),x+W/2,y+36.5,{align:'center'});
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(70,70,70); pdf.text((c.papel==='tecnico'?(String(c.area||'').trim()||'Manutenção'):(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas')),x+W/2,y+36.5,{align:'center'});
     pdfCode128(pdf,crBarras(c.codigo),x+1,y+39,W-2,9); pdf.setTextColor(0,0,0); pdf.setFontSize(6.5); pdf.text(crBarras(c.codigo),x+W/2,y+51,{align:'center'}); });
   await manBaixar(pdf,cs.length===1?'Adesivo_QR_'+String(cs[0].nome).replace(/\W+/g,'_')+'.pdf':'Adesivos_QR_crachas.pdf','PDF com '+cs.length+' adesivo(s) de 3,8 × 5,4 cm (QR para o tablet e código de barras para o coletor). Imprima em 100% (sem ajustar à página) e cole no crachá.'); }
 { const _vc=vCrachas; vCrachas=function(){ let h=_vc.apply(this,arguments);
@@ -1082,7 +1082,7 @@ function etqCanvas(c,cfg){ const px=mm=>Math.round(mm/25.4*cfg.dpi), W=Math.max(
   const fit=(t,peso,max)=>{ let s=max; g.font=`${peso} ${s}px Arial, Helvetica, sans-serif`; while(s>8&&g.measureText(t).width>tw){ s--; g.font=`${peso} ${s}px Arial, Helvetica, sans-serif`; } return s; };
   const al=deitada?'left':'center', xT=deitada?tx:W/2; g.textAlign=al; g.textBaseline='top';
   const ctH=temBar?px(3.2):0, barH=temBar?Math.max(px(5),Math.round((th-ctH)*(temTxt?0.42:0.8))):0;
-  if(temTxt&&th>10){ const nm=String(c.nome||'').trim(), ln=c.papel==='tecnico'?'Manutenção':(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas');
+  if(temTxt&&th>10){ const nm=String(c.nome||'').trim(), ln=c.papel==='tecnico'?(String(c.area||'').trim()||'Manutenção'):(c.linha&&c.linha!=='*'?c.linha:'Todas as linhas');
     const s1=fit(nm,'bold',Math.round(Math.min(px(deitada?6.5:3.6),(th-barH-ctH)*0.5))); g.fillText(nm,xT,y); y+=Math.round(s1*1.18);
     const s2=fit(ln,'bold',Math.round(s1*0.78)); if(y+s2<=ty+th-barH-ctH){ g.fillText(ln,xT,y); y+=Math.round(s2*1.3); } }
   if(temBar&&barH){ const L=c128Larg(crBarras(c.codigo)), mods=[...L].reduce((a,x)=>a+(+x),0)+20, m=Math.max(1,Math.floor(tw/mods)), bw=m*mods, bx=deitada?tx:Math.round((W-bw)/2);
