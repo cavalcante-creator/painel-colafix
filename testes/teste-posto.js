@@ -82,6 +82,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const nCh=ch.find(c=>c.l==='Linha 1').n; await p.click(`[data-act="cq-comecar"][data-n="${nCh}"]`); await H.dorme(1800);
  let cc2=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,tec:c.exec&&c.exec.tecnico,f:__T.S().tt.fase}; },nCh);
  ok('"Começar atendimento" grava o técnico e volta ao início', /execu/i.test(cc2.st||'')&&cc2.tec==='Bruno Lima'&&cc2.f==='espera', JSON.stringify(cc2));
+ { await H.dorme(400); const ln=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.cq-ln')].find(x=>/Linha 1/.test(x.textContent)); return e?{c:e.className,t:e.textContent,bc:getComputedStyle(e).borderColor}:null; });
+ ok('Na espera, a Linha 1 fica LARANJA: "Sendo arrumada · Bruno Lima"', ln&&/\barr\b/.test(ln.c)&&/Sendo arrumada · Bruno Lima/.test(ln.t)&&ln.bc==='rgb(217, 121, 43)', JSON.stringify(ln)); }
  await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; }); await bip('000123'); await p.keyboard.press('1'); await H.dorme(600); s=await st(); await p.screenshot({path:'/tmp/po-liberar.png'});
  ok('Operador volta ao chamado: "A máquina já voltou? Confira e libere."', /A máquina já voltou/.test(s.txt)&&!!(await p.$(`[data-act="po-lib"][data-n="${nCh}"]`)), s.txt.slice(0,200).replace(/\n/g,' | '));
  await p.click(`[data-act="po-lib"][data-n="${nCh}"]`); await H.dorme(2000); s=await st();
