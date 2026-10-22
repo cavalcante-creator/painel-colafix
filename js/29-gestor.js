@@ -277,7 +277,7 @@ function gxMesHtml(M){ const T=M.tot, pc=gxPct(T.t,T.mAte), disp=T.turno?1-T.par
    </div>`; }
 function vGxMes(){ gxAssina(); const h=hojeStr(), cp=S.gx.cp||h.slice(0,7), M=gxMesDados(cp);
   const meses=[]; for(let i=0;i<12;i++){ const d=new Date(+h.slice(0,4),+h.slice(5,7)-1-i,1); meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1)); }
-  return `${banner()}${gxCab('RELATÓRIOS · '+gxMesTxt(cp).toUpperCase(),'Relatório do mês',`<label class="gx-sel"><span class="sr">Mês</span><select id="gx-mes">${meses.map(m=>`<option value="${m}" ${m===cp?'selected':''}>${gxMesTxt(m)}</option>`).join('')}</select></label><button class="btn" data-act="gx-pdf-mes" ${M?'':'disabled'}>${ic('baixar',18,2)}Baixar PDF do mês</button>`)}
+  return `${banner()}${gxCab('RELATÓRIOS · '+gxMesTxt(cp).toUpperCase(),'Relatório do mês',`<label class="gx-sel"><span class="gx-sr">Mês</span><select id="gx-mes">${meses.map(m=>`<option value="${m}" ${m===cp?'selected':''}>${gxMesTxt(m)}</option>`).join('')}</select></label><button class="btn" data-act="gx-pdf-mes" ${M?'':'disabled'}>${ic('baixar',18,2)}Baixar PDF do mês</button>`)}
    ${gxTabsRel('gxmes')}
    ${M?gxMesHtml(M):'<section class="card"><div class="empty">A previsão deste mês não foi importada na Curva S (Análise › Base de dados). Sem ela não há meta para comparar.</div></section>'}`; }
 
@@ -324,7 +324,7 @@ function vGxSeg(){ gxAssina(); const d=S.gx.segDia||hojeStr(), s=S.gxSeg[d]||{},
   const fld=(id,t,v,suf)=>`<label class="gx-f">${t}<input id="${id}" inputmode="numeric" value="${esc(v==null?'':String(v))}" ${suf?`aria-describedby="${id}-s"`:''}>${suf?`<small id="${id}-s">${suf}</small>`:''}</label>`;
   return `${banner()}${gxCab('GESTÃO','Pessoas e segurança')}
    <section class="gx-ks">${gxK('Dias sem acidente',dias!=null?String(dias):'—',ult?'última ocorrência '+dm(ult):'nenhuma ocorrência registrada',dias!=null&&dias<30?'warn':'ok')}${gxK('Ocorrências no mês',String(xs.reduce((a,x)=>a+(+x.ocorr||0),0)),gxMesTxt(cp))}${gxK('Desvios no mês',String(xs.reduce((a,x)=>a+(+x.desvios||0),0)))}${gxK('Dias preenchidos',String(xs.length),'neste mês')}</section>
-   <section class="card"><div class="gx-ch"><h2>Segurança do dia</h2><label class="gx-sel"><span class="sr">Dia</span><input type="date" id="gx-seg-d" value="${d}" max="${hojeStr()}"></label></div>
+   <section class="card"><div class="gx-ch"><h2>Segurança do dia</h2><label class="gx-sel"><span class="gx-sr">Dia</span><input type="date" id="gx-seg-d" value="${d}" max="${hojeStr()}"></label></div>
     <div class="gx-f5">${fld('gx-s-oc','Ocorrências',s.ocorr!=null?s.ocorr:0)}${fld('gx-s-pe','Pessoas presentes',s.pessoas)}${fld('gx-s-ep','Uso de EPI (%)',s.epi!=null?s.epi:100)}${fld('gx-s-de','Desvios',s.desvios!=null?s.desvios:0)}${fld('gx-s-in','Inspeções feitas (%)',s.insp!=null?s.insp:100)}</div>
     <label class="gx-f">Observação (o que aconteceu, desvio encontrado…)<textarea id="gx-s-ob" rows="2" maxlength="600">${esc(s.obs||'')}</textarea></label>
     <div class="gx-ac2"><span class="gx-mut">${s.em?'Salvo por '+esc(s.porNome||'')+' em '+new Date(s.em).toLocaleString('pt-BR'):'Ainda não preenchido.'}</span><span style="flex:1"></span><button class="btn" data-act="gx-seg-salvar">Salvar</button></div></section>
@@ -449,8 +449,8 @@ document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.gx.acNova&&doc
 /* ================= estilo ================= */
 document.head.insertAdjacentHTML('beforeend',`<style id="gx-css">
 .gx-head{align-items:flex-end;flex-wrap:wrap;gap:12px}.gx-hd{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto}
-.gx-mut{color:var(--muted);font-size:13px}.gx-p{color:var(--muted);font-size:13.5px;margin:8px 0 0;line-height:1.45}.sr{position:absolute;left:-9999px}
-.gx-ch{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.gx-ch h2,.card>h2{margin:0;font-size:18px}
+.gx-mut{color:var(--muted);font-size:13px}.gx-p{color:var(--muted);font-size:13.5px;margin:8px 0 0;line-height:1.45}.gx-sr{position:absolute;left:-9999px}
+.gx-ch{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.gx-ch h2,.gx-g2>.card>h2,.gx-g3>.card>h2{margin:0;font-size:18px}
 .gx-auto{font-size:12px;font-weight:600;color:#3F6F93;background:#E6EEF3;border-radius:999px;padding:3px 10px;white-space:nowrap}.gx-mao{font-size:12px;font-weight:600;color:#8A5A12;background:#F6EEDC;border-radius:999px;padding:3px 10px;white-space:nowrap}
 .gx-ks{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}.gx-ks4{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:10px 0}.gx-ks4.sm .gx-k b{font-size:24px}
 .gx-k{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -473,7 +473,7 @@ button.gx-li{cursor:pointer}button.gx-li:hover{border-color:var(--teal)}.gx-li d
 .gx-chk{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}.gx-chk input{width:20px;height:20px;flex:none}.gx-chk>span{flex:1;display:flex;flex-direction:column;min-width:0}.gx-chk small{color:var(--muted)}
 .gx-ac{display:flex;justify-content:flex-end;margin-top:8px}.gx-ac2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
 .gx-r{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:7px 0;border-bottom:1px solid var(--line)}.gx-r:last-child{border-bottom:0}
-.crit{color:var(--crit)}b.crit,.n.crit{color:var(--crit)}
+.gx-p .crit,.gx-r b.crit,.gx-tb .crit,.gx-tb td.n.crit,.gx-sg .crit{color:var(--crit)}
 .gx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.gx-chip{font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:0 14px;min-height:40px;border:2px solid var(--line);background:var(--surface);color:var(--ink-2,#2D4552);cursor:pointer}.gx-chip[aria-pressed="true"]{background:#143F54;border-color:#143F54;color:#fff}
 .gx-sg{margin-bottom:10px}.gx-sg>b{display:block;font-size:13px;letter-spacing:.04em;color:var(--muted);margin-bottom:4px}
 .gx-sl{display:grid;grid-template-columns:minmax(90px,1fr) minmax(60px,2fr) auto auto;gap:8px;align-items:center;font-size:14px;padding:4px 0}.gx-sl small{color:var(--muted);font-size:12px;min-width:44px;text-align:right}
