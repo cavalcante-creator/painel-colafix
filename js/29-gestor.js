@@ -11,7 +11,10 @@ const gxEu=()=>String((S.uid&&S.nomes&&S.nomes[S.uid])||'');
 const gxN=(n,d)=>(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});
 const gxT=t=>gxN(t,1);
 const gxPct=(a,b)=>b>0?Math.round(a/b*100):null;
-const gxDur=m=>{ m=Math.round(m||0); return m<1?'0 min':m<60?m+' min':Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'); };
+/* duração de parada (só horário de expediente): passando de 1 dia de expediente (o turno da linha, padrão 10h30) mostra "N dias e H h MM" */
+const gxDur=m=>{ m=Math.round(m||0); if(m<1) return '0 min'; if(m<60) return m+' min'; const D=gxDiaMin();
+  if(m>=D){ const d=Math.floor(m/D), r=m-d*D; return d+(d>1?' dias':' dia')+(r>=1?' e '+(r<60?r+' min':Math.floor(r/60)+' h '+String(r%60).padStart(2,'0')):''); }
+  return Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'); };
 const GX_DIAS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const GX_DIAS_L=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
 function gxDiaTxt(d){ const x=new Date(d+'T12:00:00'); return GX_DIAS_L[x.getDay()].replace(/^./,c=>c.toUpperCase())+', '+dm(d)+'/'+d.slice(0,4); }
@@ -32,6 +35,20 @@ function gxTurnoMin(t){ const a=horaMin(t.ini), b=horaMin(t.fim); if(a==null||b=
 /* turno da linha no dia (linhas vazias = todas as linhas) */
 function gxTurnoDe(l,d){ const w=new Date(d+'T12:00:00').getDay(); return gxTurnos().filter(t=>(t.dias||[]).includes(w)&&(!(t.linhas||[]).length||t.linhas.includes(l))); }
 function gxTurnoMinDia(l,d){ return gxTurnoDe(l,d).reduce((a,t)=>a+gxTurnoMin(t),0); }
+/* minutos de um "dia" de expediente (maior turno cadastrado; padrão 07:30–18:00 = 10h30) */
+function gxDiaMin(){ try{ return Math.max(60,...gxTurnos().map(gxTurnoMin)); }catch(e){ return 630; } }
+/* minutos de expediente da linha entre dois instantes (ms): só dentro dos turnos da linha; feriado não tem expediente;
+   o intervalo (intv) é descontado na proporção do trecho */
+function gxExpMin(l,a,b){ if(!(b>a)) return 0; let tot=0; let d=hojeStr(new Date(a-864e5)); const fimD=hojeStr(new Date(b));
+  for(let i=0;i<400&&d<=fimD;i++){ let fer=null; try{ fer=feriadoDe(d); }catch(e){}
+    if(!fer) gxTurnoDe(l,d).forEach(t=>{ const ia=horaMin(t.ini), ib=horaMin(t.fim); if(ia==null||ib==null) return; let dur=ib-ia; if(dur<=0) dur+=1440;
+      const w0=new Date(d+'T00:00:00').getTime()+ia*6e4, w1=w0+dur*6e4, ov=Math.min(b,w1)-Math.max(a,w0); if(ov>0) tot+=ov/6e4*Math.max(0,dur-(+t.intv||0))/dur; });
+    d=addDias(d,1); }
+  return tot; }
+function gxParMin(p,a,b){ return gxExpMin(p.linha,a,b); }
+/* "parada há …" contando só o expediente; com o início quando é de outro dia */
+function gxParHa(p){ const a=new Date(p.inicio).getTime(), m=gxExpMin(p.linha,a,Date.now()), d=gxDiaLocal(p.inicio), h=hojeStr();
+  return gxDur(m)+(d!==h?' de expediente (desde '+(d===addDias(h,-1)?'ontem':dm(d))+' '+hora(p.inicio)+')':''); }
 
 /* ---------- números de um dia ---------- */
 function gxEntregasDia(d){ const xs=ritEntregas(d.slice(0,7)), an=new Set(xs.filter(e=>e.anula).map(e=>e.anula));
@@ -46,7 +63,7 @@ function gxRit(cp){ const k=cp+'|'+(S.entregas||[]).length+'|'+(S.ordens||[]).le
 function gxMetaDia(d){ const D=gxRit(d.slice(0,7)), out={}; if(!D||!D.dias.includes(d)) return out;
   D.its.forEach(x=>{ for(const l in x.dv){ const q=x.prev*x.dv[l]/D.n; const o=out[l]=out[l]||{sc:0,t:0}; o.sc+=q; o.t+=q*(x.kg||20)/1000; } }); return out; }
 function gxParadasDia(d){ const t0=new Date(d+'T00:00:00').getTime(), t1=Math.min(Date.now(),new Date(d+'T23:59:59').getTime()), out=[];
-  (S.paradas||[]).forEach(p=>{ if(!p.inicio||p.anulada) return; const a=Math.max(t0,new Date(p.inicio).getTime()), b=Math.min(t1,p.fim?new Date(p.fim).getTime():Date.now()); if(b<=a) return; out.push({p,min:(b-a)/6e4,ab:!p.fim,setup:gxSetup(p)}); });
+  (S.paradas||[]).forEach(p=>{ if(!p.inicio||p.anulada) return; const a=Math.max(t0,new Date(p.inicio).getTime()), b=Math.min(t1,p.fim?new Date(p.fim).getTime():Date.now()); if(b<=a) return; out.push({p,min:gxParMin(p,a,b),cal:(b-a)/6e4,ab:!p.fim,setup:gxSetup(p)}); });
   return out.sort((a,b)=>String(a.p.inicio).localeCompare(String(b.p.inicio))); }
 function gxDados(d){ const L=linhasOrd(), h=hojeStr(), ents=gxEntregasDia(d), meta=gxMetaDia(d), par=gxParadasDia(d);
   const lin={}; L.forEach(l=>lin[l]={l,sc:0,t:0,mSc:(meta[l]||{}).sc||0,mT:(meta[l]||{}).t||0,par:0,turno:gxTurnoMinDia(l,d),ords:0,ordsOk:0});
@@ -75,7 +92,7 @@ function gxTabsRel(on){ return `<nav class="gx-rt" aria-label="Relatórios"><but
 
 /* ---------- alertas do Início ---------- */
 function gxAlertas(){ const h=hojeStr(), agora=Date.now(), out=[];
-  (S.paradas||[]).filter(p=>!p.fim&&!p.anulada&&!gxSetup(p)).forEach(p=>out.push({c:'crit',t:p.linha+' parada há '+ltvMin(agora-new Date(p.inicio).getTime()),d:(p.motivo||'motivo a definir')+(p.porNome?' · '+p.porNome:''),go:'gxprod'}));
+  (S.paradas||[]).filter(p=>!p.fim&&!p.anulada&&!gxSetup(p)).forEach(p=>out.push({c:'crit',t:p.linha+' parada há '+gxParHa(p),d:(p.motivo||'motivo a definir')+(p.porNome?' · '+p.porNome:''),go:'gxprod'}));
   (S.chamados||[]).filter(c=>!manIgnorar(c)&&!c.excluido&&!manFechada(c)&&!c.prevId&&!(c.exec&&c.exec.tecnico)).forEach(c=>{ const m=(agora-new Date(c.criado).getTime())/6e4; if(c.impacto==='parou'||m>15) out.push({c:c.impacto==='parou'?'crit':'warn',t:'Chamado '+manNum(c.numero)+' sem técnico há '+ltvMin(agora-new Date(c.criado).getTime()),d:(c.linha||'')+' · '+(c.defeito||'')+(c.impacto==='parou'?' · máquina parada':''),n:c.numero}); });
   try{ const pa=typeof mxPrevStatus==='function'?mxPrevStatus().filter(x=>x.st==='atrasada'):[]; if(pa.length) out.push({c:'warn',t:pa.length+' preventiva'+(pa.length>1?'s':'')+' atrasada'+(pa.length>1?'s':''),d:pa.slice(0,3).map(x=>x.p.tarefa).join(' · '),go:'gxcal'}); }catch(e){}
   const av=S.gxAcoes.filter(a=>a.st!=='ok'&&a.prazo&&a.prazo<h); if(av.length) out.push({c:'warn',t:av.length+' ação'+(av.length>1?'ões':'')+' do plano com prazo vencido',d:av.slice(0,3).map(a=>a.t).join(' · '),go:'gxacoes'});
@@ -86,7 +103,7 @@ function gxAlertas(){ const h=hojeStr(), agora=Date.now(), out=[];
 
 /* ---------- linhas agora ---------- */
 function gxLinhaAgora(l){ const agora=Date.now(), p=(S.paradas||[]).find(x=>x.linha===l&&!x.fim&&!x.anulada), o=ordemRodando(l), c=(S.chamados||[]).find(x=>x.linha===l&&!manIgnorar(x)&&!manFechada(x)&&!x.prevId);
-  if(p&&!gxSetup(p)) return {c:'crit',st:'Parada '+ltvMin(agora-new Date(p.inicio).getTime()),t:p.motivo||'motivo a definir',s:c?'Chamado '+manNum(c.numero)+(c.exec&&c.exec.tecnico?' · com '+c.exec.tecnico:' · sem técnico'):(o?'OP '+o.num:''),o};
+  if(p&&!gxSetup(p)) return {c:'crit',st:'Parada '+gxParHa(p),t:p.motivo||'motivo a definir',s:c?'Chamado '+manNum(c.numero)+(c.exec&&c.exec.tecnico?' · com '+c.exec.tecnico:' · sem técnico'):(o?'OP '+o.num:''),o};
   if(p) return {c:'info',st:'Setup',t:p.motivo,s:o?'OP '+o.num:'',o};
   if(o){ const f=entregueDe(o), tt=+o.total||0; return {c:'ok',st:'Produzindo',t:'OP '+o.num+' · '+String(o.produto||'').replace(/^[A-Z0-9]+\s*[-—]\s*/,''),s:gxN(f)+' de '+gxN(tt)+' '+(typeof ttUn==='function'?ttUn(o):'sc'),pc:tt?Math.min(100,f/tt*100):0,o}; }
   return {c:'neu',st:'Sem ordem',t:'Nada rodando agora',s:''}; }
@@ -237,7 +254,7 @@ function gxMesDados(cp){ const R=gxRit(cp), h=hojeStr(); if(!R) return null; con
   const L=linhasOrd(), ls=Object.values(lin).sort((a,b)=>L.indexOf(a.l)-L.indexOf(b.l));
   const tot={t:0,mAte:0,mMes:0,par:0,turno:0}; ls.forEach(x=>{ tot.t+=x.t; tot.mAte+=x.mAte; tot.mMes+=x.mMes||0; tot.par+=x.par; tot.turno+=x.turno; });
   const parM={}; const t0=new Date(cp+'-01T00:00:00').getTime(), t1=Math.min(Date.now(),new Date(dias[dias.length-1]+'T23:59:59').getTime()+86400000*2);
-  (S.paradas||[]).forEach(p=>{ if(!p.inicio||p.anulada||gxSetup(p)) return; const a=Math.max(t0,new Date(p.inicio).getTime()), b=Math.min(t1,p.fim?new Date(p.fim).getTime():Date.now()); if(b<=a||gxDiaLocal(p.inicio).slice(0,7)!==cp) return; const k=p.motivo||'Sem motivo'; parM[k]=(parM[k]||0)+(b-a)/6e4; });
+  (S.paradas||[]).forEach(p=>{ if(!p.inicio||p.anulada||gxSetup(p)) return; const a=Math.max(t0,new Date(p.inicio).getTime()), b=Math.min(t1,p.fim?new Date(p.fim).getTime():Date.now()); if(b<=a||gxDiaLocal(p.inicio).slice(0,7)!==cp) return; const k=p.motivo||'Sem motivo'; parM[k]=(parM[k]||0)+gxParMin(p,a,b); });
   const nPar=(S.paradas||[]).filter(p=>p.inicio&&!p.anulada&&!gxSetup(p)&&gxDiaLocal(p.inicio).slice(0,7)===cp).length;
   const chs=(S.chamados||[]).filter(c=>!manIgnorar(c)&&!c.excluido&&gxDiaLocal(c.criado).slice(0,7)===cp), corr=chs.filter(c=>!c.prevId), prev=chs.filter(c=>c.prevId);
   let MZ=null; try{ MZ=mzDados(cp); }catch(e){}
@@ -515,7 +532,7 @@ const GX_CAUSAS=['Mecânica','Elétrica','Operacional','Falta de material','Qual
 S.gx.parDias=S.gx.parDias||30;
 function gxCausaAuto(p){ const m=String(p.motivo||''); return p.causa||(/el[ée]tric/i.test(m)?'Elétrica':/manuten|mec[aâ]nic|quebr/i.test(m)?'Mecânica':/falta/i.test(m)?'Falta de material':/dosag|qualid/i.test(m)?'Qualidade / dosagem':''); }
 function vGxPar(){ gxAssina(); const n=S.gx.parDias, h=hojeStr(), ini=addDias(h,-(n-1)), t0=new Date(ini+'T00:00:00').getTime(), agora=Date.now();
-  const xs=(S.paradas||[]).filter(p=>p.inicio&&!p.anulada&&!gxSetup(p)&&gxDiaLocal(p.inicio)>=ini).map(p=>{ const a=Math.max(t0,new Date(p.inicio).getTime()), b=p.fim?new Date(p.fim).getTime():agora; return {p,min:Math.max(0,(b-a)/6e4),causa:gxCausaAuto(p)}; }).sort((a,b)=>String(b.p.inicio).localeCompare(String(a.p.inicio)));
+  const xs=(S.paradas||[]).filter(p=>p.inicio&&!p.anulada&&!gxSetup(p)&&gxDiaLocal(p.inicio)>=ini).map(p=>{ const a=Math.max(t0,new Date(p.inicio).getTime()), b=p.fim?new Date(p.fim).getTime():agora; return {p,min:gxParMin(p,a,b),causa:gxCausaAuto(p)}; }).sort((a,b)=>String(b.p.inicio).localeCompare(String(a.p.inicio)));
   const tot=xs.reduce((a,x)=>a+x.min,0), por=(f)=>{ const o={}; xs.forEach(x=>{ const k=f(x)||'Sem classificar'; o[k]=(o[k]||0)+x.min; }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); };
   const pareto=(t,arr,cor)=>{ const mx=Math.max(1,...arr.map(x=>x[1])); let ac=0; return `<section class="card"><div class="gx-ch"><h2>${t}</h2></div>${arr.length?arr.map(([k,v])=>{ ac+=v; return `<div class="gx-sl"><span>${esc(k)}</span><div class="gx-bar"><i class="${cor}" style="width:${(v/mx*100).toFixed(0)}%"></i></div><b>${gxDur(v)}</b><small>${gxPct(ac,tot)}% acum.</small></div>`; }).join(''):'<div class="gx-ok">Nenhuma parada no período.</div>'}</section>`; };
   /* horas paradas por semana (segunda a domingo) */
@@ -523,7 +540,7 @@ function vGxPar(){ gxAssina(); const n=S.gx.parDias, h=hojeStr(), ini=addDias(h,
   const sk=Object.keys(sem).sort(), mxs=Math.max(1,...Object.values(sem));
   const hoje=xs.filter(x=>gxDiaLocal(x.p.inicio)===h);
   return `${banner()}${gxCab('PRODUÇÃO · PARADAS','Paradas',`<div class="gx-chips" role="group" aria-label="Período" style="margin:0">${[[7,'7 dias'],[30,'30 dias'],[60,'60 dias']].map(([k,t])=>`<button class="gx-chip" data-act="gx-par-n" data-v="${k}" aria-pressed="${n===k}">${t}</button>`).join('')}</div>`)}
-   <section class="gx-ks">${gxK('Tempo parado',gxDur(tot),'últimos '+n+' dias · sem setup',tot?'crit':'')}${gxK('Paradas',String(xs.length),gxN(xs.length/Math.max(1,n),1)+' por dia')}${gxK('Abertas agora',String(xs.filter(x=>!x.p.fim).length),'',xs.some(x=>!x.p.fim)?'crit':'ok')}${gxK('Hoje',gxDur(hoje.reduce((a,x)=>a+x.min,0)),hoje.length+' parada(s)')}${gxK('Sem classificar',String(xs.filter(x=>!x.causa).length),'escolha a causa na lista',xs.some(x=>!x.causa)?'warn':'ok')}</section>
+   <section class="gx-ks">${gxK('Tempo parado',gxDur(tot),'últimos '+n+' dias · só no expediente · sem setup',tot?'crit':'')}${gxK('Paradas',String(xs.length),gxN(xs.length/Math.max(1,n),1)+' por dia')}${gxK('Abertas agora',String(xs.filter(x=>!x.p.fim).length),'',xs.some(x=>!x.p.fim)?'crit':'ok')}${gxK('Hoje',gxDur(hoje.reduce((a,x)=>a+x.min,0)),hoje.length+' parada(s)')}${gxK('Sem classificar',String(xs.filter(x=>!x.causa).length),'escolha a causa na lista',xs.some(x=>!x.causa)?'warn':'ok')}</section>
    <div class="gx-g3">${pareto('Por causa',por(x=>x.causa),'crit')}${pareto('Por motivo',por(x=>x.p.motivo),'warn')}${pareto('Por linha',por(x=>x.p.linha),'neu')}</div>
    <section class="card"><div class="gx-ch"><h2>Horas paradas por semana</h2><span class="gx-mut">semana começando na segunda</span></div>
     ${sk.length?`<div class="gx-pd" style="height:160px">${sk.map(k=>`<div class="gx-pdc" title="Semana de ${dm(k)}: ${gxDur(sem[k])}"><div class="gx-pdb"><i class="crit" style="height:${(sem[k]/mxs*100).toFixed(0)}%"></i></div><small>${dm(k)}</small></div>`).join('')}</div>`:'<div class="gx-ok">Nenhuma parada no período.</div>'}</section>
