@@ -92,7 +92,7 @@ async function ppGera(r,forcar){ if(typeof soVer==='function'&&soVer()) return n
       hist:[{em:agora.toISOString(),por:S.uid||null,o:'OS do plano preventivo aberta: '+ppNomeRot(rr)+' (prevista para '+dm(rr.prox)+')'}]});
     await ppGravaRot(rot=>{ const x=rot.find(y=>y.id===rr.id); if(x){ x.osDe=rr.prox||hojeStr(); x.os=doc.numero; } }); return doc; }
   finally{ try{ lk&&await lk.release(); }catch(e){} } }
-setInterval(async()=>{ const P=S.pp; if(P.gerando||!P.lido||!P.plano||!S.db) return; try{ if(!viewOk('manch')||(typeof soVer==='function'&&soVer())) return; }catch(e){ return; }
+setInterval(async()=>{ const P=S.pp; if(P.gerando||!P.lido||!P.plano||!S.db) return; try{ if(!(viewOk('manch')||(typeof ofOn==='function'&&ofOn()))||(typeof soVer==='function'&&soVer())) return; }catch(e){ return; }
   const h=hojeStr(), dev=(P.plano.rot||[]).filter(r=>r.ativo!==false&&r.prox&&r.prox<=h&&r.osDe!==r.prox&&!ppOs(r)).slice(0,6); if(!dev.length) return; P.gerando=true;
   try{ for(const r of dev) await ppGera(r,false); }catch(e){ console.warn('[plano] gerar OS',e); } P.gerando=false; },9000);
 
@@ -358,7 +358,7 @@ async function ppAgGera(a){ if(typeof soVer==='function'&&soVer()) return null; 
       prevId:'ag-'+aa.id,agId:aa.id,origem:'preventiva-agenda',exec:{tipo:'Preventiva'},hist:[{em:agora.toISOString(),por:S.uid||null,o:'Tarefa programada para '+dm(aa.dia)+' aberta'+(aa.paraTec?' para '+aa.paraTec:'')}]});
     await ppGravaAg(ag=>{ const x=ag.find(y=>y.id===aa.id); if(x){ x.osDe=hojeStr(); x.os=doc.numero; } }); return doc; }
   finally{ try{ lk&&await lk.release(); }catch(e){} } }
-setInterval(async()=>{ const P=S.pp; if(P.agGerando||!P.lido||!S.db) return; try{ if(!viewOk('manch')||(typeof soVer==='function'&&soVer())) return; }catch(e){ return; }
+setInterval(async()=>{ const P=S.pp; if(P.agGerando||!P.lido||!S.db) return; try{ if(!(viewOk('manch')||(typeof ofOn==='function'&&ofOn()))||(typeof soVer==='function'&&soVer())) return; }catch(e){ return; }
   const h=hojeStr(), dev=ppAgenda().filter(a=>a.dia&&a.dia<=h&&!a.osDe&&!ppAgOs(a)).slice(0,6); if(!dev.length) return; P.agGerando=true;
   try{ for(const a of dev) await ppAgGera(a); }catch(e){ console.warn('[plano] tarefa programada',e); } P.agGerando=false; },9000);
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="ppg-"]'); if(!b) return; const P=S.pp, a=b.dataset.act;
