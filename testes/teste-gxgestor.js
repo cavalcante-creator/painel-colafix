@@ -25,10 +25,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Relatório do dia: produção 20,0 t, 900 sacos e a meta do dia da Curva S', /Produção do dia\s*20,0 t/i.test(t)&&/900 sacos/.test(t)&&!/Meta do dia\s*—/i.test(t), (t.match(/Produção do dia[\s\S]{0,140}/i)||[''])[0].replace(/\n/g,'|'));
  ok('Relatório do dia: paradas sem o setup (Linha 2 aberta + 30 min da Linha 1) e a tabela por linha', /Setup \(setup, não conta\)|setup, não conta/.test(t)&&/Linha 1\s*10,0\s*500/.test(t)&&/Linha 2\s*10,0\s*400/.test(t), (t.match(/Linha 1\s*10,0[^\n]*/)||[''])[0]);
  ok('Relatório do dia: chamado 00001 na corretiva e a faixa dos dias anteriores', /00001/.test(t)&&/Dias anteriores/.test(t));
- /* PDF do dia abre a janela de impressão */
- const [pop]=await Promise.all([B.ctx.waitForEvent('page',{timeout:5000}).catch(()=>null),p.click('[data-act="gx-pdf-dia"]')]);
- let pt=''; if(pop){ await pop.waitForLoadState().catch(()=>{}); pt=await pop.evaluate(()=>document.body.innerText).catch(()=>''); await pop.close().catch(()=>{}); }
- ok('"Baixar PDF do dia" abre o relatório pronto para salvar em PDF', /Relatório do dia/.test(pt)&&/Produção por linha/.test(pt)&&!/Nova OS corretiva/.test(pt), pt.slice(0,200).replace(/\n/g,'|'));
+ /* PDF do dia: baixa o arquivo (jsPDF), sem janela de impressão */
+ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:15000}).catch(()=>null),p.click('[data-act="gx-pdf-dia"]')]);
+ ok('"Baixar PDF do dia" baixa o arquivo Relatorio-do-dia-AAAA-MM-DD.pdf', !!dl&&/^Relatorio-do-dia-\d{4}-\d{2}-\d{2}\.pdf$/.test(dl.suggestedFilename()), dl&&dl.suggestedFilename());
  /* mês */
  await p.click('[data-go="gxmes"]'); await H.dorme(900); t=await tx();
  ok('Relatório do mês: produção do mês, curva S, por linha e paradas por causa', /Produção do mês/i.test(t)&&/Curva S do mês/.test(t)&&/Por linha/.test(t)&&/Paradas por causa/.test(t)&&/Falta de cimento/.test(t), [/Produção do mês/.test(t),/Curva S do mês/.test(t),/Por linha/.test(t),/Paradas por causa/.test(t),/Falta de cimento/.test(t)].join()+t.slice(t.indexOf('Paradas por causa'),t.indexOf('Paradas por causa')+300).replace(/\n/g,'|'));
