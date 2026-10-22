@@ -21,12 +21,18 @@ function poLinhasSalvas(){ try{ const v=JSON.parse(localStorage.getItem('colafix
 
 /* depois do crachá: menu (operador) ou lista de consertos (técnico) */
 { const _ti=ttInicia; ttInicia=function(p){ if(!poOn()) return _ti.apply(this,arguments); const T=S.tt;
-    Object.assign(T,{p,outra:false,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:p.papel==='tecnico'?'tecnico':'pomenu',ult:Date.now(),po:{},ap:null,pm:null,hub:null}); ttCamDesliga(); render(); }; }
+    Object.assign(T,{p,outra:false,linha:'',equipId:'',equip:'',defeito:'',txt:'',msg:'',numero:null,enviando:false,fase:p.papel==='tecnico'?'potec':'pomenu',ult:Date.now(),po:{},ap:null,pm:null,hub:null}); ttCamDesliga(); render(); }; }
 /* com o coletor, bipar de novo é de propósito: ao sair, o mesmo crachá pode entrar na hora (a trava de 8 s é para a câmera) */
 { const _tv=ttVoltar; ttVoltar=function(){ if(poOn()&&S.tt.p&&S.tt.p.codigo&&S.tt.recente) delete S.tt.recente[S.tt.p.codigo]; return _tv.apply(this,arguments); }; }
 function poVai(f,extra){ const T=S.tt; T.fase=f; T.msg=''; T.ult=Date.now(); if(extra) Object.assign(T,extra); render(); }
+/* chamado (protótipo 21/10): sem escolher máquina; só Elétrico/Mecânico e se a máquina parou completa, em parte ou não interferiu */
+const PO_IMP=[['parou','Parou completa','crit'],['reduziu','Parou em parte (semi)','warn'],['nao','Não interferiu · continua funcionando','ok']];
+const poImpTxt=v=>({parou:'parou completa',reduziu:'parou em parte',nao:'não interferiu'})[v]||v||'';
+function poChamado(linha,imp){ const T=S.tt; T.ch={linha,tipo:'',imp:imp||''}; poVai('poch'); }
+/* chamados com o técnico trabalhando, nas linhas do posto: o operador confere e libera */
+function poEmAtend(){ const L=ttLinhas(); return cqAbertos().filter(c=>L.includes(c.linha)&&c.exec&&c.exec.tecnico&&!c.liberadoEm).sort((a,b)=>String(a.criado).localeCompare(String(b.criado))); }
 function poMenuAcao(n){ const T=S.tt, L=ttLinhas(); if(!T.p) return;
-  if(n===1){ const l=L.includes(T.p.linha)?T.p.linha:(L.length===1?L[0]:''); Object.assign(T,{linha:l,equip:'',equipId:'',defeito:''}); poVai(l?'maquina':'cqlinha'); return; }
+  if(n===1){ poChamado(L.includes(T.p.linha)?T.p.linha:L[0],''); return; }
   if(n===2||n===3){ T.po={acao:n===2?'ap':'pm'}; T.hub=null; poVai('pofolha'); return; }
   if(n===4){ T.po={parL:''}; poVai('popar'); } }
 
@@ -56,36 +62,37 @@ function poRod(txt,act,lab){ return `<div class="cq-rod"><span>${txt}</span><but
 function poParAberta(l){ return (S.paradas||[]).find(p=>p.linha===l&&!p.fim&&!p.anulada)||null; }
 function poEstLinha(l){ const par=poParAberta(l);
   if(par) return {c:'crit',t:'Parada desde '+hora(par.inicio)+' · '+(par.motivo==='A definir'?'motivo a definir':par.motivo),s:'há '+ltvMin(Date.now()-new Date(par.inicio))+(par.porNome?' · '+par.porNome:'')};
-  const ch=cqEstado(l); if(ch.c!=='ok') return ch;
-  const o=ordemRodando(l); if(o){ ttEntDaOrdem(o._id); return {c:'ok',t:'Produzindo · ordem '+o.num,s:String(o.produto||'').replace(/^\S+\s+-\s+/,'')+' · '+fQ(entregueDe(o))+' de '+fQ(+o.total||0)+' '+ttUn(o)}; }
-  return {c:'ok',t:'Sem ordem programada agora',s:'nenhum chamado aberto'}; }
+  const ab=cqAbertos().filter(c=>c.linha===l).sort((a,b)=>String(a.criado).localeCompare(String(b.criado)))[0];
+  const chTxt=ab?('Chamado '+manNum(ab.numero)+' aberto às '+hm(ab.criado||ab.quando)+' · '+(ab.exec&&ab.exec.tecnico?'em atendimento com '+ab.exec.tecnico:'aguardando manutenção')):'';
+  const o=ordemRodando(l); if(o){ ttEntDaOrdem(o._id); return {c:ab&&ab.impacto==='parou'&&!(ab.exec&&ab.exec.tecnico)?'crit':'ok',t:'Produzindo · ordem '+o.num,s:String(o.produto||'').replace(/^\S+\s+-\s+/,'')+' · '+fQ(entregueDe(o))+' de '+fQ(+o.total||0)+' '+ttUn(o),ch:chTxt}; }
+  return {c:ab?(ab.impacto==='parou'&&!(ab.exec&&ab.exec.tecnico)?'crit':'warn'):'ok',t:'Sem ordem programada agora',s:ab?'':'nenhum chamado aberto',ch:chTxt}; }
 function poOrdCab(o,folha){ return `<section class="po-ord"><div><small>${folha?'FOLHA BIPADA ✓ · ':''}ORDEM ${esc(o.num)} · ${esc((o.linha||'').toUpperCase())}${o.rancho?' · RANCHO '+esc(o.rancho):''}</small><b>${esc(o.produto||'')}</b></div>${ttProg(o).replace('class="tt-prog"','class="tt-prog po-prog"')}</section>`; }
 function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
   if(f==='espera'||!T.p){ const cfg=T.po&&T.po.cfgL;
-    return poPagina('Posto · '+L.join(' e '),`<div class="cq-lns">${L.map(l=>{ const e=poEstLinha(l); return `<section class="cq-ln ${e.c}${e.c==='crit'?' cq-pisca':''}"><div><h2>${esc(l)}</h2><i></i></div><b>${esc(e.t)}</b><span>${esc(e.s)}</span></section>`; }).join('')}</div>
-      <section class="cq-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor</h1><p>Depois você escolhe: chamar a manutenção, apontar, pedir material ou registrar parada</p>${poMsg()}</div></section>
+    return poPagina('Posto · '+L.join(' e '),`<div class="cq-lns">${L.map(l=>{ const e=poEstLinha(l); return `<section class="cq-ln ${e.c}${e.c==='crit'?' cq-pisca':''}"><div><h2>${esc(l)}</h2><i></i></div><b>${esc(e.t)}</b><span>${esc(e.s)}</span>${e.ch?`<em class="po-lch">${esc(e.ch)}</em>`:''}</section>`; }).join('')}</div>
+      <section class="cq-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor</h1><p>Operador: chamar a manutenção, apontar, pedir material ou registrar parada. Técnico da manutenção: começar o atendimento de um chamado.</p>${poMsg()}</div></section>
       ${cfg?`<section class="po-cfg"><b>Linhas deste posto</b><div>${linhasOrd().map(l=>`<label class="ck"><input type="checkbox" data-po-lt="${esc(l)}" ${L.includes(l)?'checked':''}> ${esc(l)}</label>`).join('')}</div><span>Fica guardado neste computador.</span></section>`:''}
       <div class="cq-tema">${ttSemCrachaOk()?'<button class="cq-sec" data-act="tt-sem">Estou sem crachá</button>':''}${ttCam.stream?`<button class="cq-sec" data-act="po-cam">${poCamOff()?'Mostrar câmera':'Esconder câmera'}</button>`:''}<button class="cq-sec" data-act="po-cfgl">${cfg?'Fechar':'Linhas deste posto'}</button><button class="cq-sec" data-act="cq-tema">${cqEsc()?'Tela clara':'Tela escura'}</button><button class="cq-sec" data-act="cq-cheia">${document.fullscreenElement?'Sair da tela cheia':'Tela cheia'}</button><button class="cq-sec" data-act="po-sair">Sair</button></div>`); }
   if(f==='pomenu'){ const nome=String(T.p.nome||'').split(/\s+/)[0]; const par=L.map(poParAberta).filter(Boolean)[0];
     const bt=(n,cls,t,s)=>`<button class="po-op ${cls}" data-act="po-op" data-n="${n}"><span class="po-k">${n}</span><div><b>${t}</b><small>${s}</small></div></button>`;
     return poPagina('Posto · '+L.join(' e '),`<h1 class="cq-h">Olá, ${esc(nome)}. O que você quer fazer?</h1><div class="po-menu">
-      ${bt(1,'crit','Chamar a manutenção','máquina com problema ou parada')}${bt(2,'ok','Apontar produção','quantos saíram · bipa a folha da ordem')}
+      ${bt(1,'crit','Chamar a manutenção',poEmAtend().length?'liberar a máquina · '+poEmAtend().length+' em atendimento':'abrir chamado · liberar a máquina depois do conserto')}${bt(2,'ok','Apontar produção','quantos saíram · bipa a folha da ordem')}
       ${bt(3,'pri','Pedir material','para o almoxarifado · bipa a folha da ordem')}${bt(4,'warn','A linha parou / voltou',par?esc(par.linha)+' está parada há '+ltvMin(Date.now()-new Date(par.inicio)):'registrar parada da linha')}</div>
       ${poMsg()}${poRod('Aperte o número no teclado ou clique. Sem uso por 1 minuto, a tela volta ao início.','po-sai','Sair (Esc)')}`); }
   if(f==='pofolha'){ const ap=T.po.acao==='ap';
     return poPagina(ap?'Apontar produção':'Pedir material',`<ol class="cq-et" aria-label="Etapas"><li class="on"><span>✓</span>Crachá</li><li class="on at"><span>2</span>Folha da ordem</li><li><span>3</span>${ap?'Quantidade':'Material'}</li></ol>
       <section class="cq-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="4" width="28" height="40" rx="2"/><path d="M15 12h18M15 18v8M18 18v8M21 18v8M25 18v8M28 18v8M32 18v8M15 32h18M15 37h12"/></svg><div><h1>Bipe o código de barras da folha</h1><p>Fica no alto da folha de produção, ao lado do QR (começa com OP- ou RA-). Só vale ordem da ${esc(L.join(' ou '))}.</p>${poMsg()}</div></section>
-      ${poRod('Sem a folha não dá para '+(ap?'apontar':'pedir material')+': peça ao PCP.')}`); }
+      <div class="cq-rod"><span>Sem a folha não dá para ${ap?'apontar':'pedir material'}. Folha não bipa ou deu erro? Avise o PCP.</span><div class="po-rbs"><button class="cq-bt crit po-pcp" data-act="po-pcp" ${T.enviando?'disabled':''}><b>Deu erro? Avisar o PCP</b></button><button class="cq-sec" data-act="po-volta">Voltar (Esc)</button></div></div>`); }
   if(f==='poesc'){ const cs=(T.po.cands||[]).map(ordById).filter(Boolean);
     return poPagina(T.po.acao==='ap'?'Apontar produção':'Pedir material',`<h1 class="cq-h">Qual ordem? <small>· o rancho ${esc(T.po.rancho||'')} tem mais de uma</small></h1><div class="cq-g">${cs.map(o=>`<button class="cq-bt" data-act="po-ord" data-id="${esc(o._id)}"><b>Ordem ${esc(o.num)} · ${esc(o.linha)}</b><span>${esc(o.produto||'')}</span></button>`).join('')}</div>${poMsg()}${poRod('Escolha a ordem que você está produzindo.')}`); }
   if(f==='poap'){ const o=ttOrd(); if(!o){ T.fase='pofolha'; return vPosto(); }
-    const A=T.ap, pp=ttPP(o), un=ttUn(o), tot=A.pal*pp+(+A.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), pronto=!!S._entOrd[o._id];
+    const A=T.ap; if(A.pp==null) A.pp=String(ttPP(o)||96); const pp=+A.pp||0, un=ttUn(o), tot=A.pal*pp+(+A.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), pronto=!!S._entOrd[o._id];
     const pode=pronto&&tot>0&&tot<=falta&&!T.enviando;
     return poPagina('Apontar produção',`${poOrdCab(o,true)}<h1 class="cq-h">Quanto saiu agora?</h1>
-      <div class="po-q2">${pp?`<section class="po-box"><span class="po-lb">Paletes <small>· ${fQ(pp)} ${esc(un)} cada</small></span><div class="po-pal"><button data-act="po-pal" data-v="-1" aria-label="Menos um palete" ${A.pal?'':'disabled'}>−</button><b>${A.pal}</b><button data-act="po-pal" data-v="1" aria-label="Mais um palete">+</button></div><small class="po-dica">Teclado: setas ↑ e ↓</small></section>`:''}
-        <section class="po-box"><label class="po-lb" for="po-av">${pp?'Avulsos':'Quantidade'} (${esc(un)})</label><input id="po-av" class="po-in" inputmode="numeric" autocomplete="off" maxlength="6" value="${esc(A.av||'')}" placeholder="0"><small class="po-dica">Digite o número</small></section></div>
+      <div class="po-q2"><section class="po-box"><div class="po-pph"><span class="po-lb">Paletes</span><label class="po-ppl" for="po-pp">${esc(un)} por palete</label><input id="po-pp" class="po-in po-pp" inputmode="numeric" autocomplete="off" maxlength="4" value="${esc(A.pp)}"><small>padrão ${fQ(ttPP(o)||96)} · pode mudar</small></div><div class="po-pal"><button data-act="po-pal" data-v="-1" aria-label="Menos um palete" ${A.pal?'':'disabled'}>−</button><b>${A.pal}</b><button data-act="po-pal" data-v="1" aria-label="Mais um palete">+</button></div><small class="po-dica">Teclado: setas ↑ e ↓</small></section>
+        <section class="po-box"><label class="po-lb" for="po-av">Avulsos (${esc(un)})</label><input id="po-av" class="po-in" inputmode="numeric" autocomplete="off" maxlength="6" value="${esc(A.av||'')}" placeholder="0"><small class="po-dica">Digite o número</small></section></div>
       ${poMsg()}<div class="cq-rod"><button class="cq-sec" data-act="po-volta">Voltar (Esc)</button>
-        <div class="po-tot ${tot>falta?'warn':''}">Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${A.pal} palete${A.pal===1?'':'s'} + ${fQ(+A.av||0)} avulsos</small>`:''}${!pronto?'<small>Carregando o que já foi apontado…</small>':tot>falta?`<small>${falta?'Passa do que falta ('+fQ(falta)+'). O excedente é lançado no computador do PCP.':'A ordem já está completa. Fale com o PCP.'}</small>`:''}</div>
+        <div class="po-tot ${tot>falta?'warn':''}">Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${A.pal} palete${A.pal===1?'':'s'} × ${fQ(pp)} + ${fQ(+A.av||0)} avulsos</small>`:''}${!pronto?'<small>Carregando o que já foi apontado…</small>':tot>falta?`<small>${falta?'Passa do que falta ('+fQ(falta)+'). O excedente é lançado no computador do PCP.':'A ordem já está completa. Fale com o PCP.'}</small>`:''}</div>
         <button class="cq-bt ok po-ok" data-act="po-ap-ok" ${pode?'':'disabled'}><b>${T.enviando?'Salvando…':'Apontar '+fQ(tot)+' '+esc(un)+' (Enter)'}</b></button></div>`); }
   if(f==='popm'){ const o=ttOrd(); if(!o){ T.fase='pofolha'; return vPosto(); }
     const M=T.pm, rc=o.rancho&&ranchoDe(o.rancho), its=((rc&&rc.itens)||[]).filter(x=>dbVisivel(x)), pend=(S.pedmat||[]).filter(p=>p.ordem===o._id);
@@ -100,10 +107,23 @@ function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
   if(f==='popar'){ const sel=T.po.parL;
     return poPagina('A linha parou / voltou',`<div class="po-par"><div class="po-pls">${L.map(l=>{ const p=poParAberta(l), o=ordemRodando(l);
         return p?`<section class="po-pl crit"><div><h2>${esc(l)}</h2><em>● parada há ${ltvMin(Date.now()-new Date(p.inicio))}</em></div><span>Desde ${hora(p.inicio)} · ${esc(p.motivo==='A definir'?'motivo a definir':p.motivo)}${p.porNome?' · '+esc(p.porNome):''}</span><button class="cq-bt ok" data-act="po-voltou" data-id="${esc(p._id)}" ${T.enviando?'disabled':''}><b>A ${esc(l)} voltou a produzir</b></button><small>Um clique fecha a parada com a hora de agora</small></section>`
-          :`<section class="po-pl ${sel===l?'sel':''}"><div><h2>${esc(l)}</h2><em class="ok">● produzindo</em></div><span>${o?'Ordem '+esc(o.num)+' · '+esc(String(o.produto||'').replace(/^\S+\s+-\s+/,'')):'sem ordem programada agora'}</span><button class="cq-bt crit" data-act="po-parou" data-l="${esc(l)}"><b>A ${esc(l)} parou</b></button>${sel===l?'<small>Escolha o motivo ao lado →</small>':''}</section>`; }).join('')}</div>
-      <section class="po-mots">${sel?`<h1 class="cq-h">Por que a ${esc(sel)} parou?</h1><div class="po-mg">${(S.cfg.motivos||[]).map(m=>`<button class="cq-bt" data-act="po-mot" data-v="${esc(m)}" ${T.enviando?'disabled':''}><b>${esc(m)}</b></button>`).join('')}<button class="cq-bt po-ad" data-act="po-mot" data-v="A definir" ${T.enviando?'disabled':''}><b>Ainda não sei</b></button></div>`
+          :`<section class="po-pl ${sel===l?'sel':''}"><div><h2>${esc(l)}${T.p&&T.p.linha===l?' <small class="po-sua">· sua linha</small>':''}</h2><em class="ok">● produzindo</em></div><span>${o?'Ordem '+esc(o.num)+' · '+esc(String(o.produto||'').replace(/^\S+\s+-\s+/,'')):'sem ordem programada agora'}</span><button class="cq-bt crit" data-act="po-parou" data-l="${esc(l)}"><b>A ${esc(l)} parou</b></button>${sel===l?'<small>Escolha o motivo ao lado →</small>':''}</section>`; }).join('')}</div>
+      <section class="po-mots">${sel?`<h1 class="cq-h">Por que a ${esc(sel)} parou?</h1><div class="po-mg">${(S.cfg.motivos||[]).map(m=>`<button class="cq-bt" data-act="po-mot" data-v="${esc(m)}" ${T.enviando?'disabled':''}><b>${esc(m)}</b>${/manuten/i.test(m)?'<span>abre o chamado →</span>':''}</button>`).join('')}<button class="cq-bt po-ad" data-act="po-mot" data-v="A definir" ${T.enviando?'disabled':''}><b>Ainda não sei</b></button></div>`
         :`<div class="cq-vz">Toque em “parou” na linha que parou, ou em “voltou” na que voltou a produzir.</div>`}</section></div>
-      ${poMsg()}${poRod('Se a máquina quebrou, use também “Chamar a manutenção”.')}`); }
+      ${poMsg()}${poRod('Motivos dos Ajustes. “Manutenção” leva direto para abrir o chamado.')}`); }
+  if(f==='poch'){ const C=T.ch, ea=poEmAtend(), pode=C.tipo&&C.imp&&!T.enviando;
+    return poPagina('Chamar a manutenção',`<div class="po-chh"><h1 class="cq-h">Abrir chamado da <em>${esc(C.linha)}</em></h1>${L.length>1?`<div class="po-seg" role="group" aria-label="Linha">${L.map(l=>`<button data-act="po-chl" data-l="${esc(l)}" aria-pressed="${C.linha===l}">${esc(l)}</button>`).join('')}</div>`:''}</div>
+      ${ea.map(c=>`<section class="po-lib"><div><small>CHAMADO ${manNum(c.numero)} · ${esc((c.linha||'').toUpperCase())} · EM ATENDIMENTO${c.exec.inicio?' DESDE '+esc(String(c.exec.inicio).slice(11,16)):''} · ${esc(c.exec.tecnico)}</small><b>A máquina já voltou? Confira e libere.</b></div><button class="cq-bt ok" data-act="po-lib" data-n="${c.numero}" ${T.enviando?'disabled':''}><b>Liberar e fechar chamado</b></button><button class="cq-sec" data-act="po-aind" data-n="${c.numero}">Ainda com problema</button></section>`).join('')}
+      <div class="po-ch2"><section class="po-chq"><h2>1 · O problema é…</h2><div class="po-chb">${[['Elétrico','Elétrico'],['Mecânico','Mecânico']].map(([v,t])=>`<button data-act="po-tipo" data-v="${v}" aria-pressed="${C.tipo===v}">${t}</button>`).join('')}</div></section>
+        <section class="po-chq"><h2>2 · A máquina…</h2><div class="po-chb">${PO_IMP.map(([v,t,k])=>`<button class="${k}" data-act="po-imp" data-v="${v}" aria-pressed="${C.imp===v}">${t}</button>`).join('')}</div></section></div>
+      ${poMsg()}<div class="cq-rod"><span>${C.imp==='parou'&&!C.tipo?'Vindo de “A linha parou”, “Parou completa” já vem marcado. ':''}Depois de abrir, o posto volta para a tela inicial.</span><div class="po-rbs"><button class="cq-bt crit po-ok" data-act="po-ch-ok" ${pode?'':'disabled'}><b>${T.enviando?'Abrindo…':'Abrir chamado (Enter)'}</b></button><button class="cq-sec" data-act="po-volta">Voltar (Esc)</button></div></div>`); }
+  if(f==='potec'){ const xs=cqAbertos().filter(c=>!c.liberadoEm).sort((a,b)=>{ const p=c=>c.exec&&c.exec.tecnico?2:c.impacto==='parou'?0:1; return p(a)-p(b)||String(a.criado||'').localeCompare(String(b.criado||'')); });
+    return poPagina('Chamados da manutenção',`<h1 class="cq-h">${xs.length?'Qual chamado você vai atender?':'Nenhum chamado aberto'}</h1>
+      <div class="po-tecs">${xs.map(c=>{ const com=c.exec&&c.exec.tecnico, meu=com&&mxNorm(c.exec.tecnico)===mxNorm(T.p.nome), k=com?'info':c.impacto==='parou'?'crit':'warn';
+        return `<section class="po-tec ${k}"><div class="po-tech"><h2>${esc(c.linha||'')}</h2><em>● ${com?'em atendimento'+(c.exec.inicio?' desde '+esc(String(c.exec.inicio).slice(11,16)):''):'aguardando há '+ltvMin(Date.now()-new Date(c.criado||Date.now()))}</em></div>
+          <small>CHAMADO ${manNum(c.numero)}${meu?' · COM VOCÊ':com?' · COM '+esc(String(c.exec.tecnico).toUpperCase()):''}</small><b>${esc(c.defeito||'')}${c.impacto?' · '+esc(poImpTxt(c.impacto)):''}</b><span>Aberto às ${hm(c.criado||c.quando)}${c.nome?' por '+esc(c.nome):''}</span>
+          ${com?`<div class="po-tecok">Em atendimento · nada a marcar aqui</div><small>Quando a máquina voltar, o operador fecha o chamado e libera a máquina</small>`:`<button class="cq-bt pri" data-act="cq-comecar" data-n="${c.numero}" ${T.enviando?'disabled':''}><b>Começar atendimento</b></button><small>Grava você e a hora de início</small>`}</section>`; }).join('')||'<div class="cq-vz">Tudo funcionando.</div>'}</div>
+      ${poMsg()}${poRod('O técnico bipa o crachá aqui, como todo mundo. Esta tela volta sozinha para o início, liberando o posto para as duas linhas.','po-sai','Sair (Esc)')}`); }
   if(f==='pook') return poPagina('Posto · '+L.join(' e '),`<section class="cq-fim"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg><h1>${esc(T.okTit||'')}</h1><p>${esc(T.okTxt||'')}</p><p class="cq-p2">Esta tela volta para o início sozinha.</p></section>
       <div class="cq-rod"><button class="cq-sec" data-act="po-outra">Fazer outra coisa (mesmo crachá)</button><button class="cq-bt pri po-ok" data-act="po-fim"><b>Pronto (Enter)</b></button></div>`);
   /* chamado e técnico: a tela de chamados aprovada, com o título do posto */
@@ -127,7 +147,7 @@ function poFoco(){ if(!ttAtivo()||!poOn()) return; const f=S.tt.fase, id=f==='po
 { const _tl=ttLeu; ttLeu=function(txt){ if(poOn()&&S.tt.fase==='pofolha'){ poFolha(txt); return; } return _tl.apply(this,arguments); }; }
 
 /* ---------- gravações ---------- */
-async function poApontar(){ const T=S.tt, o=ttOrd(); if(!o||!T.p||T.enviando) return; const pp=ttPP(o), tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o));
+async function poApontar(){ const T=S.tt, o=ttOrd(); if(!o||!T.p||T.enviando) return; const pp=+T.ap.pp||0, tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o));
   if(!(tot>0)||tot>falta||!S._entOrd[o._id]) return;
   T.enviando=true; render(); const d={ordem:o._id,num:o.num,linha:o.linha,em:new Date().toISOString(),por:S.uid,qtd:Math.round(tot*1000)/1000,origem:'posto',operador:T.p.nome,cracha:T.p.codigo||null};
   if(T.ap.pal&&pp){ d.pal=T.ap.pal; d.porPal=pp; } if(+T.ap.av) d.avulso=+T.ap.av;
@@ -151,11 +171,37 @@ async function poVoltou(id){ const T=S.tt, p=(S.paradas||[]).find(x=>x._id===id)
   try{ const em=new Date().toISOString(); await S.db.doc('paradas/'+p._id).update({fim:em,porFim:S.uid||null,fimPor:T.p.nome,fimCracha:T.p.codigo||null,fimOrigem:'posto'}); p.fim=em; T.enviando=false; SOMpo('ok');
     poVai('pook',{okTit:p.linha+' voltou a produzir',okTxt:'Parada de '+dur(new Date(em)-new Date(p.inicio))+' ('+(p.motivo==='A definir'?'motivo a definir':p.motivo)+') · fechada por '+T.p.nome}); }
   catch(e){ T.enviando=false; console.warn('[posto] voltou',e); T.msg='Não foi possível salvar. Confira a internet e tente de novo.'; render(); } }
+async function poAbrirChamado(){ const T=S.tt, C=T.ch; if(!C||!C.tipo||!C.imp||T.enviando||!T.p) return; T.enviando=true; T.msg=''; render();
+  if(S.man.salv&&Date.now()-(S.man._salvDesde||0)>30000) S.man.salv=false;
+  manNovo(C.linha); Object.assign(S.man.f,{linha:C.linha,quando:manAgoraLocal(),defeito:C.tipo,impacto:C.imp,nome:T.p.nome,equip:'',equipId:'',origem:'posto',cracha:T.p.codigo||null});
+  S.man.novo=false; S.man.cur=null; S.man._ultErro=''; S.man._salvDesde=Date.now();
+  let estourou=false; const sv=manSalvar().catch(e=>{ S.man._ultErro=cqErroTxt(e); });
+  await Promise.race([sv,new Promise(r=>setTimeout(()=>{ estourou=true; r(); },window.__cqTempo||25000))]);
+  const n=S.man.cur; S.man.cur=null; S.man.novo=false; T.enviando=false;
+  if(n==null){ if(estourou) S.man.salv=false; T.msg=(estourou?'O Firebase não respondeu em 25 segundos':'Não foi possível abrir o chamado')+(S.man._ultErro?' ('+S.man._ultErro+')':'')+'. Confira a internet e tente de novo.'; render(); return; }
+  try{ await S.db.doc('chamados/os-'+manNum(n)).update({tipo:C.tipo==='Elétrico'?'eletrico':'mecanico'}); }catch(e){}
+  SOMpo('ok'); poVai('pook',{okTit:'Chamado aberto · '+manNum(n),okTxt:C.linha+' · '+C.tipo+' · '+poImpTxt(C.imp)+' · a manutenção já foi avisada'}); }
+async function poLiberar(n){ const T=S.tt, c=manDoc(n); if(!c||T.enviando||!T.p) return; T.enviando=true; render();
+  try{ const agora=new Date().toISOString(), E=Object.assign({},c.exec||{},{servicos:(c.exec&&c.exec.servicos)||'Conserto conferido e máquina liberada pelo operador no posto'});
+    const hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Operador conferiu e liberou a máquina no posto: '+T.p.nome+(T.p.codigo?' (crachá)':'')}]).slice(-200);
+    await S.db.doc('chamados/'+c._id).update({exec:E,hist,liberadoEm:agora,liberadoPor:T.p.nome,liberadoCracha:T.p.codigo||null,liberadoPeloOperador:true}); Object.assign(c,{exec:E,hist,liberadoEm:agora,liberadoPor:T.p.nome});
+    c._mzOk=true; try{ await manStatus(c,'Concluída'); } finally { delete c._mzOk; }
+    T.enviando=false; if(c.status!=='Concluída'){ T.msg='Não foi possível fechar o chamado. Confira a internet e tente de novo.'; render(); return; }
+    SOMpo('ok'); poVai('pook',{okTit:'Máquina liberada · chamado '+manNum(n)+' fechado',okTxt:(c.linha||'')+' · conserto de '+(c.exec&&c.exec.tecnico||'manutenção')+' · liberado por '+T.p.nome}); }
+  catch(e){ T.enviando=false; console.warn('[posto] liberar',e); T.msg='Não foi possível fechar o chamado: '+cqErroTxt(e)+'.'; render(); } }
+async function poAinda(n){ const T=S.tt, c=manDoc(n); if(!c||!T.p) return;
+  try{ const agora=new Date().toISOString(), hist=(c.hist||[]).concat([{em:agora,por:S.uid||null,o:'Operador conferiu no posto: a máquina ainda está com problema ('+T.p.nome+')'}]).slice(-200);
+    await S.db.doc('chamados/'+c._id).update({hist,aindaProblemaEm:agora,aindaProblemaPor:T.p.nome}); c.hist=hist; toast('Avisado: a máquina ainda está com problema. O chamado continua aberto.'); }catch(e){ toast('Não foi possível salvar agora.'); } }
+async function poAvisarPcp(){ const T=S.tt; if(!T.p||T.enviando) return; T.enviando=true; render();
+  try{ await S.db.collection('pcpavisos').add({status:'aberto',em:new Date().toISOString(),por:S.uid||null,nome:T.p.nome,cracha:T.p.codigo||null,linha:T.p.linha&&ttLinhas().includes(T.p.linha)?T.p.linha:ttLinhas().join(' / '),posto:ttLinhas().join(' / '),acao:T.po&&T.po.acao==='pm'?'pedir material':'apontar',msg:T.msg||'',origem:'posto'});
+    T.enviando=false; SOMpo('ok'); poVai('pook',{okTit:'PCP avisado',okTxt:'O aviso tocou no painel do PCP: '+T.p.nome+' precisa de ajuda com a folha.'}); }
+  catch(e){ T.enviando=false; T.msg='Não foi possível avisar o PCP. Confira a internet.'; render(); } }
 function SOMpo(k){ try{ if(typeof SOM!=='undefined'&&SOM[k]) SOM[k](); else ttBip(); }catch(e){} }
 
 /* ---------- cliques ---------- */
 function poVolta(){ const T=S.tt, f=T.fase;
-  if(f==='pomenu'||f==='tecnico'||f==='pook'){ ttVoltar(); return; }
+  if(f==='pomenu'||f==='tecnico'||f==='potec'||f==='pook'){ ttVoltar(); return; }
+  if(f==='poch'){ poVai('pomenu'); return; }
   if(f==='popar'&&T.po&&T.po.parL){ T.po.parL=''; render(); return; }
   if(f==='poap'||f==='popm'||f==='poesc'){ T.hub=null; poVai('pofolha'); return; }
   if(['pofolha','popar','cqlinha','maquina'].includes(f)){ poVai('pomenu'); return; }
@@ -165,6 +211,13 @@ window.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.close
   if(b.dataset.act==='cq-cancel'&&T.p&&['cqlinha','maquina'].includes(T.fase)){ ev.preventDefault(); ev.stopImmediatePropagation(); poVai('pomenu'); } },true);
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="po-"]'); if(!b||b.disabled||!ttAtivo()||!poOn()) return; const T=S.tt, a=b.dataset.act; T.ult=Date.now(); T.msg='';
   if(a==='po-op'){ poMenuAcao(+b.dataset.n); return; }
+  if(a==='po-chl'){ T.ch.linha=b.dataset.l; render(); return; }
+  if(a==='po-tipo'){ T.ch.tipo=b.dataset.v; render(); return; }
+  if(a==='po-imp'){ T.ch.imp=b.dataset.v; render(); return; }
+  if(a==='po-ch-ok'){ poAbrirChamado(); return; }
+  if(a==='po-lib'){ poLiberar(+b.dataset.n); return; }
+  if(a==='po-aind'){ poAinda(+b.dataset.n); return; }
+  if(a==='po-pcp'){ poAvisarPcp(); return; }
   if(a==='po-volta'){ poVolta(); return; }
   if(a==='po-sai'||a==='po-fim'){ ttVoltar(); return; }
   if(a==='po-outra'){ T.po={}; poVai('pomenu'); return; }
@@ -177,9 +230,10 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='po-pmi'){ const o=ttOrd(), c=b.dataset.c, rc=o&&o.rancho&&ranchoDe(o.rancho), it=c!=='__outro'&&((rc&&rc.itens)||[]).find(x=>x.c===c); T.pm.cod=c; T.pm.um=it?(it.um||''):''; render(); return; }
   if(a==='po-pm-ok'){ poPedir(); return; }
   if(a==='po-parou'){ T.po.parL=b.dataset.l; render(); return; }
-  if(a==='po-mot'){ if(T.po.parL) poParou(T.po.parL,b.dataset.v); return; }
+  if(a==='po-mot'){ if(!T.po.parL) return; if(/manuten/i.test(b.dataset.v)){ poChamado(T.po.parL,'parou'); return; } poParou(T.po.parL,b.dataset.v); return; }
   if(a==='po-voltou'){ poVoltou(b.dataset.id); return; } });
 document.addEventListener('input',ev=>{ const t=ev.target; if(!poOn()) return; const T=S.tt; T.ult=Date.now();
+  if(t.id==='po-pp'&&T.ap){ const v=t.value.replace(/\D/g,'').slice(0,4); if(v!==t.value) t.value=v; T.ap.pp=v; poAtualiza(); }
   if(t.id==='po-av'&&T.ap){ const v=t.value.replace(/\D/g,'').slice(0,6); if(v!==t.value) t.value=v; T.ap.av=v; poAtualiza(); }
   if(t.id==='po-pmq'&&T.pm){ const v=t.value.replace(/[^\d,.]/g,'').replace(',','.').slice(0,8); if(v!==t.value) t.value=v; T.pm.qtd=v; poAtualiza(); }
   if(t.id==='po-pmt'&&T.pm){ T.pm.txt=t.value; poAtualiza(); } });
@@ -189,8 +243,8 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(!poOn()) return;
     L=linhasOrd().filter(x=>L.includes(x)); try{ localStorage.setItem('colafix.posto.linhas',JSON.stringify(L)); }catch(e){} render(); } });
 /* digitar não redesenha a tela inteira (o campo não perde o cursor): atualiza só o total e o botão */
 function poAtualiza(){ const T=S.tt, o=ttOrd(); if(!o) return;
-  if(T.fase==='poap'){ const pp=ttPP(o), un=ttUn(o), tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), bt=document.querySelector('[data-act="po-ap-ok"]'), tt=document.querySelector('.po-tot');
-    if(tt){ tt.classList.toggle('warn',tot>falta); tt.innerHTML=`Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${T.ap.pal} palete${T.ap.pal===1?'':'s'} + ${fQ(+T.ap.av||0)} avulsos</small>`:''}${tot>falta?`<small>${falta?'Passa do que falta ('+fQ(falta)+'). O excedente é lançado no computador do PCP.':'A ordem já está completa. Fale com o PCP.'}</small>`:''}`; }
+  if(T.fase==='poap'){ const pp=+T.ap.pp||0, un=ttUn(o), tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), bt=document.querySelector('[data-act="po-ap-ok"]'), tt=document.querySelector('.po-tot');
+    if(tt){ tt.classList.toggle('warn',tot>falta); tt.innerHTML=`Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${T.ap.pal} palete${T.ap.pal===1?'':'s'} × ${fQ(pp)} + ${fQ(+T.ap.av||0)} avulsos</small>`:''}${tot>falta?`<small>${falta?'Passa do que falta ('+fQ(falta)+'). O excedente é lançado no computador do PCP.':'A ordem já está completa. Fale com o PCP.'}</small>`:''}`; }
     if(bt){ bt.disabled=!(S._entOrd[o._id]&&tot>0&&tot<=falta&&!T.enviando); bt.innerHTML='<b>Apontar '+fQ(tot)+' '+esc(un)+' (Enter)</b>'; } }
   if(T.fase==='popm'){ const M=T.pm, bt=document.querySelector('[data-act="po-pm-ok"]'); if(bt) bt.disabled=!(M.cod&&+M.qtd>0&&!T.enviando&&(M.cod!=='__outro'||String(M.txt||'').trim().length>1)); } }
 
@@ -200,11 +254,26 @@ document.addEventListener('keydown',ev=>{ if(!ttAtivo()||!poOn()||ev.ctrlKey||ev
   if(poTecla.pend&&gap<120){ clearTimeout(poTecla.pend); poTecla.pend=null; } /* rajada do coletor: não é atalho */
   if(ev.key==='Escape'){ ev.preventDefault(); poVolta(); return; }
   if(f==='pomenu'&&/^[1-4]$/.test(ev.key)){ const n=+ev.key; ev.preventDefault(); poTecla.pend=setTimeout(()=>{ poTecla.pend=null; if(S.tt.fase==='pomenu') poMenuAcao(n); },120); return; }
-  if(f==='poap'){ if(ev.key==='ArrowUp'||ev.key==='ArrowDown'){ ev.preventDefault(); const o=ttOrd(); if(o&&ttPP(o)){ T.ap.pal=Math.max(0,T.ap.pal+(ev.key==='ArrowUp'?1:-1)); render(); } return; }
+  if(f==='poap'){ if(ev.key==='ArrowUp'||ev.key==='ArrowDown'){ ev.preventDefault(); const o=ttOrd(); if(o&&+T.ap.pp){ T.ap.pal=Math.max(0,T.ap.pal+(ev.key==='ArrowUp'?1:-1)); render(); } return; }
     if(ev.key==='Enter'){ ev.preventDefault(); poApontar(); return; } }
   if(f==='popm'&&ev.key==='Enter'){ ev.preventDefault(); const bt=document.querySelector('[data-act="po-pm-ok"]'); if(bt&&!bt.disabled) poPedir(); return; }
+  if(f==='poch'&&ev.key==='Enter'&&!(document.activeElement&&document.activeElement.matches('button'))){ ev.preventDefault(); poAbrirChamado(); return; }
   if(f==='pook'&&ev.key==='Enter'){ ev.preventDefault(); ttVoltar(); return; }
   if(f==='popar'&&!T.po.parL&&/^[1-9]$/.test(ev.key)){ const l=ttLinhas()[+ev.key-1]; if(l){ ev.preventDefault(); const p=poParAberta(l); if(p) poVoltou(p._id); else { T.po.parL=l; render(); } } } });
+/* ---------- painel do PCP: aviso "Deu erro? Avisar o PCP" toca e aparece no topo ---------- */
+S.pcpav=[]; let _pcpVistos=null;
+function pcpRecebe(){ try{ if(poOn()||!S.acs||!S.acs.pronto) return false; if(S.acs.dono) return true; const d=S.acs.doc; return !!d&&(d.perfil==='pcp'||(acsP().mods||[]).includes('analise')); }catch(e){ return false; } }
+setInterval(()=>{ try{ if(S._pcpSub||!S.db||!pcpRecebe()) return; S._pcpSub=true;
+  inscrever('pcpavisos',()=>S.db.collection('pcpavisos').where('status','==','aberto').limit(30),snap=>{ const xs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>String(b.em).localeCompare(String(a.em)));
+    const novos=_pcpVistos?xs.filter(x=>!_pcpVistos.has(x._id)):[]; _pcpVistos=new Set(xs.map(x=>x._id)); S.pcpav=xs;
+    if(novos.length){ try{ (typeof SOM!=='undefined'&&SOM.erro)?(SOM.erro(),setTimeout(()=>SOM.erro(),600)):ttBip(); }catch(e){} toast('Posto pediu ajuda: '+novos[0].nome+' · '+novos[0].linha); }
+    pcpFaixa(); }); }catch(e){} },1000);
+function pcpFaixa(){ let el=document.getElementById('pcp-faixa'); const xs=S.pcpav||[]; if(!xs.length){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='pcp-faixa'; document.body.appendChild(el); }
+  el.innerHTML=xs.slice(0,3).map(x=>`<div class="pcp-av"><b>Posto pediu ajuda do PCP</b><span>${esc(x.nome||'')} · ${esc(x.linha||'')} · ${esc(x.acao||'')} · ${hora(x.em)}${x.msg?' · “'+esc(x.msg)+'”':''}</span><button data-pcpok="${esc(x._id)}">Visto</button></div>`).join(''); }
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-pcpok]'); if(!b) return; b.disabled=true;
+  try{ await S.db.doc('pcpavisos/'+b.dataset.pcpok).update({status:'visto',vistoEm:new Date().toISOString(),vistoPor:S.uid||null}); }catch(e){ erro(e); b.disabled=false; } });
+registrarAviso(()=>(S.pcpav||[]).map(x=>({nivel:'crit',rotulo:'Posto',titulo:'Posto pediu ajuda do PCP · '+(x.linha||''),texto:(x.nome||'')+' · '+(x.acao||'')+' · '+hora(x.em),go:''})));
 /* confirmação volta sozinha */
 setInterval(()=>{ const T=S.tt; if(ttAtivo()&&poOn()&&T.fase==='pook'&&Date.now()-T.ult>10000) ttVoltar(); },1000);
 
@@ -242,6 +311,27 @@ body.po-on.po-camoff #tt-video{opacity:0;pointer-events:none}
 .po-pl>span{font-size:clamp(14px,2vh,17px);color:var(--tx2)}.po-pl small{font-size:14px;color:var(--tx2)}.po-pl .cq-bt{min-height:0;padding:14px 18px;align-items:center;text-align:center}.po-pl .cq-bt b{font-size:clamp(20px,3.2vh,26px)}
 .po-mots{background:var(--card);border-radius:20px;padding:20px 24px;display:flex;flex-direction:column;gap:14px;min-height:0;box-shadow:var(--sombra)}
 .po-mg{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));grid-auto-rows:minmax(64px,1fr);gap:12px;overflow:auto}.po-mg .cq-bt{min-height:64px;padding:10px 18px}.po-mg .cq-bt b{font-size:clamp(17px,2.8vh,22px)}.po-mg .po-ad{border-style:dashed;border-color:var(--warn)}
+.po-lch{display:block;font-style:normal;font-weight:700;color:var(--crit);font-size:clamp(14px,1.9vh,17px)}
+.po-rbs{display:flex;gap:12px;align-items:center;flex:none}.cq-bt.po-pcp{min-height:0;padding:12px 22px}.cq-bt.po-pcp b{font-size:clamp(16px,2.4vh,20px)}
+.po-pph{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.po-ppl{margin-left:auto;font-size:clamp(14px,2vh,17px);font-weight:600;color:var(--tx2)}.po-in.po-pp{width:96px;height:52px;font-size:26px;text-align:center;padding:0 8px;border-width:2px}.po-pph small{font-size:14px;color:var(--tx2);width:100%;text-align:right}
+.po-sua{font-size:15px;font-weight:700;color:var(--info)}
+.cq-bt span{display:block}
+.po-chh{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.po-seg{display:flex;background:var(--card);border:2px solid var(--linha);border-radius:14px;padding:4px}.po-seg button{font:inherit;font-size:clamp(17px,2.6vh,22px);font-weight:700;border:0;border-radius:10px;padding:10px 24px;background:transparent;color:var(--tx);cursor:pointer}.po-seg button[aria-pressed="true"]{background:var(--pri);color:var(--prifg)}
+.po-lib{background:var(--card);border:3px solid var(--ok);border-radius:18px;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.po-lib>div{flex:1;min-width:260px}.po-lib small{font-size:clamp(13px,1.8vh,15px);font-weight:700;letter-spacing:.04em;color:var(--ok)}.po-lib b{display:block;font-size:clamp(18px,2.8vh,24px)}.po-lib .cq-bt{min-height:0;padding:12px 22px}.po-lib .cq-bt b{font-size:clamp(17px,2.6vh,22px)}
+.po-ch2{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:18px}
+.po-chq{background:var(--card);border-radius:20px;padding:18px 22px;display:flex;flex-direction:column;gap:12px;min-height:0;box-shadow:var(--sombra)}.po-chq h2{margin:0;font-size:clamp(20px,3.4vh,28px)}
+.po-chb{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}.po-chb button{font:inherit;flex:1;min-height:56px;border-radius:18px;border:2px solid var(--linha);background:var(--card);color:var(--tx);font-size:clamp(20px,3.8vh,30px);font-weight:800;cursor:pointer}
+.po-chb button:hover{border-color:var(--info)}.po-chb button[aria-pressed="true"]{border-color:var(--pri);background:var(--pri);color:var(--prifg)}.po-chb button.crit[aria-pressed="true"]{border-color:var(--crit);background:var(--crit);color:#FFFFFF}.po-chb button.warn[aria-pressed="true"]{border-color:var(--warn);background:var(--warn);color:#FFFFFF}.po-chb button.ok[aria-pressed="true"]{border-color:var(--ok);background:var(--ok);color:#FFFFFF}
+.po-tecs{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px;overflow:auto;align-content:start}
+.po-tec{background:var(--card);border:3px solid var(--warn);border-radius:20px;padding:18px 22px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--sombra)}.po-tec.crit{border-color:var(--crit)}.po-tec.info{border-color:var(--info)}
+.po-tech{display:flex;justify-content:space-between;align-items:center;gap:10px}.po-tech h2{margin:0;font-size:clamp(22px,3.6vh,30px)}.po-tech em{font-style:normal;font-weight:700;font-size:15px;color:var(--warn)}.po-tec.crit .po-tech em{color:var(--crit)}.po-tec.info .po-tech em{color:var(--info)}
+.po-tec>small{font-size:14px;font-weight:700;letter-spacing:.04em;color:var(--tx2)}.po-tec>b{font-size:clamp(20px,3.2vh,26px)}.po-tec>span{font-size:16px;color:var(--tx2)}.po-tec .cq-bt{min-height:0;padding:14px;align-items:center;margin-top:6px}.po-tec .cq-bt b{font-size:clamp(20px,3.2vh,24px)}
+.po-tecok{margin-top:6px;text-align:center;font-size:clamp(17px,2.6vh,21px);font-weight:700;color:var(--info);background:var(--pag);border-radius:14px;padding:14px}
+#pcp-faixa{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:3000;display:flex;flex-direction:column;gap:8px;width:min(720px,calc(100vw - 24px))}
+.pcp-av{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;align-items:center;background:#B5473F;color:#FFFFFF;border-radius:14px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pcpPisca 1s ease-in-out 4}
+.pcp-av b{font-size:17px}.pcp-av span{grid-column:1;font-size:14px;opacity:.95}.pcp-av button{grid-row:1/3;grid-column:2;font:inherit;font-weight:700;border:0;border-radius:10px;padding:10px 18px;background:#FFFFFF;color:#B5473F;cursor:pointer}
+@keyframes pcpPisca{50%{background:#E3312D}}
 .po-cfg{background:var(--card);border-radius:14px;padding:12px 18px;display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;font-size:17px}.po-cfg div{display:flex;flex-wrap:wrap;gap:6px 18px}.po-cfg span{color:var(--tx2);font-size:14px}
 @media (max-width:900px){.po-menu{grid-template-columns:1fr;grid-template-rows:none}.po-par{grid-template-columns:1fr}.po-ord{grid-template-columns:1fr}}
 </style>`);
