@@ -93,7 +93,7 @@ function vOfEspera(){ const L=ofLinhas(), TF=ofTarefas().filter(ofPend), PV=ofPr
     <section class="of-col"><div class="of-hd"><h2>Quem está fazendo o quê</h2><span>agora</span></div><div class="of-l">${tecs.slice(0,8).map(x=>`<div class="of-tc"><span class="of-av ${x.c?'on':''}">${esc(String(x.t.nome||'?')[0])}</span><div><b>${esc(String(x.t.nome).split(' ')[0])}${x.t.area?' · '+esc(x.t.area):''}</b><small>${esc(x.txt)}</small></div></div>`).join('')||'<p class="of-vz">Nenhum técnico cadastrado em Crachás.</p>'}</div>
       <div class="of-ks"><div><b class="${semN?'crit':''}">${semN}</b><span>sem ninguém</span></div><div><b>${and}</b><span>em andamento</span></div><div><b class="ok">${fe}</b><span>feitos hoje</span></div></div></section></div>
    <section class="of-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor ou mostre o QR na câmera</h1><p>Para aceitar as tarefas do Marcelo, começar a preventiva, pedir peça ou terminar o que é seu</p>${ofMsg()}</div>
-    <div class="of-ctab"><button class="of-b" data-act="of-sem">Quadro da semana</button>${ttSemCrachaOk()?'<button class="of-b sec" data-act="tt-sem">Estou sem crachá</button>':''}</div></section>
+    <div class="of-camslot" aria-hidden="true"><span>câmera</span></div><div class="of-ctab"><button class="of-b" data-act="of-sem">Quadro da semana</button>${ttSemCrachaOk()?'<button class="of-b sec" data-act="tt-sem">Estou sem crachá</button>':''}</div></section>
    <div class="cq-tema"><button class="cq-sec" data-act="cq-tema">${cqEsc()?'Tela clara':'Tela escura'}</button><button class="cq-sec" data-act="cq-cheia">${document.fullscreenElement?'Sair da tela cheia':'Tela cheia'}</button><button class="cq-sec" data-act="cq-sair">Sair</button></div>`;
   return ofPagina('Manutenção · oficina',corpo,ofAlarmeHtml()); }
 const ofBt=(act,txt,n,cls,dis)=>`<button class="of-b ${cls||''}" data-act="${act}" ${n!=null?`data-n="${n}"`:''} ${dis||S.tt.enviando?'disabled':''}>${esc(txt)}</button>`;
@@ -391,5 +391,15 @@ document.head.insertAdjacentHTML('beforeend',`<style id="of-css">
 .of-ovc h1{margin:0;font-size:clamp(34px,6.4vh,72px);line-height:1.05}.of-ovd{margin:0;font-size:clamp(20px,3.2vh,34px)}.of-ovs{margin:0;font-size:clamp(15px,2.2vh,22px);color:#55666F}.of-ovi{margin:0;font-size:clamp(18px,2.8vh,28px);font-weight:700}
 .of-ov.lin .of-ovk{color:#B5473F}.of-ov.tar .of-ovk{color:#8A6420}.of-ovb{display:flex;gap:12px;margin-top:1vh}.of-ovb .of-b{background:#143F54;border-color:#143F54;color:#fff}.of-ovb .of-b.sec{background:#fff;color:#143F54;border-color:#C9D3DA}.of-ovc small{color:#55666F;font-size:15px}
 @media (max-width:1100px){.of-cols,.of-tg,.of-pg{grid-template-columns:1fr}.of-sem{grid-template-columns:repeat(2,minmax(0,1fr))}.of-g3{grid-template-columns:1fr}.of-main{overflow:auto}.of .cq-main{overflow:auto}.of-cta{flex-wrap:wrap}}
+</style>`);
+/* câmera: dentro da faixa do crachá (antes ficava no canto de baixo, por cima dos botões) */
+function ofCamPos(){ const on=ofOn()&&ttAtivo(); document.body.classList.toggle('of-on',on); if(!on) return; const v=document.getElementById('tt-video'), sl=document.querySelector('.of-camslot'); if(!v) return;
+  if(!sl){ v.style.cssText=''; return; } const r=sl.getBoundingClientRect(); Object.assign(v.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',right:'auto',bottom:'auto'}); }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ ofCamPos(); }catch(e){} return x; }; }
+setInterval(()=>{ try{ ofCamPos(); }catch(e){} },500); window.addEventListener('resize',()=>{ try{ ofCamPos(); }catch(e){} });
+document.head.insertAdjacentHTML('beforeend',`<style id="of-cam-css">
+.of-camslot{flex:none;width:clamp(150px,11vw,210px);aspect-ratio:16/10;border-radius:12px;border:2px solid #3E6A80;background:#0E2E3E;display:flex;align-items:center;justify-content:center;color:#9FC3D3;font-size:13px}
+body.of-on #tt-video{border-radius:12px;border:2px solid #9FC3D3;box-shadow:none}
+@media (max-width:1100px){.of-camslot{width:150px}}
 </style>`);
 /* ===FIM OFICINA=== */
