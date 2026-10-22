@@ -28,6 +28,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('"Deu erro? Avisar o PCP" grava o aviso no nome da Ana e confirma', s.f==='pook'&&/PCP avisado/.test(s.txt)&&av.some(x=>x.n==='Ana Souza'&&x.st==='aberto'), JSON.stringify(av));
  await p.keyboard.press('Enter'); await H.dorme(500); await bip('000123'); await p.keyboard.press('2'); await H.dorme(500);
  await bip('OP-5001'); await H.dorme(800); s=await st();
+ ok('Ordem que não está rodando: pergunta "Começar a ordem 5001 agora?" antes de apontar', s.f==='poini'&&/Começar a ordem 5001 agora/.test(s.txt), s.f);
+ await p.keyboard.press('Enter'); await H.dorme(1200); s=await st();
+ const sg=await p.evaluate(()=>(__T.S().ordens.find(o=>String(o.num)==='5001')||{}).prodSeg);
+ ok('Enter começa a ordem (grava o começo no nome da Ana) e vai para o apontar com "Rodando desde"', s.f==='poap'&&Array.isArray(sg)&&sg.length===1&&!sg[0].fim&&sg[0].por==='Ana Souza'&&/Rodando desde/.test(s.txt), JSON.stringify(sg));
  const foco=await p.evaluate(()=>document.activeElement&&document.activeElement.id);
  ok('Folha da ordem 5001: "Quanto saiu agora?" com o cursor já no campo', s.f==='poap'&&/Quanto saiu agora/.test(s.txt)&&/5001/.test(s.txt)&&foco==='po-av', foco);
  const pp0=await p.evaluate(()=>document.getElementById('po-pp').value);
@@ -40,8 +44,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.screenshot({path:'/tmp/po-apontar.png'});
  await p.keyboard.press('Enter'); await H.dorme(1500);
  const ent=await p.evaluate(()=>{ const xs=Object.values(JSON.parse(localStorage.getItem('__srv')).docs||{}); return null; }).catch(()=>null);
- s=await st(); const e=await p.evaluate(()=>{ const S=__T.S(); const xs=(S.entregas||[]).filter(x=>x.origem==='posto'); return xs.map(x=>({q:x.qtd,pal:x.pal,av:x.avulso,op:x.operador,cr:x.cracha,l:x.linha})); });
- ok('Enter aponta 188 no nome da Ana (origem posto, crachá) e mostra "Apontado: +188"', s.f==='pook'&&/Apontado: \+188/.test(s.txt)&&e.some(x=>x.q===188&&x.pal===2&&x.av===12&&x.op==='Ana Souza'&&x.cr==='ABCD2345'), JSON.stringify(e));
+ s=await st(); const e=await p.evaluate(()=>{ const S=__T.S(); return {ap:(S.apPend||[]).map(x=>({q:x.qtd,pal:x.pal,av:x.avulso,op:x.operador,cr:x.cracha,st:x.status})),ent:(S.entregas||[]).filter(x=>x.origem==='posto').length}; });
+ ok('Enter aponta 188 no nome da Ana e vai para a conferência do PCP (não entra direto na programação)', s.f==='pook'&&/Apontado: \+188/.test(s.txt)&&/PCP conferir/.test(s.txt)&&e.ap.some(x=>x.q===188&&x.pal===2&&x.av===12&&x.op==='Ana Souza'&&x.cr==='ABCD2345'&&x.st==='pendente')&&e.ent===0, JSON.stringify(e));
  await p.screenshot({path:'/tmp/po-ok.png'});
  await p.keyboard.press('Enter'); await H.dorme(600); s=await st(); ok('Enter na confirmação volta ao início', s.f==='espera', s.f);
  await bip('000123'); await p.keyboard.press('3'); await H.dorme(600); await bip('RA-4471230'); await H.dorme(500); s=await st();

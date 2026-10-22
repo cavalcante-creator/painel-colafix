@@ -93,13 +93,13 @@ function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
     return poPagina(T.po.acao==='ap'?'Apontar produção':'Pedir material',`<h1 class="cq-h">Qual ordem? <small>· o rancho ${esc(T.po.rancho||'')} tem mais de uma</small></h1><div class="cq-g">${cs.map(o=>`<button class="cq-bt" data-act="po-ord" data-id="${esc(o._id)}"><b>Ordem ${esc(o.num)} · ${esc(o.linha)}</b><span>${esc(o.produto||'')}</span></button>`).join('')}</div>${poMsg()}${poRod('Escolha a ordem que você está produzindo.')}`); }
   if(f==='poap'){ const o=ttOrd(); if(!o){ T.fase='pofolha'; return vPosto(); }
     const A=T.ap; if(A.pp==null) A.pp=String(ttPP(o)||96); const pp=+A.pp||0, un=ttUn(o), tot=A.pal*pp+(+A.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), pronto=!!S._entOrd[o._id];
-    const pode=pronto&&tot>0&&tot<=falta&&!T.enviando;
-    return poPagina('Apontar produção',`${poOrdCab(o,true)}<h1 class="cq-h">Quanto saiu agora?</h1>
+    const pode=pronto&&tot>0&&!T.enviando, pend=apPendDe(o._id);
+    return poPagina('Apontar produção',`${poOrdCab(o,true)}${otFaixa(o)}<h1 class="cq-h">Quanto saiu agora?</h1>
       <div class="po-q2"><section class="po-box"><div class="po-pph"><span class="po-lb">Paletes</span><label class="po-ppl" for="po-pp">${esc(un)} por palete</label><input id="po-pp" class="po-in po-pp" inputmode="numeric" autocomplete="off" maxlength="4" value="${esc(A.pp)}"><small>padrão ${fQ(ttPP(o)||96)} · pode mudar</small></div><div class="po-pal"><button data-act="po-pal" data-v="-1" aria-label="Menos um palete" ${A.pal?'':'disabled'}>−</button><b>${A.pal}</b><button data-act="po-pal" data-v="1" aria-label="Mais um palete">+</button></div><small class="po-dica">Teclado: setas ↑ e ↓</small></section>
         <section class="po-box"><label class="po-lb" for="po-av">Avulsos (${esc(un)})</label><input id="po-av" class="po-in" inputmode="numeric" autocomplete="off" maxlength="6" value="${esc(A.av||'')}" placeholder="0"><small class="po-dica">Digite o número</small></section></div>
       ${poMsg()}<div class="cq-rod"><button class="cq-sec" data-act="po-volta">Voltar (Esc)</button>
-        <div class="po-tot ${tot>falta?'warn':''}">Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${A.pal} palete${A.pal===1?'':'s'} × ${fQ(pp)} + ${fQ(+A.av||0)} avulsos</small>`:''}${!pronto?'<small>Carregando o que já foi apontado…</small>':tot>falta?`<small>${falta?'Passa do que falta ('+fQ(falta)+'). O excedente é lançado no computador do PCP.':'A ordem já está completa. Fale com o PCP.'}</small>`:''}</div>
-        <button class="cq-bt ok po-ok" data-act="po-ap-ok" ${pode?'':'disabled'}><b>${T.enviando?'Salvando…':'Apontar '+fQ(tot)+' '+esc(un)+' (Enter)'}</b></button></div>`); }
+        <div class="po-tot ${tot>falta?'warn':''}">Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${A.pal} palete${A.pal===1?'':'s'} × ${fQ(pp)} + ${fQ(+A.av||0)} avulsos</small>`:''}${!pronto?'<small>Carregando o que já foi apontado…</small>':tot>falta?`<small>Passa do total da ordem em ${fQ(tot-falta)} ${esc(un)} (reprocesso?). O PCP confere antes de entrar na programação.</small>`:''}${pend?`<small>Aguardando o PCP conferir: ${fQ(pend)} ${esc(un)}</small>`:''}</div>
+        <button class="cq-bt ok po-ok" data-act="po-ap-ok" ${pode?'':'disabled'}><b>${T.enviando?'Enviando…':'Apontar '+fQ(tot)+' '+esc(un)+' (Enter)'}</b></button></div>`); }
   if(f==='popm'){ const o=ttOrd(); if(!o){ T.fase='pofolha'; return vPosto(); }
     const M=T.pm, rc=o.rancho&&ranchoDe(o.rancho), its=((rc&&rc.itens)||[]).filter(x=>dbVisivel(x)), pend=(S.pedmat||[]).filter(p=>p.ordem===o._id);
     const pode=M.cod&&+M.qtd>0&&!T.enviando&&(M.cod!=='__outro'||String(M.txt||'').trim().length>1);
@@ -154,14 +154,14 @@ function poFoco(){ if(!ttAtivo()||!poOn()) return; const f=S.tt.fase, id=f==='se
 
 /* ---------- gravações ---------- */
 async function poApontar(){ const T=S.tt, o=ttOrd(); if(!o||!T.p||T.enviando) return; const pp=+T.ap.pp||0, tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o));
-  if(!(tot>0)||tot>falta||!S._entOrd[o._id]) return;
-  T.enviando=true; render(); const d={ordem:o._id,num:o.num,linha:o.linha,em:new Date().toISOString(),por:S.uid,qtd:Math.round(tot*1000)/1000,origem:'posto',operador:T.p.nome,cracha:T.p.codigo||null};
+  if(!(tot>0)||!S._entOrd[o._id]) return;
+  /* não entra direto na programação: vai para a conferência do PCP (apontpend); o PCP confirma e aí vira apontamento (entregas) */
+  T.enviando=true; render(); const d={ordem:o._id,num:o.num,linha:o.linha,produto:o.produto||'',em:new Date().toISOString(),por:S.uid||null,qtd:Math.round(tot*1000)/1000,origem:'posto',operador:T.p.nome,cracha:T.p.codigo||null,status:'pendente',passa:tot>falta?Math.round((tot-falta)*1000)/1000:0};
   if(T.ap.pal&&pp){ d.pal=T.ap.pal; d.porPal=pp; } if(+T.ap.av) d.avulso=+T.ap.av;
-  const ok=await salvar('entregas',d); T.enviando=false;
+  let ok=false; try{ const r=await S.db.collection('apontpend').add(d); ok=true; S.apPend=[Object.assign({_id:r&&r.id},d)].concat(S.apPend||[]); }catch(e){ console.warn('[posto] apontar',e); } T.enviando=false;
   if(!ok){ T.msg='Não foi possível salvar. Confira a internet e tente de novo.'; render(); return; }
-  if(!(S._entOrd[o._id]||[]).some(e=>e.em===d.em&&e.qtd===d.qtd)){ S._entOrd[o._id]=(S._entOrd[o._id]||[]).concat([Object.assign({_id:'novo-'+d.em},d)]); const m=new Map(); Object.values(S._entOrd).forEach(xs=>xs.forEach(e=>m.set(e._id,e))); S.entregas=[...m.values()]; }
-  const resta=Math.max(0,(+o.total||0)-entregueDe(o)), un=ttUn(o); SOMpo('ok');
-  poVai('pook',{okTit:'Apontado: +'+fQ(tot)+' '+un,okTxt:'Ordem '+o.num+' · '+o.linha+' · '+(resta?'faltam '+fQ(resta)+' '+un:'ordem completa')+' · no nome de '+T.p.nome}); }
+  const un=ttUn(o); SOMpo('ok');
+  poVai('pook',{okTit:'Apontado: +'+fQ(tot)+' '+un,okTxt:'Ordem '+o.num+' · '+o.linha+' · enviado para o PCP conferir'+(d.passa?' (passa do total em '+fQ(d.passa)+')':'')+' · no nome de '+T.p.nome}); }
 async function poPedir(){ const T=S.tt, o=ttOrd(), M=T.pm; if(!o||!T.p||!M||T.enviando) return; const rc=o.rancho&&ranchoDe(o.rancho), it=M.cod!=='__outro'&&((rc&&rc.itens)||[]).find(x=>x.c===M.cod);
   const item=it?(it.c+' '+(it.d||'')).trim():String(M.txt||'').trim(); if(item.length<2){ T.msg='Escreva qual material.'; render(); return; } if(!(+M.qtd>0)) return;
   T.enviando=true; render();
@@ -218,7 +218,7 @@ function poVolta(){ const T=S.tt, f=T.fase;
   if(f==='pomenu'||f==='tecnico'||f==='potec'||f==='pook'||f==='sem'){ ttVoltar(); return; }
   if(f==='poch'){ poVai('pomenu'); return; }
   if(f==='popar'&&T.po&&T.po.parL){ T.po.parL=''; render(); return; }
-  if(f==='poap'||f==='popm'||f==='poesc'){ T.hub=null; poVai('pofolha'); return; }
+  if(f==='poap'||f==='popm'||f==='poesc'||f==='poini'){ T.hub=null; poVai('pofolha'); return; }
   if(['pofolha','popar','cqlinha','maquina'].includes(f)){ poVai('pomenu'); return; }
   if(f==='defeito'){ poVai('maquina'); return; } if(f==='impacto'){ poVai('defeito'); return; } if(f==='cqcausa'){ poVai('tecnico'); return; } }
 window.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act]'); if(!b||!ttAtivo()||!poOn()) return; const T=S.tt;
@@ -258,9 +258,9 @@ document.addEventListener('change',ev=>{ const t=ev.target; if(!poOn()) return;
     L=linhasOrd().filter(x=>L.includes(x)); try{ localStorage.setItem('colafix.posto.linhas',JSON.stringify(L)); }catch(e){} render(); } });
 /* digitar não redesenha a tela inteira (o campo não perde o cursor): atualiza só o total e o botão */
 function poAtualiza(){ const T=S.tt, o=ttOrd(); if(!o) return;
-  if(T.fase==='poap'){ const pp=+T.ap.pp||0, un=ttUn(o), tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), bt=document.querySelector('[data-act="po-ap-ok"]'), tt=document.querySelector('.po-tot');
-    if(tt){ tt.classList.toggle('warn',tot>falta); tt.innerHTML=`Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${T.ap.pal} palete${T.ap.pal===1?'':'s'} × ${fQ(pp)} + ${fQ(+T.ap.av||0)} avulsos</small>`:''}${tot>falta?`<small>${falta?'Passa do que falta ('+fQ(falta)+'). O excedente é lançado no computador do PCP.':'A ordem já está completa. Fale com o PCP.'}</small>`:''}`; }
-    if(bt){ bt.disabled=!(S._entOrd[o._id]&&tot>0&&tot<=falta&&!T.enviando); bt.innerHTML='<b>Apontar '+fQ(tot)+' '+esc(un)+' (Enter)</b>'; } }
+  if(T.fase==='poap'){ const pp=+T.ap.pp||0, un=ttUn(o), tot=T.ap.pal*pp+(+T.ap.av||0), falta=Math.max(0,(+o.total||0)-entregueDe(o)), pend=apPendDe(o._id), bt=document.querySelector('[data-act="po-ap-ok"]'), tt=document.querySelector('.po-tot');
+    if(tt){ tt.classList.toggle('warn',tot>falta); tt.innerHTML=`Total: <b>${fQ(tot)} ${esc(un)}</b>${pp&&tot?`<small>${T.ap.pal} palete${T.ap.pal===1?'':'s'} × ${fQ(pp)} + ${fQ(+T.ap.av||0)} avulsos</small>`:''}${tot>falta?`<small>Passa do total da ordem em ${fQ(tot-falta)} ${esc(un)} (reprocesso?). O PCP confere antes de entrar na programação.</small>`:''}${pend?`<small>Aguardando o PCP conferir: ${fQ(pend)} ${esc(un)}</small>`:''}`; }
+    if(bt){ bt.disabled=!(S._entOrd[o._id]&&tot>0&&!T.enviando); bt.innerHTML='<b>Apontar '+fQ(tot)+' '+esc(un)+' (Enter)</b>'; } }
   if(T.fase==='popm'){ const M=T.pm, bt=document.querySelector('[data-act="po-pm-ok"]'); if(bt) bt.disabled=!(M.cod&&+M.qtd>0&&!T.enviando&&(M.cod!=='__outro'||String(M.txt||'').trim().length>1)); } }
 
 /* ---------- teclado (o computador do posto não tem tela de toque) ---------- */
