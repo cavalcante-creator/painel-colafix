@@ -92,8 +92,8 @@ function vOfEspera(){ const L=ofLinhas(), TF=ofTarefas().filter(ofPend), PV=ofPr
       <div class="of-hd of-hd2"><h2>Preventivas de hoje</h2><span>do plano</span></div>${PV.map(ofCardPrev).join('')||'<p class="of-vz">Nenhuma preventiva aberta.</p>'}</div></section>
     <section class="of-col"><div class="of-hd"><h2>Quem está fazendo o quê</h2><span>agora</span></div><div class="of-l">${tecs.slice(0,8).map(x=>`<div class="of-tc"><span class="of-av ${x.c?'on':''}">${esc(String(x.t.nome||'?')[0])}</span><div><b>${esc(String(x.t.nome).split(' ')[0])}${x.t.area?' · '+esc(x.t.area):''}</b><small>${esc(x.txt)}</small></div></div>`).join('')||'<p class="of-vz">Nenhum técnico cadastrado em Crachás.</p>'}</div>
       <div class="of-ks"><div><b class="${semN?'crit':''}">${semN}</b><span>sem ninguém</span></div><div><b>${and}</b><span>em andamento</span></div><div><b class="ok">${fe}</b><span>feitos hoje</span></div></div></section></div>
-   <section class="of-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor ou mostre o QR na câmera</h1><p>Para aceitar as tarefas do Marcelo, começar a preventiva, pedir peça ou terminar o que é seu</p>${ofMsg()}</div>
-    <div class="of-camslot" aria-hidden="true"><span>câmera</span></div><div class="of-ctab"><button class="of-b" data-act="of-sem">Quadro da semana</button>${ttSemCrachaOk()?'<button class="of-b sec" data-act="tt-sem">Estou sem crachá</button>':''}</div></section>
+   <section class="of-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor${S.of.cam?' ou mostre o QR na câmera':''}</h1><p>Para aceitar as tarefas do Marcelo, começar a preventiva, pedir peça ou terminar o que é seu</p>${ofMsg()}</div>
+    ${S.of.cam?`<div class="of-camw"><div class="of-camslot" aria-hidden="true"><span>ligando a câmera…</span></div><button class="of-camb" data-act="of-cam">Desligar câmera</button></div>`:`<button class="of-camoff" data-act="of-cam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3l2-2h8l2 2h3v12H3z"/><circle cx="12" cy="13" r="4"/></svg><b>Ligar câmera</b><small>para ler o QR do crachá</small></button>`}<div class="of-ctab"><button class="of-b" data-act="of-sem">Quadro da semana</button>${ttSemCrachaOk()?'<button class="of-b sec" data-act="tt-sem">Estou sem crachá</button>':''}</div></section>
    <div class="cq-tema"><button class="cq-sec" data-act="cq-tema">${cqEsc()?'Tela clara':'Tela escura'}</button><button class="cq-sec" data-act="cq-cheia">${document.fullscreenElement?'Sair da tela cheia':'Tela cheia'}</button><button class="cq-sec" data-act="cq-sair">Sair</button></div>`;
   return ofPagina('Manutenção · oficina',corpo,ofAlarmeHtml()); }
 const ofBt=(act,txt,n,cls,dis)=>`<button class="of-b ${cls||''}" data-act="${act}" ${n!=null?`data-n="${n}"`:''} ${dis||S.tt.enviando?'disabled':''}>${esc(txt)}</button>`;
@@ -392,12 +392,21 @@ document.head.insertAdjacentHTML('beforeend',`<style id="of-css">
 .of-ov.lin .of-ovk{color:#B5473F}.of-ov.tar .of-ovk{color:#8A6420}.of-ovb{display:flex;gap:12px;margin-top:1vh}.of-ovb .of-b{background:#143F54;border-color:#143F54;color:#fff}.of-ovb .of-b.sec{background:#fff;color:#143F54;border-color:#C9D3DA}.of-ovc small{color:#55666F;font-size:15px}
 @media (max-width:1100px){.of-cols,.of-tg,.of-pg{grid-template-columns:1fr}.of-sem{grid-template-columns:repeat(2,minmax(0,1fr))}.of-g3{grid-template-columns:1fr}.of-main{overflow:auto}.of .cq-main{overflow:auto}.of-cta{flex-wrap:wrap}}
 </style>`);
+/* câmera desligada por padrão (o leitor de crachá é o principal): "Ligar câmera" liga; desliga sozinha depois de ler um crachá ou com 2 min sem uso */
+{ const _cl=ttCamLiga; ttCamLiga=function(){ if(ofOn()&&!S.of.cam) return; return _cl.apply(this,arguments); }; }
+function ofCamSet(on){ S.of.cam=on; S.of.camEm=Date.now(); if(!on){ try{ ttCamDesliga(); }catch(e){} } render(); }
+{ const _ti=ttInicia; ttInicia=function(p){ if(ofOn()&&S.of.cam){ S.of.cam=false; } return _ti.apply(this,arguments); }; }
+setInterval(()=>{ try{ if(ofOn()&&S.of.cam&&S.tt.fase==='espera'&&Date.now()-(S.of.camEm||0)>120000) ofCamSet(false); }catch(e){} },2000);
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="of-cam"]'); if(!b||!ofOn()) return; ev.preventDefault(); ev.stopImmediatePropagation(); ofCamSet(!S.of.cam); },true);
 /* câmera: dentro da faixa do crachá (antes ficava no canto de baixo, por cima dos botões) */
 function ofCamPos(){ const on=ofOn()&&ttAtivo(); document.body.classList.toggle('of-on',on); if(!on) return; const v=document.getElementById('tt-video'), sl=document.querySelector('.of-camslot'); if(!v) return;
   if(!sl){ v.style.cssText=''; return; } const r=sl.getBoundingClientRect(); Object.assign(v.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',right:'auto',bottom:'auto'}); }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ ofCamPos(); }catch(e){} return x; }; }
 setInterval(()=>{ try{ ofCamPos(); }catch(e){} },500); window.addEventListener('resize',()=>{ try{ ofCamPos(); }catch(e){} });
 document.head.insertAdjacentHTML('beforeend',`<style id="of-cam-css">
+.of-camw{display:flex;flex-direction:column;align-items:center;gap:6px}.of-camb{font:inherit;font-size:14px;font-weight:600;color:#fff;background:none;border:0;text-decoration:underline;cursor:pointer}
+.of-camoff{font:inherit;cursor:pointer;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:clamp(150px,11vw,210px);min-height:110px;border-radius:12px;border:2px dashed #9FC3D3;background:transparent;color:#fff}
+.of-camoff svg{width:30px;height:30px;fill:none;stroke:#fff;stroke-width:1.8}.of-camoff b{font-size:17px}.of-camoff small{font-size:12px;opacity:.8}
 .of-camslot{flex:none;width:clamp(150px,11vw,210px);aspect-ratio:16/10;border-radius:12px;border:2px solid #3E6A80;background:#0E2E3E;display:flex;align-items:center;justify-content:center;color:#9FC3D3;font-size:13px}
 body.of-on #tt-video{border-radius:12px;border:2px solid #9FC3D3;box-shadow:none}
 @media (max-width:1100px){.of-camslot{width:150px}}
