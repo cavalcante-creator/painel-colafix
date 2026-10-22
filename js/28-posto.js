@@ -65,7 +65,7 @@ function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
     return poPagina('Posto · '+L.join(' e '),`<div class="cq-lns">${L.map(l=>{ const e=poEstLinha(l); return `<section class="cq-ln ${e.c}${e.c==='crit'?' cq-pisca':''}"><div><h2>${esc(l)}</h2><i></i></div><b>${esc(e.t)}</b><span>${esc(e.s)}</span></section>`; }).join('')}</div>
       <section class="cq-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor</h1><p>Depois você escolhe: chamar a manutenção, apontar, pedir material ou registrar parada</p>${poMsg()}</div></section>
       ${cfg?`<section class="po-cfg"><b>Linhas deste posto</b><div>${linhasOrd().map(l=>`<label class="ck"><input type="checkbox" data-po-lt="${esc(l)}" ${L.includes(l)?'checked':''}> ${esc(l)}</label>`).join('')}</div><span>Fica guardado neste computador.</span></section>`:''}
-      <div class="cq-tema">${ttSemCrachaOk()?'<button class="cq-sec" data-act="tt-sem">Estou sem crachá</button>':''}<button class="cq-sec" data-act="po-cfgl">${cfg?'Fechar':'Linhas deste posto'}</button><button class="cq-sec" data-act="cq-tema">${cqEsc()?'Tela clara':'Tela escura'}</button><button class="cq-sec" data-act="cq-cheia">${document.fullscreenElement?'Sair da tela cheia':'Tela cheia'}</button><button class="cq-sec" data-act="po-sair">Sair</button></div>`); }
+      <div class="cq-tema">${ttSemCrachaOk()?'<button class="cq-sec" data-act="tt-sem">Estou sem crachá</button>':''}${ttCam.stream?`<button class="cq-sec" data-act="po-cam">${poCamOff()?'Mostrar câmera':'Esconder câmera'}</button>`:''}<button class="cq-sec" data-act="po-cfgl">${cfg?'Fechar':'Linhas deste posto'}</button><button class="cq-sec" data-act="cq-tema">${cqEsc()?'Tela clara':'Tela escura'}</button><button class="cq-sec" data-act="cq-cheia">${document.fullscreenElement?'Sair da tela cheia':'Tela cheia'}</button><button class="cq-sec" data-act="po-sair">Sair</button></div>`); }
   if(f==='pomenu'){ const nome=String(T.p.nome||'').split(/\s+/)[0]; const par=L.map(poParAberta).filter(Boolean)[0];
     const bt=(n,cls,t,s)=>`<button class="po-op ${cls}" data-act="po-op" data-n="${n}"><span class="po-k">${n}</span><div><b>${t}</b><small>${s}</small></div></button>`;
     return poPagina('Posto · '+L.join(' e '),`<h1 class="cq-h">Olá, ${esc(nome)}. O que você quer fazer?</h1><div class="po-menu">
@@ -110,9 +110,11 @@ function vPosto(){ const T=S.tt, L=ttLinhas(), f=T.fase;
   const h=vChamados(); if(h) return h.replace('<div class="cq-tt">Chamados da manutenção</div>','<div class="cq-tt">'+(T.p&&T.p.papel==='tecnico'?'Manutenção · consertos':'Chamar a manutenção')+'</div>').replace('<small>Gestor','<small>Operador');
   return null; }
 { const _vt=vTotem; vTotem=function(){ if(poOn()){ S.tt.ocioso=60000; const h=vPosto(); if(h) return h; } return _vt.apply(this,arguments); }; }
+/* câmera: no posto fica no canto esquerdo (não tapa os botões) e pode sumir da tela — continua lendo o QR escondida */
+function poCamOff(){ try{ return localStorage.getItem('colafix.posto.cam')==='0'; }catch(e){ return false; } }
 function poFoco(){ if(!ttAtivo()||!poOn()) return; const f=S.tt.fase, id=f==='poap'?'po-av':f==='popm'?(S.tt.pm&&S.tt.pm.cod==='__outro'&&!String(S.tt.pm.txt||'').trim()?'po-pmt':'po-pmq'):''; const i=id&&document.getElementById(id);
   if(i&&document.activeElement!==i){ i.focus(); try{ const n=i.value.length; i.setSelectionRange(n,n); }catch(e){} } }
-{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ if(ttAtivo()&&poOn()) setTimeout(poFoco,0); }catch(e){} return x; }; }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ const on=ttAtivo()&&poOn(); document.body.classList.toggle('po-on',on); document.body.classList.toggle('po-camoff',on&&poCamOff()); if(on) setTimeout(poFoco,0); }catch(e){} return x; }; }
 
 /* ---------- leitura pelo coletor ---------- */
 { const _cb=cbLeu; cbLeu=function(cod){ const c=String(cod||'').toUpperCase();
@@ -166,6 +168,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='po-volta'){ poVolta(); return; }
   if(a==='po-sai'||a==='po-fim'){ ttVoltar(); return; }
   if(a==='po-outra'){ T.po={}; poVai('pomenu'); return; }
+  if(a==='po-cam'){ try{ localStorage.setItem('colafix.posto.cam',poCamOff()?'1':'0'); }catch(e){} render(); return; }
   if(a==='po-cfgl'){ T.po=T.po||{}; T.po.cfgL=!T.po.cfgL; render(); return; }
   if(a==='po-sair'){ if(!confirm('Sair do posto?\n\nPara voltar, será preciso entrar de novo com o usuário e a senha.')) return; ttCamDesliga(); const x=document.createElement('button'); x.dataset.act='sair-conta'; x.hidden=true; document.body.appendChild(x); x.click(); x.remove(); return; }
   if(a==='po-ord'){ poAbreOrdem(b.dataset.id); return; }
@@ -207,6 +210,8 @@ setInterval(()=>{ const T=S.tt; if(ttAtivo()&&poOn()&&T.fase==='pook'&&Date.now(
 
 document.head.insertAdjacentHTML('beforeend',`<style id="po-css">
 .po .cq-g{grid-auto-rows:minmax(80px,1fr)}
+body.po-on #tt-video{left:16px;right:auto}
+body.po-on.po-camoff #tt-video{opacity:0;pointer-events:none}
 .po-menu{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:clamp(12px,2vh,20px)}
 .po-op{font:inherit;cursor:pointer;border:0;border-radius:20px;color:#FFFFFF;padding:clamp(14px,2.4vh,26px) clamp(18px,2.2vw,32px);display:flex;align-items:center;gap:clamp(14px,1.8vw,28px);text-align:left;box-shadow:var(--sombra)}
 .po-op:hover,.po-op:focus-visible{filter:brightness(1.08);outline:3px solid var(--tx);outline-offset:2px}

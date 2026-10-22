@@ -1,12 +1,12 @@
 /* Posto da linha (computador no meio das linhas, com coletor): crachá → menu pelo teclado → apontar / pedir material
    (só pela folha), parou/voltou, chamar manutenção e técnico. Simula o coletor digitando o código + Enter. */
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,260):'')); };
-(async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString();
+(async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString(), hj=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10))(new Date()); /* data local (depois das 21h o UTC já é amanhã) */
  D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
  D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',ativo:true,adesivo:'777888',criadoEm:t};
  D['config/geral'].paletes={'Linha 1':88,'Linha 2':88}; D['config/geral'].linhasOrdem=['Linha 1','Linha 2','Linha 3']; D['config/geral'].motivos=['Falta de cimento','Falta de areia','Outros'];
- D['ordens/5001'].rancho='4471230'; D['ordens/5001'].data=t.slice(0,10); D['ordens/5002'].data=t.slice(0,10);
- D['ordens/5003']={num:'5003',produto:'AC3001 - ARGAMASSA AC3 20KG',linha:'Linha 3',data:t.slice(0,10),turno:'Dia todo',total:500,status:'aberta',criadaEm:t};
+ D['ordens/5001'].rancho='4471230'; D['ordens/5001'].data=hj; D['ordens/5002'].data=hj;
+ D['ordens/5003']={num:'5003',produto:'AC3001 - ARGAMASSA AC3 20KG',linha:'Linha 3',data:hj,turno:'Dia todo',total:500,status:'aberta',criadaEm:t};
  D['ranchos/4471230']={numero:'4471230',criadoEm:t,ordens:[{num:'5001'}],itens:[{c:'CIM01',d:'CIMENTO CINZA',um:'kg',q:500},{c:'SAC01',d:'SACO VALVULADO AC3',um:'un',q:1000}]};
  D['entregas/e1']={ordem:'5001',num:'5001',linha:'Linha 1',em:t,por:'uDONA',qtd:100};
  d.users['posto@painel-colafix.app']={uid:'uPO',pass:'po1234',nome:'Posto L1 L2'}; D['perfis/uPO']={nome:'Posto L1 L2',usuario:'posto'}; D['acessos/uPO']={perfil:'posto',mods:['tablet'],locais:[],ativo:true};
@@ -66,10 +66,21 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); }); await H.dorme(300);
  await bip('000123'); await p.evaluate(()=>{ __T.S().tt.ult=Date.now()-61000; }); await H.dorme(1500); s=await st();
  ok('Sem uso por 1 minuto, volta ao início sozinho', s.f==='espera', s.f);
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x)).slice(0,4));
  await p.setViewportSize({width:1920,height:1080}); await bip('000123'); await H.dorme(300); await p.screenshot({path:'/tmp/po-menu-1080.png'});
  const rol=await p.evaluate(()=>({x:document.documentElement.scrollWidth>innerWidth+2, cq:(()=>{ const c=document.querySelector('.cq-main'); return c.scrollHeight>c.clientHeight+4; })()}));
  ok('Em 1920 × 1080 o menu cabe inteiro, sem rolagem', !rol.x&&!rol.cq, JSON.stringify(rol));
  console.log('erros:',B.erros.filter(x=>!/404/.test(x)).slice(0,4)); await B.browser.close();
+ /* câmera ligada: no posto fica no canto esquerdo e o botão esconde/mostra (continua lendo, só fica invisível) */
+ const B3=await H.abrir({viewport:{width:1366,height:768},camera:'/tmp/camfake.y4m'}); const p3=B3.page; await H.preparar(p3,d); await p3.goto(H.BASE); await H.entrar(p3,'posto','po1234'); await H.dorme(4000);
+ const cam=()=>p3.evaluate(()=>{ const v=document.getElementById('tt-video'); if(!v) return null; const r=v.getBoundingClientRect(); return {x:Math.round(r.left),op:getComputedStyle(v).opacity,bt:(document.querySelector('[data-act="po-cam"]')||{}).innerText||''}; });
+ let c1=await cam(); ok('No posto a câmera fica no canto esquerdo e aparece o botão "Esconder câmera"', c1&&c1.x<100&&/Esconder câmera/.test(c1.bt), JSON.stringify(c1));
+ await p3.screenshot({path:'/tmp/po-camera.png'});
+ await p3.click('[data-act="po-cam"]'); await H.dorme(500); let c2=await cam();
+ ok('"Esconder câmera" deixa a câmera invisível (ela continua ligada) e o botão vira "Mostrar câmera"', c2&&c2.op==='0'&&/Mostrar câmera/.test(c2.bt), JSON.stringify(c2));
+ await p3.reload(); await H.dorme(4000); let c3=await cam(); ok('A escolha fica guardada no computador', c3&&c3.op==='0', JSON.stringify(c3));
+ await p3.click('[data-act="po-cam"]'); await H.dorme(500); let c4=await cam(); ok('"Mostrar câmera" volta a mostrar', c4&&c4.op==='1', JSON.stringify(c4));
+ await B3.browser.close();
  /* a administradora vê o cargo pronto "Posto da linha" em Equipe e cargos */
  const B2=await H.abrir({viewport:{width:1440,height:900}}); const p2=B2.page; await H.preparar(p2,d); await p2.goto(H.BASE); await H.entrar(p2,'iasmyn','senha123'); await H.dorme(2500);
  await p2.evaluate(()=>{ __T.go('acessos'); }); await H.dorme(1500); await p2.click('[data-act="eq-aba"][data-v="cargos"]'); await H.dorme(800);
