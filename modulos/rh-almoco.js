@@ -129,7 +129,8 @@
       ${st&&A.vis!=='dia'?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Faltas sem justificativa</span><b class="num">${st.semJust}</b><small>vezes que alguém veio e não almoçou · ${st.just} justificadas · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
     if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty" style="padding:24px;text-align:center">Nenhum dado do Face ID em ${esc(mesNome(A.mes))}. Importe o CSV do Control iD. Ausências no almoço já podem ser programadas.</div><div style="text-align:center;padding-bottom:16px"><button class="btn sec" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button></div></section>`+vAus(c);
-    const abas=`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="dir" aria-pressed="${A.vis==='dir'}">Diretoria</button></div>`;
+    const abas=`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="dir" aria-pressed="${A.vis==='dir'}">Diretoria</button><button data-act="alm-vis" data-v="pont" aria-pressed="${A.vis==='pont'}">Pontualidade</button></div>`;
+    if(A.vis==='pont') return topo+`<section class="card"><div class="alm-f">${abas}</div>${vPont(c)}</section>`+vPessoa(c,ds);
     if(A.vis==='dir') return topo+`<section class="card"><div class="alm-f">${abas}<span style="flex:1"></span><button class="btn sec" data-act="alm-pdf" ${A.pdf?'disabled':''}>${P.ic('baixar',18,2.2)}${A.pdf?'Gerando…':'Relatório em PDF'}</button><button class="btn" data-act="alm-ppt" ${A.ppt?'disabled':''}>${P.ic('baixar',18,2.2)}${A.ppt?'Gerando…':'Baixar apresentação (PowerPoint)'}</button></div>${vDir(c,st)}</section>`;
     const filtros=`<div class="alm-f alm-f1">${abas}<span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button>${A.vis==='mes'?`<button class="btn sec rh-sm" data-act="alm-xls">${P.ic('baixar',16,2.2)}Excel</button><button class="btn sec rh-sm" data-act="alm-imp">Imprimir</button>`:''}</div>
       <div class="alm-f alm-f2">
@@ -703,5 +704,83 @@
     PR.ocupado=true; try{ for(const d of dias.sort()){ const o=prDia(c,d,maxP); const h=prHash([o,d===hj?fonte:null]); if(PR.map[d]===h) continue;
         await P.db().doc('presenca/'+d).set(Object.assign(o,{h,em:new Date().toISOString(),fonte})); PR.map[d]=h; } }
     catch(e){ console.warn('[presença]',e); } finally{ PR.ocupado=false; PR.ult=Date.now(); } }
-  window.RHAlmoco={publicar,_prDia:prDia,ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,_A:A};
+  /* ---------- Pontualidade pelo Face ID (pedido de 22/10): atrasos, saídas antes do horário e faltas sem registro ----------
+     Horário de cada pessoa: turno de config/geral.turnos que tem o setor dela na lista de linhas; senão o horário padrão do RH
+     (rh/config.almoco.ponto {ini,fim,tol}); senão o turno sem linhas; senão 07:30–17:30. Tolerância padrão 10 min.
+     Chegada = 1ª passagem do dia; saída = última (de preferência num leitor de SAÍDA). Só dias de expediente. */
+  const PONTO_PAD={ini:'07:30',fim:'17:30',tol:10};
+  const pontoCfg=()=>Object.assign({},PONTO_PAD,cfg().ponto||{});
+  const hmT=m=>pad(Math.floor(m/60))+':'+pad(m%60);
+  function turnoDe(c,setor,d){ const pc=pontoCfg(), T=((c.P.S&&c.P.S.cfg&&c.P.S.cfg.turnos)||[]).filter(t=>t&&t.ini&&t.fim), wd=new Date(d+'T12:00').getDay();
+    const doDia=T.filter(t=>!(Array.isArray(t.dias)&&t.dias.length)||t.dias.includes(wd)), s=nrm(setor);
+    const daLinha=s&&doDia.find(t=>(t.linhas||[]).some(l=>nrm(l)===s));
+    if(daLinha) return {ini:daLinha.ini,fim:daLinha.fim,nome:daLinha.nome||'turno da linha'};
+    if((cfg().ponto||{}).ini) return {ini:pc.ini,fim:pc.fim,nome:'horário padrão do RH'};
+    const geral=doDia.find(t=>!(t.linhas||[]).length); if(geral) return {ini:geral.ini,fim:geral.fim,nome:geral.nome||'turno geral'};
+    return {ini:pc.ini,fim:pc.fim,nome:'horário padrão'}; }
+  function pontoMes(c,m){ const D=A.dados[m]; if(!D) return null; const R=c.R, P=c.P, tol=+pontoCfg().tol||0, hj=P.hojeStr(), agora=new Date().getHours()*60+new Date().getMinutes();
+    const ds=Object.keys(D.dias||{}).sort(); if(!ds.length) return {m,dias:[],pes:{}};
+    const fx={}; (R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
+    const maxP=Math.max(1,...ds.map(d=>Object.keys(D.dias[d]||{}).length)), P0=D.pessoas||{}, out={}, dExp=[];
+    const pes=(k,f,pp)=>out[k]=out[k]||{k,nome:titulo(f?f.nome:(pp&&pp.n)||'Sem nome'),setor:(f&&f.setor)||'',emp:empCurta((pp&&pp.e)||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX'):'')),funcId:f?f._id:null,cpf:/^\d{11}$/.test(k)?k:'',dias:0,atr:[],sai:[],falt:[]};
+    ds.forEach(d=>{ const r=prDia(c,d,maxP); if(!r.exp) return; dExp.push(d); const dia=D.dias[d]||{};
+      Object.keys(dia).forEach(k=>{ const x=dia[k]||{}, f=fx[k]||null; const t=(x.t||[]).map(z=>{ const mm=String(z).match(/^(\d{2}:\d{2})(:\d{2})?\s*(.*)$/); return mm?{h:mm[1],d:mm[3]}:null; }).filter(Boolean).sort((a,b)=>a.h.localeCompare(b.h)); if(!t.length) return;
+        const o=pes(k,f,P0[k]); o.dias++; const tu=turnoDe(c,o.setor,d), ini=hm(tu.ini), fim=hm(tu.fim), ch=hm(t[0].h);
+        if(ch>ini+tol) o.atr.push({d,h:t[0].h,esp:tu.ini,min:ch-ini});
+        const sds=t.filter(z=>ehSaida(z.d)), u=(sds.length?sds[sds.length-1]:t[t.length-1]); const um=hm(u.h);
+        if((d<hj||agora>fim+60)&&um<fim-tol&&um>ch) o.sai.push({d,h:u.h,esp:tu.fim,min:fim-um,leitor:ehSaida(u.d)}); });
+      r.f.filter(x=>x.m==='Sem registro').forEach(x=>{ const f=(R.func||[]).find(y=>titulo(y.nome)===x.n); if(!f) return; const k=String(f.cpf||'').replace(/\D/g,'').padStart(11,'0')||('f:'+f._id); pes(k,f,null).falt.push(d); }); });
+    return {m,dias:dExp,pes:out}; }
+  /* carrega o mês (o almoço só assina quando a tela abre) */
+  function carregar(c,m){ A.ctx=A.ctx||c; assinar(m); return new Promise(res=>{ const t0=Date.now(); const ver=()=>{ if((A.dados[m]&&A.aj[m])||Date.now()-t0>9000) return res(!!A.dados[m]); setTimeout(ver,150); }; ver(); }); }
+  /* números do mês por pessoa, para o fechamento da folha (rh.js) */
+  function fechamento(c,m){ A.ctx=A.ctx||c; const D=A.dados[m]; if(!D) return null; const ds=Object.keys(D.dias||{}).sort(); const sv={mes:A.mes,q:A.q,emp:A.emp,setor:A.setor,sit:A.sit};
+    let G=[]; try{ A.mes=m; A.q=''; A.emp=''; A.setor=''; A.sit=''; G=grade(ds,pessoasDoMes(m)); } finally{ Object.assign(A,sv); }
+    const vd=+cfg().valorDesc||0, alm={}; G.forEach(g=>{ alm[g.p.k]={nome:g.p.nome,emp:empCurta(g.p.emp),alm:g.tot,sj:g.sj,jj:g.jj,desc:g.sj*vd}; });
+    return {m,valorDesc:vd,alm,ponto:pontoMes(c,m)}; }
+  function vPont(c){ const esc=c.esc, P=c.P, X=pontoMes(c,A.mes), pc=pontoCfg(), lim=+A.pontN||40;
+    if(!X||!X.dias.length) return '<div class="empty">Sem dias de expediente com Face ID neste mês.</div>';
+    let L=Object.values(X.pes).filter(o=>A.pontTodos||o.atr.length||o.sai.length||o.falt.length);
+    const pts=o=>o.falt.length*3+o.atr.length+o.sai.length; L.sort((a,b)=>pts(b)-pts(a)||a.nome.localeCompare(b.nome,'pt-BR'));
+    const tot=k=>Object.values(X.pes).reduce((a,o)=>a+o[k].length,0), nAtr=Object.values(X.pes).filter(o=>o.atr.length).length;
+    const dl=d=>d.slice(8)+'/'+d.slice(5,7)+' '+semana(d);
+    const det=o=>A.pontAb===o.k?`<tr class="alm-pdet"><td colspan="7"><div class="alm-pdg">
+        <div><b>Atrasos (${o.atr.length})</b>${o.atr.map(x=>`<span>${dl(x.d)} · chegou ${x.h} <small>(horário ${x.esp}, +${x.min} min)</small></span>`).join('')||'<span class="sub">nenhum</span>'}</div>
+        <div><b>Saídas antes (${o.sai.length})</b>${o.sai.map(x=>`<span>${dl(x.d)} · ${x.leitor?'saiu':'última passagem'} ${x.h} <small>(até ${x.esp}, −${x.min} min)</small></span>`).join('')||'<span class="sub">nenhuma</span>'}</div>
+        <div><b>Faltas sem registro (${o.falt.length})</b>${o.falt.map(d=>`<span>${dl(d)}</span>`).join('')||'<span class="sub">nenhuma</span>'}</div></div></td></tr>`:'';
+    const cfgH=A.pontCfg?`<div class="alm-pcfg"><label><span class="label">Entrada</span><input class="txt" type="time" id="alm-pini" value="${esc(pc.ini)}"></label><label><span class="label">Saída</span><input class="txt" type="time" id="alm-pfim" value="${esc(pc.fim)}"></label><label><span class="label">Tolerância (min)</span><input class="txt" type="number" min="0" max="60" id="alm-ptol" value="${esc(pc.tol)}"></label><button class="btn rh-sm" data-act="alm-pcfgok">Salvar horário</button><button class="lnk" data-act="alm-pcfg">Cancelar</button>
+        <div class="sub" style="flex-basis:100%;margin:0;font-size:12.5px">Vale para quem não tem turno da linha cadastrado (Visão do gestor › Turnos usa o setor = nome da linha).</div></div>`:'';
+    return `<div class="alm-pk"><div><span>Pessoas que chegaram atrasadas</span><b class="num">${nAtr}</b><small>${tot('atr')} atrasos no mês</small></div><div><span>Saídas antes do horário</span><b class="num">${tot('sai')}</b><small>última passagem antes do fim</small></div>
+        <div class="${tot('falt')?'w':''}"><span>Faltas sem registro</span><b class="num">${tot('falt')}</b><small>dia de expediente sem passar no Face ID (sem férias)</small></div><div><span>Dias de expediente</span><b class="num">${X.dias.length}</b><small>horário padrão ${esc(pc.ini)}–${esc(pc.fim)} · tolerância ${esc(pc.tol)} min · <button class="lnk" data-act="alm-pcfg">mudar</button></small></div></div>${cfgH}
+      <div class="alm-pbar"><label class="ck"><input type="checkbox" data-act="alm-ptodos" ${A.pontTodos?'checked':''}> Mostrar também quem está em dia</label><span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-pxls">${P.ic('baixar',16,2.2)}Excel</button></div>
+      ${L.length?`<div class="rh-tw"><table class="rh-t alm-pt"><thead><tr><th>Nome</th><th>Setor · empresa</th><th style="text-align:right">Atrasos</th><th style="text-align:right">Saídas antes</th><th style="text-align:right">Faltas</th><th style="text-align:right">Dias no Face ID</th><th></th></tr></thead><tbody>
+        ${L.slice(0,lim).map(o=>`<tr><td><button class="lnk alm-nm" data-act="alm-pab" data-k="${esc(o.k)}">${esc(o.nome)}</button></td><td>${esc([o.setor,o.emp].filter(Boolean).join(' · ')||'—')}</td>
+          <td class="num" style="text-align:right">${o.atr.length?`<b>${o.atr.length}</b> <small>· ${o.atr.reduce((a,x)=>a+x.min,0)} min</small>`:'—'}</td><td class="num" style="text-align:right">${o.sai.length||'—'}</td><td class="num" style="text-align:right">${o.falt.length?`<span class="pill crit">${o.falt.length}</span>`:'—'}</td><td class="num" style="text-align:right">${o.dias}</td>
+          <td class="rh-ac"><button class="lnk" data-act="alm-pab" data-k="${esc(o.k)}">${A.pontAb===o.k?'fechar':'ver dias'}</button>${o.funcId&&(o.atr.length>=3||o.falt.length)?` <button class="btn sec rh-sm" data-act="rh-presoc" data-id="${o.funcId}">Ocorrência</button>`:''}</td></tr>${det(o)}`).join('')}</tbody></table></div>
+        ${L.length>lim?`<div style="text-align:center;margin-top:10px"><button class="btn sec" data-act="alm-pmais">Mostrar mais (${L.length-lim})</button></div>`:''}`:'<div class="empty">Ninguém atrasou, saiu antes ou faltou sem registro neste mês.</div>'}
+      <div class="sub" style="margin:10px 0 0;font-size:12.5px">Chegada = primeira passagem do dia; saída = última passagem (num leitor de saída, quando houver). É um apoio para o RH conferir: o ponto oficial continua sendo o da folha.</div>`; }
+  async function pontoXls(c){ const X=pontoMes(c,A.mes); if(!X) return; if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const L=Object.values(X.pes).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')), wb=XLSX.utils.book_new(), br=d=>d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4);
+    const a1=[['Nome','Setor','Empresa','Dias no Face ID','Atrasos','Minutos de atraso','Saídas antes','Faltas sem registro']].concat(L.map(o=>[o.nome,o.setor,o.emp,o.dias,o.atr.length,o.atr.reduce((a,x)=>a+x.min,0),o.sai.length,o.falt.length]));
+    const a2=[['Nome','Dia','O que','Horário','Esperado','Minutos']]; L.forEach(o=>{ o.atr.forEach(x=>a2.push([o.nome,br(x.d),'Atraso',x.h,x.esp,x.min])); o.sai.forEach(x=>a2.push([o.nome,br(x.d),x.leitor?'Saída antes':'Última passagem antes do fim',x.h,x.esp,x.min])); o.falt.forEach(d=>a2.push([o.nome,br(d),'Falta sem registro','','',''])); });
+    [['Resumo',a1],['Dia a dia',a2]].forEach(([n,a])=>{ const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=a[0].map((h,i)=>({wch:i===0?34:16})); XLSX.utils.book_append_sheet(wb,ws,n); });
+    c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Pontualidade-'+A.mes+'.xlsx'); }
+  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="alm-p"]'); if(!b||!A.ctx) return; const a=b.dataset.act, c=A.ctx, P=c.P;
+    if(a==='alm-pab'){ A.pontAb=A.pontAb===b.dataset.k?null:b.dataset.k; P.render(); return; }
+    if(a==='alm-ptodos'){ A.pontTodos=b.checked; P.render(); return; }
+    if(a==='alm-pmais'){ A.pontN=(+A.pontN||40)+60; P.render(); return; }
+    if(a==='alm-pcfg'){ A.pontCfg=!A.pontCfg; P.render(); return; }
+    if(a==='alm-pxls'){ pontoXls(c).catch(e=>P.erro(e)); return; }
+    if(a==='alm-pcfgok'){ const v=id=>String((document.getElementById(id)||{}).value||'').trim(), ini=v('alm-pini'), fim=v('alm-pfim'), tol=Math.max(0,Math.min(60,parseInt(v('alm-ptol'),10)||0));
+      if(!/^\d{2}:\d{2}$/.test(ini)||!/^\d{2}:\d{2}$/.test(fim)||hm(fim)<=hm(ini)) return P.toast('Confira os horários de entrada e saída.');
+      const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{},{ponto:{ini,fim,tol}}); P.db().doc('rh/config').set({almoco:al},{merge:true}).then(()=>{ if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; A.pontCfg=false; P.toast('Horário padrão salvo.'); P.render(); }).catch(e=>P.erro(e)); return; } });
+  try{ document.head.insertAdjacentHTML('beforeend',`<style id="alm-ponto-css">
+  .alm-pk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:14px 0}.alm-pk>div{background:var(--sunken);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+  .alm-pk span{font-size:13px;color:var(--muted)}.alm-pk b{font-size:26px;font-weight:600}.alm-pk small{font-size:12.5px;color:var(--muted)}.alm-pk .w b{color:var(--crit-ink)}
+  .alm-pcfg{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:12px;border-radius:12px;background:var(--teal-wash);margin:0 0 12px}.alm-pcfg label{display:flex;flex-direction:column;gap:2px}.alm-pcfg .txt{width:130px}
+  .alm-pbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px}
+  .alm-pt{width:100%}.alm-pt td{vertical-align:middle}.alm-pdet td{background:var(--teal-wash)}.alm-pdg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.alm-pdg>div{display:flex;flex-direction:column;gap:3px;font-size:13px}.alm-pdg small{color:var(--muted)}
+  @media (max-width:900px){ .alm-pk,.alm-pdg{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  </style>`); }catch(e){}
+  window.RHAlmoco={publicar,carregar,fechamento,_prDia:prDia,ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,_A:A};
 })();

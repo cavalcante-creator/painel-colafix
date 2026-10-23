@@ -1020,7 +1020,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     return `<section class="card"><div class="rh-ch" style="flex-wrap:wrap"><div style="display:flex;gap:8px;align-items:center"><button class="btn sec rh-sm" data-act="rh-relmes" data-v="-1">‹</button><h2 style="margin:0">${esc(mesTitulo(m))}</h2>${m<P.hojeStr().slice(0,7)?'<button class="btn sec rh-sm" data-act="rh-relmes" data-v="1">›</button>':''}</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec rh-sm" data-act="rh-relimp">Imprimir / PDF</button><button class="btn rh-sm" data-act="rh-relxls">Baixar Excel</button></div></div>
       <div class="rh-kpi" style="margin:4px 0 0">${[[D.quadro.length,'no quadro no fim do mês'],[clt+' / '+(D.quadro.length-clt),'CLT / PJ'],[D.adm.length,D.adm.length===1?'admissão':'admissões'],[D.desl.length,D.desl.length===1?'desligamento':'desligamentos']].map(([n,l])=>`<div><b class="num">${n}</b><span>${l}</span></div>`).join('')}</div></section>`
-      +REL_T.map(([k,t,cab,fn])=>`<section class="card"><h2>${t}${D[k].length?' · '+D[k].length:''}</h2>${relTabela(D[k].map(fn),cab)}</section>`).join(''); }
+      +fechCard(m)+REL_T.map(([k,t,cab,fn])=>`<section class="card"><h2>${t}${D[k].length?' · '+D[k].length:''}</h2>${relTabela(D[k].map(fn),cab)}</section>`).join(''); }
   function relHtml(m){ const D=relDados(m);
     return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório do RH - ${esc(mesTitulo(m))}</title><style>@page{size:A4;margin:16mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}h2{font-size:12pt;margin:18px 0 6px;color:#143F54}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;font-size:9.5pt}th{background:#f2efe7}.sub{color:#666}</style></head><body>
       <h1>Relatório do RH · ${esc(mesTitulo(m))}</h1><div class="sub">${esc(EMP_DOC.COLAFIX.nome)} · gerado em ${br(P.hojeStr())} · ${D.quadro.length} no quadro no fim do mês</div>
@@ -1031,6 +1031,41 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const L=[]; REL_T.forEach(([k,t,cab,fn])=>{ L.push([t]); L.push(cab); D[k].map(fn).forEach(r=>L.push(r)); L.push([]); });
     baixar(new Blob(['\ufeff'+L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(';')).join('\r\n')],{type:'text/csv'}),'Relatorio-RH-'+m+'.csv'); }
 
+  /* ---------- Fechamento do mês para a folha (pedido de 22/10): um Excel com tudo o que a contabilidade precisa ---------- */
+  function fechDados(m){ const H=R.fech&&R.fech[m]; if(!H||H==='carregando') return null; const D=relDados(m), F=H.d, ini=D.ini, fim=D.fim;
+    const k=f=>{ const c=dig(f.cpf); return c?c.padStart(11,'0'):'f:'+f._id; };
+    const pon=(F&&F.ponto&&F.ponto.pes)||{}, alm=(F&&F.alm)||{};
+    const ferDias=f=>R.fer.filter(x=>x.funcId===f._id&&!x.anterior&&x.status!=='cancelada'&&okIso(x.inicio)&&x.inicio<=fim&&x.fim>=ini).reduce((a,x)=>a+diasEntre(x.inicio>ini?x.inicio:ini,x.fim<fim?x.fim:fim)+1,0);
+    const ocs=f=>R.oc.filter(x=>x.funcId===f._id&&!x.removido&&okIso(x.data)&&x.data>=ini&&x.data<=fim);
+    const pes=R.func.filter(f=>(!okIso(f.admissao)||f.admissao<=fim)&&!(okIso(f.desligamento)&&f.desligamento<ini&&f.status==='Desligado')).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(f=>{ const p=pon[k(f)]||{atr:[],sai:[],falt:[],dias:0}, a=alm[k(f)]||null, o=ocs(f);
+      return {f,p,a,o,fer:ferDias(f),adv:o.filter(x=>/advert/i.test(x.tipo||'')).length,susp:o.filter(x=>/suspens/i.test(x.tipo||'')).reduce((s,x)=>s+(+x.dias||0),0),
+        obs:[okIso(f.admissao)&&f.admissao>=ini?'admitido em '+br(f.admissao):'',okIso(f.desligamento)&&f.desligamento>=ini&&f.desligamento<=fim&&(f.status==='Desligado'||f.desligAgendado)?'desligado em '+br(f.desligamento):'',f.status==='Afastado'?'afastado':''].filter(Boolean).join(' · ')}; });
+    return {m,D,F,pes,temFace:!!(F&&F.ponto),vd:(F&&F.valorDesc)||0}; }
+  function fechCarrega(m){ R.fech=R.fech||{}; if(R.fech[m]&&R.fech[m]!=='carregando'&&R.fech[m].ok&&window.RHAlmoco){ R.fech[m].d=RHAlmoco.fechamento(almCtx(),m)||R.fech[m].d; return; } if(R.fech[m]) return; if(!window.RHAlmoco||!RHAlmoco.carregar){ R.fech[m]={d:null}; return; } R.fech[m]='carregando';
+    RHAlmoco.carregar(almCtx(),m).then(ok=>{ R.fech[m]={ok,d:ok?RHAlmoco.fechamento(almCtx(),m):null}; P.rerender(); }).catch(()=>{ R.fech[m]={d:null}; P.rerender(); }); }
+  function fechCard(m){ fechCarrega(m); const X=fechDados(m), R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+    if(!X) return `<section class="card rh-fech"><div class="rh-ch"><h2>Fechamento para a folha</h2></div><div class="sub" style="margin:0">Juntando o Face ID do mês…</div></section>`;
+    const s=k=>X.pes.reduce((a,o)=>a+k(o),0), falt=s(o=>o.p.falt.length), atr=s(o=>o.p.atr.length), sai=s(o=>o.p.sai.length), desc=s(o=>o.a?o.a.desc:0), sj=s(o=>o.a?o.a.sj:0), adv=s(o=>o.adv), susp=s(o=>o.susp), fer=X.pes.filter(o=>o.fer).length;
+    return `<section class="card rh-fech"><div class="rh-ch" style="flex-wrap:wrap;gap:10px"><div><h2 style="margin:0">Fechamento para a folha</h2><div class="sub" style="margin:2px 0 0">Um Excel só com o resumo por pessoa e o detalhe de cada coisa, para mandar para a contabilidade.</div></div>
+        <button class="btn" data-act="rh-fechxls">${P.ic('baixar',18,2.2)}Baixar fechamento (Excel)</button></div>
+      <div class="rh-fk">${[[X.pes.length,'pessoas no mês',''],[falt,'faltas sem registro',falt?'crit':''],[atr,'atrasos',atr?'warn':''],[sai,'saídas antes',''],[sj,'sem almoço sem justif.',sj?'warn':''],[R$(desc),'desconto do almoço',''],[fer,'com férias no mês',''],[adv+(susp?' · '+susp+' d':''),'advertências · dias de suspensão',adv||susp?'warn':'']].map(([n,l,c])=>`<div class="${c}"><b class="num">${n}</b><span>${l}</span></div>`).join('')}</div>
+      ${X.temFace?'':'<div class="banner" style="margin:10px 0 0">Sem dados do Face ID neste mês: o fechamento sai sem faltas, atrasos e almoço.</div>'}
+      <div class="sub" style="margin:8px 0 0;font-size:12.5px">Faltas, atrasos e saídas vêm do Face ID (Almoço › Pontualidade): confira antes de mandar. Desconto do almoço = dias sem almoço e sem justificativa × ${R$(X.vd)}.</div></section>`; }
+  async function fechExcel(m){ const X=fechDados(m); if(!X) return P.toast('Ainda juntando os dados do Face ID. Tente de novo em instantes.');
+    try{ if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }catch(e){}
+    if(!window.XLSX||!XLSX.utils) return P.toast('Não consegui abrir o gerador de Excel. Confira a internet e tente de novo.');
+    const wb=XLSX.utils.book_new(), add=(n,a,w)=>{ const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=a[0].map((h,i)=>({wch:(w&&w[i])||(i===0?36:15)})); XLSX.utils.book_append_sheet(wb,ws,n); };
+    const vinc=f=>f.tipo==='PJ'?'PJ':'CLT', emp=f=>empNome(f.empresa)||(f.tipo==='PJ'?'':'Colafix');
+    add('Resumo por pessoa',[['Nome','CPF / CNPJ','Vínculo','Empresa','Função','Setor','Admissão','Desligamento','Dias de férias no mês','Faltas sem registro','Atrasos (vezes)','Atrasos (minutos)','Saídas antes (vezes)','Almoços','Almoço sem justificativa','Desconto do almoço (R$)','Advertências','Suspensão (dias)','Observação']]
+      .concat(X.pes.map(o=>[o.f.nome,docF(o.f),vinc(o.f),emp(o.f),o.f.funcao||'',o.f.setor||'',br(o.f.admissao),okIso(o.f.desligamento)&&(o.f.status==='Desligado'||o.f.desligAgendado)?br(o.f.desligamento):'',o.fer||0,o.p.falt.length,o.p.atr.length,o.p.atr.reduce((a,x)=>a+x.min,0),o.p.sai.length,o.a?o.a.alm:'',o.a?o.a.sj:'',o.a?Math.round(o.a.desc*100)/100:'',o.adv,o.susp,o.obs])),[36,16,8,14,24,16,12,12]);
+    const L=[['Nome','Dia','Dia da semana']]; X.pes.forEach(o=>o.p.falt.forEach(d=>L.push([o.f.nome,br(d),['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(d+'T12:00').getDay()]])));
+    add('Faltas sem registro',L);
+    const A2=[['Nome','Dia','O que','Horário','Esperado','Minutos']]; X.pes.forEach(o=>{ o.p.atr.forEach(x=>A2.push([o.f.nome,br(x.d),'Atraso',x.h,x.esp,x.min])); o.p.sai.forEach(x=>A2.push([o.f.nome,br(x.d),x.leitor?'Saída antes':'Última passagem antes do fim',x.h,x.esp,x.min])); });
+    add('Atrasos e saídas',A2);
+    add('Almoço',[['Nome','Almoços','Sem justificativa','Justificados','Desconto (R$)']].concat(X.pes.filter(o=>o.a).map(o=>[o.f.nome,o.a.alm,o.a.sj,o.a.jj,Math.round(o.a.desc*100)/100])));
+    add('Ocorrências',[['Nome','Data','Tipo','Dias','O que aconteceu']].concat(X.pes.flatMap(o=>o.o.map(x=>[o.f.nome,br(x.data),x.tipo||'',x.dias||'',x.motivo||'']))),[36,12,22,8,60]);
+    REL_T.forEach(([k,t,cab,fn])=>add(t.slice(0,31).replace(/[()]/g,''),[cab].concat(X.D[k].map(fn))));
+    baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Fechamento-folha-'+m+'.xlsx'); P.toast('Fechamento baixado.'); }
   /* ---------- Ficha completa da pessoa ---------- */
   function tempoDe(iso){ const hj=P.hojeStr(); let a=+hj.slice(0,4)-+iso.slice(0,4), m=+hj.slice(5,7)-+iso.slice(5,7); if(hj.slice(8)<iso.slice(8)) m--; if(m<0){ a--; m+=12; } return {a,m}; }
   const tempoTxt=iso=>{ const t=tempoDe(iso); return [t.a?plural(t.a,'ano','anos'):'',t.m?plural(t.m,'mês','meses'):''].filter(Boolean).join(' e ')||'menos de 1 mês'; };
@@ -1504,6 +1539,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   @media (max-width:1280px){ .rh-v2doc{grid-template-columns:minmax(220px,260px) minmax(0,1fr)} .rh-v2d3{grid-column:1/-1} }
   @media (max-width:760px){ .rh-v2doc{grid-template-columns:minmax(0,1fr)} .rh-v2dl2{max-height:280px} }
   .rh-v2pc .rh-v2pf{display:flex;flex-direction:column;gap:2px;padding:10px 12px;margin:8px 0 0;border-radius:10px;background:var(--crit-tint);color:var(--crit-ink)}.rh-v2pf b{font-size:14px;font-weight:600}.rh-v2pf small{font-size:12.5px}.rh-v2pf>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.rh-v2pf .btn{background:var(--surface);flex:0 0 auto;width:auto;min-height:36px;height:36px;padding:0 12px;font-size:13.5px}
+  .rh-fk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0 0}.rh-fk div{background:var(--sunken);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}.rh-fk b{font-size:20px;font-weight:600}.rh-fk span{font-size:12.5px;color:var(--muted)}.rh-fk .crit b{color:var(--crit-ink)}.rh-fk .warn b{color:var(--warn-ink)}
+  @media (max-width:760px){ .rh-fk{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media (max-width:1180px){ .rh-v2side{position:static} .rh-v2kps{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media (max-width:1180px){ .rh-v2{grid-template-columns:minmax(0,1fr)} .rh-v2d{position:static;max-height:none} .rh-v2ls{max-height:none} }
   @media (max-width:700px){ .rh-v2h{display:none} .rh-v2r{grid-template-columns:minmax(0,1fr) auto} .rh-v2r .rh-v2c{display:none} .rh-v2t{grid-column:1/-1;padding-left:50px} .rh-v2d{display:none} }
@@ -2154,6 +2191,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       /* ficha da pessoa */
       if(a==='rh-pess'){ R.pess=b.dataset.id; R.f=null; R.adm=null; R.buscaIni=''; P.go('rhfunc'); window.scrollTo(0,0); return; }
       if(a==='rh-presoc'){ R.fview='lista'; R.pess=null; R.fusel=b.dataset.id; R.fab='hist'; R.foc={funcId:b.dataset.id,data:P.hojeStr(),tipo:'Advertência verbal'}; P.go('rhfunc'); setTimeout(()=>{ const n=document.getElementById('rh-ocm'); if(n){ n.scrollIntoView({block:'center'}); n.focus(); } },150); return; }
+      if(a==='rh-fechxls'){ b.disabled=true; try{ await fechExcel(R.relMes); } finally{ b.disabled=false; } return; }
       if(a==='rh-dgpick'){ R.dg.funcId=b.dataset.id; R.dg.extra={}; R.dg.feriasId=''; R.dg.reg=null; R.dg.over={}; R.dg.edHtml=null; R.dg.edOn=false; P.render(); return; }
       if(a==='rh-dgmod'){ R.dg.modeloId=b.dataset.id; R.dg.reg=null; R.dg.over={}; R.dg.edHtml=null; R.dg.edOn=false; P.render(); return; }
       if(a==='rh-fusel'){ if(window.innerWidth<900){ R.pess=b.dataset.id; R.f=null; P.render(); window.scrollTo(0,0); return; } R.fusel=b.dataset.id; R.fab='resumo'; P.render(); return; }
