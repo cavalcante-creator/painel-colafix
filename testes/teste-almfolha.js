@@ -1,10 +1,10 @@
 /* RH · Almoço: folha de assinatura no modelo do Excel. Sai NORMAL; pergunta se o CSV do Face ID foi importado; o RH confirma quem não veio;
    "Não almoçam hoje" = ausência programada + não almoça na empresa (já marcados); busca de pessoa; tirar da folha só no dia; editar depois de emitir. */
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
-const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), lista=require('/tmp/lista-almoco.json'); /* aba 2010 da planilha do RH */
+const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), lista=JSON.parse(require('fs').readFileSync(__dirname+'/../modulos/rh-almoco.js','utf8').match(/const LISTA_BASE=(\[[^\]]*\])/)[1]); /* lista base de 20/10 (aba 2010 da planilha do RH) */
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
  const F=(id,nome,cpf)=>{ D['rh/dados/funcionarios/'+id]={nome,cpf,tipo:'CLT',status:'Ativo',admissao:'2020-01-01'}; };
- F('a','ADRIANO REUS DA SILVA','11111111111'); F('b','ALEXANDRE TEIXEIRA','22222222222'); F('c','ANA MARIA RODRIGUES','33333333333'); F('i','IASMYN CAVALCANTE','44444444444'); F('s','ALISSON SANTOS','55555555555');
+ F('a','ADRIANO REUS DA SILVA','11111111111'); F('b','ALEXANDRE TEIXEIRA','22222222222'); F('c','ANA MARIA RODRIGUES','33333333333'); F('i','IASMYN CAVALCANTE','44444444444'); F('s','ALISSON SANTOS','55555555555'); F('z','JOSE NOVO DA SILVA','66666666666'); /* no cadastro, fora da lista fixa: não sai na folha */
  D['rh/dados/ferias/f1']={funcId:'c',funcionario:'ANA MARIA RODRIGUES',inicio:hj,fim:hj,dias:1,status:'programada'};
  D['rh/config']=Object.assign({},D['rh/config']||{},{almoco:{listaFolha:lista,fora:{'55555555555':{em:new Date().toISOString(),por:'RH'}},
    ausencias:[{id:'au1',cpf:'44444444444',nome:'IASMYN CAVALCANTE',tipo:'semana',dias:[new Date(hj+'T12:00').getDay()],de:'2026-01-01'}]}});
@@ -54,4 +54,17 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  ok('Dia sem o CSV importado: pergunta se o Face ID já foi importado', /já foi importado\?/.test(c)&&/Importar o CSV agora/.test(c)&&/Emitir sem conferir/.test(c));
  await p.click('[data-act="alm-fsem"]'); await H.dorme(600); c=await card();
  ok('"Emitir sem conferir": busca de pessoa e imprimir', /Procurar pessoa na lista/.test(c)&&/Imprimir folha/.test(c));
+ /* editor da lista fixa */
+ await dia(hj); await p.click('[data-act="alm-flista"]'); await H.dorme(400);
+ let ed=await p.evaluate(()=>({t:(document.querySelector('.alm-fl')||{}).innerText||'',n:document.querySelectorAll('.alm-flr').length,sug:[...document.querySelectorAll('.alm-flsg')].map(b=>b.dataset.n)}));
+ ok('Editor da lista fixa: 67 linhas, situação "Salva" e "Não estão na lista" com quem é do cadastro (José Novo)', ed.n===67&&/Salva/.test(ed.t)&&ed.sug.some(n=>/Jose Novo/i.test(n)), JSON.stringify({n:ed.n,sug:ed.sug}));
+ await p.selectOption('#alm-fltp','Terceiro - '); await p.fill('#alm-flnovo','Fulano Teste'); await p.keyboard.press('Enter'); await H.dorme(300);
+ await p.click('[data-act="alm-fl-x"][data-i="0"]'); await H.dorme(300); await p.click('[data-act="alm-fl-dn"][data-i="0"]'); await H.dorme(300);
+ await p.click('.alm-flsg'); await H.dorme(300);
+ ed=await p.evaluate(()=>({t:(document.querySelector('.alm-fl')||{}).innerText||'',v:[...document.querySelectorAll('.alm-flin')].map(i=>i.value)}));
+ ok('Acrescentar (Terceiro - Fulano Teste), tirar (Adriano), descer e acrescentar a sugestão: "Alterações ainda não salvas"', ed.v.length===68&&ed.v[0]==='Alisson Santos'&&ed.v[1]==='Alexandre Teixeira'&&ed.v.includes('Terceiro - Fulano Teste')&&!ed.v.includes('Adriano Reus')&&/não salvas/.test(ed.t), JSON.stringify(ed.v.slice(0,3))+' '+ed.v.length);
+ await p.click('[data-act="alm-flsalva"]'); await H.dorme(900);
+ const lf=await p.evaluate(()=>window.RHAlmoco._A.ctx.R.cfg.almoco.listaFolha); const pv2=await p.evaluate(()=>document.querySelectorAll('.alm-pvt tbody tr').length);
+ ok('Salvar grava a lista e a folha passa a ter só esses 68', lf.length===68&&lf[0]==='Alisson Santos'&&pv2===68, lf.length+' '+pv2);
+ await p.screenshot({path:'/tmp/alm-lista.png'});
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
