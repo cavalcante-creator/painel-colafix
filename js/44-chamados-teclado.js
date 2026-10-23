@@ -15,7 +15,7 @@ const ckK={t:0,pend:null};
 function ckLimpaCap(n){ const i=document.getElementById('cr-cap'); if(i&&i.value.endsWith(n)) i.value=i.value.slice(0,-n.length); }
 window.addEventListener('keydown',ev=>{ if(!ckOn()||ev.ctrlKey||ev.altKey||ev.metaKey||document.getElementById('trava-m')) return; const T=S.tt, ag=performance.now(), gap=ag-ckK.t; ckK.t=ag;
   if(ev.target&&/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)&&ev.target.id!=='cr-cap') return;
-  if(ckK.pend&&gap<120){ clearTimeout(ckK.pend); ckK.pend=null; }
+  if(gap<120){ if(ckK.pend){ clearTimeout(ckK.pend); ckK.pend=null; } if(/^[0-9]$/.test(ev.key)) return; }
   if(ev.key==='Escape'&&T.fase!=='espera'){ ev.preventDefault(); ev.stopImmediatePropagation(); ttVoltar(); return; }
   if(ev.key==='Enter'&&(T.fase==='ok'||T.fase==='fimok')&&gap>120){ ev.preventDefault(); ev.stopImmediatePropagation(); ttVoltar(); return; }
   if(!/^[0-9]$/.test(ev.key)||T.fase==='espera'||!T.p) return; const n=+ev.key;
@@ -26,3 +26,15 @@ document.head.insertAdjacentHTML('beforeend',`<style id="ck-css">
 .cq .cq-bt{position:relative}.cq .cq-bt>.ck-k{position:absolute;top:10px;left:10px;margin:0}.cq .cq-bt:has(>.ck-k){padding-left:58px}
 .cq .ck-dica{opacity:.75}.cq .cq-bt.ck-ap{outline:4px solid currentColor;outline-offset:2px}
 </style>`);
+/* tela de espera (posto, Nexus, oficina e chamados): os botões de baixo também ganham número (pedido de 23/10) */
+function ckEsperaOn(){ try{ return typeof ttAtivo==='function'&&ttAtivo()&&S.tt&&(S.tt.fase==='espera'||!S.tt.p)&&!!document.querySelector('.cq .cq-tema'); }catch(e){ return false; } }
+function ckEspBotoes(){ return [...document.querySelectorAll('.cq .cq-tema button')].filter(b=>b.offsetParent!==null).slice(0,9); }
+function ckEspMarca(){ if(!ckEsperaOn()) return; ckEspBotoes().forEach((b,i)=>{ if(b.querySelector('.ck-k')) return; b.insertAdjacentHTML('afterbegin',`<span class="ck-k" aria-hidden="true">${i+1}</span>`); b.setAttribute('aria-keyshortcuts',String(i+1)); }); }
+{ const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ setTimeout(ckEspMarca,0); }catch(e){} return x; }; }
+const ckE={t:0,pend:null};
+window.addEventListener('keydown',ev=>{ if(!ckEsperaOn()||ev.ctrlKey||ev.altKey||ev.metaKey||document.getElementById('trava-m')) return; const ag=performance.now(), gap=ag-ckE.t; ckE.t=ag;
+  if(ev.target&&/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)&&ev.target.id!=='cr-cap') return;
+  if(gap<120){ if(ckE.pend){ clearTimeout(ckE.pend); ckE.pend=null; } return; }
+  if(!/^[1-9]$/.test(ev.key)) return; const n=+ev.key;
+  ckE.pend=setTimeout(()=>{ ckE.pend=null; if(!ckEsperaOn()) return; ckLimpaCap(String(n)); const b=ckEspBotoes()[n-1]; if(b&&!b.disabled) b.click(); },120); },true);
+document.head.insertAdjacentHTML('beforeend','<style id="ck-esp-css">.cq .cq-tema button .ck-k{min-width:1.5em;height:1.5em;font-size:.85em}</style>');

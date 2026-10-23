@@ -1,0 +1,20 @@
+/* Espera do posto com números nos botões de baixo (23/10): a tecla escolhe; o coletor (crachá) não dispara atalho. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString();
+ D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
+ d.users['posto@painel-colafix.app']={uid:'uPO',pass:'po1234',nome:'Posto'}; D['perfis/uPO']={nome:'Posto',usuario:'posto'}; D['acessos/uPO']={perfil:'posto',mods:['tablet'],locais:[],ativo:true};
+ const B=await H.abrir({viewport:{width:1366,height:768}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'posto','po1234'); await H.dorme(3500);
+ const bts=()=>p.evaluate(()=>[...document.querySelectorAll('.cq .cq-tema button')].filter(b=>b.offsetParent!==null).map(b=>({k:(b.querySelector('.ck-k')||{}).textContent||'',a:b.dataset.act,t:b.innerText.replace(/\s+/g,' ').trim()})));
+ const esc=()=>p.evaluate(()=>document.querySelector('.cq').classList.contains('esc'));
+ let b=await bts(); ok('Botões de baixo da espera numerados 1, 2, 3…', b.length>=3&&b.every((x,i)=>x.k===String(i+1)), JSON.stringify(b));
+ const iT=b.findIndex(x=>x.a==='cq-tema'), e0=await esc();
+ await p.keyboard.press(String(iT+1)); await H.dorme(800);
+ ok('Tecla do "Tela clara/escura" troca o tema', (await esc())!==e0);
+ const e1=await esc(); await p.keyboard.type('000123',{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1200);
+ const f=await p.evaluate(()=>__T.S().tt.fase);
+ ok('Crachá pelo coletor entra no menu e não dispara atalho', f==='pomenu'&&(await esc())===e1, f);
+ await p.keyboard.press('Escape'); await H.dorme(800); await p.evaluate(()=>{ const T=__T.S().tt; if(T.fase!=='espera'&&typeof ttVoltar==='function') ttVoltar(); });  await H.dorme(600);
+ b=await bts(); const iL=b.findIndex(x=>x.a==='po-cfgl');
+ if(iL>=0){ await p.keyboard.press(String(iL+1)); await H.dorme(800); const c=await p.evaluate(()=>!!(__T.S().tt.po||{}).cfgL);
+   ok('Tecla do "Linhas deste posto" abre a escolha das linhas', c); } else ok('Botão Linhas deste posto existe', false);
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
