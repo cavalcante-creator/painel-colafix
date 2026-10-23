@@ -4,12 +4,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
 const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), lista=JSON.parse(require('fs').readFileSync(__dirname+'/../modulos/rh-almoco.js','utf8').match(/const LISTA_BASE=(\[[^\]]*\])/)[1]); /* lista base de 20/10 (aba 2010 da planilha do RH) */
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
  const F=(id,nome,cpf)=>{ D['rh/dados/funcionarios/'+id]={nome,cpf,tipo:'CLT',status:'Ativo',admissao:'2020-01-01'}; };
- F('a','ADRIANO REUS DA SILVA','11111111111'); F('b','ALEXANDRE TEIXEIRA','22222222222'); F('c','ANA MARIA RODRIGUES','33333333333'); F('i','IASMYN CAVALCANTE','44444444444'); F('s','ALISSON SANTOS','55555555555'); F('z','JOSE NOVO DA SILVA','66666666666'); /* no cadastro, fora da lista fixa: não sai na folha */
+ F('a','ADRIANO REUS DA SILVA','11111111111'); F('b','ALEXANDRE TEIXEIRA','22222222222'); F('c','ANA MARIA RODRIGUES','33333333333'); F('i','IASMYN CAVALCANTE','44444444444'); F('s','ALISSON SANTOS','55555555555'); F('z','JOSE NOVO DA SILVA','66666666666'); D['rh/dados/funcionarios/t1']={nome:'BRUNO FERNANDES',cnpj:'',tipo:'PJ',empresa:'ZENITH',status:'Ativo',admissao:'2020-01-01'}; D['rh/dados/funcionarios/t2']={nome:'TAINAN ROCHA',tipo:'PJ',empresa:'NEXUS',status:'Ativo',admissao:'2020-01-01'}; /* no cadastro, fora da lista fixa: não sai na folha */
  D['rh/dados/ferias/f1']={funcId:'c',funcionario:'ANA MARIA RODRIGUES',inicio:hj,fim:hj,dias:1,status:'programada'};
  D['rh/config']=Object.assign({},D['rh/config']||{},{almoco:{listaFolha:lista,fora:{'55555555555':{em:new Date().toISOString(),por:'RH'}},
    ausencias:[{id:'au1',cpf:'44444444444',nome:'IASMYN CAVALCANTE',tipo:'semana',dias:[new Date(hj+'T12:00').getDay()],de:'2026-01-01'}]}});
  const outro=hj.slice(8)==='01'?addD(hj,1):m+'-01'; function addD(x,n){ const y=new Date(x+'T12:00'); y.setDate(y.getDate()+n); return iso(y); }
- D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ADRIANO REUS DA SILVA'},'22222222222':{n:'ALEXANDRE TEIXEIRA'}},dias:{[hj]:{'11111111111':{a:'11:40'}},[outro]:{'22222222222':{a:'11:50'}}},imp:[]};
+ D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ADRIANO REUS DA SILVA'},'22222222222':{n:'ALEXANDRE TEIXEIRA'},'77777777777':{n:'DEIVID SOUZA',e:'ZENITH'}},dias:{[hj]:{'11111111111':{a:'11:40'}},[outro]:{'22222222222':{a:'11:50'}}},imp:[]};
  const B=await H.abrir({viewport:{width:1440,height:1100}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  const dia=async x=>{ await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; },x); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1000); const ab=await p.$('[data-act="alm-fabre"]'); if(ab&&!(await p.$('.alm-fm'))){ await ab.click(); await H.dorme(600); } };
  const card=()=>p.evaluate(()=>(document.querySelector('.alm-folha')||{}).innerText||'');
@@ -67,4 +67,14 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  const lf=await p.evaluate(()=>window.RHAlmoco._A.ctx.R.cfg.almoco.listaFolha); const pv2=await p.evaluate(()=>document.querySelectorAll('.alm-pvt tbody tr').length);
  ok('Salvar grava a lista e a folha passa a ter só esses 68', lf.length===68&&lf[0]==='Alisson Santos'&&pv2===68, lf.length+' '+pv2);
  await p.screenshot({path:'/tmp/alm-lista.png'});
+ /* terceiros da lista que estão cadastrados */
+ const idOf=n=>p.evaluate(n=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.value===n); return i?(i.closest('.alm-flr').querySelector('.alm-fid')||{}).innerText:''; },n);
+ const tb=await idOf('Terceiro - Bruno Fernandes'), td=await idOf('Terceiro - Deivid'), tt=await idOf('Terceiros - Tainan'), tg=await idOf('Terceiro - Gustavo');
+ ok('Terceiros: Bruno Fernandes "Cadastrado · Zenith", Deivid e Tainan "Provável", Gustavo "Sem cadastro"', /Cadastrado · Zenith/.test(tb)&&/Provável: Deivid Souza/.test(td)&&/Provável: Tainan Rocha · Nexus/.test(tt)&&/Sem cadastro/.test(tg), [tb,td,tt,tg].join(' | '));
+ const resumo=await p.evaluate(()=>(document.querySelector('.alm-flid')||{}).innerText||''); ok('Resumo dos terceiros e motoristas da lista', /Terceiros e motoristas da lista \(\d+\)/.test(resumo)&&/1 cadastrados/.test(resumo)&&/2 prováveis/.test(resumo), resumo);
+ await p.click('[data-almflf="sem"]'); await H.dorme(200); const vis=await p.evaluate(()=>[...document.querySelectorAll('.alm-flr')].filter(l=>!l.hidden).map(l=>l.querySelector('.alm-flin').value));
+ ok('Filtro "Sem cadastro" mostra só quem não foi achado', vis.length>5&&vis.every(v=>!/Bruno Fernandes|Deivid|Tainan/.test(v))&&vis.includes('Terceiro - Gustavo'), vis.length);
+ await p.click('[data-almflf=""]'); await H.dorme(200);
+ await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.value==='Terceiro - Deivid'); i.closest('.alm-flr').querySelector('[data-act="alm-fl-usa"]').click(); }); await H.dorme(300);
+ const nd=await p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].map(i=>i.value).filter(v=>/Deivid/.test(v))); ok('"usar nome completo" troca para "Terceiro - Deivid Souza"', nd[0]==='Terceiro - Deivid Souza'&&/Cadastrado|No Face ID/.test(await idOf('Terceiro - Deivid Souza')), nd.join());
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
