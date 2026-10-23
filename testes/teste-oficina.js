@@ -32,7 +32,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const c
  await p.screenshot({path:'/tmp/of-espera.png'});
  await bip('444333'); t=await txt(); s=await p.evaluate(()=>__T.S().tt.fase);
  ok('Crachá de operador não entra (vai para o posto da linha)', s==='espera'&&/posto da linha/.test(t), s);
- await bip('777888'); s=await p.evaluate(()=>__T.S().tt.fase); t=await txt();
+ await bip('777888'); s=await p.evaluate(()=>({f:__T.S().tt.fase,acc:__T.S().of.acc}));
+ ok('Bruno tem tarefa do Marcelo para ele: o crachá abre direto "Aceitar tarefa" (OS 33)', s.f==='ofacc'&&s.acc===33, JSON.stringify(s));
+ await p.keyboard.press('Escape'); await H.dorme(500); s=await p.evaluate(()=>__T.S().tt.fase); t=await txt();
  ok('Bruno passa o crachá: menu igual ao do posto (1 Tarefas do Marcelo · 2 Minhas tarefas · 3 Preventivas · 4 Pedir peça · 5 Quadro)', s==='oftec'&&/Olá, Bruno/.test(t)&&/Tarefas do Marcelo/.test(t)&&/3 para aceitar · 2 urgentes/.test(t)&&/Minhas tarefas/.test(t)&&/Preventivas e checklist/.test(t)&&/Pedir peça/.test(t)&&/Quadro da semana/.test(t)&&(await p.$$('.po-op')).length===5, t.slice(0,600).replace(/\n/g,'|'));
  await p.screenshot({path:'/tmp/of-menu.png'});
  await p.keyboard.press('1'); await H.dorme(500); s=await p.evaluate(()=>__T.S().tt.fase); t=await txt();

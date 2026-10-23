@@ -457,7 +457,10 @@ ofAlarmeHtml=function(){ const M=S.of; if(!M.alerta.length||S.tt.fase!=='espera'
     <small>${livre?'O alarme toca até alguém '+(lin?'começar o chamado no posto':'aceitar a tarefa')+'.':'O navegador só toca o alarme depois de um toque na tela ou de uma leitura do coletor.'}</small></div></div>`; };
 /* crachá passado com o alarme da tarefa na tela: abre direto a tarefa para aceitar (se for para ele ou para qualquer técnico) */
 { const _ti=ttInicia; ttInicia=function(p){ let al=null; try{ if(ofOn()&&S.tt.fase==='espera'&&p&&p.papel==='tecnico'){ const x=ofAlarmes().find(a=>a.c._id===S.of.alerta[0]); if(x&&x.k==='tarefa') al=x.c; } }catch(e){}
-  const r=_ti.apply(this,arguments); if(!al||!S.tt.p) return r;
+  const r=_ti.apply(this,arguments); if(!S.tt.p||!ofOn()) return r;
+  /* sem alarme tocando: se há tarefa do Marcelo esperando por ELE, abre direto para aceitar */
+  if(!al&&p&&p.papel==='tecnico'){ const minha=ofTarefas().find(c=>ofPend(c)&&c.paraTec&&ofN(c.paraTec)===ofN(p.nome)); if(minha){ S.of.acc=minha.numero; S.of.dev=null; ofVai('ofacc'); } return r; }
+  if(!al) return r;
   if(!al.paraTec||ofN(al.paraTec)===ofN(p.nome)){ S.of.acc=al.numero; S.of.dev=null; ofVai('ofacc'); }
   else { S.tt.msg='A tarefa que está tocando é para '+al.paraTec+' — só ele pode aceitar.'; render(); }
   return r; }; }
