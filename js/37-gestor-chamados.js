@@ -107,6 +107,8 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 document.addEventListener('click',ev=>{ if(ev.target.classList&&ev.target.classList.contains('gx-modal')&&document.getElementById('gch-ft')){ S.gch.nova=false; S.gch.fm=null; render(); } });
 /* "Onde" muda o formulário (outro lugar / linha parada) sem perder o que foi digitado */
 document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='gch-on'){ gchLe(); render(); } });
+/* guarda na hora o que foi escolhido/digitado (o redesenho automático da tela não perde o "Para quem") */
+['change','input'].forEach(t=>document.addEventListener(t,ev=>{ const id=ev.target&&ev.target.id; if(id&&/^gch-/.test(id)&&id!=='gch-on') try{ gchLe(); }catch(e){} },true));
 document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.gch.nova){ S.gch.nova=false; S.gch.fm=null; render(); } });
 /* busca sem redesenhar */
 document.addEventListener('input',ev=>{ if(!(ev.target&&ev.target.hasAttribute&&ev.target.hasAttribute('data-gchq'))) return; const q=String(ev.target.value||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(Boolean);

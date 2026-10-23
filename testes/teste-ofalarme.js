@@ -11,7 +11,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>__T.S().db.doc('chamados/os-00041').set({numero:41,linha:'Pátio',defeito:'Trocar lâmpada do pátio',tipo:'eletrico',impacto:'nao',prioridade:'normal',tarefa:true,origem:'gestor',paraTec:'Bruno Lima',nome:'Marcelo Souza',status:'Aberta',criado:new Date().toISOString()})); await H.dorme(2200);
  const ov=await p.evaluate(()=>(document.querySelector('.of-ov')||{}).innerText||'');
  ok('Tarefa NORMAL do Marcelo também toca o alarme', /TAREFA NOVA DO MARCELO/.test(ov), ov.slice(0,200));
- ok('O alarme diz para quem é ("Para: Bruno Lima") e pede o crachá', /Para: Bruno Lima/.test(ov)&&/Bruno, passe seu crachá/.test(ov), ov.replace(/\n/g,'|').slice(0,300));
+ ok('O alarme diz para quem é ("Para: Bruno Lima") e pede o crachá', /Para: Bruno Lima/.test(ov)&&/Bruno, mostre o QR do crachá na câmera/.test(ov), ov.replace(/\n/g,'|').slice(0,300));
+  ok('Alarme da tarefa liga a câmera sozinho (a oficina não tem coletor)', await p.evaluate(()=>__T.S().of.cam===true&&!!document.querySelector('.of-ov .of-camslot')));
  t=await p.evaluate(()=>document.querySelector('.cq').innerText);
  ok('Quem está fazendo o quê: Bruno com "tarefa do Marcelo esperando ele aceitar"', /esperando ele aceitar/.test(t));
  await bip('900001'); let f=await p.evaluate(()=>({f:__T.S().tt.fase,m:__T.S().tt.msg}));

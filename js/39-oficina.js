@@ -422,7 +422,7 @@ function ofCamSet(on){ S.of.cam=on; S.of.camEm=Date.now(); if(!on){ try{ ttCamDe
 setInterval(()=>{ try{ if(ofOn()&&S.of.cam&&S.tt.fase==='espera'&&Date.now()-(S.of.camEm||0)>120000) ofCamSet(false); }catch(e){} },2000);
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="of-cam"]'); if(!b||!ofOn()) return; ev.preventDefault(); ev.stopImmediatePropagation(); ofCamSet(!S.of.cam); },true);
 /* câmera: dentro da faixa do crachá (antes ficava no canto de baixo, por cima dos botões) */
-function ofCamPos(){ const on=ofOn()&&ttAtivo(); document.body.classList.toggle('of-on',on); if(!on) return; const v=document.getElementById('tt-video'), sl=document.querySelector('.of-camslot'); if(!v) return;
+function ofCamPos(){ const on=ofOn()&&ttAtivo(); document.body.classList.toggle('of-on',on); if(!on) return; const v=document.getElementById('tt-video'), sl=document.querySelector('.of-ov .of-camslot')||document.querySelector('.of-camslot'); if(!v) return;
   if(!sl){ v.style.cssText=''; return; } const r=sl.getBoundingClientRect(); Object.assign(v.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',right:'auto',bottom:'auto'}); }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ ofCamPos(); }catch(e){} return x; }; }
 setInterval(()=>{ try{ ofCamPos(); }catch(e){} },500); window.addEventListener('resize',()=>{ try{ ofCamPos(); }catch(e){} });
@@ -452,7 +452,7 @@ ofAlarmeHtml=function(){ const M=S.of; if(!M.alerta.length||S.tt.fase!=='espera'
     <h1 id="of-ovt">${lin?esc(String(c.linha||'').toUpperCase())+' · '+imp.toUpperCase():ofOnde(c)}</h1>
     <p class="of-ovd">${esc(lin?tipo+(c.equip?' · '+c.equip:''):String(c.defeito||'').slice(0,120))}</p>${para}
     <p class="of-ovs">OS ${manNum(c.numero)} · aberto às ${ofHm(c.criado)} por ${esc(c.nome||'—')} · há ${ofMin(c.criado)}${M.alerta.length>1?' · mais '+(M.alerta.length-1)+' esperando':''}</p>
-    <div class="of-ovcr">${ofCrIc}<div><b>${lin?'Vá até o posto da '+esc(c.linha||'linha')+' e passe o crachá lá':c.paraTec?esc(String(c.paraTec).split(' ')[0])+', passe seu crachá no leitor agora':'Passe seu crachá no leitor agora'}</b><span>${lin?'O chamado da linha é começado no posto.':'Abre a tarefa para aceitar — o alarme para quando alguém aceitar.'}</span>${ofMsg()}</div></div>
+    <div class="of-ovcr">${!lin&&S.of.cam?'<div class="of-camslot of-ovcam" aria-hidden="true"><span>ligando a câmera…</span></div>':ofCrIc}<div><b>${lin?'Vá até o posto da '+esc(c.linha||'linha')+' e passe o crachá lá':(c.paraTec?esc(String(c.paraTec).split(' ')[0])+', mostre':'Mostre')+' o QR do crachá na câmera'+(S.of.cam?'':' ou passe no leitor')}</b><span>${lin?'O chamado da linha é começado no posto.':'Abre a tarefa para aceitar — o alarme para quando alguém aceitar.'}</span>${ofMsg()}</div></div>
     <div class="of-ovb">${livre?'':'<button class="of-b" data-act="of-som">Ativar o som do alarme</button>'}<button class="of-b sec" data-act="of-sil">Silenciar</button></div>
     <small>${livre?'O alarme toca até alguém '+(lin?'começar o chamado no posto':'aceitar a tarefa')+'.':'O navegador só toca o alarme depois de um toque na tela ou de uma leitura do coletor.'}</small></div></div>`; };
 /* crachá passado com o alarme da tarefa na tela: abre direto a tarefa para aceitar (se for para ele ou para qualquer técnico) */
@@ -476,4 +476,9 @@ document.head.insertAdjacentHTML('beforeend',`<style id="of-al-css">
 .of-ovcr b{display:block;font-size:clamp(22px,3.4vh,36px)}.of-ovcr span{font-size:clamp(14px,2vh,20px);color:#55666F}@keyframes ofCr{50%{transform:translateY(4px)}}
 .of-col .of-l:has(.of-tc){max-height:46vh;overflow:auto}.of-tc small{display:block}
 </style>`);
+
+/* alarme de tarefa: liga a câmera sozinha (a oficina não tem coletor; o técnico mostra o QR do crachá) e mantém ligada enquanto toca */
+setInterval(()=>{ try{ if(!ofOn()||!ttAtivo()||S.tt.fase!=='espera') return; const M=S.of, x=ofAlarmes().find(a=>a.c._id===M.alerta[0]);
+  if(x&&x.k==='tarefa'){ if(!M.cam){ M.camAl=x.c._id; ofCamSet(true); } else M.camEm=Date.now(); } }catch(e){} },1000);
+document.head.insertAdjacentHTML('beforeend','<style id="of-al2-css">.of-ovcam{width:clamp(220px,26vw,360px);height:clamp(160px,19vw,260px);flex:0 0 auto;border-radius:14px;background:#0B2230;display:flex;align-items:center;justify-content:center;color:#9FC3D3;font-size:14px}</style>');
 /* ===FIM OFICINA=== */

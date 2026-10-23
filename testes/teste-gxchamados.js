@@ -16,6 +16,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click('[data-act="gch-nova"]'); await H.dorme(400);
  await p.fill('#gch-tx','Consertar o portão da portaria que não fecha'); await p.selectOption('#gch-on','Portaria'); await H.dorme(400);
  await p.fill('#gch-lc','portão 2'); await p.selectOption('#gch-tp','serralheria'); await p.selectOption('#gch-tc','Bruno Lima');
+ await p.evaluate(()=>{ document.activeElement&&document.activeElement.blur(); return __T.S().db.doc('config/geral').update({tstRedesenho:Date.now()}); }); await H.dorme(1200); /* a tela se redesenha sozinha (dados chegando) antes de salvar */
  await p.click('[data-act="gch-salvar"]'); await H.dorme(1800);
  let c1=await p.evaluate(()=>{ const c=__T.S().chamados.find(x=>x.tarefa&&/portão/.test(x.defeito)); return c&&{n:c.numero,l:c.linha,lc:c.local,tp:c.tipo,pr:c.prioridade,tec:c.paraTec,st:c.status,imp:c.impacto,nome:c.nome,par:!!c.paradaId}; });
  ok('Tarefa fora das linhas gravada (Portaria · portão 2, serralheria, para o Bruno, normal, sem parada)', c1&&c1.l==='Portaria'&&c1.lc==='portão 2'&&c1.tp==='serralheria'&&c1.tec==='Bruno Lima'&&c1.pr==='normal'&&c1.st==='Aberta'&&!c1.par&&/Marcelo/.test(c1.nome), JSON.stringify(c1));
