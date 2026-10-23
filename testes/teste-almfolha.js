@@ -9,7 +9,7 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  D['rh/config']=Object.assign({},D['rh/config']||{},{almoco:{listaFolha:lista,fora:{'55555555555':{em:new Date().toISOString(),por:'RH'}},
    ausencias:[{id:'au1',cpf:'44444444444',nome:'IASMYN CAVALCANTE',tipo:'semana',dias:[new Date(hj+'T12:00').getDay()],de:'2026-01-01'}]}});
  const outro=hj.slice(8)==='01'?addD(hj,1):m+'-01'; function addD(x,n){ const y=new Date(x+'T12:00'); y.setDate(y.getDate()+n); return iso(y); }
- D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ADRIANO REUS DA SILVA'},'22222222222':{n:'ALEXANDRE TEIXEIRA'},'77777777777':{n:'DEIVID SOUZA',e:'ZENITH'}},dias:{[hj]:{'11111111111':{a:'11:40'}},[outro]:{'22222222222':{a:'11:50'}}},imp:[]};
+ D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ADRIANO REUS DA SILVA'},'22222222222':{n:'ALEXANDRE TEIXEIRA'},'77777777777':{n:'DEIVID SOUZA',e:'ZENITH'},'88888888888':{n:'YURI PACHECO DE LIMA',e:'NEXUS'},'99999999999':{n:'YURI MARQUES',e:'NEXUS'}},dias:{[hj]:{'11111111111':{a:'11:40'}},[outro]:{'22222222222':{a:'11:50'}}},imp:[]};
  const B=await H.abrir({viewport:{width:1440,height:1100}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  const dia=async x=>{ await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; },x); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1000); const ab=await p.$('[data-act="alm-fabre"]'); if(ab&&!(await p.$('.alm-fm'))){ await ab.click(); await H.dorme(600); } };
  const card=()=>p.evaluate(()=>(document.querySelector('.alm-folha')||{}).innerText||'');
@@ -71,10 +71,16 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  const idOf=n=>p.evaluate(n=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.value===n); return i?(i.closest('.alm-flr').querySelector('.alm-fid')||{}).innerText:''; },n);
  const tb=await idOf('Terceiro - Bruno Fernandes'), td=await idOf('Terceiro - Deivid'), tt=await idOf('Terceiros - Tainan'), tg=await idOf('Terceiro - Gustavo');
  ok('Terceiros: Bruno Fernandes "Cadastrado · Zenith", Deivid e Tainan "Provável", Gustavo "Sem cadastro"', /Cadastrado · Zenith/.test(tb)&&/Provável: Deivid Souza/.test(td)&&/Provável: Tainan Rocha · Nexus/.test(tt)&&/Sem cadastro/.test(tg), [tb,td,tt,tg].join(' | '));
- const resumo=await p.evaluate(()=>(document.querySelector('.alm-flid')||{}).innerText||''); ok('Resumo dos terceiros e motoristas da lista', /Terceiros e motoristas da lista \(\d+\)/.test(resumo)&&/1 cadastrados/.test(resumo)&&/2 prováveis/.test(resumo), resumo);
+ const resumo=await p.evaluate(()=>(document.querySelector('.alm-flid')||{}).innerText||''); ok('Resumo dos terceiros e motoristas da lista', /Terceiros e motoristas da lista \(\d+\)/.test(resumo)&&/1 cadastrados/.test(resumo)&&/3 prováveis/.test(resumo), resumo);
  await p.click('[data-almflf="sem"]'); await H.dorme(200); const vis=await p.evaluate(()=>[...document.querySelectorAll('.alm-flr')].filter(l=>!l.hidden).map(l=>l.querySelector('.alm-flin').value));
  ok('Filtro "Sem cadastro" mostra só quem não foi achado', vis.length>5&&vis.every(v=>!/Bruno Fernandes|Deivid|Tainan/.test(v))&&vis.includes('Terceiro - Gustavo'), vis.length);
  await p.click('[data-almflf=""]'); await H.dorme(200);
  await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.value==='Terceiro - Deivid'); i.closest('.alm-flr').querySelector('[data-act="alm-fl-usa"]').click(); }); await H.dorme(300);
- const nd=await p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].map(i=>i.value).filter(v=>/Deivid/.test(v))); ok('"usar nome completo" troca para "Terceiro - Deivid Souza"', nd[0]==='Terceiro - Deivid Souza'&&/Cadastrado|No Face ID/.test(await idOf('Terceiro - Deivid Souza')), nd.join());
+ const nd=await p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].map(i=>i.value).filter(v=>/Deivid/.test(v))); await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.value==='Terceiro - Yuri'); i.closest('.alm-flr').querySelector('.alm-fid').click(); }); await H.dorme(400);
+ const vr=await p.evaluate(()=>({q:(document.getElementById('alm-flvq')||{}).value,ns:[...document.querySelectorAll('.alm-flvo b')].map(b=>b.innerText)}));
+ ok('Tocar em "procurar" no Terceiro - Yuri abre a busca já com "yuri" e mostra os dois Yuri do Face ID', vr.q==='yuri'&&vr.ns.includes('Yuri Pacheco De Lima')&&vr.ns.includes('Yuri Marques'), JSON.stringify(vr));
+ await p.fill('#alm-flvq','yuri pach'); await H.dorme(200); const vr2=await p.evaluate(()=>[...document.querySelectorAll('.alm-flvo b')].map(b=>b.innerText)); ok('Digitar "yuri pach" filtra sem redesenhar', vr2.length===1&&vr2[0]==='Yuri Pacheco De Lima', vr2.join());
+ await p.click('.alm-flvo'); await H.dorme(400); const yv=await p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].map(i=>i.value).filter(v=>/Yuri/.test(v)));
+ ok('Escolher troca para "Terceiro - Yuri Pacheco De Lima" (mantém o "Terceiro -")', yv[0]==='Terceiro - Yuri Pacheco De Lima', yv.join());
+ ok('"usar nome completo" troca para "Terceiro - Deivid Souza"', nd[0]==='Terceiro - Deivid Souza'&&/Cadastrado|No Face ID/.test(await idOf('Terceiro - Deivid Souza')), nd.join());
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
