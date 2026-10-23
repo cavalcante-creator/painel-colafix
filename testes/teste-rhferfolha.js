@@ -19,7 +19,7 @@ const LINHAS=fs.readFileSync(__dirname+'/dados-ferias-folha.txt','utf8').split('
  ok('Luís Gelci (afastado 178 dias): não aparece como prazo vencido, e sim "afastado · conferir na folha"', r.f5&&/Afastado 178/.test(r.f5.sit.t), JSON.stringify(r.f5&&r.f5.sit));
  ok('Paulo Roberto: as férias programadas na folha (01/10/2026, 30 dias) descontam o saldo do período', r.f2&&r.f2.periodos[0].saldo===0, JSON.stringify(r.f2&&r.f2.periodos[0]));
  ok('Quem não está no relatório: cálculo pela admissão, com o limite para gozo (24 meses − 30 dias)', r.f6&&r.f6.periodos[0].ini==='2020-01-10'&&r.f6.periodos[0].lim==='2021-12-11', JSON.stringify(r.f6&&r.f6.periodos[0]));
- const marcadas=async()=>p.evaluate(()=>[...document.querySelectorAll('#view table tbody tr')].filter(tr=>/Paulo Roberto/i.test(tr.innerText)&&/01\/10\/2026/.test(tr.innerText)).length);
+ const marcadas=async()=>p.evaluate(()=>[...document.querySelectorAll('#view table tbody tr, #view .rh-v2fmi')].filter(tr=>/Paulo Roberto/i.test(tr.innerText)&&/01\/10\/2026/.test(tr.innerText)).length);
  const n1=await marcadas(); await p.evaluate(l=>window.rhFolhaPreviaLinhas(l),LINHAS); await H.dorme(600); await p.click('[data-act="rh-ffi-ok"]'); await H.dorme(2500); const n2=await marcadas();
  ok('Férias do Paulo aparecem em "Férias marcadas" e reimportar não duplica', n1===1&&n2===1, n1+' → '+n2);
  // cadastrar os não encontrados direto da conferência (desmarcando um)

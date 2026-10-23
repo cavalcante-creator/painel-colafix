@@ -153,7 +153,7 @@
     frEl(); if(!R._prevT) R._prevT=setTimeout(()=>{ R._prevT=null; if(P.S.view==='rhfichas') P.rerender(); },700); return null; }
 
   /* ---------- pedaços de tela ---------- */
-  const TELA_EY={rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhfuncoes:'CADASTROS'};
+  const TELA_EY={rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhfuncoes:'CADASTROS'};
 const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('RH'+((P.S&&TELA_EY[P.S.view])?' · '+TELA_EY[P.S.view]:''))}</div><h1>${t}</h1>${s?`<div class="sub">${s}</div>`:''}</div>${acoes?`<div class="rh-acoes">${acoes}</div>`:''}</div>`;
   const opts=(xs,v)=>xs.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
   const unicos=k=>[...new Set(R.func.map(x=>x[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -254,7 +254,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const sub=(P.hojeStr().slice(0,7)<FDESDE()?'O controle das fichas começa em '+mesNome(FDESDE())+' de '+FDESDE().slice(0,4)+'. ':'')+(fr.tot?`${fr.c.ass} de ${fr.tot} assinadas · ${fr.c.imp} falta assinar · ${fr.c.nao} não geradas`:'');
     const seg=`<div class="seg rh-modo" role="group" aria-label="Como mostrar">${[['lista','Lista'],['setor','Por setor']].map(([k,l])=>`<button data-act="rh-fmodo" data-v="${k}" aria-pressed="${R.fmodo===k}">${l}</button>`).join('')}</div>`;
     return topo(mesTitulo(m),sub,acoes,EY)+odBarra()+ban+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':!fr.tot?'<section class="card"><div class="empty">Nenhum funcionário em atividade. Cadastre em Funcionários.</div></section>':R.fmodo==='setor'?vFichasSetor(fr,seg):vFichasLista(fr,m,seg)); }
-  function vFichasLista(fr,m,seg){ const F=R.ffil, q=norm(F.q), qd=dig(F.q);
+  function vFichasLista(fr,m,seg){ const F=R.ffil, q=norm(F.q), qd=dig(F.q), faltamN=fr.xs.filter(o=>o.s.k==='nao'||(o.s.k==='semepi'&&!o.s.i)).length;
     const cnt={todas:fr.tot,nao:fr.c.nao,imp:fr.c.imp,ass:fr.c.ass};
     const grupo=s=>s.k==='semepi'?(s.i?'imp':'nao'):s.k;
     let xs=fr.xs.filter(o=>(F.sit==='todas'||grupo(o.s)===F.sit)&&(!F.setor||(o.f.setor||'Sem setor')===F.setor)&&(!q||norm(o.f.nome).includes(q)||(qd&&(dig(o.f.cpf).includes(qd)||(o.f.cnpj&&dig(o.f.cnpj).includes(qd))))));
@@ -265,8 +265,14 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       if(s.k==='semepi') return `<button class="lnk" data-act="rh-fsemepi" data-n="${esc(f.funcao||'')}" data-f="${f._id}">${f.funcao?'Cadastrar EPIs':'Escolher a função'}</button>`;
       if(s.k==='imp') return anexar(`data-rh-anx="${f._id}"`,'Anexar assinada','btn sec rh-sm');
       return `<button class="btn rh-sm" data-act="rh-fger" data-id="${f._id}">Gerar</button>`; };
-    const tab=`<section class="card rh-ftab">${xs.length?`<div class="rh-tw"><table class="rh-t rh-tf"><thead><tr><th>Funcionário</th><th>Setor</th><th>Situação</th><th></th></tr></thead><tbody>
-      ${xs.slice(0,F.n).map(o=>`<tr data-act="rh-fsel" data-id="${o.f._id}" ${o.f._id===R.fsel?'class="sel"':''}><td><b>${esc(o.f.nome)}</b><small>${esc(vinc(o.f))}</small></td><td>${esc(o.f.setor||'—')}</td><td><span class="pill ${o.s.c}">${esc(o.s.t)}</span></td><td class="rh-ac">${acao(o)}</td></tr>`).join('')}</tbody></table></div>
+    /* RH revisado (opção 1): a lista vem separada por situação, cada grupo com o seu cabeçalho */
+    const linhaF=o=>`<tr data-act="rh-fsel" data-id="${o.f._id}" ${o.f._id===R.fsel?'class="sel"':''}><td><b>${esc(o.f.nome)}</b><small>${esc(vinc(o.f))}</small></td><td>${esc(o.f.setor||'—')}</td><td><span class="pill ${o.s.c}">${esc(o.s.t)}</span></td><td class="rh-ac">${acao(o)}</td></tr>`;
+    const vis=xs.slice(0,F.n), GR=[['nao','Não geradas','#8FA3AF'],['imp','Impressas, falta assinar','#D9A54A'],['ass','Assinadas','#3C8A63'],['disp','Não usam EPI','#C9D3DA']];
+    const tabela=ls=>`<div class="rh-tw"><table class="rh-t rh-tf rh-v2fit"><colgroup><col style="width:36%"><col style="width:17%"><col style="width:24%"><col style="width:23%"></colgroup><tbody>${ls.map(linhaF).join('')}</tbody></table></div>`;
+    const corpoF=F.sit!=='todas'?tabela(vis):GR.map(([k,l,c])=>{ const ls=vis.filter(o=>grupo(o.s)===k); if(!ls.length) return '';
+      const n=xs.filter(o=>grupo(o.s)===k).length, bt=k==='nao'&&faltamN?`<button class="btn rh-sm" data-act="rh-ffaltam">Gerar ${faltamN===1?'a que falta':'as '+faltamN}</button>`:'';
+      return `<div class="rh-v2gh"><i style="background:${c}"></i><b>${l} · ${n}</b>${bt}</div>${tabela(ls)}`; }).join('');
+    const tab=`<section class="card rh-ftab rh-v2fic">${xs.length?corpoF+`
       ${mais?`<div style="text-align:center;margin-top:10px"><button class="btn sec" data-act="rh-fmais">Mostrar mais (${xs.length-F.n})</button></div>`:''}`:'<div class="empty">Ninguém nesta situação.</div>'}</section>`;
     let pv='';
     if(sel){ const f=sel.f, s=sel.s, p=prevDe(f,m); const quando=s.k==='ass'?'assinada'+(s.a.em?' em '+(/^\d{2}\//.test(s.a.em)?s.a.em.slice(0,5):dmIso(s.a.em)):''):s.i?'gerada em '+dmIso(s.i.em)+' · impressa':'ainda não gerada';
@@ -276,7 +282,11 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         <div class="rh-2b"><button class="btn sec" data-act="rh-fimp1" data-id="${f._id}">Imprimir</button>${s.k==='ass'?`<button class="btn" data-act="rh-fver" data-id="${f._id}">Ver escaneada</button>`:anexar(`data-rh-anx="${f._id}"`,'Anexar assinada','btn')}</div></section>`; }
     const chips=`<div class="rh-chips">${[['todas','Todas'],['nao','Não geradas'],['imp','Falta assinar'],['ass','Assinadas']].map(([k,l])=>`<button class="rh-chip2" data-act="rh-fchip" data-v="${k}" aria-pressed="${F.sit===k}">${l} · ${cnt[k]}</button>`).join('')}
       ${F.setor?`<button class="rh-chip2" data-act="rh-fsetorx" aria-pressed="true">Setor: ${esc(F.setor)} ✕</button>`:''}<span class="rh-busca"><label for="rh-fq">Buscar</label><input class="txt" id="rh-fq" placeholder="nome ou CPF" value="${esc(F.q)}"></span>${seg}</div>`;
-    return chips+`<div class="rh-fg">${tab}${pv}</div>`; }
+    const fimM=addDias(addMeses(m+'-01',1),-1), dF=diasEntre(P.hojeStr(),fimM), pct=k=>fr.tot?(fr.c[k]/fr.tot*100).toFixed(1):0;
+    const prog=fr.tot?`<section class="card rh-v2pr"><div><span><b class="num">${fr.c.ass} de ${fr.tot}</b> assinadas</span><small>${m===P.hojeStr().slice(0,7)?(dF>0?'faltam '+plural(dF,'dia','dias')+' para fechar o mês':'último dia do mês'):m<P.hojeStr().slice(0,7)?'mês fechado':'mês que vem'}</small></div>
+      <div class="rh-v2pb" role="img" aria-label="${fr.c.ass} assinadas, ${fr.c.imp} falta assinar, ${fr.c.nao} não geradas"><i style="width:${pct('ass')}%;background:#3C8A63"></i><i style="width:${pct('imp')}%;background:#D9A54A"></i><i style="width:${pct('nao')}%;background:#9AAAB5"></i></div>
+      <div class="rh-v2pl"><span><i style="background:#3C8A63"></i>assinadas ${fr.c.ass}</span><span><i style="background:#D9A54A"></i>falta assinar ${fr.c.imp}</span><span><i style="background:#9AAAB5"></i>não geradas ${fr.c.nao}</span>${fr.c.disp?`<span>não usam EPI ${fr.c.disp}</span>`:''}</div></section>`:'';
+    return prog+chips+`<div class="rh-fg">${tab}${pv}</div>`; }
   function vFichasSetor(fr,seg){ const g={}; fr.xs.forEach(o=>{ const k=o.f.setor||'Sem setor'; (g[k]=g[k]||[]).push(o); });
     const ks=Object.keys(g).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     return `<div class="rh-chips">${seg}</div><div class="rh-sets">${ks.map(k=>{ const xs=g[k], c={ass:0,imp:0,nao:0}; xs.forEach(o=>c[o.s.k==='semepi'?(o.s.i?'imp':'nao'):o.s.k]++);
@@ -298,16 +308,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       +(R.fdesl?formDesl():'')+(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':R.fview==='adm'?cartaoFichasCel()+vQuadroAdm():vOrg());
     return topo('Funcionários','Cadastro, situação e o que cada um usa.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-csv">Exportar</button>`)
       +(R.carga?vCarga():'')+(R.adm&&!R.f?vAdm():'')+(R.fdesl?formDesl():'')+(R.f?formFunc():'')
-      +`<div class="rh-kpi">${ST.map(s=>`<div><b class="num">${cnt(s)}</b><span>${s}</span></div>`).join('')}</div>
-      <section class="card"><div class="rh-fil"><input class="txt" id="rh-q" placeholder="Buscar nome, CPF, CNPJ ou função" value="${esc(F.q)}">
-        <select class="txt" data-rh-fil="st"><option value="ativos" ${F.st==='ativos'?'selected':''}>Em atividade</option>${ST.map(s=>`<option ${F.st===s?'selected':''}>${s}</option>`).join('')}<option value="todos" ${F.st==='todos'?'selected':''}>Todos</option></select>
-        <select class="txt" data-rh-fil="setor"><option value="">Todos os setores</option>${opts(unicos('setor'),F.setor)}</select>
-        <select class="txt" data-rh-fil="emp"><option value="">Todas as empresas</option>${unicos('empresa').map(e=>`<option value="${esc(e)}" ${F.emp===e?'selected':''}>${esc(empNome(e))}</option>`).join('')}</select>
-        <select class="txt" data-rh-fil="tipo"><option value="">CLT e PJ</option>${opts(['CLT','PJ'],F.tipo)}</select></div>
-      ${!R.lido.func?'<div class="empty">Carregando…</div>':xs.length?`<div class="rh-tw"><table class="rh-t"><thead><tr><th>Nome</th><th>CPF / CNPJ</th><th>Função</th><th>Setor</th><th>Empresa</th><th>Admissão</th><th>Situação</th><th></th></tr></thead><tbody>
-        ${xs.map(x=>`<tr><td><button class="rh-nm" data-act="rh-pess" data-id="${x._id}">${esc(x.nome)}</button>${x.tipo==='PJ'?' <span class="pill neu">PJ</span>':''}</td><td class="num">${esc(docF(x))}</td><td>${esc(x.funcao||'')}</td><td>${esc(x.setor||'')}</td><td>${esc(empNome(x.empresa))}</td><td class="num">${br(x.admissao)}</td>
-          <td><span class="pill ${corSt(x.status)}">${esc(x.status||'')}</span>${x.status==='Desligado'&&x.desligamento?`<small style="display:block;color:var(--muted)">${br(x.desligamento)}${x.desligMotivo?' · '+esc(x.desligMotivo):''}</small>${deslForm(x)}`:x.desligAgendado&&okIso(x.desligamento)?`<small style="display:block;color:var(--crit-ink)">sai em ${br(x.desligamento)}</small>${deslForm(x)}`:expInfo(x)?`<small style="display:block;color:var(--muted)">em experiência</small>`:''}</td><td><button class="lnk" data-act="rh-ed" data-id="${x._id}">Editar</button></td></tr>`).join('')}</tbody></table></div>
-        <div class="sub" style="margin:8px 0 0">${xs.length} funcionário(s)</div>`:'<div class="empty">Nenhum funcionário com esses filtros.</div>'}</section>`; }
+      +vFuncLista(xs); }
   function formFunc(){ const f=R.f, fs=R.funcoes.map(x=>x.nome).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const i=(k,l,t,ex)=>`<label><span class="label">${l}</span><input class="txt" data-rh-f="${k}" type="${t||'text'}" value="${esc(f[k]==null?'':f[k])}" ${ex||''}></label>`;
     return `<section class="card rh-form"><div class="head" style="align-items:baseline"><h2>${f.admNova?'Nova admissão · cadastro':(f._id?'Editar':'Novo')+' funcionário'}</h2><button class="lnk" data-act="rh-fx">Fechar</button></div>
@@ -640,9 +641,23 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const ferHtml=usaFer&&f?(fers.length?`<label class="rh-lb"><span class="label">Férias</span><select class="txt" id="rh-dgfe">${fers.map(x=>`<option value="${x._id}" ${G.feriasId===x._id?'selected':''}>${br(x.inicio)} a ${br(x.fim)} · ${x.dias} dias</option>`).join('')}</select></label>`
       :`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);margin:0 0 10px">Este modelo usa as datas das férias. Marque as férias em <button class="lnk" data-act="rh-pzabrir" data-v="ferias">Férias e prazos</button>.</div>`):'';
     const qHtml=qs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Perguntas deste documento</div>${qs.map((q,i)=>`<label class="rh-lb"><span>${esc(q)}</span><input class="txt rh-amar" data-rh-dq="${i}" ${qData(q)?'type="date"':''} value="${esc(G.resp[q]||'')}"></label>`).join('')}`:'';
-    return `<div class="rh-gg"><section class="card"><h2>Para quem?</h2>
-        <label class="rh-lb"><span class="label">Funcionário</span><select class="txt" id="rh-dgf"><option value="">Escolha…</option>${fs.map(x=>`<option value="${x._id}" ${G.funcId===x._id?'selected':''}>${esc(x.nome)}${x.status==='Desligado'?' (desligado)':''}</option>`).join('')}</select></label>
-        <label class="rh-lb"><span class="label">Modelo</span><select class="txt" id="rh-dgm">${lista.map(m=>`<option value="${m._id}" ${G.modeloId===m._id?'selected':''}>${esc(m.nome)}</option>`).join('')}</select></label>
+    /* RH revisado (opção 1): três colunas — 1 para quem, 2 qual documento, 3 conferir e baixar */
+    const grpM=m=>{ const n=norm(m.nome||'').toLowerCase(); return /ferias/.test(n)?'FÉRIAS':/advert|suspens|ocorr|notifica|declara/.test(n)?'OCORRÊNCIAS E DECLARAÇÕES':/aviso previo|demiss|distrato|rescis|deslig|encerr/.test(n)||modeloDesliga(m)?'DESLIGAMENTO':/contrato|experien|admiss|termo|epi|uniforme|prorrog/.test(n)?'ADMISSÃO E CONTRATO':'OUTROS'; };
+    const GRUPOS=['ADMISSÃO E CONTRATO','FÉRIAS','OCORRÊNCIAS E DECLARAÇÕES','DESLIGAMENTO','OUTROS'];
+    const pesH=fs.map(x=>`<button class="rh-v2dp${G.funcId===x._id?' sel':''}" data-act="rh-dgpick" data-id="${x._id}" data-dgb="${esc(norm(x.nome+' '+(x.funcao||'')+' '+(x.setor||''))+' '+dig(x.cpf)+' '+dig(x.cnpj))}" aria-pressed="${G.funcId===x._id}"><b>${esc(x.nome)}</b><small>${esc([x.funcao,x.setor,x.tipo==='PJ'?'PJ · '+empNome(x.empresa):'CLT',x.status==='Desligado'?'desligado':''].filter(Boolean).join(' · '))}</small></button>`).join('');
+    const modH=GRUPOS.map(g=>{ const xs=lista.filter(m=>grpM(m)===g); return xs.length?`<div class="rh-v2dg">${g}</div>${xs.map(m=>{ const nq=perguntasDe(m.html||'').length; return `<button class="rh-v2dm${G.modeloId===m._id?' sel':''}" data-act="rh-dgmod" data-id="${m._id}" aria-pressed="${G.modeloId===m._id}"><span><b>${esc(m.nome)}</b><small>${esc(valeNome(m.vale))}${nq?' · '+plural(nq,'pergunta','perguntas'):''}</small></span><i aria-hidden="true">›</i></button>`; }).join('')}`:''; }).join('');
+    const nFalta=f&&md?falta.length+qs.filter(q=>!String(G.resp[q]||'').trim()).length:0;
+    const recentes=R.docs.slice().sort((a,b)=>String(b.em||'').localeCompare(String(a.em||''))).slice(0,8);
+    const recH=recentes.length?`<section class="card rh-v2rec"><h2>Feitos recentemente</h2>${recentes.map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')} · ${esc(titulo(d.funcionario||(R.func.find(x=>x._id===d.funcId)||{}).nome||''))}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}</section>`:'';
+    return `<div class="rh-v2doc">
+      <section class="card rh-v2dc" aria-label="1. Para quem"><div class="rh-v2dt"><span>1</span><h2>Para quem</h2></div>
+        <input class="txt" id="rh-dgq" type="search" placeholder="Buscar nome ou CPF" value="${esc(R.dgq||'')}" autocomplete="off" aria-label="Buscar pessoa">
+        <div class="rh-v2dl2" id="rh-dgpl">${pesH||'<div class="empty">Ninguém cadastrado.</div>'}</div></section>
+      <section class="card rh-v2dc" aria-label="2. Qual documento"><div class="rh-v2dt"><span>2</span><h2>Qual documento</h2></div>
+        ${f&&cab.length&&cab.length<ms.length?`<div class="sub" style="font-size:12.5px;margin:0 0 6px">Só os modelos que valem para ${f.tipo==='PJ'?'PJ':'CLT'}.</div>`:''}
+        <div class="rh-v2dl2">${modH}</div></section>
+      <section class="card rh-v2dc rh-v2d3" aria-label="3. Conferir e baixar"><div class="rh-v2dt"><span>3</span><h2>Conferir e baixar</h2>${nFalta?`<em class="pill warn">falta ${plural(nFalta,'campo','campos')}</em>`:f&&md?'<em class="pill ok">tudo preenchido</em>':''}</div>
+        ${f&&md?`<div class="sub" style="margin:0 0 8px;font-size:13px"><b>${esc(md.nome)}</b> para <b>${esc(titulo(f.nome))}</b></div>`:''}
         ${f&&cab.length<ms.length&&!cab.length?'<div class="sub" style="font-size:12.5px">Nenhum modelo marcado para o vínculo desta pessoa; mostrando todos.</div>':''}
         ${ferHtml}${qHtml}
         ${f&&md&&modeloDesliga(md)&&f.status!=='Desligado'?(()=>{ const qd=qDeslig(qs), dt=G.deslData||(qd&&G.resp[qd])||P.hojeStr(); return `<div class="rh-sep"></div><label class="ck"><input type="checkbox" id="rh-dgdesl" ${G.desligar!==false?'checked':''}> Marcar ${esc(f.nome)} como <b>desligado</b> ao gerar${f.desligAgendado&&okIso(f.desligamento)?' (já marcado para '+br(f.desligamento)+')':''}</label>
@@ -651,12 +666,13 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
           <label class="ck" style="margin:6px 0 4px"><input type="checkbox" id="rh-dgg" ${G.guardar?'checked':''}> Guardar no cadastro</label>`:''}
         ${(()=>{ if(!f||!md) return ''; const vb=valores(f,R.dg.extra,ferSel(f)), o=R.dg.over||{}, ks=[...new Set(usa.filter(k=>!FALTA_CAMPO[k]&&(!vb[k]||k in o)))];
           return ks.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:6px">Preencher o que falta</div>${ks.map(k=>`<label class="rh-lb"><span>${esc(CAMPO_NOME(k))}</span><input class="txt rh-amar" data-rh-do="${k}" ${DG_DATA(k)?'type="date"':''} value="${esc(o[k]||'')}" ${dgEditado(f,md)?'disabled title="O texto já foi editado: desfaça as edições para usar os campos"':''}></label>`).join('')}<div class="sub" style="font-size:12.5px;margin:0">Vale só para este documento.${ks.includes('DESLIGAMENTO')?' Com a data do desligamento, o "pago até" e o "início do saldo" saem sozinhos.':''}</div>`:''; })()}
+      <section class="rh-page rh-pageg${G.edOn?' rh-editando':''}" id="rh-dgdoc" aria-label="Documento" ${G.edOn&&f&&md?'contenteditable="true" spellcheck="true"':''}>${f&&md?docCorpo(f,md,true)+assinaDg(f,md):`<div class="empty">${f?'Escolha o modelo.':'Escolha o funcionário para ver o documento preenchido.'}</div>`}</section>
         <div class="rh-sep"></div><div class="rh-dbt" style="margin-bottom:8px"><button class="btn sec" data-act="rh-dged" ${f&&md?'':'disabled'}>${G.edOn?'✓ Concluir edição':'✎ Editar texto'}</button>${f&&md&&dgEditado(f,md)?'<button class="lnk" data-act="rh-dgedx">Desfazer edições</button>':''}</div>
         ${G.edOn?'<div class="banner" style="margin:0 0 8px">Editando: clique no documento e escreva, apague ou corrija. Imprimir, PDF e Word saem com o texto editado.</div>':''}
         <div class="rh-dbt"><button class="btn" data-act="rh-dgo" data-v="imprimir" ${f&&md?'':'disabled'}>Imprimir</button><button class="btn sec" data-act="rh-dgo" data-v="pdf" ${f&&md?'':'disabled'}>Salvar PDF</button><button class="btn sec" data-act="rh-dgo" data-v="word" ${f&&md?'':'disabled'}>Baixar em Word</button></div>
         <div class="sub" style="font-size:12.5px;margin:10px 0 0">Fica guardado no histórico do funcionário (quem gerou e quando). Depois de assinado, anexe a cópia escaneada aqui embaixo ou no cadastro.</div>
-        ${f&&docs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:4px">Já gerados para ${esc(f.nome)}</div>${docs.slice(0,6).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}`:''}</section>
-      <section class="rh-page rh-pageg${G.edOn?' rh-editando':''}" id="rh-dgdoc" aria-label="Documento" ${G.edOn&&f&&md?'contenteditable="true" spellcheck="true"':''}>${f&&md?docCorpo(f,md,true)+assinaDg(f,md):`<div class="empty">${f?'Escolha o modelo.':'Escolha o funcionário para ver o documento preenchido.'}</div>`}</section></div>`; }
+
+        ${f&&docs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:4px">Já gerados para ${esc(f.nome)}</div>${docs.slice(0,6).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}`:''}</section></div>${recH}`; }
   function edSync(){ const ed=document.getElementById('rh-ed'); if(ed&&R.dm) R.dm.html=limpar(ed.innerHTML); const n=document.getElementById('rh-dnome'); if(n&&R.dm) R.dm.nome=n.value; const v=document.getElementById('rh-dvale'); if(v&&R.dm) R.dm.vale=v.value; const dd=document.getElementById('rh-ddesl'); if(dd&&R.dm&&R.dm.deslUser) R.dm.desliga=dd.checked; }
   function inserirNoEditor(html){ const ed=document.getElementById('rh-ed'); if(!ed) return; ed.focus(); const sel=getSelection();
     if(!sel.rangeCount||!ed.contains(sel.anchorNode)){ const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
@@ -775,19 +791,27 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   function vFeriasCLT(){ const hj=P.hojeStr(), F=R.pzfil;
     let xs=clts().map(f=>({f,s:sitFer(f)})); const nAt=xs.filter(o=>['crit','warn'].includes(o.s.c)).length; if(F==='atencao') xs=xs.filter(o=>['crit','warn'].includes(o.s.c));
     xs.sort((a,b)=>a.s.n-b.s.n||(a.s.d||0)-(b.s.d||0)||a.f.nome.localeCompare(b.f.nome,'pt-BR'));
-    const venc=clts().reduce((n,f)=>n+periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim<hj).length,0), prox=ferProximas();
-    return ffiCard()+(R.fajs?formAjuste():'')+(R.ffer?formFerias():'')
-      +(prox.length?`<section class="card"><h2>Férias marcadas</h2><div class="rh-tw"><table class="rh-t"><thead><tr><th>Funcionário</th><th>Férias</th><th>Volta</th><th>Aviso de férias</th><th></th></tr></thead><tbody>
-        ${prox.map(x=>{ const ag=x.inicio<=hj; return `<tr><td><b>${esc(x.funcionario)}</b><small style="display:block;color:var(--muted)">período ${br(x.aquisitivo)} a ${br(x.aquisitivoFim)}</small></td><td class="num">${br(x.inicio)} a ${br(x.fim)} <small style="color:var(--muted)">· ${plural(+x.dias,'dia','dias')}</small>${ag?' <span class="pill ok">em férias</span>':''}</td><td class="num">${br(x.retorno)}</td>
-          <td>${temAviso(x)?'<span class="pill ok">Gerado</span>':`<button class="btn rh-sm" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}</td><td class="rh-ac">${ag?'':`<button class="lnk" data-act="rh-fercanc" data-id="${x._id}" style="color:var(--crit-ink)">Desmarcar</button>`}</td></tr>`; }).join('')}</tbody></table></div></section>`:'')
-      +`<section class="card"><div class="rh-chips">${[['atencao','Precisam de atenção · '+nAt],['todos','Todos os CLT · '+clts().length]].map(([k,l])=>`<button class="rh-chip2" data-act="rh-pzfil" data-v="${k}" aria-pressed="${F===k}">${l}</button>`).join('')}
-          ${venc?`<button class="lnk" data-act="rh-feranteriores" style="margin-left:auto">${venc===1?'Marcar como já tirado o período vencido':'Marcar como já tirados os '+venc+' períodos vencidos'} (antes do painel)</button>`:''}</div>
-        ${xs.length?`<div class="rh-tw"><table class="rh-t rh-tf"><thead><tr><th>Funcionário</th><th>Admissão</th><th>Período em aberto</th><th>Situação</th><th></th></tr></thead><tbody>
-        ${xs.map(({f,s})=>{ const p=s.p; return `<tr><td><b>${esc(f.nome)}</b><small>${esc([f.funcao,f.setor].filter(Boolean).join(' · '))}</small></td><td class="num">${br(f.admissao)||'—'}</td>
-          <td class="num">${p?`${br(p.ini)} a ${br(p.fim)}<small>${p.completo?(p.saldo?'faltam '+plural(p.saldo,'dia','dias')+' · conceder até '+br(p.lim):'tirado'):'em aquisição · completa em '+br(p.fim)}</small>`:'—'}</td>
-          <td><span class="pill ${s.c}">${esc(s.t)}</span></td>
-          <td class="rh-ac">${s.p?`<button class="btn sec rh-sm" data-act="rh-fernova" data-id="${f._id}">Marcar férias</button>`:`<button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${f._id}">Informar admissão</button>`}${s.p&&s.p.completo&&s.p.saldo?` <button class="lnk" data-act="rh-ferant" data-id="${f._id}" data-p="${s.p.ini}" title="Para férias tiradas antes de usar o painel">Já tirou</button>`:''}${s.p?` <button class="lnk" data-act="rh-fajabrir" data-id="${f._id}" title="Dizer quantos dias de cada período a pessoa já tirou">Ajustar</button>`:''}</td></tr>`; }).join('')}</tbody></table></div>`
-        :`<div class="empty">${F==='atencao'?'Nenhum prazo de férias perto de vencer.':'Nenhum CLT em atividade.'}</div>`}</section>`; }
+    const todos=clts().map(f=>({f,s:sitFer(f)})), nCrit=todos.filter(o=>o.s.c==='crit').length, nWarn=todos.filter(o=>o.s.c==='warn').length;
+    const venc=clts().reduce((n,f)=>n+periodos(f).filter(p=>p.completo&&p.saldo>0&&p.lim<hj).length,0), prox=ferProximas(), agora=prox.filter(x=>x.inicio<=hj), fut=prox.filter(x=>x.inicio>hj), semAv=fut.filter(x=>!temAviso(x)).length;
+    const com=clts().filter(f=>f.ferFolha), ult=com.reduce((a,f)=>String(f.ferFolha.importadoEm||'')>String(a.importadoEm||'')?f.ferFolha:a,{});
+    const folha=R.ffi||rhDuplos().length?ffiCard():'';
+    const kpi=(n,t,s,c)=>`<div class="rh-v2kp"><b class="num ${c||''}">${n}</b><span><b>${t}</b><small>${s}</small></span></div>`;
+    const bar=p=>{ if(!p) return ''; const a=p.ini, z=p.lim, tot=Math.max(1,diasEntre(a,z)), pos=d=>Math.max(0,Math.min(100,diasEntre(a,d)/tot*100)), fp=pos(p.fim), hp=pos(hj);
+      return `<span class="rh-v2fb" title="Período ${br(p.ini)} a ${br(p.fim)} · dar até ${br(p.lim)}"><i class="a" style="width:${fp.toFixed(1)}%"></i><i class="c${p.lim<hj?' v':''}" style="left:${fp.toFixed(1)}%;width:${(100-fp).toFixed(1)}%"></i><i class="h" style="left:${hp.toFixed(1)}%"></i></span>`; };
+    const lado=R.ffer?formFerias():`<section class="card rh-v2fx"><div class="eyebrow">MARCAR FÉRIAS</div><div class="sub" style="margin:6px 0 0">Escolha a pessoa na lista: o quadro para marcar as férias abre aqui.</div></section>`;
+    const marc=prox.length?`<section class="card rh-v2fm"><h2>Já marcadas</h2>${prox.slice(0,12).map(x=>{ const ag=x.inicio<=hj; return `<div class="rh-v2fmi"><div><b>${esc(titulo(x.funcionario||''))}</b><small>${br(x.inicio)} a ${br(x.fim)} · ${plural(+x.dias,'dia','dias')} · volta ${br(x.retorno)}</small></div><span>${ag?'<span class="pill ok">de férias agora</span>':temAviso(x)?'<span class="pill ok">Aviso gerado</span>':`<button class="btn rh-sm" data-act="rh-dgfer" data-id="${x._id}">Gerar aviso</button>`}${ag?'':` <button class="lnk" data-act="rh-fercanc" data-id="${x._id}" style="color:var(--crit-ink)">Desmarcar</button>`}</span></div>`; }).join('')}</section>`:'';
+    return folha+(R.fajs?formAjuste():'')+`<div class="rh-v2kps">${kpi(nCrit,'Prazo vencido','passou o dia de dar as férias',nCrit?'crit':'')}${kpi(nWarn,'Dar férias logo','prazo nos próximos '+PZ_AVISO()+' dias',nWarn?'warn':'')}${kpi(fut.length,'Marcadas',semAv?plural(semAv,'sem aviso de férias','sem aviso de férias'):'todas com aviso')}${kpi(agora.length,'De férias agora',agora.length?agora.slice(0,2).map(x=>titulo(x.funcionario||'').split(' ')[0]+' · volta '+br(x.retorno).slice(0,5)).join(', '):'ninguém','ok')}</div>
+      <div class="rh-v2 rh-v2fer"><section class="card rh-v2l"><div class="rh-v2fbar"><div class="rh-v2ch" style="margin:0">${[['atencao','Precisam de atenção',nAt],['todos','Todos os CLT',clts().length]].map(([k,l,n])=>`<button data-act="rh-pzfil" data-v="${k}" aria-pressed="${F===k}">${l} <b>${n}</b></button>`).join('')}</div>
+          <label class="btn sec rh-sm" style="cursor:pointer" title="${com.length?'Último relatório: '+br(ult.emissao):'Relatório Programação de férias do sistema de folha'}">${P.ic('folha',16,2)}Importar relatório da folha (PDF)<input type="file" id="rh-ffi-file" accept=".pdf,application/pdf" hidden></label></div>
+        <div class="rh-v2fleg"><span><i class="a"></i>adquirindo</span><span><i class="c"></i>tempo para dar</span><span><i class="h"></i>hoje</span>${com.length?`<span class="sub" style="margin:0 0 0 auto">dados da folha de ${br(ult.emissao)}</span>`:''}</div>
+        ${xs.length?`<div class="rh-tw"><table class="rh-t rh-tf rh-v2ft"><tbody>
+        ${xs.map(({f,s})=>{ const p=s.p, sel=(R.ffer&&R.ffer.funcId===f._id)||(R.fajs&&R.fajs.funcId===f._id); return `<tr class="${sel?'sel':''}"><td><button class="rh-v2fn" data-act="rh-fernova" data-id="${f._id}"><b>${esc(f.nome)}</b><small>${esc([f.funcao,f.setor].filter(Boolean).join(' · '))}</small></button></td>
+          <td class="rh-v2fp">${p?`${bar(p)}<small class="num">${br(p.ini)} a ${br(p.fim)} · ${p.completo?(p.saldo?'faltam '+plural(p.saldo,'dia','dias')+' · dar até '+br(p.lim):'tirado'):'em aquisição · completa em '+br(p.fim)}</small>`:'<small>—</small>'}</td>
+          <td><span class="pill ${s.c}">${esc(s.t)}</span><span class="rh-v2fl">${s.p&&s.p.completo&&s.p.saldo?`<button class="lnk" data-act="rh-ferant" data-id="${f._id}" data-p="${s.p.ini}" title="Para férias tiradas antes de usar o painel">Já tirou</button>`:''}${s.p?`<button class="lnk" data-act="rh-fajabrir" data-id="${f._id}" title="Dizer quantos dias de cada período a pessoa já tirou">Ajustar</button>`:''}</span></td>
+          <td class="rh-ac">${s.p?`<button class="btn sec rh-sm" data-act="rh-fernova" data-id="${f._id}">Marcar</button>`:`<button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${f._id}">Informar admissão</button>`}</td></tr>`; }).join('')}</tbody></table></div>`
+        :`<div class="empty">${F==='atencao'?'Nenhum prazo de férias perto de vencer.':'Nenhum CLT em atividade.'}</div>`}
+        ${venc?`<div class="rh-v2fant"><span><b>${plural(venc,'período vencido','períodos vencidos')}.</b> Se as férias já foram tiradas antes de usar o painel, marque de uma vez.</span><button class="btn rh-sm" data-act="rh-feranteriores">${venc===1?'Marcar como já tirado':'Marcar os '+venc+' como já tirados'}</button></div>`:''}</section>
+      <aside class="rh-v2side">${lado}${marc}</aside></div>`; }
   /* Ajustar períodos: a RH informa, período a período, quantos dias a pessoa já tirou antes do painel */
   function formAjuste(){ const g=R.fajs, f=R.func.find(x=>x._id===g.funcId); if(!f) return ''; const ps=periodos(f), hj=P.hojeStr();
     const ant=p=>p.ps.filter(x=>x.anterior).reduce((a,x)=>a+(+x.dias||0),0), noP=p=>p.usados-ant(p);
@@ -1345,11 +1369,159 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     await P.db().doc(COL.fcand+'/'+t).set({usada:true,funcId,usadaEm:agora(),usadaPor:eu()},{merge:true}); try{ await P.db().doc(COL.conv+'/'+t).delete(); }catch(e){}
     return n; }
 
+  /* ---------- Funcionários · lista + ficha ao lado (protótipo "RH revisado", opção 1, 22/10) ----------
+     Clicar numa pessoa abre a ficha à direita sem sair da lista (R.fusel); abas Resumo · Férias · Documentos · EPI · Histórico (R.fab).
+     "Perfil completo" abre a tela antiga (vPessoa). No celular o clique abre o perfil completo. */
+  function pendF(f){ const o=[], add=(t,c,d)=>o.push({t,c,d:d||''}), hj=P.hojeStr();
+    if(f.desligAgendado&&okIso(f.desligamento)&&f.status!=='Desligado') add('Sai em '+br(f.desligamento).slice(0,5),'crit','Desligamento marcado'+(f.desligMotivo?' · '+f.desligMotivo:''));
+    const e=expInfo(f); if(e) add(e.c==='crit'||e.c==='warn'?e.t:'Em experiência',e.c==='crit'?'crit':e.c==='warn'?'warn':'info','1ª etapa até '+br(e.f1)+' · 2ª até '+br(e.f2));
+    if(f.tipo!=='PJ'&&f.status!=='Desligado'){ const s=sitFer(f); if(s.c==='crit') add('Férias vencidas','crit',s.t+(s.p?' · faltam '+plural(s.p.saldo,'dia','dias'):'')); else if(s.c==='warn') add('Dar férias','warn',s.t); }
+    if(f.tipo==='PJ'&&f.status!=='Desligado'){ const s=pjSit(f); if(s.c==='crit'||s.c==='warn') add(s.t,s.c,'Troca do PJ'+(s.prox?' · '+br(s.prox):'')); }
+    if(f.status!=='Desligado') qAtuais(f).forEach(q=>{ const s=qSit(q); if(s.c!=='ok') add(qNome(q).split(' · ')[0]+(s.d<0?' vencido':' vence '+br(q.validade).slice(0,5)),s.c,qNome(q)+' · '+s.t); });
+    const fa=admFaltam(f); if(fa.length) add(plural(fa.length,'doc','docs')+' da admissão','warn','Falta: '+fa.join(', '));
+    if(f.status!=='Desligado'){ const fl=[!okIso(f.nascimento)&&'nascimento',!f.telefone&&'telefone',!f.funcao&&'função',!f.setor&&'setor'].filter(Boolean); if(fl.length) add('Cadastro incompleto','warn','Falta: '+fl.join(', ')); }
+    return o; }
+  const emFeriasF=f=>{ const hj=P.hojeStr(); return f.status==='Férias'||ferDe(f).some(x=>!x.anterior&&x.status!=='cancelada'&&x.inicio<=hj&&x.fim>=hj); };
+  const FCHIPS=[['todos','Todos'],['exp','Em experiência'],['fer','De férias'],['pj','PJ'],['pend','Com pendência']];
+  const fchipOk=(f,k)=>k==='exp'?!!expInfo(f):k==='fer'?emFeriasF(f):k==='pj'?f.tipo==='PJ':k==='pend'?pendF(f).some(p=>p.c==='crit'||p.c==='warn'):true;
+  const casaCurto=iso=>{ if(!okIso(iso)) return '—'; if(iso>P.hojeStr()) return 'entra '+br(iso).slice(0,5); const t=tempoDe(iso); return t.a?plural(t.a,'ano','anos'):t.m?plural(t.m,'mês','meses'):diasEntre(iso,P.hojeStr())+' dias'; };
+  function vFuncLista(xs0){ const F=R.filtro, ch=R.fuchip||'todos', xs=xs0.filter(f=>fchipOk(f,ch));
+    if(!xs.some(f=>f._id===R.fusel)) R.fusel=xs[0]?xs[0]._id:null;
+    const sel=R.func.find(f=>f._id===R.fusel);
+    const chips=`<div class="rh-v2ch" role="group" aria-label="Filtros rápidos">${FCHIPS.map(([k,l])=>`<button data-act="rh-fuchip" data-v="${k}" aria-pressed="${ch===k}">${l} <b>${xs0.filter(f=>fchipOk(f,k)).length}</b></button>`).join('')}</div>`;
+    const linha=f=>{ const pd=pendF(f), s=f._id===R.fusel;
+      return `<button class="rh-v2r${s?' sel':''}" data-act="rh-fusel" data-id="${f._id}" aria-pressed="${s}"><span class="rh-v2p"><span class="rh-v2av">${esc(iniciais(f.nome).toUpperCase())}</span><span class="rh-v2n"><b class="rh-nm2">${esc(f.nome)}</b><small>${esc([f.funcao||'sem função',f.tipo==='PJ'?'PJ · '+empNome(f.empresa):'CLT'].join(' · '))}</small></span></span>
+        <span class="rh-v2c">${esc(f.setor||'—')}</span><span class="rh-v2c num">${esc(casaCurto(f.admissao))}</span>
+        <span class="rh-v2t">${f.status!=='Ativo'?`<span class="pill ${corSt(f.status)}">${esc(f.status)}</span>`:''}${pd.slice(0,2).map(p=>`<span class="pill ${p.c==='info'?'neu':p.c}">${esc(p.t)}</span>`).join('')}${pd.length>2?`<small>+${pd.length-2}</small>`:''}</span></button>`; };
+    return chips+`<div class="rh-v2">
+      <section class="card rh-v2l" aria-label="Lista de funcionários"><div class="rh-fil rh-v2f"><input class="txt" id="rh-q" type="search" placeholder="Buscar nome, CPF, CNPJ ou função" value="${esc(F.q)}">
+        <select class="txt" data-rh-fil="st" aria-label="Situação"><option value="ativos" ${F.st==='ativos'?'selected':''}>Em atividade</option>${ST.map(s=>`<option ${F.st===s?'selected':''}>${s}</option>`).join('')}<option value="todos" ${F.st==='todos'?'selected':''}>Todos</option></select>
+        <select class="txt" data-rh-fil="setor" aria-label="Setor"><option value="">Todos os setores</option>${opts(unicos('setor'),F.setor)}</select>
+        <select class="txt" data-rh-fil="emp" aria-label="Empresa"><option value="">Todas as empresas</option>${unicos('empresa').map(e=>`<option value="${esc(e)}" ${F.emp===e?'selected':''}>${esc(empNome(e))}</option>`).join('')}</select></div>
+        ${!R.lido.func?'<div class="empty">Carregando…</div>':xs.length?`<div class="rh-v2h"><span>PESSOA</span><span>SETOR</span><span>NA CASA</span><span>PENDÊNCIAS</span></div><div class="rh-v2ls">${xs.map(linha).join('')}</div>
+        <div class="sub rh-v2rod">${xs.length} de ${R.func.length} funcionário(s)</div>`:'<div class="empty">Nenhum funcionário com esses filtros.</div>'}</section>
+      <aside class="card rh-v2d" aria-label="Ficha da pessoa">${sel?fichaLado(sel):'<div class="empty">Escolha uma pessoa na lista.</div>'}</aside></div>`; }
+  function fichaLado(f){ const ab=R.fab||'resumo', pd=pendF(f), sf=f.tipo!=='PJ'?sitFer(f):null, e=expInfo(f), pj=f.tipo==='PJ'?pjSit(f):null, fc=R.funcoes.find(x=>norm(x.nome)===norm(f.funcao)), m=fichasMesIni(), fs=fSit(f,m);
+    const dd=(l,v)=>v?`<div><span>${l}</span><b>${v}</b></div>`:'';
+    const ABAS=[['resumo','Resumo'],['ferias',f.tipo==='PJ'?'Troca do PJ':'Férias'],['docs','Documentos'],['epi','EPI'],['hist','Histórico']];
+    let corpo='';
+    if(ab==='resumo'){ corpo=`<div class="rh-v2dl">${dd(docRot(f),esc(docF(f)))}${dd('Admissão',okIso(f.admissao)?br(f.admissao):'')}${dd('Vínculo',f.tipo==='PJ'?'PJ · '+esc(empNome(f.empresa)||''):'CLT · Colafix')}${dd('Setor',esc(f.setor||''))}${dd('Função',esc(f.funcao||''))}${dd('Telefone',esc(f.telefone||''))}${dd('Aniversário',okIso(f.nascimento)?br(f.nascimento).slice(0,5)+' · '+tempoDe(f.nascimento).a+' anos':'')}${dd('Salário',f.salario!==''&&f.salario!=null?esc(brl(f.salario)):'')}${dd('Jornada',esc(f.jornada||''))}${dd('Férias',sf?esc(sf.t):'')}</div>
+        ${e?`<div class="rh-v2ex"><div><b>Experiência 45 + 45</b><span class="pill ${e.c}">${esc(e.t)}</span></div><div class="rh-v2bar"><i style="width:${Math.max(2,Math.min(100,diasEntre(f.admissao,P.hojeStr())/90*100)).toFixed(0)}%"></i><em></em></div><div class="rh-v2bl"><span>1ª etapa até ${br(e.f1)}</span><span>2ª até ${br(e.f2)}</span></div>
+          <div class="rh-pfb">${e.etapa===1?`<button class="btn sec rh-sm" data-act="rh-expprorr" data-id="${f._id}">Prorrogar</button>`:''}<button class="btn sec rh-sm" data-act="rh-expefet" data-id="${f._id}">Efetivar</button></div></div>`:''}
+        ${f.status==='Desligado'||f.desligAgendado?`<div class="rh-v2ds">${f.status==='Desligado'?'Desligado em <b>'+br(f.desligamento)+'</b>':'Sai em <b>'+br(f.desligamento)+'</b>'}${f.desligMotivo?' · '+esc(f.desligMotivo):''} ${deslForm(f)}</div>`:''}
+        ${f.obs?`<div class="sub" style="margin:12px 0 0;font-size:13.5px">${esc(f.obs)}</div>`:''}`; }
+    else if(ab==='ferias'){ if(sf){ const p=sf.p, us=p?30-p.saldo:0, fx=ferDe(f).filter(x=>!x.anterior&&x.status!=='cancelada').sort((a,b)=>String(b.inicio).localeCompare(String(a.inicio))).slice(0,5);
+        corpo=`<div class="rh-v2al" style="margin-bottom:12px"><div class="${sf.c==='crit'?'crit':sf.c==='warn'?'warn':'info'}"><b>${esc(sf.t)}</b></div></div><div class="rh-v2k"><div><span>Saldo</span><b>${p?plural(p.saldo,'dia','dias'):'—'}</b></div><div><span>Dar até</span><b>${p&&p.completo?br(p.lim):'em aquisição'}</b></div><div><span>Período</span><b>${p?br(p.ini).slice(0,5)+'/'+p.ini.slice(2,4)+' a '+br(p.fim).slice(0,5)+'/'+p.fim.slice(2,4):'—'}</b></div></div>
+          ${p?`<div class="rh-bt" style="margin:14px 0 6px" title="${us} de 30 dias"><i style="width:${(us/30*100).toFixed(1)}%"></i></div><div class="sub" style="margin:0;font-size:13px">${us} de 30 dias usados neste período</div>`:''}
+          ${fx.length?`<div class="rh-v2li">${fx.map(x=>`<div><span>${br(x.inicio)} a ${br(x.fim)} · ${plural(+x.dias,'dia','dias')}</span><small>${x.inicio>P.hojeStr()?'marcadas':x.fim>=P.hojeStr()?'de férias agora':'tiradas'}${temAviso(x)?' · aviso gerado':''}</small></div>`).join('')}</div>`:''}
+          <div class="rh-pfb" style="margin-top:14px">${p&&f.status!=='Desligado'?`<button class="btn" data-act="rh-fernova" data-id="${f._id}" data-go-fer="1">Marcar férias</button>`:''}${okIso(f.admissao)?`<button class="btn sec" data-act="rh-fajabrir" data-id="${f._id}" data-go-fer="1">Já tirou antes / ajustar</button>`:''}</div>`; }
+      else if(pj) corpo=`<div class="rh-v2al" style="margin-bottom:12px"><div class="${pj.c==='crit'?'crit':pj.c==='warn'?'warn':'info'}"><b>${esc(pj.t)}</b></div></div><div class="rh-v2k"><div><span>Intervalo</span><b>${plural(+f.pjMeses||3,'mês','meses')}</b></div><div><span>Próxima troca</span><b>${pj.prox?br(pj.prox):'—'}</b></div><div><span>Última</span><b>${okIso(f.ultimaTroca)?br(f.ultimaTroca):'—'}</b></div></div><div class="rh-pfb" style="margin-top:14px"><button class="btn sec" data-act="rh-pzabrir" data-v="pj">Abrir a troca dos PJ</button></div>`; }
+    else if(ab==='docs') corpo=docsDaPessoa(f._id).replace('class="rh-docs"','class="rh-docs" style="margin:0;padding:0;border:0"');
+    else if(ab==='epi') corpo=`<div class="rh-ch" style="margin-bottom:8px"><span class="label">EPIS DA FUNÇÃO ${esc((f.funcao||'').toUpperCase())}</span><span class="pill ${fs.c}">${esc(fs.t)}</span></div>
+      ${fc&&((fc.epis||[]).length||(fc.uniformes||[]).length)?`<div class="rh-pfl">${(fc.epis||[]).map(x=>`<div><span>${esc(x.nome)}</span><small>${x.ca?'CA '+esc(x.ca):''}</small></div>`).join('')}${(fc.uniformes||[]).map(x=>`<div><span>${esc(x.nome)}</span><small>uniforme</small></div>`).join('')}</div>`:fc&&fc.naoUsaEpi?'<div class="sub" style="margin:0">Esta função não usa EPI.</div>':`<div class="sub" style="margin:0">${f.funcao?'A função "'+esc(f.funcao)+'" ainda não tem EPIs cadastrados.':'Sem função no cadastro.'}</div>`}
+      <div class="sub" style="margin:12px 0 0;font-size:13.5px">Ficha de ${esc(mesNome(m))}: <b>${esc(fs.t)}</b> · <button class="lnk" data-act="rh-fabrir">abrir as fichas do mês</button></div>`;
+    else { const ev=historia(f), cor={teal:'var(--teal)',ok:'var(--ok)',purple:'#5B3FA6',crit:'var(--crit)',ink:'var(--teal-strong)'};
+      corpo=(ev.length?`<div class="rh-tl">${ev.slice(0,12).map((x,i)=>`<div class="rh-tli"><b class="num">${br(x.d)}</b><span class="rh-tld"><i style="background:${cor[x.c]||cor.teal}"></i>${i<Math.min(ev.length,12)-1?'<em></em>':''}</span><div><b>${esc(x.t)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</div></div>`).join('')}</div>`:'<div class="empty">Ainda nada registrado.</div>')
+        +`<div class="rh-v2sub">${cartaoOc(f)}${cartaoEmp(f)}</div>`; }
+    return `<div class="rh-v2top"><span class="rh-v2av g">${esc(iniciais(f.nome).toUpperCase())}</span><div class="rh-v2tn"><b>${esc(titulo(f.nome))}</b><span>${esc([f.funcao,f.setor].filter(Boolean).join(' · ')||'sem função')}</span><span>${f.tipo==='PJ'?'PJ · '+esc(empNome(f.empresa)||''):'CLT'} · ${okIso(f.admissao)?esc(tempoTxt(f.admissao))+' de casa':'sem admissão'}${f.status!=='Ativo'?` · <span class="pill ${corSt(f.status)}">${esc(f.status)}</span>`:''}</span></div></div>
+      <div class="rh-v2bt"><button class="btn sec rh-sm" data-act="rh-dgpara" data-id="${f._id}">Documento</button>${f.tipo!=='PJ'&&f.status!=='Desligado'?`<button class="btn sec rh-sm" data-act="rh-fernova" data-id="${f._id}" data-go-fer="1">Férias</button>`:''}<button class="btn sec rh-sm" data-act="rh-v2oc" data-id="${f._id}">Ocorrência</button><button class="btn sec rh-sm" data-act="rh-ed" data-id="${f._id}">Editar</button>${okIso(f.nascimento)?`<button class="btn sec rh-sm" data-act="rh-cartao" data-id="${f._id}" title="Cartão de aniversário">Cartão</button>`:''}<button class="btn rh-sm" data-act="rh-pess" data-id="${f._id}">Perfil completo</button></div>
+      <div class="rh-v2tabs" role="tablist" aria-label="Partes da ficha">${ABAS.map(([k,l])=>`<button role="tab" data-act="rh-fab" data-v="${k}" aria-selected="${ab===k}">${l}</button>`).join('')}</div>
+      ${pd.length&&ab==='resumo'?`<div class="rh-v2al">${pd.map(p=>`<div class="${p.c}"><b>${esc(p.t)}</b><span>${esc(p.d)}</span></div>`).join('')}</div>`:''}
+      <div class="rh-v2bd">${corpo}</div>`; }
+  function dgFiltra(){ const i=document.getElementById('rh-dgq'); if(!i) return; const q=norm(i.value).split(/\s+/).filter(Boolean), qd=dig(i.value);
+    document.querySelectorAll('#rh-dgpl [data-dgb]').forEach(b=>{ const t=b.dataset.dgb; b.hidden=!(q.every(w=>t.includes(w))||(qd.length>=3&&t.includes(qd))); }); }
+  try{ new MutationObserver(()=>{ if(document.getElementById('rh-dgq')&&R.dgq) dgFiltra(); const s=document.querySelector('#rh-dgpl .sel'); if(s&&!s._vis){ s._vis=1; const l=s.parentElement; if(l&&s.offsetTop>l.clientHeight) l.scrollTop=s.offsetTop-40; } }).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+  /* estilos do RH revisado (lista + detalhe ao lado) */
+  try{ document.head.insertAdjacentHTML('beforeend',`<style id="rh-v2-css">
+  .rh-v2ch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+  .rh-v2ch button,.rh-v2tabs button{font:inherit;cursor:pointer}
+  .rh-v2ch button{font-size:14px;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+  .rh-v2ch button b{font-weight:600;margin-left:4px;color:var(--muted)}
+  .rh-v2ch button[aria-pressed="true"]{background:var(--teal-strong);border-color:var(--teal-strong);color:#fff}.rh-v2ch button[aria-pressed="true"] b{color:#fff}
+  .rh-v2{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(380px,1fr);gap:16px;align-items:start}
+  .rh-v2>.card{margin:0}.card.rh-v2l{padding:0;overflow:hidden}
+  .rh-fil.rh-v2f{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px;margin:0;border-bottom:1px solid var(--line)}.rh-v2f #rh-q{flex:1 1 220px;min-width:0}.rh-v2f select{flex:0 1 auto;width:auto}
+  .rh-v2h,.rh-v2r{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1.5fr);gap:12px;align-items:center;padding:0 16px}
+  .rh-v2h{min-height:36px;font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line);background:var(--sunken)}
+  .rh-v2ls{max-height:calc(100vh - 290px);overflow:auto}
+  .rh-v2r{width:100%;min-height:60px;padding-top:8px;padding-bottom:8px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+  .rh-v2r:hover{background:var(--teal-wash)}.rh-v2r.sel{background:var(--teal-wash);box-shadow:inset 3px 0 0 var(--teal-strong)}
+  .rh-v2p{display:flex;align-items:center;gap:12px;min-width:0}
+  .rh-v2av{width:38px;height:38px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;background:var(--teal-tint);color:var(--teal-strong)}
+  .rh-v2r.sel .rh-v2av,.rh-v2av.g{background:var(--teal-strong);color:#fff}
+  .rh-v2n{display:flex;flex-direction:column;min-width:0}.rh-v2n b{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rh-v2n small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rh-v2c{font-size:13.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rh-v2t{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.rh-v2t .pill{font-size:11.5px;white-space:nowrap}.rh-v2t small{font-size:12px;color:var(--muted)}
+  .rh-v2rod{margin:0;padding:10px 16px}
+  .rh-v2d{position:sticky;top:12px;padding:20px 22px;max-height:calc(100vh - 24px);overflow:auto}
+  .rh-v2top{display:flex;gap:14px;align-items:center}.rh-v2top .rh-v2av{width:56px;height:56px;font-size:19px}
+  .rh-v2tn{display:flex;flex-direction:column;gap:1px;min-width:0}.rh-v2tn b{font-size:21px;font-weight:600}.rh-v2tn span{font-size:13.5px;color:var(--muted)}
+  .rh-v2bt{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}.rh-v2bt .btn{min-height:40px;height:40px;padding:0 14px;font-size:14px}
+  .rh-v2tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:8px 0 14px;overflow-x:auto}
+  .rh-v2tabs button{min-height:44px;padding:0 12px;border:0;background:none;color:var(--muted);font-size:14px;white-space:nowrap}
+  .rh-v2tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;box-shadow:inset 0 -3px 0 #E3312D}
+  .rh-v2al{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}.rh-v2al div{display:flex;flex-direction:column;gap:1px;padding:9px 12px;border-radius:10px;font-size:13px}
+  .rh-v2al .crit{background:var(--crit-tint);color:var(--crit-ink)}.rh-v2al .warn{background:var(--warn-tint);color:var(--warn-ink)}.rh-v2al .info{background:var(--teal-tint);color:var(--teal-strong)}.rh-v2al b{font-size:13.5px}
+  .rh-v2dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}.rh-v2dl div{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .rh-v2dl>div>span,.rh-v2k>div>span{font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}.rh-v2dl b{font-weight:500;font-size:14.5px;overflow-wrap:anywhere}
+  .rh-v2ex{margin-top:16px;padding:14px;border-radius:12px;background:var(--sunken);display:flex;flex-direction:column;gap:8px}.rh-v2ex>div:first-child{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+  .rh-v2bar{position:relative;height:10px;border-radius:5px;background:var(--line)}.rh-v2bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--teal)}.rh-v2bar em{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--muted)}
+  .rh-v2bl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+  .rh-v2ds{margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--crit-tint);color:var(--crit-ink);font-size:13.5px}
+  .rh-v2k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.rh-v2k div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:var(--sunken)}.rh-v2k b{font-weight:600;font-size:15px}
+  .rh-v2li{display:flex;flex-direction:column;margin-top:14px}.rh-v2li div{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}.rh-v2li small{color:var(--muted)}
+  .rh-v2sub .card{margin:14px 0 0;box-shadow:none;border:1px solid var(--line)}
+  .rh-v2kps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 16px}
+  .rh-v2kp{background:var(--surface);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+  .rh-v2kp>b{font-size:32px;font-weight:600;min-width:40px}.rh-v2kp>b.crit{color:var(--crit-ink)}.rh-v2kp>b.warn{color:var(--warn-ink)}.rh-v2kp>b.ok{color:var(--ok-ink)}
+  .rh-v2kp span{display:flex;flex-direction:column;min-width:0}.rh-v2kp span b{font-size:14px;font-weight:600}.rh-v2kp small{font-size:13px;color:var(--muted)}
+  .rh-v2side{display:flex;flex-direction:column;gap:16px;position:sticky;top:12px;min-width:0}.rh-v2side>.card{margin:0}
+  .rh-v2fbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .rh-v2fleg{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12.5px;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line)}.rh-v2fleg span{display:flex;align-items:center;gap:6px}
+  .rh-v2fleg i{display:inline-block;width:16px;height:8px;border-radius:3px}.rh-v2fleg i.a,.rh-v2fb i.a{background:var(--line)}.rh-v2fleg i.c,.rh-v2fb i.c{background:var(--teal-tint)}.rh-v2fleg i.h{width:3px;height:12px;background:#C7832A}
+  .rh-v2ft{margin:0;table-layout:fixed;width:100%}.rh-v2ft td:nth-child(1){width:30%}.rh-v2ft td:nth-child(3){width:26%}.rh-v2ft td:nth-child(4){width:112px;text-align:right;padding-right:16px}.rh-v2fer{grid-template-columns:minmax(0,1.7fr) minmax(360px,1fr)}.rh-v2ft .pill{white-space:normal}.rh-v2fl{display:flex;gap:12px;margin-top:4px}.rh-v2fl .lnk{font-size:13px}.rh-v2ft td{padding-top:10px;padding-bottom:10px;vertical-align:middle}.rh-v2ft tr.sel td{background:var(--teal-wash)}.rh-v2ft tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--teal-strong)}
+  .rh-v2fn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;background:none;padding:0;font:inherit;color:var(--ink);cursor:pointer;text-align:left}.rh-v2fn b{font-weight:600}.rh-v2fn small{font-size:12.5px;color:var(--muted)}.rh-v2fn:hover b{text-decoration:underline}
+  .rh-v2fp{min-width:220px}.rh-v2fp small{display:block;font-size:12px;color:var(--muted);margin-top:5px}
+  .rh-v2fb{position:relative;display:block;height:10px;border-radius:5px;background:var(--sunken);overflow:hidden}.rh-v2fb i{position:absolute;top:0;bottom:0}.rh-v2fb i.c.v{background:var(--crit-tint)}.rh-v2fb i.h{width:3px;background:#C7832A;top:-1px;bottom:-1px}
+  .rh-v2fant{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--warn-tint);color:var(--warn-ink);font-size:13.5px}
+  .rh-v2fm h2{margin:0 0 6px;font-size:16px}.rh-v2fmi{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}.rh-v2fmi b{display:block;font-weight:600;font-size:14px}.rh-v2fmi small{color:var(--muted);font-size:12.5px}.rh-v2fmi>span{display:flex;gap:8px;align-items:center;flex:none}
+  .rh-v2side .rh-form .rh-g{grid-template-columns:minmax(0,1fr)}
+  .rh-v2pr{display:flex;flex-direction:column;gap:8px;padding:14px 18px;margin:0 0 14px}.rh-v2pr>div:first-child{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}.rh-v2pr b{font-size:20px;font-weight:600}.rh-v2pr small{color:var(--muted);font-size:13px}
+  .rh-v2pb{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden;background:var(--sunken)}.rh-v2pb i{display:block;height:100%}
+  .rh-v2pl{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}.rh-v2pl span{display:flex;align-items:center;gap:6px}.rh-v2pl i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .rh-v2fic .rh-tf{margin:0;table-layout:fixed;width:100%}.rh-v2fic .rh-tf td:last-child{text-align:right;white-space:normal}.rh-v2fic .rh-tf .pill{white-space:normal}.rh-v2gh{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:10px 0 0;background:var(--sunken);border-radius:10px}.rh-v2gh:first-child{margin-top:0}.rh-v2gh i{width:12px;height:12px;border-radius:50%;flex:none}.rh-v2gh b{flex:1;font-size:14.5px;font-weight:600}
+  .rh-v2doc{display:grid;grid-template-columns:minmax(220px,270px) minmax(240px,300px) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}.rh-v2doc>.card{margin:0}
+  .rh-v2dc{display:flex;flex-direction:column;min-width:0;padding:16px}.rh-v2dc>.txt{margin:0 0 8px}
+  .rh-v2dt{display:flex;align-items:center;gap:10px;margin:0 0 12px}.rh-v2dt span{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:var(--teal-strong);color:#fff;font-size:14px;font-weight:600}.rh-v2dt h2{margin:0;font-size:17px;flex:1}.rh-v2dt em{font-style:normal}
+  .rh-v2dl2{display:flex;flex-direction:column;max-height:calc(100vh - 300px);overflow:auto;margin:0 -16px;border-top:1px solid var(--line)}
+  .rh-v2dp{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;min-height:52px;justify-content:center;padding:6px 16px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer}.rh-v2dp[hidden]{display:none}
+  .rh-v2dp b{font-weight:600;font-size:14px}.rh-v2dp small{font-size:12.5px;color:var(--muted)}.rh-v2dp:hover{background:var(--teal-wash)}.rh-v2dp.sel{background:var(--teal-wash);box-shadow:inset 3px 0 0 var(--teal-strong)}
+  .rh-v2dg{font-size:11.5px;font-weight:600;letter-spacing:.08em;color:var(--muted);padding:12px 16px 4px}
+  .rh-v2dm{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:2px 10px;min-height:50px;padding:6px 12px;border-radius:10px;border:1px solid transparent;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+  .rh-v2dm span{display:flex;flex-direction:column;min-width:0}.rh-v2dm b{font-weight:600;font-size:14px}.rh-v2dm small{font-size:12.5px;color:var(--muted)}.rh-v2dm i{font-style:normal;color:var(--muted);font-size:18px}.rh-v2dm:hover{background:var(--teal-wash)}.rh-v2dm.sel{border:2px solid var(--teal-strong);background:var(--teal-wash)}
+  .rh-v2d3 .rh-pageg{margin:12px 0;max-height:70vh;overflow:auto;box-shadow:0 2px 10px rgba(20,63,84,.08)}
+  .rh-v2rec h2{margin:0 0 6px;font-size:16px}.rh-v2d3 .rh-dbt{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px}.rh-v2d3 .rh-dbt .btn{flex:1 1 140px;width:auto;margin:0;height:auto;min-height:44px}
+  @media (max-width:1280px){ .rh-v2doc{grid-template-columns:minmax(220px,260px) minmax(0,1fr)} .rh-v2d3{grid-column:1/-1} }
+  @media (max-width:760px){ .rh-v2doc{grid-template-columns:minmax(0,1fr)} .rh-v2dl2{max-height:280px} }
+  .rh-v2pc .rh-v2pf{display:flex;flex-direction:column;gap:2px;padding:10px 12px;margin:8px 0 0;border-radius:10px;background:var(--crit-tint);color:var(--crit-ink)}.rh-v2pf b{font-size:14px;font-weight:600}.rh-v2pf small{font-size:12.5px}.rh-v2pf>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.rh-v2pf .btn{background:var(--surface);flex:0 0 auto;width:auto;min-height:36px;height:36px;padding:0 12px;font-size:13.5px}
+  @media (max-width:1180px){ .rh-v2side{position:static} .rh-v2kps{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:1180px){ .rh-v2{grid-template-columns:minmax(0,1fr)} .rh-v2d{position:static;max-height:none} .rh-v2ls{max-height:none} }
+  @media (max-width:700px){ .rh-v2h{display:none} .rh-v2r{grid-template-columns:minmax(0,1fr) auto} .rh-v2r .rh-v2c{display:none} .rh-v2t{grid-column:1/-1;padding-left:50px} .rh-v2d{display:none} }
+  </style>`); }catch(e){}
+  /* ---------- Pessoas na empresa (RH revisado, opção 1): a mesma tela do gestor, com as ações do RH ao lado ---------- */
+  const presFunc=n=>{ const k=norm(n); return R.func.find(f=>norm(f.nome)===k)||R.func.find(f=>{ const a=norm(f.nome).split(' '), b=k.split(' '); return a[0]===b[0]&&a[a.length-1]===b[b.length-1]; })||null; };
+  function vPresRH(){ if(!P.presenca) return '<section class="card"><div class="empty">Carregando…</div></section>';
+    return P.presenca.render({lado:(D,Rs)=>{ const hoje=D.dia===P.hojeStr(), fal=(D.f||[]).filter(x=>x.m!=='Férias'), atr=(D.p||[]).filter(x=>{ const m=String(x.c||'').match(/(\d+):(\d+)/), l=String(D.lim||'08:00').match(/(\d+):(\d+)/); return m&&l&&(+m[1]*60+ +m[2])>(+l[1]*60+ +l[2]); });
+      const card=x=>{ const f=presFunc(x.n), tel=f&&dig(f.telefone); const nOc=f?ocDe(f._id).filter(o=>String(o.data||'').slice(0,4)===D.dia.slice(0,4)).length:0;
+        return `<div class="rh-v2pf"><b>${esc(titulo(x.n))}${x.s?' · '+esc(x.s):''}</b><small>sem passagem no Face ID ${hoje?'hoje':'em '+br(D.dia).slice(0,5)}${nOc?' · '+plural(nOc,'ocorrência','ocorrências')+' no ano':''}${f?'':' · sem cadastro no RH'}</small>
+          <div>${f?`<button class="btn sec rh-sm" data-act="rh-pess" data-id="${f._id}">Ver perfil</button><button class="btn sec rh-sm" data-act="rh-presoc" data-id="${f._id}">Ocorrência</button>`:''}${tel&&tel.length>=10?`<a class="btn sec rh-sm" target="_blank" rel="noopener" href="https://wa.me/55${tel.replace(/^55/,'')}?text=${encodeURIComponent('Olá, '+titulo(x.n).split(' ')[0]+'! Aqui é do RH da Colafix. Não vimos sua passagem no Face ID '+(hoje?'hoje':'em '+br(D.dia).slice(0,5))+'. Está tudo bem?')}">WhatsApp</a>`:''}</div></div>`; };
+      return `<section class="card rh-v2pc"><h2 class="gxn-h2">Faltou sem registro${fal.length?' · '+fal.length:''}</h2>${fal.length?fal.slice(0,8).map(card).join('')+(fal.length>8?`<div class="sub" style="margin:6px 0 0">e mais ${fal.length-8} na lista "Não vieram".</div>`:''):'<div class="sub" style="margin:0">Ninguém faltou sem registro.</div>'}
+        ${atr.length?`<div class="sub" style="margin:10px 0 0;font-size:13px">${plural(atr.length,'pessoa chegou','pessoas chegaram')} depois das ${esc(D.lim||'08:00')}.</div>`:''}</section>`; }}); }
   /* ---------- registro do módulo ---------- */
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:()=>{ const h=vInicio(), i=h.indexOf('Próximos 7 dias'); if(i<0) return h+avCardRH();
       /* fim do bloco dos 7 dias (conta seções abertas dentro dele) → os avisos entram logo depois, na largura toda */
       let k=h.lastIndexOf('<section',i), d=0, j=k; const re=/<\/?section\b/g; re.lastIndex=k; let m; while((m=re.exec(h))){ if(m[0]==='<section') d++; else { d--; if(d===0){ j=h.indexOf('>',m.index)+1; break; } } }
-      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
+      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhpres:{nome:'Pessoas na empresa',mob:'Pessoas',render:vPresRH}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
     rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'}, rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros} };
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r()+modalConv()+modalFicha()+(window.RHCartao?RHCartao.modal({P,R,esc,baixar}):''); }; });
   /* tela Almoço (modulos/rh-almoco.js): controle do almoço pelo Face ID */
@@ -1689,7 +1861,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   P.registrarPerfil('rh',{ nome:'RH (funcionários, fichas, documentos, terceirizados)', mods:['rh'], soVer:true, pos:2, desc:'Só o módulo RH: funcionários, fichas de EPI e uniforme do mês, documentos e contratos, funções e EPIs e terceirizados. Não vê nem muda nada da fábrica.' });
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
   function navSolo(){ const ms=P.modsVis?P.modsVis():[], solo=ms.length===1&&ms[0]==='rh'&&!!TELAS[P.S.view]; document.body.classList.toggle('rh-solo',solo); if(!solo) return;
-    const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhfichas:'folha',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhfuncoes:'ajuste'};
+    const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhpres:'fabrica',rhfichas:'folha',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhfuncoes:'ajuste'};
     const h=Object.keys(TELAS).filter(v=>P.viewOk(v)&&TELAS[v].menu!==false).map(v=>`<button class="navbtn" data-go="${v}" ${P.S.view===v?'aria-current="page"':''}>${NIC[v]?P.ic(NIC[v],18):''}${esc(TELAS[v].nome)}</button>`).join('');
     if(nl.dataset.rh!==h){ nl.dataset.rh=h; nl.innerHTML=h; } const lb=nl.previousElementSibling; if(lb&&lb.classList.contains('modulo')) lb.textContent='RH'; }
   { const nl=document.getElementById('navlist'); if(nl&&window.MutationObserver) new MutationObserver(()=>{ if(document.body.classList.contains('rh-solo')&&!nl.querySelector('[data-go^="rh"]')){ nl.dataset.rh=''; navSolo(); } }).observe(nl,{childList:true}); }
@@ -1706,6 +1878,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     if(t.id==='rh-q'){ const v=t.value; busca('rh-q',()=>{ R.filtro.q=v; }); }
     if(t.id==='rh-fq'){ const v=t.value; busca('rh-fq',()=>{ R.ffil.q=v; R.ffil.n=60; }); }
     if(t.id==='rh-bus'){ const v=t.value; busca('rh-bus',()=>{ R.buscaIni=v; }); }
+    if(t.id==='rh-dgq'){ R.dgq=t.value; dgFiltra(); }
     if(t.id==='rh-ed'||t.id==='rh-dnome') edSync();
     if(t.id==='rh-dnome'&&R.dm&&!R.dm.deslUser){ const dd=document.getElementById('rh-ddesl'); if(dd) dd.checked=modeloDesliga(R.dm); }
     if(t.dataset&&t.dataset.rhDq!=null){ const md=R.modelos.find(x=>x._id===R.dg.modeloId), q=md&&perguntasDe(md.html)[+t.dataset.rhDq]; if(q!=null) R.dg.resp[q]=t.value; clearTimeout(R._dx); R._dx=setTimeout(()=>{ const a=document.activeElement, k=a&&a.dataset&&a.dataset.rhDq, pos=a&&a.selectionStart; P.render(); if(k!=null){ const n2=document.querySelector('[data-rh-dq="'+k+'"]'); if(n2){ n2.focus(); try{ n2.setSelectionRange(pos,pos); }catch(e){} } } },400); }
@@ -1980,6 +2153,13 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       if(a==='rh-relxls'){ await relExcel(R.relMes); return; }
       /* ficha da pessoa */
       if(a==='rh-pess'){ R.pess=b.dataset.id; R.f=null; R.adm=null; R.buscaIni=''; P.go('rhfunc'); window.scrollTo(0,0); return; }
+      if(a==='rh-presoc'){ R.fview='lista'; R.pess=null; R.fusel=b.dataset.id; R.fab='hist'; R.foc={funcId:b.dataset.id,data:P.hojeStr(),tipo:'Advertência verbal'}; P.go('rhfunc'); setTimeout(()=>{ const n=document.getElementById('rh-ocm'); if(n){ n.scrollIntoView({block:'center'}); n.focus(); } },150); return; }
+      if(a==='rh-dgpick'){ R.dg.funcId=b.dataset.id; R.dg.extra={}; R.dg.feriasId=''; R.dg.reg=null; R.dg.over={}; R.dg.edHtml=null; R.dg.edOn=false; P.render(); return; }
+      if(a==='rh-dgmod'){ R.dg.modeloId=b.dataset.id; R.dg.reg=null; R.dg.over={}; R.dg.edHtml=null; R.dg.edOn=false; P.render(); return; }
+      if(a==='rh-fusel'){ if(window.innerWidth<900){ R.pess=b.dataset.id; R.f=null; P.render(); window.scrollTo(0,0); return; } R.fusel=b.dataset.id; R.fab='resumo'; P.render(); return; }
+      if(a==='rh-fuchip'){ R.fuchip=b.dataset.v; P.render(); return; }
+      if(a==='rh-fab'){ R.fab=b.dataset.v; P.render(); return; }
+      if(a==='rh-v2oc'){ R.fusel=b.dataset.id; R.fab='hist'; R.foc={funcId:b.dataset.id,data:P.hojeStr(),tipo:'Advertência verbal'}; P.render(); setTimeout(()=>{ const n=document.getElementById('rh-ocm'); if(n){ n.scrollIntoView({block:'center'}); n.focus(); } },60); return; }
       if(a==='rh-pessx'){ R.pess=null; P.render(); return; }
       /* admissão */
       if(a==='rh-admnova'){ R.f={status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr()}; R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); return; }
@@ -2017,7 +2197,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       if(a==='rh-pzabrir'){ R.pzv=b.dataset.v||'ferias'; P.go('rhferias'); return; }
       if(a==='rh-pzv'){ R.pzv=b.dataset.v; P.render(); return; }
       if(a==='rh-pzfil'){ R.pzfil=b.dataset.v; P.render(); return; }
-      if(a==='rh-fernova'){ R.ffer={funcId:b.dataset.id,inicio:'',dias:''}; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-fernova'){ R.ffer={funcId:b.dataset.id,inicio:'',dias:''}; R.fajs=null; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); window.scrollTo(0,0); setTimeout(()=>{ const fm=document.querySelector('.rh-v2side .rh-form'); if(fm&&window.innerWidth<=1180) fm.scrollIntoView({block:'start'}); },60); return; }
       if(a==='rh-fajabrir'){ R.fajs={funcId:b.dataset.id,v:{}}; R.ffer=null; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); setTimeout(()=>{ const el=document.getElementById('rh-fajs'); if(el) el.scrollIntoView({block:'start'}); },60); return; }
       if(a==='rh-fajx'){ R.fajs=null; P.render(); return; }
       if(a==='rh-fajtudo'){ if(R.fajs) R.fajs.v[b.dataset.p]=b.dataset.v; P.render(); return; }

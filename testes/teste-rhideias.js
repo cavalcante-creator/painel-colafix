@@ -17,7 +17,7 @@ const anos=(a,n)=>{ const d=new Date(); d.setHours(12,0,0,0); d.setFullYear(d.ge
   const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept());
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2800);
   const view=()=>p.evaluate(()=>document.getElementById('view').innerText);
-  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('.rh-nm:has-text("ANA SOUZA")'); await H.dorme(400); const pf=await view();
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-fusel"]:has-text("ANA SOUZA")'); await H.dorme(250); await p.click('.rh-v2d [data-act="rh-pess"]'); await H.dorme(400); const pf=await view();
   ok('Perfil: tempo de casa em destaque, história (admissão e férias), férias, EPI e documentos', /3 anos\s*de casa/.test(pf)&&/A HISTÓRIA NA COLAFIX[\s\S]*Férias marcadas · 15 dias[\s\S]*Admissão/.test(pf)&&/Férias/.test(pf)&&/EPI e uniforme/.test(pf)&&/DOCUMENTOS/.test(pf), pf.replace(/\n/g,' | ').slice(0,260));
   await p.click('[data-act="rh-pessx"]'); await H.dorme(200); await p.click('[data-act="rh-fview"][data-v="adm"]'); await H.dorme(300); const qa=await view();
   ok('Quadro de admissões: Carla em Documentos, Edu nos efetivados', /Documentos\s*1[\s\S]*Carla Nova[\s\S]*1 de 9/.test(qa)&&/Efetivados \(30 dias\)\s*1[\s\S]*Edu Efetivo/.test(qa), qa.replace(/\n/g,' | ').slice(0,260));

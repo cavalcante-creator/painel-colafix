@@ -7,16 +7,17 @@ const hoje=new Date().toISOString().slice(0,10), mais=n=>{ const d=new Date(); d
  const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(1200);
  await p.evaluate(()=>{ const s=[...document.querySelectorAll('select')].find(x=>[...x.options].some(o=>o.value==='Desligado')); if(s){ s.value='Desligado'; s.dispatchEvent(new Event('change',{bubbles:true})); } }); await H.dorme(800);
+ await p.click('[data-act="rh-fusel"][data-id="r1"]'); await H.dorme(400);
  ok('Na lista, quem foi marcado como desligado tem "Ainda não foi desligado?"', await p.evaluate(()=>!!document.querySelector('[data-act="rh-desfaz"][data-id="r1"]')));
  await p.click('[data-act="rh-desfaz"][data-id="r1"]'); await H.dorme(400); await p.fill('#rh-dsdata',mais(3)); await p.click('[data-act="rh-desagenda"][data-id="r1"]'); await H.dorme(1200);
  const ag=await p.evaluate(()=>{ const x=window.__rhFunc?null:null; return null; });
  const st=await p.evaluate(()=>{ const t=document.getElementById('view').innerText; return t; });
  await p.evaluate(()=>{ const s=[...document.querySelectorAll('select')].find(x=>[...x.options].some(o=>o.value==='Desligado')); if(s){ s.value='todos'; s.dispatchEvent(new Event('change',{bubbles:true})); } }); await H.dorme(800);
-  const linha=await p.evaluate(()=>{ const tr=[...document.querySelectorAll('#view tr')].find(r=>/RICHARD/.test(r.innerText)); return tr?tr.innerText.replace(/\n/g,' | '):''; });
- ok('"Agendar" deixa ativo e mostra "sai em" com a data escolhida', /Ativo|atividade/.test(linha)&&linha.includes('sai em '+mais(3).split('-').reverse().join('/')), linha);
+  const linha=await p.evaluate(()=>{ const d=document.querySelector('.rh-v2d'); return d&&/RICHARD/i.test(d.innerText)?d.innerText.replace(/\n/g,' | '):''; });
+ ok('"Agendar" deixa ativo e mostra "sai em" com a data escolhida', !/Desligado em/.test(linha)&&linha.includes('Sai em '+mais(3).split('-').reverse().join('/')), linha);
  p.once('dialog',dl=>dl.accept()); await p.click('[data-act="rh-desfaz"][data-id="r1"]'); await H.dorme(300); await p.click('[data-act="rh-descancela"][data-id="r1"]'); await H.dorme(1200);
- const l2=await p.evaluate(()=>{ const tr=[...document.querySelectorAll('#view tr')].find(r=>/RICHARD/.test(r.innerText)); return tr?tr.innerText.replace(/\n/g,' | '):''; });
- ok('"Cancelar desligamento" volta a ativo sem data de saída', /Ativo/.test(l2)&&!/sai em/.test(l2), l2);
+ const l2=await p.evaluate(()=>{ const d=document.querySelector('.rh-v2d'); return d&&/RICHARD/i.test(d.innerText)?d.innerText.replace(/\n/g,' | '):''; });
+ ok('"Cancelar desligamento" volta a ativo sem data de saída', /RICHARD/i.test(l2)&&!/Sai em|Desligado/.test(l2), l2);
  // modelos: ajustar campos automaticamente
  await p.evaluate(()=>__T.go('rhdocs')); await H.dorme(1000);
  await p.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>/^Modelos/.test(x.innerText.trim())); if(b) b.click(); }); await H.dorme(700);

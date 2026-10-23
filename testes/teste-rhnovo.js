@@ -27,7 +27,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
 
   // ---- Início
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
-  ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
+  ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
   ok('Início: 9 no quadro (8 CLT, 1 PJ), 1 de férias, 1 afastado, 2 contratos de terceirizados (sem contar desligado e encerrado)', /9\s*no quadro\s*8 CLT · 1 PJ/.test(v0)&&/1\s*de férias agora/.test(v0)&&/1\s*afastado/.test(v0)&&/2 contratos ativos/.test(v0), v0.replace(/\n/g,' ').slice(0,200));
   ok('Início em painel: pessoas por setor, vínculo, tempo de casa e próximos 30 dias; sem as fichas', /Por setor/.test(v0)&&/Quadro/.test(v0)&&/Tempo de casa/.test(v0)&&/Próximos 7 dias/.test(v0)&&/Precisa de você/.test(v0)&&!/assinadas e anexadas/.test(v0), v0.replace(/\n/g,' ').slice(0,300));
   ok('Avisos: contrato vencido, contrato vencendo e função sem EPI (com quantas pessoas)', /Contrato: LIMPA TUDO LTDA\s*venceu há (1 dia|2 dias)/.test(v0)&&/Contrato: SEGURA VIGILÂNCIA\s*vence em (9|10) dias/.test(v0)&&/Função "Mecânico" sem EPI cadastrado\s*a ficha de 2 pessoas sai sem itens/.test(v0)&&!/ANTIGO/.test(v0), (v0.match(/Avisos[\s\S]{0,400}/)||[''])[0].replace(/\n/g,' | '));
@@ -92,7 +92,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   ok('Modelo salvo com os campos (inclusive {CPF} digitado à mão) e sem quebrar linha a cada campo', md&&md.vale==='CLT'&&['NOME','CPF','FUNCAO','SALARIO','SALARIO_EXTENSO','JORNADA','EMPRESA'].every(k=>md.html.includes('data-k="'+k+'"'))&&!/contenteditable|​/.test(md.html)&&linhasEd<=1, md&&md.html.slice(0,160));
   await p.click('[data-act="rh-dprev"]'); const pex=await p.evaluate(()=>document.querySelector('.rh-modal .rh-page').innerText); await p.click('.rh-modal .lnk[data-act="rh-dprevx"]');
   ok('"Ver com dados de exemplo" mostra o texto preenchido', /MARIA DA SILVA/.test(pex)&&/dois mil, cento e cinquenta reais/.test(pex), pex.slice(0,120));
-  await p.click('[data-act="rh-dv"][data-v="gerar"]'); await p.selectOption('#rh-dgf','f0'); await H.dorme(300);
+  await p.click('[data-act="rh-dv"][data-v="gerar"]'); await p.click('[data-act="rh-dgpick"][data-id="f0"]'); await H.dorme(300);
   const faltam=await p.evaluate(()=>[...document.querySelectorAll('[data-rh-dx]')].map(x=>x.dataset.rhDx).sort().join(','));
   const ext=async v=>{ await p.fill('[data-rh-dx="salario"]',v); await H.dorme(800); return p.evaluate(()=>{ const t=document.querySelector('.rh-pageg').innerText; return (t.match(/\(([^)]*)\)/)||['',''])[1]; }); };
   const e1=await ext('1.000.000,00'), e2=await ext('1.001,01'), e3=await ext('2100'), e4=await ext('2.150,00');
@@ -107,7 +107,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   const ainda=await p.evaluate(()=>document.querySelectorAll('[data-rh-dx]').length);
   await p.setInputFiles('input[data-rh-danx]','foto-a.png'); await espera(()=>!!document.querySelector('[data-act="rh-dver"]'),8000); s=await srv();
   ok('Depois de guardar não pede mais os dados; anexar o assinado fica no histórico', ainda===0&&Object.values(s).some(x=>x&&x.assinado&&/\(assinado\)\.png$/.test(x.assinado.nome)), 'campos pedidos depois: '+ainda);
-  await p.evaluate(()=>__T.go('rhfunc')); await p.click('tr:has-text("ANA SOUZA") [data-act="rh-ed"]'); await H.dorme(300);
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-fusel"]:has-text("ANA SOUZA")'); await H.dorme(250); await p.click('.rh-v2d [data-act="rh-ed"]'); await H.dorme(300);
   const ff=await p.evaluate(()=>({sal:document.querySelector('[data-rh-f="salario"]').value,docs:document.querySelector('.rh-docs').innerText}));
   ok('Cadastro mostra salário e os documentos gerados', ff.sal==='R$ 2.150,00'&&/Contrato de trabalho · CLT/.test(ff.docs)&&/Ver assinado/.test(ff.docs), JSON.stringify(ff).slice(0,160));
   console.log('erros:',B.erros.filter(x=>!/404|cdnjs/.test(x))); const errosRH=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close();
@@ -117,6 +117,6 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   const C=await H.abrir({viewport:{width:1440,height:900}}); await H.preparar(C.page,d); await C.page.goto(H.BASE); await H.entrar(C.page,'iasmyn','senha123'); await H.dorme(2500);
   await C.page.evaluate(()=>__T.go('rhinicio')); await H.dorme(500);
   const dn=await C.page.evaluate(()=>({solo:document.body.classList.contains('rh-solo'),abas:[...document.querySelectorAll('#view nav.tabs .tab')].map(t=>t.innerText.trim()).join('|'),mods:document.querySelectorAll('#navlist [data-mod]').length}));
-  ok('A dona continua com a lista de módulos e as abas do RH em cima', !dn.solo&&dn.mods>2&&dn.abas==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', JSON.stringify(dn));
+  ok('A dona continua com a lista de módulos e as abas do RH em cima', !dn.solo&&dn.mods>2&&dn.abas==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', JSON.stringify(dn));
   await C.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?f+' FALHOU':'TODOS PASSARAM'); process.exit(f?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

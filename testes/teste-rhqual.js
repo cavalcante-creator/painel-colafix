@@ -13,7 +13,7 @@ const dd=n=>{ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString
  const t=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Lista: ASO vencido e NR-35 vencendo em 10 dias (a NR-10 em dia não aparece) e aviso de quem não tem ASO', /ASO periódico[\s\S]*Vencido há 5 dias/.test(t)&&/NR-35[\s\S]*Vence em 10 dias/.test(t)&&!/NR-10/.test(t)&&/sem ASO registrado: Bruno/.test(t), t.slice(t.indexOf('Precisam'),t.indexOf('Precisam')+260).replace(/\n/g,' | '));
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(800);
- await p.evaluate(()=>{ const b=[...document.querySelectorAll('#view [data-act]')].find(x=>/BRUNO/.test(x.closest('tr')?x.closest('tr').innerText:'')&&/Editar/.test(x.innerText)); if(b) b.click(); }); await H.dorme(900);
+ await p.click('[data-act="rh-fusel"]:has-text("BRUNO")'); await H.dorme(300); await p.click('.rh-v2d [data-act="rh-ed"]'); await H.dorme(900);
  await p.click('[data-act="rh-qnovo"][data-f="b"]'); await H.dorme(400); await p.selectOption('#rh-q-tipo','NR-11'); await H.dorme(400);
  const val=await p.evaluate(()=>document.getElementById('rh-q-val').value);
  const hoje=dd(0); const esp=(()=>{ const x=new Date(hoje+'T12:00:00'); x.setMonth(x.getMonth()+12); x.setDate(x.getDate()-1); return x.toISOString().slice(0,10); })();

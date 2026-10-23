@@ -25,7 +25,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
   ok('Perguntas rápidas: aniversariantes do mês escolhido, quem é do setor, quem não tem nascimento (com Imprimir)', aniv&&/Setor Linha 2[\s\S]*Bruno Lima/.test(t2)&&!/Ana Souza/.test(t2)&&/Sem data de nascimento[\s\S]*Bruno Lima[\s\S]*Completar/.test(t3)&&!/Ana Souza/.test(t3), [t,t2,t3].join(' || ').replace(/\n/g,' | ').slice(0,300));
 
   /* 3 · ocorrências */
-  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('.rh-nm:has-text("ANA SOUZA")'); await H.dorme(400);
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-fusel"]:has-text("ANA SOUZA")'); await H.dorme(250); await p.click('.rh-v2d [data-act="rh-pess"]'); await H.dorme(400);
   await p.click('[data-act="rh-ocnova"]'); await H.dorme(200); await p.selectOption('#rh-oct','Advertência escrita'); await p.fill('#rh-ocd',dias(-1)); await p.fill('#rh-ocm','Faltou sem avisar'); await p.fill('#rh-ocw','Carlos');
   await p.click('[data-act="rh-ocsalvar"]'); await H.dorme(700); let S=await srv(); const oc=Object.entries(S).find(([k])=>k.startsWith('rh/dados/ocorrencias/'));
   const pf=await view();
@@ -34,7 +34,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
   ok('Gerar documento da ocorrência: abre a advertência já com a data e o motivo', /Advertimos[\s\S]*ANA SOUZA[\s\S]*Faltou sem avisar/.test(dg)&&await p.evaluate(()=>__T.S().view==='rhdocs'), dg.replace(/\n/g,' | ').slice(0,300));
 
   /* 4 · itens emprestados + desligamento */
-  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await H.dorme(200); await p.click('.rh-nm:has-text("BRUNO LIMA")'); await H.dorme(400);
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await H.dorme(200); await p.click('[data-act="rh-fusel"]:has-text("BRUNO LIMA")'); await H.dorme(250); await p.click('.rh-v2d [data-act="rh-pess"]'); await H.dorme(400);
   await p.click('[data-act="rh-empnovo"]'); await H.dorme(200); await p.fill('#rh-empi','Armário'); await p.fill('#rh-empo','nº 12'); await p.click('[data-act="rh-empsalvar"]'); await H.dorme(700);
   await p.click('[data-act="rh-empnovo"]'); await H.dorme(200); await p.fill('#rh-empi','Rádio'); await p.click('[data-act="rh-empsalvar"]'); await H.dorme(700);
   const pe=await view();
@@ -56,7 +56,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
   await p.evaluate(()=>__T.go('rhagenda')); await H.dorme(300); await p.click('[data-act="rh-agdias"][data-v="90"]'); await H.dorme(300); const ag=await view();
   /* férias começando 2 dias antes de domingo ou feriado: aviso da CLT */
   let sx=dias(20); while(new Date(sx+'T12:00:00Z').getUTCDay()!==5) sx=iso(new Date(new Date(sx+'T12:00:00Z').getTime()+864e5));
-  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('.rh-nm:has-text("ANA SOUZA")'); await H.dorme(300); await p.click('[data-act="rh-fernova"]'); await H.dorme(400);
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('[data-act="rh-fusel"]:has-text("ANA SOUZA")'); await H.dorme(250); await p.click('.rh-v2d [data-act="rh-pess"]'); await H.dorme(300); await p.click('[data-act="rh-fernova"]'); await H.dorme(400);
   await p.fill('#rh-feri',sx); await p.dispatchEvent('#rh-feri','change'); await H.dorme(400); const ff=await view();
   ok('Feriados na agenda do RH e aviso da CLT ao marcar férias numa sexta (2 dias antes do domingo)', /Feriado[\s\S]*Ponte da Consciência Negra|Feriado: /.test(ag)&&/não podem começar nos 2 dias antes de feriado ou do domingo/.test(ff), ag.replace(/\n/g,' | ').slice(0,200));
   await p.click('[data-act="rh-ferx"]').catch(()=>{});

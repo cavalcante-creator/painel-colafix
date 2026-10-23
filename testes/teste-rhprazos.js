@@ -18,7 +18,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   const espera=async(f,ms)=>{ const t0=Date.now(); while(Date.now()-t0<(ms||8000)){ if(await p.evaluate(f).catch(()=>false)) return true; await H.dorme(200); } return false; };
 
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
-  ok('Menu ganhou "Férias e prazos"', nav==='Início|Agenda|Funcionários|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', nav);
+  ok('Menu ganhou "Férias e prazos"', nav==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', nav);
   ok('Início avisa: férias perto do prazo e vencida, troca do PJ perto e atrasada (e não a que está em dia)',
     /(Atenção|Vencido)\s*Férias: ANA SOUZA\s*(conceder até|passou do dia de avisar)/i.test(v0)&&/Vencido\s*Férias: CARLOS LIMA\s*o prazo para conceder venceu/.test(v0)&&/Atenção\s*Troca do PJ: PEDRO ALVES\s*próxima troca/.test(v0)&&/Atrasada\s*Troca do PJ: JOAO PJ/.test(v0)&&!/BRUNO ROCHA|RAFAEL NUNES/.test(v0), v0.replace(/\n/g,' | ').slice(300,700));
 
@@ -57,17 +57,17 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   await p.evaluate(()=>__T.go('rhferias')); await H.dorme(300); const av0=await p.evaluate(()=>document.querySelectorAll('[data-act="rh-dgfer"]').length);
   await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(200); const v2=await view();
   ok('Férias começando em até 15 dias sem aviso: avisa no Início e mostra "Gerar aviso"', av0===2&&/Aviso de férias: ANA SOUZA\s*as férias começam em/.test(v2), 'botões: '+av0);
-  await p.evaluate(()=>__T.go('rhferias')); await H.dorme(200); await p.click('tr:has-text("'+br(dias(5))+'") [data-act="rh-dgfer"]'); await H.dorme(500);
-  const g=await p.evaluate(()=>({v:__T.S().view,m:document.getElementById('rh-dgm').selectedOptions[0].text,f:(document.getElementById('rh-dgfe')||{selectedOptions:[{text:''}]}).selectedOptions[0].text,q:[...document.querySelectorAll('[data-rh-dq]')].map(x=>x.type),doc:document.querySelector('.rh-pageg').innerText.replace(/ /g,' ')}));
+  await p.evaluate(()=>__T.go('rhferias')); await H.dorme(200); await p.click('.rh-v2fmi:has-text("'+br(dias(5))+'") [data-act="rh-dgfer"]'); await H.dorme(500);
+  const g=await p.evaluate(()=>({v:__T.S().view,m:(document.querySelector('.rh-v2dm.sel b')||{}).textContent,f:(document.getElementById('rh-dgfe')||{selectedOptions:[{text:''}]}).selectedOptions[0].text,q:[...document.querySelectorAll('[data-rh-dq]')].map(x=>x.type),doc:document.querySelector('.rh-pageg').innerText.replace(/ /g,' ')}));
   ok('"Gerar aviso" abre o documento com o modelo, as férias certas e as perguntas (data vira calendário)', g.v==='rhdocs'&&g.m==='Aviso de férias'&&g.f.startsWith(br(dias(5)))&&g.q.join(',')==='date,text'&&new RegExp('ANA SOUZA as férias de '+br(dias(5))+' a '+br(dias(14))+', volta em '+br(dias(15))).test(g.doc)&&/\[Data do aviso\]/.test(g.doc), g.doc.slice(0,200));
   await p.click('[data-act="rh-dgo"][data-v="word"]'); await H.dorme(300); const t3=await toast();
   await p.fill('[data-rh-dq="0"]',dias(0)); await p.fill('[data-rh-dq="1"]','Gozo em casa'); await H.dorme(800);
   const [dl]=await Promise.all([p.waitForEvent('download',{timeout:8000}).catch(()=>null),p.click('[data-act="rh-dgo"][data-v="word"]')]); await H.dorme(600);
   const word=dl?fs.readFileSync(await dl.path(),'utf8'):''; s=await srv(); const dg=Object.values(s).find(x=>x&&x.modelo==='Aviso de férias');
   ok('Sem responder as perguntas não gera; respondendo, o Word sai com a data formatada e o histórico guarda férias e respostas', /Responda: Data do aviso · Observação do RH/.test(t3)&&new RegExp('Aviso dado em '+br(dias(0))+'\\. Obs\\.: Gozo em casa').test(word.replace(/&nbsp;| /g,' '))&&dg&&dg.feriasId&&dg.respostas['Data do aviso']===dias(0), t3);
-  await p.evaluate(()=>__T.go('rhferias')); await H.dorme(300); const gerado=await p.evaluate(()=>[...document.querySelectorAll('.card')].find(c=>/Férias marcadas/.test(c.innerText)).innerText);
-  ok('Depois de gerado, a férias mostra "Gerado" e sai do aviso', /Gerado/.test(gerado)&&(await p.evaluate(()=>document.querySelectorAll('[data-act="rh-dgfer"]').length))===1);
-  await p.click('tr:has-text("'+br(dias(20))+'") [data-act="rh-fercanc"]'); await H.dorme(500); s=await srv();
+  await p.evaluate(()=>__T.go('rhferias')); await H.dorme(300); const gerado=await p.evaluate(()=>[...document.querySelectorAll('.card')].find(c=>/Já marcadas/.test(c.innerText)).innerText);
+  ok('Depois de gerado, a férias mostra "Gerado" e sai do aviso', /Aviso gerado/.test(gerado)&&(await p.evaluate(()=>document.querySelectorAll('[data-act="rh-dgfer"]').length))===1);
+  await p.click('.rh-v2fmi:has-text("'+br(dias(20))+'") [data-act="rh-fercanc"]'); await H.dorme(500); s=await srv();
   ok('Desmarcar férias guarda como cancelada (não apaga)', Object.values(s).some(x=>x&&x.funcId==='f0'&&x.status==='cancelada'&&x.canceladaPor==='Paula RH'));
 
   // PJ

@@ -14,7 +14,7 @@ function gxSolo(){ try{ const A=S.acs; if(!A||!A.pronto) return false; if(A.dono
 /* ---------- presença (Face ID) ---------- */
 S.gxPres=S.gxPres||{docs:[],lido:false}; S.gxp=S.gxp||{f:'todos',dia:null};
 let _gxpSub=false;
-function gxpAssina(){ if(_gxpSub||!S.db||!viewOk('gxpres')) return; _gxpSub=true;
+function gxpAssina(){ if(_gxpSub||!S.db||!(viewOk('gxpres')||S._gxpRH)) return; _gxpSub=true;
   inscrever('gxpresenca',()=>S.db.collection('presenca').orderBy('dia','desc').limit(14),snap=>{ S.gxPres.docs=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&x.dia); S.gxPres.lido=true; rerenderSeguro(); }); }
 function gxpDoc(d){ return (S.gxPres.docs||[]).find(x=>x.dia===d)||null; }
 const gxpM=t=>{ const m=String(t||'').match(/(\d{1,2}):(\d{2})/); return m?(+m[1])*60+(+m[2]):null; };
@@ -126,7 +126,7 @@ function gxpHist(docs,dSel,n){ /* status por pessoa nos últimos n dias de exped
   return {dias:ds.map(x=>x.dia),out}; }
 function vGxPres(){ gxpAssina(); const G=S.gxp, docs=S.gxPres.docs||[], h=hojeStr();
   if(!S.gxPres.lido) return `${banner()}<section class="card"><div class="empty">Carregando…</div></section>`;
-  if(!docs.length) return `${banner()}<section class="gxp-hero"><div><span class="gxn-eye">VISÃO DO GESTOR · PELO FACE ID</span><h1>Quem está na empresa</h1><p>Os dados do Face ID ainda não foram publicados. Eles chegam sozinhos quando alguém do RH (ou a administradora) está com o painel aberto e o Face ID do dia foi importado (pelo robô ou pelo arquivo).</p></div></section>`;
+  if(!docs.length) return `${banner()}<section class="gxp-hero"><div><span class="gxn-eye">${S._gxpRH?'RH · PESSOAS NA EMPRESA':'VISÃO DO GESTOR'} · PELO FACE ID</span><h1>Quem está na empresa</h1><p>Os dados do Face ID ainda não foram publicados. Eles chegam sozinhos quando alguém do RH (ou a administradora) está com o painel aberto e o Face ID do dia foi importado (pelo robô ou pelo arquivo).</p></div></section>`;
   const dSel=(G.dia&&gxpDoc(G.dia))?G.dia:(gxpDoc(h)?h:docs[0].dia), D=gxpDoc(dSel), R=gxpResumo(D), ag=R.ag;
   const p=D.p||[], f=D.f||[];
   /* faixa de horas */
@@ -167,7 +167,7 @@ function vGxPres(){ gxpAssina(); const G=S.gxp, docs=S.gxPres.docs||[], h=hojeSt
   /* lado: empresas e atenção */
   const emp={}; p.forEach(x=>{ const e=x.e||'Colafix'; (emp[e]=emp[e]||{v:0,t:0}).v++; emp[e].t++; }); f.forEach(x=>{ const e=x.e||'Colafix'; (emp[e]=emp[e]||{v:0,t:0}).t++; });
   const EM=Object.keys(emp).sort((a,b)=>emp[b].t-emp[a].t), cor=e=>GXP_EMP_COR[e]||'#8AA3B0';
-  const lado=`<aside class="gxp-side"><section class="card"><h2 class="gxn-h2">Quem veio, por empresa</h2>
+  const lado=`<aside class="gxp-side">${S._gxpRH&&typeof S._gxpRH.lado==='function'?S._gxpRH.lado(D,R):''}<section class="card"><h2 class="gxn-h2">Quem veio, por empresa</h2>
       <div class="gxp-stk" role="img" aria-label="${esc(EM.map(e=>e+' '+emp[e].v).join(', '))}">${EM.map(e=>`<i style="flex:${emp[e].v} 1 0;background:${cor(e)}"></i>`).join('')}</div>
       ${EM.map(e=>`<div class="gxp-er"><i style="background:${cor(e)}"></i><span>${esc(e)}</span><b>${emp[e].v} de ${emp[e].t}</b></div>`).join('')}</section>
     <section class="card"><h2 class="gxn-h2">Precisa de atenção</h2>
@@ -182,7 +182,7 @@ function vGxPres(){ gxpAssina(); const G=S.gxp, docs=S.gxPres.docs||[], h=hojeSt
     <div class="gxp-dsc"><div class="gxp-dg" style="--n:${hist10.length}">${rs.map(({x,r})=>{ const ruim=r.semReg>=3||r.atr>=Math.max(7,r.esper*.12); const lab=x.dia===h?'hoje':['dom','seg','ter','qua','qui','sex','sáb'][new Date(x.dia+'T12:00').getDay()]+' '+dm(x.dia);
       return `<button class="gxp-dc ${ruim?'ruim':''}" data-act="gxp-dia" data-d="${x.dia}" aria-pressed="${x.dia===dSel}"><span class="gxn-mut">${lab}</span><b>${r.vieram}<em>/${r.esper}</em></b><i class="gxp-db"><i style="width:${r.esper?Math.round(r.vieram/r.esper*100):0}%"></i></i><small>${r.atr} depois · ${r.semReg} s/ reg.</small></button>`; }).join('')}</div></div></section>`;
   const fonte=gxpFonte(D), velho=gxpVelho(D);
-  const hero=`<section class="gxp-hero"><div class="gxp-hl"><span class="gxn-eye">VISÃO DO GESTOR · PELO FACE ID</span><h1>Quem está na empresa</h1><p>${esc(gxDiaTxt(dSel))}${fonte?' · '+esc(fonte):''}${dSel!==h&&gxpDoc(h)?` · <button class="gxp-lk" data-act="gxp-dia" data-d="${h}">voltar para hoje</button>`:''}</p>${velho?'<p class="gxp-velho">O Face ID não atualiza há mais de 2 horas. Confira o robô ou a importação no RH.</p>':''}</div>
+  const hero=`<section class="gxp-hero"><div class="gxp-hl"><span class="gxn-eye">${S._gxpRH?'RH · PESSOAS NA EMPRESA':'VISÃO DO GESTOR'} · PELO FACE ID</span><h1>Quem está na empresa</h1><p>${esc(gxDiaTxt(dSel))}${fonte?' · '+esc(fonte):''}${dSel!==h&&gxpDoc(h)?` · <button class="gxp-lk" data-act="gxp-dia" data-d="${h}">voltar para hoje</button>`:''}</p>${velho?'<p class="gxp-velho">O Face ID não atualiza há mais de 2 horas. Confira o robô ou a importação no RH.</p>':''}</div>
      <div class="gxp-hs">${gxpRing(R.hoje?R.na:R.vieram,R.esper,140,String(R.hoje?R.na:R.vieram),R.hoje?'na empresa':'vieram')}
        <div><span>Vieram</span><b>${R.vieram} <em>de ${R.esper}</em></b></div><div><span>Almoçaram</span><b>${R.alm} <em>· ${R.semAlm} ${R.hoje&&R.almAberto?'ainda não':'não'}</em></b></div><div><span>Não vieram</span><b class="${R.nao?'nv':''}">${R.nao} <em>${R.fer?'· '+R.fer+' de férias':''}</em></b></div></div></section>`;
   return `${banner()}${hero}${ritmo}<div class="gxp-g">${lista}${lado}</div>${dias}`; }
@@ -285,3 +285,6 @@ body.gx-mod #view>nav.tabs{display:none}
 .gxp-dc[aria-pressed="true"]{border:2px solid #143F54;box-shadow:0 0 0 3px #D3E7EC;padding:11px}
 @media (max-width:640px){.gxp-hs{grid-template-columns:auto 1fr}.gxp-side{max-width:none}.gxp-tab-in{min-width:0}.gxp-row{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px}.gxp-row .gxp-tr,.gxp-hd{display:none!important}.gxp-row .gxp-st{justify-self:end}.gxp-row .gxp-hist{grid-column:1/-1}.gxp-who b{white-space:normal}.gxp-fx span{font-size:11px}.gxn-hr{width:100%;justify-content:space-between}.gxn-ring{width:120px!important;height:120px!important}.gxn-ring svg{width:120px;height:120px}}
 </style>`);
+
+/* RH revisado (22/10): a mesma tela "Quem está na empresa" dentro do RH (tela rhpres), com as ações do RH ao lado (o.lado(D,R)) */
+try{ window.Painel.presenca={ render:o=>{ S._gxpRH=o||{}; try{ return vGxPres(); } finally{ S._gxpRH=null; } } }; }catch(e){}

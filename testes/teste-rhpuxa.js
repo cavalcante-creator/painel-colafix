@@ -6,7 +6,7 @@ const TXT='DISTRATO. CONTRATANTE: ZENITH SOLUÇÕES INDUSTRIAIS LTDA, inscrita n
  D['rh/dados/funcionarios/o1']={nome:'OUTRA PESSOA',tipo:'PJ',empresa:'ZENITH',status:'Ativo',admissao:'2025-01-10'};
  const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(1000);
- await p.evaluate(()=>{ const b=[...document.querySelectorAll('#view [data-act]')].find(x=>/THIAGO/.test(x.closest('tr')?x.closest('tr').innerText:'')&&/Editar/.test(x.innerText)); if(b) b.click(); }); await H.dorme(900);
+ await p.click('[data-act="rh-fusel"]:has-text("THIAGO")'); await H.dorme(300); await p.click('.rh-v2d [data-act="rh-ed"]'); await H.dorme(900);
  ok('Cadastro da pessoa tem "Puxar dados de um documento já feito"', await p.evaluate(()=>!!document.querySelector('[data-rh-pux="t1"]')));
  await p.evaluate(t=>window.rhPuxaTexto('t1',t),TXT); await H.dorme(700);
  const tab=await p.evaluate(()=>[...document.querySelectorAll('.rh-pux tbody tr')].map(r=>r.innerText.replace(/\s+/g,' ').trim()));
@@ -16,7 +16,7 @@ const TXT='DISTRATO. CONTRATANTE: ZENITH SOLUÇÕES INDUSTRIAIS LTDA, inscrita n
  const dados=await p.evaluate(async()=>{ const g=await __T.S().db.doc('rh/dados/funcionarios/t1').get(); const x=g.data(); return {cnpj:x.cnpj,endereco:x.endereco,cep:x.cep,admissao:x.admissao}; });
  ok('"Trazer marcados" grava no cadastro (CNPJ só números, endereço, CEP; admissão mantida)', dados.cnpj==='67974976000136'&&/VILA PRINCESA/.test(dados.endereco)&&dados.cep==='94.940-030'&&dados.admissao==='2026-07-13', JSON.stringify(dados));
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(800);
- await p.evaluate(()=>{ const b=[...document.querySelectorAll('#view [data-act]')].find(x=>/OUTRA PESSOA/.test(x.closest('tr')?x.closest('tr').innerText:'')&&/Editar/.test(x.innerText)); if(b) b.click(); }); await H.dorme(900);
+ await p.click('[data-act="rh-fusel"]:has-text("OUTRA PESSOA")'); await H.dorme(300); await p.click('.rh-v2d [data-act="rh-ed"]'); await H.dorme(900);
  await p.evaluate(t=>window.rhPuxaTexto('o1',t),TXT); await H.dorme(700);
  const av=await p.evaluate(()=>(document.querySelector('.rh-pux')||{innerText:''}).innerText);
  ok('Documento de outra pessoa: avisa antes de trazer', /parece ser de THIAGO DE FARIAS CARDOSO/.test(av), av.slice(0,120).replace(/\n/g,' | '));

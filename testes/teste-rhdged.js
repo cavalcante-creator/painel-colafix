@@ -6,7 +6,7 @@ const tk=k=>`<span class="rh-tk" data-k="${k}"></span>`;
  D['rh/dados/modelos/m1']={nome:'Distrato zenith',vale:'ZENITH',html:`<p>CONTRATADO: ${tk('NOME')}, com sede na ${tk('ENDERECO')}.</p><p>Encerrando a partir de ${tk('DESLIGAMENTO')}.</p><p>Serviços prestados até ${tk('PAGO_ATE')}. Saldo do dia ${tk('SALDO_INICIO')} ao dia ${tk('DESLIGAMENTO')}.</p>`};
  const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('rhferias')); await H.dorme(800); await p.evaluate(()=>{ const b=document.querySelector('[data-act="rh-pzv"][data-v="pj"]'); if(b) b.click(); }); await H.dorme(500);
- await p.click('[data-act="rh-dgpara"][data-id="b"]'); await H.dorme(1200); await p.selectOption('#rh-dgm','m1'); await H.dorme(800);
+ await p.click('[data-act="rh-dgpara"][data-id="b"]'); await H.dorme(1200); await p.click('[data-act="rh-dgmod"][data-id="m1"]'); await H.dorme(800);
  const ks=await p.evaluate(()=>[...document.querySelectorAll('[data-rh-do]')].map(x=>x.dataset.rhDo));
  ok('"Preencher o que falta" mostra Endereço, Data do desligamento, Pago até e Início do saldo', ['ENDERECO','DESLIGAMENTO','PAGO_ATE','SALDO_INICIO'].every(k=>ks.includes(k)), ks.join(','));
  await p.fill('[data-rh-do="ENDERECO"]','Rua das Acácias, 120 · Gravataí/RS'); await H.dorme(700); await p.fill('[data-rh-do="DESLIGAMENTO"]','2026-10-19'); await H.dorme(900);
