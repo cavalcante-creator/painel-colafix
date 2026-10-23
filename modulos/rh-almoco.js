@@ -689,7 +689,8 @@
     const wd=new Date(d+'T12:00').getDay(); let fer=false; try{ fer=!!(P.feriadoDe&&P.feriadoDe(d)); }catch(e){}
     const exp=d===P.hojeStr()?(wd>0&&wd<6&&!fer):ps.length>=Math.max(5,.4*maxP);
     const fs=[]; let VI=null; if(exp){ const ferias=(R.fer||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
-      (R.func||[]).filter(f=>!/deslig|inativ/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d)).filter(f=>(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)).forEach(f=>{
+      const sFil=((R.cfg&&R.cfg.setoresFilial)||[]).map(nrm), fora=f=>f.filial==='FIXCOL'||(f.setor&&sFil.includes(nrm(f.setor)));
+      (R.func||[]).filter(f=>!/deslig|inativ|encerr|demit|rescis|afast/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d&&!/afast/i.test(f.status||''))).filter(f=>(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)&&!fora(f)).forEach(f=>{
         const k=String(f.cpf||'').replace(/\D/g,'').padStart(11,'0'); if(vistos.has(k)||vistos.has('f:'+f._id)||ps.some(p=>fMesma(p.n,f.nome))) return;
         const fer=ferias.some(y=>y.funcId===f._id), vi=fer?null:(VI||(VI=prVisto(d))), u=vi&&vi.ult[k]||'', lim2=prMenos(d,14);
         /* sem passar no Face ID há mais de 2 semanas (ou nunca, com 2 semanas de dados): provavelmente saiu e o cadastro não foi atualizado */

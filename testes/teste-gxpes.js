@@ -7,6 +7,9 @@ const n=new Date(), hj=iso(n);
   const P=[['ANA SOUZA','11111111111'],['BRUNO LIMA','22222222222'],['CARLA DIAS','33333333333'],['DIEGO ROCHA','44444444444'],['ELAINE MOURA','55555555555'],['FABIO REIS','66666666666']];
   P.forEach((x,i)=>D['rh/dados/funcionarios/f'+i]={nome:x[0],cpf:x[1],setor:'Linha '+(i%3+1),empresa:'COLAFIX',tipo:'CLT',status:'Ativo',admissao:'2020-01-01'});
   D['rh/dados/funcionarios/fx']={nome:'GILSON SAIU',cpf:'77777777777',setor:'Expedição',empresa:'COLAFIX',tipo:'CLT',status:'Ativo',admissao:'2020-01-01'};
+  D['rh/dados/funcionarios/fz']={nome:'HELENA FILIAL',cpf:'88888888888',setor:'SECAGEM FIXCOL',empresa:'ZENITH',tipo:'PJ',status:'Ativo',admissao:'2020-01-01'};
+  D['rh/dados/funcionarios/fd']={nome:'IVO DESLIGADO',cpf:'99999999999',setor:'Expedição',empresa:'COLAFIX',tipo:'CLT',status:'Desligado',admissao:'2020-01-01'};
+  D['rh/dados/funcionarios/fa']={nome:'JOAO AFASTADO',cpf:'10101010101',setor:'Expedição',empresa:'COLAFIX',tipo:'CLT',status:'Afastado',admissao:'2020-01-01'};
   /* 20 dias para trás: todos passam (Gilson só até 18 dias atrás); hoje Fabio não veio */
   const docs={};
   for(let k=20;k>=0;k--){ const x=new Date(n); x.setDate(x.getDate()-k); const ds=iso(x), m=ds.slice(0,7); docs[m]=docs[m]||{mes:m,dias:{},pessoas:{},imp:[{em:new Date().toISOString(),por:'Teste'}]};
@@ -19,8 +22,9 @@ const n=new Date(), hj=iso(n);
   const fg=doc&&doc.f.find(x=>/Gilson/.test(x.n)), ff=doc&&doc.f.find(x=>/Fabio/.test(x.n));
   ok('Quem não passa no Face ID há mais de 2 semanas vira "Sumiu" (com a última passagem); quem faltou hoje continua "Sem registro"', fg&&fg.m==='Sumiu'&&/^\d{4}-\d{2}-\d{2}$/.test(fg.u)&&ff&&ff.m==='Sem registro', JSON.stringify(doc&&doc.f));
   await p.evaluate(()=>__T.go('gxpres')); await H.dorme(1500);
+  ok('Desligado e afastado não aparecem em "não vieram"', doc&&!doc.f.some(x=>/Ivo|Joao/.test(x.n)), JSON.stringify(doc&&doc.f.map(x=>x.n)));
   const tabs=await p.evaluate(()=>[...document.querySelectorAll('.gxp-tab')].map(b=>b.innerText.replace(/\s+/g,' ')).join(' | '));
-  ok('"Não vieram" conta só o Fabio; aba "Fora do Face ID" com o Gilson', /Não vieram 1/.test(tabs)&&/Fora do Face ID 1/.test(tabs), tabs);
+  ok('"Não vieram" conta só o Fabio; aba "Fora do Face ID" com o Gilson', /Não vieram 1/.test(tabs)&&/Fora do Face ID 2/.test(tabs), tabs);
   await p.click('.gxp-tab[data-v="sumiu"]'); await H.dorme(300);
   const vis=await p.evaluate(()=>[...document.querySelectorAll('.gxp-row[data-b]')].filter(r=>!r.hidden).map(r=>r.innerText.replace(/\s+/g,' ')).join(' || '));
   ok('Na aba aparece "Não passa no Face ID desde …"', /Gilson Saiu/.test(vis)&&/Não passa no Face ID desde/.test(vis)&&!/Fabio/.test(vis), vis.slice(0,200));
@@ -31,7 +35,12 @@ const n=new Date(), hj=iso(n);
   /* tela do RH */
   await p.evaluate(()=>__T.go('rhpres')); await H.dorme(1500);
   const lado=await p.evaluate(()=>[...document.querySelectorAll('.rh-v2pc')].map(c=>c.innerText.replace(/\s+/g,' ')).join(' || '));
-  ok('RH: cartão "Fora do Face ID" com o Gilson e "Faltou sem registro" só com o Fabio', /Fora do Face ID · 1/.test(lado)&&/Gilson Saiu/.test(lado)&&/Faltou sem registro · 1/.test(lado), lado.slice(0,300));
+  ok('RH: cartão "Fora do Face ID" com o Gilson e "Faltou sem registro" só com o Fabio', /Fora do Face ID · 2/.test(lado)&&/Gilson Saiu/.test(lado)&&/Faltou sem registro · 1/.test(lado), lado.slice(0,300));
+  await p.click('.rh-v2pc [data-act="rh-presfil"][data-id="fz"]'); await H.dorme(800);
+  const fz=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/dados/funcionarios/fz'].filial);
+  let saiu=false; for(let i=0;i<60&&!saiu;i++){ await H.dorme(500); saiu=await p.evaluate(x=>__T.S().db.doc('presenca/'+x).get().then(g=>!(g.data().f||[]).some(y=>/Helena/.test(y.n))),hj); }
+  ok('"Trabalha na Fixcol" grava filial no cadastro e a pessoa sai da presença daqui', fz==='FIXCOL'&&saiu, fz);
+  await p.evaluate(()=>__T.go('rhpres')); await H.dorme(1200);
   await p.click('[data-act="gxp-pes"][data-n="Gilson Saiu"]'); await H.dorme(400);
   const md2=await p.evaluate(()=>(document.querySelector('.gxp-mdb')||{}).innerText||'');
   ok('No RH o detalhe avisa e oferece "Registrar desligamento"', /Continua ativo no cadastro do RH/.test(md2)&&await p.evaluate(()=>!!document.querySelector('.gxp-mdb [data-act="rh-presdesl"]')), md2.replace(/\n/g,' | ').slice(0,200));
