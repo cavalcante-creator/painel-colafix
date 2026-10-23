@@ -674,6 +674,9 @@
   const ehSaida=s=>/SAIDA/.test(nrm(s));
   function prEmp(f,x){ const e=nrm((f&&f.empresa)||(x&&x.e)||''); if(/ZENITH/.test(e)) return 'Zenith'; if(/NEXUS/.test(e)) return 'Nexus'; if(/COLAFIX|FIXCOL/.test(e)) return 'Colafix'; return e?'Terceiros':'Colafix'; }
   function prHash(o){ const s=JSON.stringify(o); let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36)+'.'+s.length; }
+  const prMenos=(d,n)=>{ const x=new Date(d+'T12:00'); x.setDate(x.getDate()-n); return x.toISOString().slice(0,10); };
+  /* último dia em que cada CPF passou no Face ID (meses já carregados), antes do dia d */
+  function prVisto(d){ const ult={}; let dias=0; Object.keys(A.dados).forEach(m=>{ const ds=(A.dados[m]||{}).dias||{}; Object.keys(ds).forEach(x=>{ if(x>=d) return; const ks=Object.keys(ds[x]||{}); if(ks.length>=5) dias++; ks.forEach(k=>{ if(!ult[k]||x>ult[k]) ult[k]=x; }); }); }); return {ult,dias}; }
   function prDia(c,d,maxP){ const m=d.slice(0,7), Dm=A.dados[m]||{}, dia=(Dm.dias||{})[d]||{}, P0=Dm.pessoas||{}, P=c.P, R=c.R;
     const fx={}; (R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const tur=((P.S&&P.S.cfg&&P.S.cfg.turnos)||[])[0], ini=hm((tur&&tur.ini)||'07:30'), lim=Math.min(23*60,ini+30), limT=pad(Math.floor(lim/60))+':'+pad(lim%60);
@@ -685,10 +688,13 @@
     ps.sort((a,b)=>a.n.localeCompare(b.n,'pt-BR'));
     const wd=new Date(d+'T12:00').getDay(); let fer=false; try{ fer=!!(P.feriadoDe&&P.feriadoDe(d)); }catch(e){}
     const exp=d===P.hojeStr()?(wd>0&&wd<6&&!fer):ps.length>=Math.max(5,.4*maxP);
-    const fs=[]; if(exp){ const ferias=(R.fer||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
+    const fs=[]; let VI=null; if(exp){ const ferias=(R.fer||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
       (R.func||[]).filter(f=>!/deslig|inativ/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d)).filter(f=>(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)).forEach(f=>{
         const k=String(f.cpf||'').replace(/\D/g,'').padStart(11,'0'); if(vistos.has(k)||vistos.has('f:'+f._id)||ps.some(p=>fMesma(p.n,f.nome))) return;
-        fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:ferias.some(y=>y.funcId===f._id)?'Férias':'Sem registro'}); });
+        const fer=ferias.some(y=>y.funcId===f._id), vi=fer?null:(VI||(VI=prVisto(d))), u=vi&&vi.ult[k]||'', lim2=prMenos(d,14);
+        /* sem passar no Face ID há mais de 2 semanas (ou nunca, com 2 semanas de dados): provavelmente saiu e o cadastro não foi atualizado */
+        if(vi&&vi.dias>=8&&(!f.admissao||f.admissao<lim2)&&(!u||u<lim2)){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Sumiu',u}); return; }
+        fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:fer?'Férias':'Sem registro'}); });
       fs.sort((a,b)=>a.n.localeCompare(b.n,'pt-BR')); }
     const C=cfg(); return {dia:d,exp,lim:limT,alm:[C.ini,C.fim],p:ps,f:fs}; }
   async function publicar(c){ if(!c||!c.P||PR.ocupado) return; const P=c.P, R=c.R; A.ctx=A.ctx||c; if(!(R.lido&&R.lido.func&&R.lido.fer)) return;

@@ -35,7 +35,7 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
  ok('Início novo: saudação, meta do dia e "Pessoas hoje" com o Face ID', /Marcelo/.test(t)&&/Pessoas hoje/.test(t)&&/Na empresa agora/.test(t)&&/Precisa de você|Tudo em ordem/.test(t), t.slice(0,300).replace(/\n/g,'|'));
  await p.click('#navlist [data-go="gxpres"]'); await H.dorme(1200); t=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Quem está na empresa: 3 vieram de 5, nomes, "Saiu 12:30", férias e sem registro', /Quem está na empresa/.test(t)&&/Ana Souza/.test(t)&&/Saiu 12:30/.test(t)&&/De férias/.test(t)&&/sem registro/i.test(t)&&/3\s*de 5/.test(t), t.slice(0,500).replace(/\n/g,'|'));
- const vis=()=>p.evaluate(()=>[...document.querySelectorAll('.gxp-row[data-b]')].filter(r=>!r.hidden).map(r=>r.querySelector('b').innerText));
+ const vis=()=>p.evaluate(()=>[...document.querySelectorAll('.gxp-row[data-b]')].filter(r=>!r.hidden).map(r=>r.querySelector('.gxp-nm').innerText));
  await p.click('.gxp-tab[data-v="f"]'); await H.dorme(300); let v=await vis();
  ok('Filtro "Não vieram" mostra Carla e Diego', v.length===2&&v.includes('Carla Dias')&&v.includes('Diego Rocha'), v.join(', '));
  await p.click('.gxp-tab[data-v="todos"]'); await p.fill('#gxp-q','manutencao'); await H.dorme(300); v=await vis();

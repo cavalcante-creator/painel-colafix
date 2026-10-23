@@ -22,8 +22,8 @@ const gxpH=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(Math.round(m%6
 const gxpNorm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 function gxpAgoraMin(){ const a=new Date(); return a.getHours()*60+a.getMinutes(); }
 function gxpResumo(D){ if(!D) return null; const hoje=D.dia===hojeStr(), ag=gxpAgoraMin(), lim=gxpM(D.lim)||480, fimAl=gxpM((D.alm||[])[1])||870;
-  const p=D.p||[], f=D.f||[]; const na=p.filter(x=>!x.sa).length, alm=p.filter(x=>x.a).length, atr=p.filter(x=>gxpM(x.c)>lim).length, semReg=f.filter(x=>x.m!=='Férias').length, fer=f.length-semReg;
-  return {hoje,ag,lim,fimAl,vieram:p.length,esper:p.length+f.length,na,alm,semAlm:p.length-alm,atr,semReg,fer,nao:f.length,almAberto:hoje&&ag<fimAl}; }
+  const p=D.p||[], f=(D.f||[]).filter(x=>x.m!=='Sumiu'), sumiu=(D.f||[]).length-f.length; const na=p.filter(x=>!x.sa).length, alm=p.filter(x=>x.a).length, atr=p.filter(x=>gxpM(x.c)>lim).length, semReg=f.filter(x=>x.m!=='Férias').length, fer=f.length-semReg;
+  return {hoje,ag,lim,fimAl,vieram:p.length,esper:p.length+f.length,na,alm,semAlm:p.length-alm,atr,semReg,fer,nao:f.length,sumiu,almAberto:hoje&&ag<fimAl}; }
 function gxpFonte(D){ const f=D&&D.fonte; if(!f||!f.em) return ''; const x=new Date(f.em); return 'atualizado às '+String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0')+(x.toISOString().slice(0,10)!==D.dia&&D.dia===hojeStr()?' de '+x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''); }
 function gxpVelho(D){ const f=D&&D.fonte; if(!f||!f.em||D.dia!==hojeStr()) return false; const h=new Date().getHours(); return h>=7&&h<=19&&(Date.now()-new Date(f.em).getTime())>130*60000; }
 function gxpRing(v,t,tam,txt,sub,cor){ const r=tam/2-9, C=2*Math.PI*r, pc=t?Math.max(0,Math.min(1,v/t)):0;
@@ -151,12 +151,12 @@ function vGxPres(){ gxpAssina(); const G=S.gxp, docs=S.gxPres.docs||[], h=hojeSt
       const seg=(x.g||[]).map(s=>{ const [a,b]=s.split('-'); const am=gxpM(a), bm=b?gxpM(b):(R.hoje?ag:u); return bm>am?`<i class="gxp-sg" style="left:${pos(am)};width:${larg(am,bm)}"></i>`:''; }).join('')||(c!=null?`<i class="gxp-sg" style="left:${pos(c)};width:${larg(c,Math.max(c+5,R.hoje?ag:u))}"></i>`:'');
       const st=x.sa?['saiu','Saiu '+x.u]:R.hoje?['na','Na empresa']:['na','Veio'];
       const cls=['p',x.sa?'saiu':'na',x.a?'alm':'semalm',atr?'atr':''].join(' ');
-      return `<div class="gxp-row" data-k="${cls}" data-b="${esc(gxpNorm(x.n+' '+(x.s||'')+' '+(x.e||'')))}"><div class="gxp-who"><b>${esc(x.n)}</b><span>${esc([x.s,x.e!=='Colafix'?x.e:''].filter(Boolean).join(' · '))}${x.s||x.e!=='Colafix'?' · ':''}<span class="${atr?'gxp-late':''}">chegou ${esc(x.c)}</span>${x.a?' · almoço '+esc(x.a):R.hoje&&R.almAberto?' · ainda não almoçou':' · não almoçou'}</span></div>
+      return `<div class="gxp-row" data-k="${cls}" data-b="${esc(gxpNorm(x.n+' '+(x.s||'')+' '+(x.e||'')))}"><div class="gxp-who"><button class="gxp-nm" data-act="gxp-pes" data-n="${esc(x.n)}">${esc(x.n)}</button><span>${esc([x.s,x.e!=='Colafix'?x.e:''].filter(Boolean).join(' · '))}${x.s||x.e!=='Colafix'?' · ':''}<span class="${atr?'gxp-late':''}">chegou ${esc(x.c)}</span>${x.a?' · almoço '+esc(x.a):R.hoje&&R.almAberto?' · ainda não almoçou':' · não almoçou'}</span></div>
         <div class="gxp-tr" role="img" aria-label="${esc(x.n+': chegou '+x.c+(x.a?', almoço '+x.a:', sem almoço')+(x.sa?', saiu '+x.u:''))}">${seg}${x.a?`<i class="gxp-al" style="left:${pos(gxpM(x.a))}" title="Almoço ${esc(x.a)}"></i>`:''}${agoraL}</div>
         <span class="gxp-st ${st[0]}">${esc(st[1])}</span>${hist(x.n)}</div>`; }).join('')
-    +f.map(x=>`<div class="gxp-row" data-k="f ${x.m==='Férias'?'fer':'semreg'}" data-b="${esc(gxpNorm(x.n+' '+(x.s||'')+' '+(x.e||'')))}"><div class="gxp-who"><b>${esc(x.n)}</b><span>${esc([x.s,x.e!=='Colafix'?x.e:''].filter(Boolean).join(' · ')||'—')}</span></div>
-        <div class="gxp-tr aus"><span>${esc(x.m==='Férias'?'De férias':'Não veio · sem registro no Face ID')}</span></div><span class="gxp-st nao">${x.m==='Férias'?'Férias':'Não veio'}</span>${hist(x.n)}</div>`).join('');
-  const abas=[['todos','Todos',p.length+f.length],['na',R.hoje?'Na empresa agora':'Vieram',R.hoje?R.na:R.vieram],['semalm',R.hoje&&R.almAberto?'Ainda não almoçou':'Não almoçou',R.semAlm],['atr','Chegaram depois',R.atr],['f','Não vieram',R.nao]];
+    +f.map(x=>{ const su=x.m==='Sumiu'; return `<div class="gxp-row" data-k="${su?'sumiu':'f '+(x.m==='Férias'?'fer':'semreg')}" data-b="${esc(gxpNorm(x.n+' '+(x.s||'')+' '+(x.e||'')))}"><div class="gxp-who"><button class="gxp-nm" data-act="gxp-pes" data-n="${esc(x.n)}">${esc(x.n)}</button><span>${esc([x.s,x.e!=='Colafix'?x.e:''].filter(Boolean).join(' · ')||'—')}</span></div>
+        <div class="gxp-tr aus ${su?'sumiu':''}"><span>${esc(su?(x.u?'Não passa no Face ID desde '+dm(x.u)+' · confira no RH se saiu da empresa':'Nunca passou no Face ID · confira no RH se ainda trabalha aqui'):x.m==='Férias'?'De férias':'Não veio · sem registro no Face ID')}</span></div><span class="gxp-st ${su?'sumiu':'nao'}">${su?'Fora do Face ID':x.m==='Férias'?'Férias':'Não veio'}</span>${hist(x.n)}</div>`; }).join('');
+  const abas=[['todos','Todos',p.length+f.length],['na',R.hoje?'Na empresa agora':'Vieram',R.hoje?R.na:R.vieram],['semalm',R.hoje&&R.almAberto?'Ainda não almoçou':'Não almoçou',R.semAlm],['atr','Chegaram depois',R.atr],['f','Não vieram',R.nao]].concat(R.sumiu?[['sumiu','Fora do Face ID',R.sumiu]]:[]);
   const fil=abas.some(a=>a[0]===G.f)?G.f:'todos';
   const lista=`<section class="card gxp-lista" data-f="${fil}"><div class="gxn-ch gxp-lh"><h2>Pessoa por pessoa</h2>
       <div class="gxp-tabs" role="group" aria-label="Filtrar pessoas">${abas.map(([k,t,n])=>`<button class="gxp-tab" data-act="gxp-f" data-v="${k}" aria-pressed="${fil===k}">${esc(t)} <em>${n}</em></button>`).join('')}</div></div>
@@ -173,7 +173,7 @@ function vGxPres(){ gxpAssina(); const G=S.gxp, docs=S.gxPres.docs||[], h=hojeSt
     <section class="card"><h2 class="gxn-h2">Precisa de atenção</h2>
       <button class="gxp-at" data-act="gxp-f" data-v="semalm"><b class="t">${R.semAlm}</b><span>${R.hoje&&R.almAberto?'ainda não almoçaram · almoço até '+esc((D.alm||[])[1]||'14:30'):'não almoçaram'}</span></button>
       <button class="gxp-at" data-act="gxp-f" data-v="f"><b class="c">${R.semReg}</b><span>sem registro hoje, sem férias</span></button>
-      <button class="gxp-at" data-act="gxp-f" data-v="atr"><b class="w">${R.atr}</b><span>chegaram depois das ${esc(D.lim||'08:00')}</span></button></section></aside>`;
+      <button class="gxp-at" data-act="gxp-f" data-v="atr"><b class="w">${R.atr}</b><span>chegaram depois das ${esc(D.lim||'08:00')}</span></button>${R.sumiu?`<button class="gxp-at" data-act="gxp-f" data-v="sumiu"><b class="c">${R.sumiu}</b><span>no cadastro, mas fora do Face ID há mais de 2 semanas · provavelmente saíram (o RH precisa dar baixa)</span></button>`:''}</section></aside>`;
   /* outros dias */
   const hist10=docs.filter(x=>x.exp||x.dia===h).sort((a,b)=>a.dia.localeCompare(b.dia)).slice(-10), rs=hist10.map(x=>({x,r:gxpResumo(x)}));
   const passado=rs.filter(z=>z.x.dia!==h), med=k=>passado.length?passado.reduce((a,z)=>a+z.r[k],0)/passado.length:null;
@@ -185,13 +185,15 @@ function vGxPres(){ gxpAssina(); const G=S.gxp, docs=S.gxPres.docs||[], h=hojeSt
   const hero=`<section class="gxp-hero"><div class="gxp-hl"><span class="gxn-eye">${S._gxpRH?'RH · PESSOAS NA EMPRESA':'VISÃO DO GESTOR'} · PELO FACE ID</span><h1>Quem está na empresa</h1><p>${esc(gxDiaTxt(dSel))}${fonte?' · '+esc(fonte):''}${dSel!==h&&gxpDoc(h)?` · <button class="gxp-lk" data-act="gxp-dia" data-d="${h}">voltar para hoje</button>`:''}</p>${velho?'<p class="gxp-velho">O Face ID não atualiza há mais de 2 horas. Confira o robô ou a importação no RH.</p>':''}</div>
      <div class="gxp-hs">${gxpRing(R.hoje?R.na:R.vieram,R.esper,140,String(R.hoje?R.na:R.vieram),R.hoje?'na empresa':'vieram')}
        <div><span>Vieram</span><b>${R.vieram} <em>de ${R.esper}</em></b></div><div><span>Almoçaram</span><b>${R.alm} <em>· ${R.semAlm} ${R.hoje&&R.almAberto?'ainda não':'não'}</em></b></div><div><span>Não vieram</span><b class="${R.nao?'nv':''}">${R.nao} <em>${R.fer?'· '+R.fer+' de férias':''}</em></b></div></div></section>`;
-  return `${banner()}${hero}${ritmo}<div class="gxp-g">${lista}${lado}</div>${dias}`; }
+  return `${banner()}${hero}${ritmo}<div class="gxp-g">${lista}${lado}</div>${dias}${S.gxp.pes?gxpPesHtml(docs,S.gxp.pes,dSel):''}`; }
 S.extViews.gxpres=vGxPres;
 function gxpFiltra(){ const L=document.querySelector('.gxp-lista'); if(!L) return; const f=L.dataset.f||'todos', q=gxpNorm((document.getElementById('gxp-q')||{}).value||''), ws=q.split(/\s+/).filter(Boolean); let n=0;
-  L.querySelectorAll('.gxp-row[data-b]').forEach(r=>{ const k=' '+r.dataset.k+' ', okF=f==='todos'||(f==='na'&&/ p /.test(k)&&(!/ saiu /.test(k)||!(S.gxp._hoje)))||(f==='semalm'&&/ semalm /.test(k))||(f==='atr'&&/ atr /.test(k))||(f==='f'&&/ f /.test(k)); const okQ=ws.every(w=>r.dataset.b.includes(w)); r.hidden=!(okF&&okQ); if(!r.hidden) n++; });
+  L.querySelectorAll('.gxp-row[data-b]').forEach(r=>{ const k=' '+r.dataset.k+' ', okF=f==='todos'||(f==='na'&&/ p /.test(k)&&(!/ saiu /.test(k)||!(S.gxp._hoje)))||(f==='semalm'&&/ semalm /.test(k))||(f==='atr'&&/ atr /.test(k))||(f==='f'&&/ f /.test(k))||(f==='sumiu'&&/ sumiu /.test(k)); const okQ=ws.every(w=>r.dataset.b.includes(w)); r.hidden=!(okF&&okQ); if(!r.hidden) n++; });
   const v=L.querySelector('.gxp-vz'); if(v) v.hidden=n>0; }
 document.addEventListener('input',ev=>{ if(ev.target&&ev.target.id==='gxp-q'){ S.gxp.q=ev.target.value; gxpFiltra(); } });
-document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="gxp-f"],[data-act="gxp-dia"]'); if(!b) return;
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="gxp-f"],[data-act="gxp-dia"],[data-act="gxp-pes"],[data-act="gxp-pesx"]'); if(!b) return;
+  if(b.dataset.act==='gxp-pes'){ S.gxp.pes=b.dataset.n; render(); return; }
+  if(b.dataset.act==='gxp-pesx'){ if(b.classList.contains('gxp-md')&&ev.target!==b) return; S.gxp.pes=null; render(); return; }
   if(b.dataset.act==='gxp-f'){ S.gxp.f=b.dataset.v; const L=document.querySelector('.gxp-lista'); if(L){ L.dataset.f=S.gxp.f; L.querySelectorAll('.gxp-tab').forEach(t=>t.setAttribute('aria-pressed',String(t.dataset.v===S.gxp.f))); gxpFiltra(); if(!b.classList.contains('gxp-tab')) L.scrollIntoView({behavior:'smooth',block:'start'}); } return; }
   S.gxp.dia=b.dataset.d; render(); });
 /* depois de desenhar: aplica filtro e busca guardados */
@@ -288,3 +290,32 @@ body.gx-mod #view>nav.tabs{display:none}
 
 /* RH revisado (22/10): a mesma tela "Quem está na empresa" dentro do RH (tela rhpres), com as ações do RH ao lado (o.lado(D,R)) */
 try{ window.Painel.presenca={ render:o=>{ S._gxpRH=o||{}; try{ return vGxPres(); } finally{ S._gxpRH=null; } } }; }catch(e){}
+
+/* detalhe da pessoa (pedido de 23/10): tocar no nome em "Quem está na empresa" */
+function gxpPesHtml(docs,n,dSel){ const k=gxpNorm(n), ds=docs.slice().sort((a,b)=>b.dia.localeCompare(a.dia)), lin=[]; let info=null, vi=0, at=0, fa=0, fe=0, al=0;
+  ds.forEach(D=>{ const lim=gxpM(D.lim)||480, p=(D.p||[]).find(x=>gxpNorm(x.n)===k), f=(D.f||[]).find(x=>gxpNorm(x.n)===k);
+    if(p){ info=info||p; vi++; const late=gxpM(p.c)>lim; if(late) at++; if(p.a) al++; lin.push({d:D.dia,t:'veio',late,p}); }
+    else if(f){ info=info||f; if(f.m==='Férias') fe++; else if(f.m!=='Sumiu'&&D.exp) fa++; lin.push({d:D.dia,t:f.m==='Férias'?'fer':f.m==='Sumiu'?'sumiu':'falta',f}); } });
+  const sem=['dom','seg','ter','qua','qui','sex','sáb'], dl=d=>sem[new Date(d+'T12:00').getDay()]+' '+dm(d);
+  const segs=p=>(p.g||[]).map(x=>{ const [a,b]=x.split('-'); return b?a+' – '+b:a+' – agora'; }).join(' · ');
+  const rh=S._gxpRH&&typeof S._gxpRH.acoes==='function'?S._gxpRH.acoes(n):'';
+  const sumiu=lin.length&&lin[0].t==='sumiu'?lin[0].f:null;
+  return `<div class="gxp-md" data-act="gxp-pesx" role="dialog" aria-modal="true" aria-label="${esc(n)}"><div class="gxp-mdb">
+    <div class="gxp-mdh"><div><b>${esc(n)}</b><span>${esc([info&&info.s,info&&info.e].filter(Boolean).join(' · ')||'—')}</span></div><button class="btn sec" data-act="gxp-pesx">Fechar</button></div>
+    ${sumiu?`<div class="gxp-mdw">${sumiu.u?'Não passa no Face ID desde '+esc(dm(sumiu.u)):'Nunca passou no Face ID'}. Continua ativo no cadastro do RH: se saiu da empresa, o RH precisa registrar o desligamento.</div>`:''}
+    <div class="gxp-mdk"><div><b>${vi}</b><span>dias que veio</span></div><div><b class="${at?'w':''}">${at}</b><span>chegou depois</span></div><div><b class="${fa?'c':''}">${fa}</b><span>faltou sem registro</span></div><div><b>${al}</b><span>almoçou</span></div>${fe?`<div><b>${fe}</b><span>de férias</span></div>`:''}</div>
+    <div class="gxp-mdl">${lin.map(x=>`<div class="${x.d===dSel?'sel':''}"><span class="gxp-mdd">${dl(x.d)}</span>${x.t==='veio'?`<span>chegou <b class="${x.late?'gxp-late':''}">${esc(x.p.c)}</b>${x.p.a?' · almoço '+esc(x.p.a):' · sem almoço'}${x.p.sa?' · saiu '+esc(x.p.u):x.d===hojeStr()?' · na empresa':' · última passagem '+esc(x.p.u)}${segs(x.p)?`<small>na empresa ${esc(segs(x.p))}</small>`:''}</span>`:`<span class="${x.t==='falta'?'gxp-mdf':''}">${x.t==='fer'?'De férias':x.t==='sumiu'?'Fora do Face ID':'Não veio · sem registro no Face ID'}</span>`}</div>`).join('')||'<div class="gxn-mut">Sem registros nos últimos dias.</div>'}</div>
+    ${rh?`<div class="gxp-mda">${rh}</div>`:''}
+    <p class="gxn-mut" style="margin:10px 0 0;font-size:12.5px">Últimos ${ds.length} dias publicados pelo Face ID. Só horários, sem CPF.</p></div></div>`; }
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.gxp&&S.gxp.pes){ S.gxp.pes=null; render(); } });
+try{ document.head.insertAdjacentHTML('beforeend',`<style id="gxp-pes-css">
+.gxp-who .gxp-nm{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gxp-nm{border:0;background:none;padding:0;font-family:inherit;color:inherit;text-align:left;cursor:pointer}.gxp-nm:hover{text-decoration:underline}
+.gxp-tr.aus.sumiu{border-color:var(--warn,#C7832A);background:var(--warn-tint,#FBEFD9)}.gxp-tr.aus.sumiu span{color:var(--warn-ink,#7A5410)}.gxp-st.sumiu{background:var(--warn-tint,#FBEFD9);color:var(--warn-ink,#7A5410)}
+.gxp-md{position:fixed;inset:0;z-index:80;background:rgba(10,30,40,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
+.gxp-mdb{background:var(--surface,#fff);color:var(--ink,#143F54);border-radius:16px;width:min(620px,100%);padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.gxp-mdh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.gxp-mdh b{display:block;font-size:21px;font-weight:600}.gxp-mdh span{font-size:13.5px;color:var(--muted)}
+.gxp-mdw{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--warn-tint,#FBEFD9);color:var(--warn-ink,#7A5410);font-size:13.5px}
+.gxp-mdk{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin:14px 0}.gxp-mdk div{background:var(--sunken,#F3F6F8);border-radius:10px;padding:10px 12px}.gxp-mdk b{display:block;font-size:22px;font-weight:600}.gxp-mdk b.w{color:var(--warn-ink)}.gxp-mdk b.c{color:var(--crit-ink)}.gxp-mdk span{font-size:12.5px;color:var(--muted)}
+.gxp-mdl>div{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}.gxp-mdl>div.sel{background:var(--teal-wash)}.gxp-mdl small{display:block;color:var(--muted);font-size:12.5px}
+.gxp-mdd{color:var(--muted);font-size:13px}.gxp-mdf{color:var(--crit-ink)}.gxp-mda{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+</style>`); }catch(e){}
