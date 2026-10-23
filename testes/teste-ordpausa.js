@@ -1,0 +1,50 @@
+/* Posto: 5 · Começar / pausar a ordem (23/10) — começar pela folha, pausar para o almoço, voltar a rodar, terminar; a pausa não conta no tempo. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString(), hj=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10))(new Date());
+ D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
+ D['ordens/5001'].data=hj; D['ordens/5001'].total=200;
+ D['ordens/5004']={num:'5004',produto:'AC3002 - ARGAMASSA AC2 20KG',linha:'Linha 1',data:hj,turno:'Dia todo',total:300,status:'aberta',criadaEm:t};
+ d.users['posto@painel-colafix.app']={uid:'uPO',pass:'po1234',nome:'Posto'}; D['perfis/uPO']={nome:'Posto',usuario:'posto'}; D['acessos/uPO']={perfil:'posto',mods:['tablet'],locais:[],ativo:true};
+ const B=await H.abrir({viewport:{width:1366,height:768}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'posto','po1234'); await H.dorme(3500);
+ const bip=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(900); };
+ const seg=n=>p.evaluate(n=>(__T.S().ordens.find(o=>String(o.num)===n)||{}).prodSeg||[],n), tx=()=>p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText.replace(/\n/g,'|'));
+ await bip('000123'); let t1=await tx();
+ ok('Menu do posto tem "5 · Começar / pausar a ordem" com a situação das linhas', /Começar \/ pausar a ordem/.test(t1)&&/Linha 1: nada rodando/.test(t1), t1.slice(0,400));
+ await p.keyboard.press('5'); await H.dorme(600); t1=await tx();
+ ok('Tecla 5 abre a tela com cada linha ("Nenhuma ordem rodando" + Começar uma ordem)', /Começar ou pausar a ordem/.test(t1)&&/Nenhuma ordem rodando/.test(t1)&&/sua linha/.test(t1), t1.slice(0,300));
+ await bip('OP-5001'); t1=await tx();
+ ok('Bipar a folha ali pergunta "Começar a ordem 5001 agora?"', /Começar a ordem 5001 agora/.test(t1)&&/Começar a ordem \(Enter\)/.test(t1), t1.slice(0,300));
+ await p.fill('#ot-h','07:30'); await p.keyboard.press('Enter'); await H.dorme(1500); t1=await tx(); let s=await seg('5001');
+ ok('Começou às 07:30: segmento aberto e confirmação', s.length===1&&!s[0].fim&&new Date(s[0].ini).getHours()===7&&/Ordem 5001 começou/.test(t1), JSON.stringify(s)+' '+t1.slice(0,200));
+ await p.keyboard.press('Enter'); await H.dorme(500); await bip('000123'); await p.keyboard.press('5'); await H.dorme(600); t1=await tx();
+ ok('Na tela: "Rodando · ordem 5001 · desde 07:30" com Pausar e Terminar', /Rodando · ordem 5001/.test(t1)&&/desde 07:30/.test(t1)&&/Pausar/.test(t1)&&/Terminar a ordem/.test(t1), t1.slice(0,300));
+ await p.keyboard.press('1'); await H.dorme(600); t1=await tx();
+ ok('Tecla da linha numa ordem rodando pergunta o motivo da pausa (Almoço, Café…)', /Por que a Linha 1 vai parar/.test(t1)&&/Almoço/.test(t1)&&/Café/.test(t1), t1.slice(0,300));
+ await p.keyboard.press('1'); await H.dorme(1500); s=await seg('5001'); t1=await tx();
+ ok('Pausar para o almoço: segmento fechado com pausa "Almoço"', s.length===1&&s[0].fim&&s[0].pausa==='Almoço'&&s[0].fimPor==='Ana Souza'&&/pausada · Almoço/.test(t1), JSON.stringify(s));
+ /* deixa a pausa com 1 hora para conferir a conta do tempo */
+ await p.evaluate(()=>{ const o=__T.S().ordens.find(o=>String(o.num)==='5001'); const u=o.prodSeg[0]; u.fim=new Date(Date.now()-60*6e4).toISOString(); u.ini=new Date(Date.now()-180*6e4).toISOString(); });
+ await p.keyboard.press('Enter'); await H.dorme(500); t1=await tx();
+ ok('Espera do posto mostra "Pausada · ordem 5001 · Almoço"', /Pausada · ordem 5001 · Almoço/.test(t1), t1.slice(0,300));
+ await bip('000123'); await p.keyboard.press('5'); await H.dorme(600); t1=await tx();
+ ok('Tela mostra a ordem pausada com "Voltar a rodar"', /Pausada · ordem 5001 · Almoço/.test(t1)&&/Voltar a rodar/.test(t1), t1.slice(0,300));
+ await p.click('[data-act="ot-volta"]'); await H.dorme(1500); s=await seg('5001'); t1=await tx();
+ ok('Voltar a rodar: novo segmento aberto; "ficou pausada 1 h"', s.length===2&&!s[1].fim&&s[1].volta&&/voltou a rodar/.test(t1)&&/ficou pausada 1 h/.test(t1), JSON.stringify(s)+' '+t1.slice(0,200));
+ const tot=await p.evaluate(()=>{ const o=__T.S().ordens.find(o=>String(o.num)==='5001'); return o.prodSeg.reduce((a,x)=>a+((x.fim?new Date(x.fim):new Date())-new Date(x.ini))/6e4,0); });
+ ok('Tempo da ordem não conta a pausa (~2 h, não 3 h)', tot>115&&tot<125, Math.round(tot)+' min');
+ /* apontar: a faixa tem Pausar */
+ await p.keyboard.press('Enter'); await H.dorme(500); await bip('000123'); await p.keyboard.press('2'); await H.dorme(500); await bip('OP-5001'); await H.dorme(500);
+ ok('No apontar, a faixa "Rodando desde" tem Pausar e Terminar', await p.evaluate(()=>!!document.querySelector('[data-act="ot-pausa-ap"]')&&!!document.querySelector('[data-act="ot-fim"]')));
+ await p.click('[data-act="ot-pausa-ap"]'); await H.dorme(500); t1=await tx();
+ ok('Pausar no apontar abre os motivos da linha da ordem', /Por que a Linha 1 vai parar/.test(t1), t1.slice(0,200));
+ await p.click('[data-act="ot-pmot"][data-v="Café"]'); await H.dorme(1500); s=await seg('5001');
+ ok('Pausa do café gravada', s.length===2&&s[1].pausa==='Café', JSON.stringify(s));
+ /* começar outra ordem com a 5001 pausada: a pausa da 5001 é encerrada */
+ await p.keyboard.press('Enter'); await H.dorme(500); await bip('000123'); await p.keyboard.press('5'); await H.dorme(600); await p.keyboard.press('Escape'); await H.dorme(300);
+ await p.keyboard.press('5'); await H.dorme(600); await bip('OP-5004'); await p.keyboard.press('Enter'); await H.dorme(1500);
+ s=await seg('5001'); const s4=await seg('5004');
+ ok('Começar a 5004 com a 5001 pausada: 5004 roda e a pausa da 5001 fica encerrada', s4.length===1&&!s4[0].fim&&s[1].encerrada&&/começou a ordem 5004/.test(s[1].motivo), JSON.stringify({s,s4}));
+ await p.keyboard.press('Enter'); await H.dorme(500); await bip('000123'); await p.keyboard.press('5'); await H.dorme(600);
+ await p.click('[data-act="ot-term"][data-l="Linha 1"]'); await H.dorme(300); await p.click('[data-act="ot-term"][data-l="Linha 1"]'); await H.dorme(1500);
+ const s4b=await seg('5004'); t1=await tx(); ok('Terminar (dois cliques) fecha a 5004', s4b[0].fim&&/terminada/.test(t1), JSON.stringify(s4b));
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
