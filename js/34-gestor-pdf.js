@@ -167,3 +167,6 @@ window.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target
   try{ if(b.dataset.act==='gx-pdf-dia') await gxPdfDia(S.gx.dia||hojeStr()); else await gxPdfMes(S.gx.cp||hojeStr().slice(0,7)); toast('PDF baixado.'); }
   catch(e){ console.warn('[pdf gestor]',e); toast('Não foi possível gerar o PDF: '+((e&&e.message)||e)); }
   finally{ delete b.dataset.gerando; b.disabled=false; b.innerHTML=t0; } },true);
+
+/* PDF no mesmo padrão para os módulos (22/10: relatório do almoço do RH) */
+try{ window.Painel.pdf={ imgs:()=>gpImgs(), novo:(tit,sub,img)=>gpNovo(tit,sub,img), cor:GPDF.cor, H:GPDF.H }; }catch(e){}
