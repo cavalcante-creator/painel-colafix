@@ -1570,7 +1570,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'}, rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros} };
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r()+modalConv()+modalFicha()+(window.RHCartao?RHCartao.modal({P,R,esc,baixar}):''); }; });
   /* tela Almoço (modulos/rh-almoco.js): controle do almoço pelo Face ID */
-  const almCtx=()=>({P,R,esc,eu,br,fCPF,carregarJs,baixar});
+  const almCtx=()=>({P,R,esc,eu,br,fCPF,carregarJs,baixar,guardar:guardarArqRH});
   /* ---------- Férias pelo relatório do sistema de folha (PDF "Programação de férias", Alleader) ----------
      O RH importa o PDF; o painel guarda em cada funcionário a situação da folha (ferFolha) e cria as férias já programadas.
      Daí em diante os períodos, dias de direito, gozados e o limite para gozo vêm da folha (consideram faltas e afastamentos). */
