@@ -75,7 +75,7 @@ function ofCardLinha(c,curto){ const t=ofTec(c), k=c.impacto==='parou'&&!t?'crit
   return `<div class="of-c ${k}"><div class="of-ch"><b>${esc(c.linha||'')}${c.equip?' · '+esc(c.equip):''}</b>${imp}</div><span>${esc((typeof mm2Tipo==='function'?mm2Tipo(c):'')||c.defeito||'')}</span>
     ${t?`<span class="of-s">Em atendimento com ${esc(tecNomes(c)||'técnico')}${c.exec&&c.exec.inicio?' desde '+esc(String(c.exec.inicio).slice(11,16)):''}</span>`:`<b class="of-s ${k?'crit':''}">${c.impacto==='parou'?'Sem técnico':'Aguardando técnico'} há ${ofMin(c.criado)}${curto?'':' · aberto por '+esc(c.nome||'—')}</b>`}</div>`; }
 function ofCardTarefa(c){ const pr=typeof gchPrio==='function'?gchPrio(c.prioridade):['','Normal','warn'], urg=c.prioridade==='urgente', ac=ofAceito(c);
-  const st=ofTec(c)?'Com '+esc(tecNomes(c)):ac?'Aceita por '+esc(c.exec.aceito.nome)+' para depois':urg?'<b class="crit">Ninguém aceitou · enviada às '+ofHm(c.criado)+'</b>':(c.paraTec?'Para '+esc(c.paraTec):'Qualquer técnico')+(c.prazo?' · prazo '+dm(c.prazo):'');
+  const st=ofTec(c)?'Com '+esc(tecNomes(c)):ac?'Aceita por '+esc(c.exec.aceito.nome)+' para depois':urg?'<b class="crit">Ninguém aceitou · enviada às '+ofHm(c.criado)+'</b> · '+(c.paraTec?'para <b>'+esc(c.paraTec)+'</b>':'qualquer técnico'):(c.paraTec?'Para <b>'+esc(c.paraTec)+'</b>':'Qualquer técnico')+(c.prazo?' · prazo '+dm(c.prazo):'');
   return `<div class="of-c ${urg&&ofPend(c)?'crit':''}"><div class="of-ch"><b>${ofOnde(c)}</b>${ofTag(pr[1].toUpperCase(),urg?'crit cheia':pr[2]==='warn'?'warn':'')}</div><span>${esc(String(c.defeito||'').slice(0,90))}${c.tipo&&typeof gchTipoT==='function'?' · '+esc(gchTipoT(c.tipo).toLowerCase()):''}</span><span class="of-s">${st}</span></div>`; }
 function ofCardPrev(c){ const n=(c.chkItens||[]).length, k=c.chk||{}, f=(c.chkItens||[]).filter(i=>k[i.id]&&k[i.id].s).length, atr=String(c.criado||'').slice(0,10)<hojeStr();
   return `<div class="of-c"><div class="of-ch"><b>${esc(ofPrevTxt(c).slice(0,70))}</b>${atr?ofTag('ATRASADA','warn'):''}</div><span class="of-s">${n?n+' itens no checklist · ':''}${ofTec(c)?'com '+esc(tecNomes(c))+(n?' · '+f+' de '+n:''):'ninguém começou'}</span></div>`; }
@@ -90,7 +90,7 @@ function vOfEspera(){ const L=ofLinhas(), TF=ofTarefas().filter(ofPend), PV=ofPr
     <section class="of-col"><div class="of-hd"><h2>Chamados das linhas</h2><span>atender no posto da linha</span></div><div class="of-l">${L.map(c=>ofCardLinha(c)).join('')||'<p class="of-vz">Nenhum chamado aberto nas linhas.</p>'}</div></section>
     <section class="of-col"><div class="of-hd"><h2>Do Marcelo · para aceitar</h2><span>aceitar aqui na oficina</span></div><div class="of-l">${TF.map(ofCardTarefa).join('')||'<p class="of-vz">Nenhuma tarefa esperando.</p>'}
       <div class="of-hd of-hd2"><h2>Preventivas de hoje</h2><span>do plano</span></div>${PV.map(ofCardPrev).join('')||'<p class="of-vz">Nenhuma preventiva aberta.</p>'}</div></section>
-    <section class="of-col"><div class="of-hd"><h2>Quem está fazendo o quê</h2><span>agora</span></div><div class="of-l">${tecs.slice(0,8).map(x=>`<div class="of-tc"><span class="of-av ${x.c?'on':''}">${esc(String(x.t.nome||'?')[0])}</span><div><b>${esc(String(x.t.nome).split(' ')[0])}${x.t.area?' · '+esc(x.t.area):''}</b><small>${esc(x.txt)}</small></div></div>`).join('')||'<p class="of-vz">Nenhum técnico cadastrado em Crachás.</p>'}</div>
+    <section class="of-col"><div class="of-hd"><h2>Quem está fazendo o quê</h2><span>agora</span></div><div class="of-l">${tecs.map(x=>`<div class="of-tc"><span class="of-av ${x.c?'on':''}">${esc(String(x.t.nome||'?')[0])}</span><div><b>${esc(String(x.t.nome).split(' ')[0])}${x.t.area?' · '+esc(x.t.area):''}</b><small>${esc(x.txt)}</small></div></div>`).join('')||'<p class="of-vz">Nenhum técnico cadastrado em Crachás.</p>'}</div>
       <div class="of-ks"><div><b class="${semN?'crit':''}">${semN}</b><span>sem ninguém</span></div><div><b>${and}</b><span>em andamento</span></div><div><b class="ok">${fe}</b><span>feitos hoje</span></div></div></section></div>
    <section class="of-cta"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg><div><h1>Passe seu crachá no leitor${S.of.cam?' ou mostre o QR na câmera':''}</h1><p>Para aceitar as tarefas do Marcelo, começar a preventiva, pedir peça ou terminar o que é seu</p>${ofMsg()}</div>
     ${S.of.cam?`<div class="of-camw"><div class="of-camslot" aria-hidden="true"><span>ligando a câmera…</span></div><button class="of-camb" data-act="of-cam">Desligar câmera</button></div>`:`<button class="of-camoff" data-act="of-cam"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3l2-2h8l2 2h3v12H3z"/><circle cx="12" cy="13" r="4"/></svg><b>Ligar câmera</b><small>para ler o QR do crachá</small></button>`}<div class="of-ctab"><button class="of-b" data-act="of-sem">Quadro da semana</button>${ttSemCrachaOk()?'<button class="of-b sec" data-act="tt-sem">Estou sem crachá</button>':''}</div></section>
@@ -438,4 +438,42 @@ body.of-on #tt-video{border-radius:12px;border:2px solid #9FC3D3;box-shadow:none
 function cqSemRolar(){ document.querySelectorAll('.cq').forEach(e=>{ if(e.scrollTop) e.scrollTop=0; }); }
 { const _r=render; render=function(){ const x=_r.apply(this,arguments); try{ cqSemRolar(); }catch(e){} return x; }; }
 document.addEventListener('focusin',()=>setTimeout(cqSemRolar,0)); document.addEventListener('scroll',ev=>{ if(ev.target&&ev.target.classList&&ev.target.classList.contains('cq')) cqSemRolar(); },true);
+
+/* ---------- pedidos de 23/10: alarme em toda tarefa do Marcelo, para quem ela é, crachá direto no alarme, todos os técnicos ---------- */
+/* tarefa urgente ou normal do Marcelo toca o alarme ("pode esperar" não toca) */
+ofAlarmes=function(){ const out=[]; ofLinhas().forEach(c=>{ if(!ofTec(c)) out.push({c,k:'linha'}); });
+  ofTarefas().forEach(c=>{ if(ofPend(c)&&c.prioridade!=='espera') out.push({c,k:'tarefa'}); }); return out; };
+const ofCrIc='<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="12" width="32" height="22" rx="3"/><path d="M14 18v10M18 18v10M22 18v10M27 18v10M31 18v10M35 18v10M4 40h40"/></svg>';
+ofAlarmeHtml=function(){ const M=S.of; if(!M.alerta.length||S.tt.fase!=='espera') return ''; const x=ofAlarmes().find(a=>a.c._id===M.alerta[0]); if(!x) return ''; const c=x.c, lin=x.k==='linha', livre=ofSomLivre(), urg=c.prioridade==='urgente';
+  const imp=c.impacto==='parou'?'parou completa':c.impacto==='reduziu'?'parou em parte':'não interferiu', tipo=(typeof mm2Tipo==='function'?mm2Tipo(c):c.defeito||'');
+  const para=lin?'':`<p class="of-ovp">Para: <b>${c.paraTec?esc(c.paraTec):'qualquer técnico'}</b></p>`;
+  return `<div class="of-ov ${lin?'lin':'tar'}" data-id="${esc(c._id)}" role="alertdialog" aria-labelledby="of-ovt"><div class="of-ovc">
+    <span class="of-ovk">${lin?'CHAMADO NOVO DA LINHA':urg?'TAREFA URGENTE DO MARCELO':'TAREFA NOVA DO MARCELO'}</span>
+    <h1 id="of-ovt">${lin?esc(String(c.linha||'').toUpperCase())+' · '+imp.toUpperCase():ofOnde(c)}</h1>
+    <p class="of-ovd">${esc(lin?tipo+(c.equip?' · '+c.equip:''):String(c.defeito||'').slice(0,120))}</p>${para}
+    <p class="of-ovs">OS ${manNum(c.numero)} · aberto às ${ofHm(c.criado)} por ${esc(c.nome||'—')} · há ${ofMin(c.criado)}${M.alerta.length>1?' · mais '+(M.alerta.length-1)+' esperando':''}</p>
+    <div class="of-ovcr">${ofCrIc}<div><b>${lin?'Vá até o posto da '+esc(c.linha||'linha')+' e passe o crachá lá':c.paraTec?esc(String(c.paraTec).split(' ')[0])+', passe seu crachá no leitor agora':'Passe seu crachá no leitor agora'}</b><span>${lin?'O chamado da linha é começado no posto.':'Abre a tarefa para aceitar — o alarme para quando alguém aceitar.'}</span>${ofMsg()}</div></div>
+    <div class="of-ovb">${livre?'':'<button class="of-b" data-act="of-som">Ativar o som do alarme</button>'}<button class="of-b sec" data-act="of-sil">Silenciar</button></div>
+    <small>${livre?'O alarme toca até alguém '+(lin?'começar o chamado no posto':'aceitar a tarefa')+'.':'O navegador só toca o alarme depois de um toque na tela ou de uma leitura do coletor.'}</small></div></div>`; };
+/* crachá passado com o alarme da tarefa na tela: abre direto a tarefa para aceitar (se for para ele ou para qualquer técnico) */
+{ const _ti=ttInicia; ttInicia=function(p){ let al=null; try{ if(ofOn()&&S.tt.fase==='espera'&&p&&p.papel==='tecnico'){ const x=ofAlarmes().find(a=>a.c._id===S.of.alerta[0]); if(x&&x.k==='tarefa') al=x.c; } }catch(e){}
+  const r=_ti.apply(this,arguments); if(!al||!S.tt.p) return r;
+  if(!al.paraTec||ofN(al.paraTec)===ofN(p.nome)){ S.of.acc=al.numero; S.of.dev=null; ofVai('ofacc'); }
+  else { S.tt.msg='A tarefa que está tocando é para '+al.paraTec+' — só ele pode aceitar.'; render(); }
+  return r; }; }
+/* som: qualquer tecla (inclusive a leitura do coletor) ou toque libera o som do navegador */
+['keydown','pointerdown'].forEach(t=>window.addEventListener(t,()=>{ try{ if(!ofOn()) return; const A=window.AudioContext||window.webkitAudioContext; if(!A) return; const c=S.man._ac||(S.man._ac=new A()); if(c.state!=='running'&&c.resume) c.resume(); }catch(e){} },true));
+/* Quem está fazendo o quê: todos os técnicos dos crachás + quem está numa OS ou foi escolhido pelo Marcelo sem crachá de técnico */
+ofTecnicos=function(){ const ab=ofAb(), lista=(typeof gchTecs==='function'?gchTecs():[]).slice(), tem=n=>lista.some(t=>ofN(t.nome)===ofN(n));
+  ab.forEach(c=>{ const E=c.exec||{}; [E.tecnico,E.ajudante&&E.ajudante.nome,E.aceito&&E.aceito.nome,ofPend(c)?c.paraTec:''].forEach(n=>{ if(n&&!tem(n)) lista.push({nome:n,area:''}); }); });
+  return lista.map(t=>{ const faz=ab.filter(c=>tecEh(c,t.nome)&&!tfConf(c)), dep=ab.filter(c=>!ofTec(c)&&ofAceito(c)&&ofN(c.exec.aceito.nome)===ofN(t.nome)), esp=ab.filter(c=>c.tarefa&&ofPend(c)&&c.paraTec&&ofN(c.paraTec)===ofN(t.nome));
+    const c=faz[0], ex=[dep.length?dep.length+(dep.length>1?' tarefas aceitas':' tarefa aceita')+' para depois':'', esp.length?esp.length+(esp.length>1?' tarefas do Marcelo esperando ele aceitar':' tarefa do Marcelo esperando ele aceitar'):''].filter(Boolean).join(' · ');
+    const txt=c?((c.prevId?'Preventiva · ':'')+(c.linha||'')+(c.equip&&!c.tarefa&&!c.prevId?' · '+c.equip:'')+(c.tarefa||c.prevId?' · '+String(c.prevId?ofPrevTxt(c):c.defeito||'').slice(0,40):'')+(c.exec&&c.exec.inicio?' · há '+ofMin(String(c.exec.inicio).length<=16?new Date(c.exec.inicio).toISOString():c.exec.inicio):'')+(faz.length>1?' · +'+(faz.length-1):'')+(ex?' · '+ex:'')):'livre'+(ex?' · '+ex:'');
+    return {t,c,dep,esp,txt}; }).sort((a,b)=>(a.c?0:a.esp.length?1:2)-(b.c?0:b.esp.length?1:2)||String(a.t.nome).localeCompare(String(b.t.nome))); };
+document.head.insertAdjacentHTML('beforeend',`<style id="of-al-css">
+.of-ovp{margin:0;font-size:clamp(22px,3.6vh,38px)}.of-ovp b{background:#143F54;color:#fff;border-radius:12px;padding:.1em .5em}
+.of-ovcr{display:flex;align-items:center;gap:18px;text-align:left;border:3px dashed currentColor;border-radius:18px;padding:1.6vh 2vw;margin-top:.6vh}.of-ovcr svg{width:64px;height:64px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2.4;animation:ofCr 1s ease-in-out infinite}
+.of-ovcr b{display:block;font-size:clamp(22px,3.4vh,36px)}.of-ovcr span{font-size:clamp(14px,2vh,20px);color:#55666F}@keyframes ofCr{50%{transform:translateY(4px)}}
+.of-col .of-l:has(.of-tc){max-height:46vh;overflow:auto}.of-tc small{display:block}
+</style>`);
 /* ===FIM OFICINA=== */

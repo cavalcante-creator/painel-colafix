@@ -1,0 +1,23 @@
+/* Oficina (23/10): tarefa normal do Marcelo toca o alarme, mostra para quem é, crachá no alarme abre a tarefa; Quem está fazendo o quê com todos. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs, iso=new Date(Date.now()-864e5).toISOString();
+ const nomes=['Bruno Lima','Carlos Souza','Diego Alves','Eduardo Rosa','Fabio Neves','Gilson Prado','Hugo Matos','Igor Pires','Jonas Reis','Leandro Dias'];
+ nomes.forEach((n,i)=>{ const c='TEC'+String(i).padStart(5,'0'); D['crachas/'+c]={codigo:c,nome:n,linha:'',papel:'tecnico',ativo:true,adesivo:'90'+String(i).padStart(4,'0'),criadoEm:iso}; });
+ d.users['oficina@painel-colafix.app']={uid:'uOF',pass:'of1234',nome:'Oficina'}; D['perfis/uOF']={nome:'Computador da manutenção',usuario:'oficina'}; D['acessos/uOF']={perfil:'oficina',mods:['tablet'],locais:[],ativo:true};
+ const B=await H.abrir({viewport:{width:1600,height:900}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'oficina','of1234'); await H.dorme(3500);
+ const bip=async c=>{ await p.evaluate(()=>{ __T.S().tt.recente={}; }); await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1200); };
+ let t=await p.evaluate(()=>document.querySelector('.cq').innerText);
+ ok('Quem está fazendo o quê mostra os 10 técnicos', nomes.every(n=>t.includes(n.split(' ')[0])), t.slice(-600).replace(/\n/g,'|'));
+ await p.evaluate(()=>__T.S().db.doc('chamados/os-00041').set({numero:41,linha:'Pátio',defeito:'Trocar lâmpada do pátio',tipo:'eletrico',impacto:'nao',prioridade:'normal',tarefa:true,origem:'gestor',paraTec:'Bruno Lima',nome:'Marcelo Souza',status:'Aberta',criado:new Date().toISOString()})); await H.dorme(2200);
+ const ov=await p.evaluate(()=>(document.querySelector('.of-ov')||{}).innerText||'');
+ ok('Tarefa NORMAL do Marcelo também toca o alarme', /TAREFA NOVA DO MARCELO/.test(ov), ov.slice(0,200));
+ ok('O alarme diz para quem é ("Para: Bruno Lima") e pede o crachá', /Para: Bruno Lima/.test(ov)&&/Bruno, passe seu crachá/.test(ov), ov.replace(/\n/g,'|').slice(0,300));
+ t=await p.evaluate(()=>document.querySelector('.cq').innerText);
+ ok('Quem está fazendo o quê: Bruno com "tarefa do Marcelo esperando ele aceitar"', /esperando ele aceitar/.test(t));
+ await bip('900001'); let f=await p.evaluate(()=>({f:__T.S().tt.fase,m:__T.S().tt.msg}));
+ ok('Outro técnico passa o crachá: avisa que a tarefa é do Bruno', f.f==='oftec'&&/para Bruno Lima/.test(f.m), JSON.stringify(f));
+ await p.keyboard.press('Escape'); await H.dorme(800); await p.evaluate(()=>{ if(__T.S().tt.fase!=='espera') ttVoltar(); }); await H.dorme(1500);
+ await bip('900000'); f=await p.evaluate(()=>({f:__T.S().tt.fase,acc:__T.S().of.acc,tx:document.querySelector('.cq').innerText.slice(0,300)}));
+ ok('Bruno passa o crachá com o alarme na tela: abre direto a tarefa para aceitar', f.f==='ofacc'&&f.acc===41, JSON.stringify(f).slice(0,300));
+ await p.screenshot({path:'/tmp/of-alarme2.png'});
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
