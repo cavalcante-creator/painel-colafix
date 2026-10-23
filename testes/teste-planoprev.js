@@ -14,6 +14,7 @@ const util=d=>{ for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00').getDay();
  D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',ativo:true,adesivo:'777888',criadoEm:t};
  d.users['chamados@painel-colafix.app']={uid:'uCH',pass:'ch1234',nome:'Chamados'}; D['perfis/uCH']={nome:'Computador de chamados',usuario:'chamados'}; D['acessos/uCH']={perfil:'chamados',mods:['tablet'],locais:[],ativo:true};
  d.users['posto@painel-colafix.app']={uid:'uPO',pass:'po1234',nome:'Posto'}; D['perfis/uPO']={nome:'Posto',usuario:'posto'}; D['acessos/uPO']={perfil:'posto',mods:['tablet'],locais:[],ativo:true};
+ d.users['nexus@painel-colafix.app']={uid:'uNX',pass:'nx1234',nome:'Nexus'}; D['perfis/uNX']={nome:'Nexus',usuario:'nexus'}; D['acessos/uNX']={perfil:'nexus',mods:['tablet'],locais:[],ativo:true};
  /* planilha no formato da real */
  const H1=['ID','Área','Código do ativo','Ativo','Tarefa','Periodicidade','Frequência (dias)','Responsável','Última execução','Próxima execução','Status','Observações'];
  const L=[['PM-0001','Linha 1','L1-MIS-01','Misturador 1','Verificar folga das pás','Semanal','','Mecânica'],['PM-0002','Linha 1','L1-MIS-01','Misturador 1','Lubrificar mancais','Semanal','','Mecânica'],['PM-0003','Linha 1','L1-ELV-01','Elevador de canecas (Linha 1)','Verificar correia e canecas','Semanal','','Mecânica'],
@@ -133,24 +134,29 @@ const util=d=>{ for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00').getDay();
  ok('O item com problema virou chamado para a manutenção (Elevador de canecas)', fim.pb&&/Problema na preventiva: Verificar correia e canecas/.test(fim.pb.def)&&fim.pb.l==='Linha 1'&&/Elevador/.test(fim.pb.eq||''), JSON.stringify(fim.pb));
  ok('Próxima data do roteiro = hoje + 7 (dia útil) e "última" = hoje', rs2.ult===hj&&rs2.prox===util(addD(hj,7))&&!rs2.osDe, JSON.stringify(rs2));
  await salva(p); await B.browser.close();
- /* 3) posto: checklist do dia do operador (tecla 5) */
+ /* 3) o checklist do dia é no computador da Nexus (pedido de 23/10); o posto não tem mais */
  ({B,p}=await abre('posto','po1234',1366));
  const bp=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1000); };
  await bp('000123'); tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
- ok('Menu do posto tem "5 · Checklist do dia · 0 de 5 itens" (Linha 1 + filtro da Linha 1 + descarga)', /Checklist do dia/.test(tx)&&/0 de 5 itens feitos/.test(tx), tx.slice(0,500).replace(/\n/g,'|'));
- await p.screenshot({path:'/tmp/pp-posto-menu.png'});
- await p.keyboard.press('5'); await H.dorme(800);
- let f=await p.evaluate(()=>({f:__T.S().tt.fase,t:(document.querySelector('.cq')||document.body).innerText}));
- ok('Tecla 5 abre o checklist (sem os itens da Linha 2)', f.f==='pochk'&&/Conferir ruído e vazamento/.test(f.t)&&/Conferir pressão diferencial/.test(f.t)&&/Conferir sinal do sensor/.test(f.t)&&!/Conferir ruído\n/.test(f.t)&&(f.t.match(/✓ OK/g)||[]).length===5, f.f+' | '+f.t.slice(0,400).replace(/\n/g,'|'));
+ ok('Menu do posto não tem mais o checklist do dia', /O que você quer fazer|Chamar|Apontar/i.test(tx)&&!/Checklist do dia/.test(tx), tx.slice(0,300).replace(/\n/g,'|'));
+ await B.browser.close();
+ ({B,p}=await abre('nexus','nx1234',1366)); await H.dorme(1500);
+ const nOp=await p.evaluate(()=>((__T.S().pp.plano||{}).tarefas||[]).filter(t=>!t.rot&&/operador/i.test(t.resp||'')&&(+t.freq||1)<=1).length);
+ tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
+ ok('Computador da Nexus: espera mostra "0 de N" (todos os itens do operador, todas as linhas) e "Passe seu crachá"', nOp>5&&new RegExp('0\\s*de '+nOp).test(tx)&&/Passe seu crachá/.test(tx), nOp+' | '+tx.slice(0,300).replace(/\n/g,'|'));
+ await p.screenshot({path:'/tmp/pp-nexus-espera.png'});
+ const bn=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1000); };
+ await bn('000123'); let f=await p.evaluate(()=>({f:__T.S().tt.fase,t:(document.querySelector('.cq')||document.body).innerText}));
+ ok('Crachá abre direto o checklist com todos os itens (inclusive da Linha 2)', f.f==='pochk'&&(f.t.match(/✓ OK/g)||[]).length===nOp&&/Conferir ruído e vazamento/.test(f.t), f.f+' | '+f.t.slice(0,300).replace(/\n/g,'|'));
  await p.keyboard.press('Enter'); await H.dorme(1500); await p.keyboard.press('p'); await H.dorme(2000);
  await p.keyboard.type('OP-5001',{delay:8}); await H.dorme(500);
  let ck=await p.evaluate(h=>__T.S().db.doc('checkop/'+h).get().then(g=>g.exists?g.data():null),hj);
  const chOp=await p.evaluate(()=>(__T.S().chamados||[]).filter(c=>c.origem==='checklist').map(c=>({d:c.defeito,l:c.linha,n:c.nome})));
- const ks=ck&&ck.it?Object.entries(ck.it).map(([k,v])=>k+':'+v.s):[];
- ok('Enter = OK no 1º item; P = problema no 2º (vira chamado); rajada do coletor não marca nada', ks.length===2&&ks.includes('PM-0009:ok')&&ks.includes('PM-0010:pb')&&chOp.length===1&&/Checklist do operador: Conferir vazamento de pó/.test(chOp[0].d)&&chOp[0].n==='Ana Souza', JSON.stringify({ks,chOp}));
- await p.screenshot({path:'/tmp/pp-posto-chk.png'});
+ const ks=ck&&ck.it?Object.values(ck.it).map(v=>v.s).sort():[];
+ ok('Enter = OK; P = problema (vira chamado); rajada do coletor não marca nada', ks.join()==='ok,pb'&&chOp.length===1&&/Checklist do operador/.test(chOp[0].d)&&chOp[0].n==='Ana Souza', JSON.stringify({ks,chOp}));
  await p.keyboard.press('Escape'); await H.dorme(600); tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
- ok('Esc volta ao menu com "2 de 5 itens feitos"', /2 de 5 itens feitos/.test(tx), tx.slice(0,400).replace(/\n/g,'|'));
+ ok('Esc volta à espera com "2 de N"', new RegExp('2\\s*de '+nOp).test(tx)&&/Passe seu crachá/.test(tx), tx.slice(0,300).replace(/\n/g,'|'));
+ await p.screenshot({path:'/tmp/pp-nexus-espera2.png'});
  await B.browser.close();
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  /* planilha de verdade (opcional): só a leitura e a montagem dos roteiros */
