@@ -1,0 +1,24 @@
+/* Computador de chamados só com o teclado (23/10): números escolhem, 0 = botão de baixo, Esc volta; o coletor não dispara atalho. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(x=>x); const D=d.docs, t=new Date().toISOString();
+ D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
+ D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',ativo:true,adesivo:'777888',criadoEm:t};
+ d.users['chamados@painel-colafix.app']={uid:'uCH',pass:'ch1234',nome:'Chamados'}; D['perfis/uCH']={nome:'Computador de chamados',usuario:'chamados'}; D['acessos/uCH']={perfil:'chamados',mods:['tablet'],locais:[],ativo:true};
+ const B=await H.abrir({viewport:{width:1600,height:900}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'chamados','ch1234'); await H.dorme(2500);
+ const bip=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); };
+ const tecla=async k=>{ await p.keyboard.press(k); await H.dorme(700); };
+ const st=()=>p.evaluate(()=>({f:__T.S().tt.fase,ks:[...document.querySelectorAll('.cq-main .cq-bt .ck-k')].map(x=>x.textContent).join(','),r:!!document.querySelector('.cq-rod .ck-k'),cap:(document.getElementById('cr-cap')||{}).value||''}));
+ await bip('000123'); let s=await st();
+ ok('Coletor (000123) entra no crachá sem disparar atalho; botões das máquinas numerados e o de baixo com 0', s.f==='maquina'&&/^1(,\d)*/.test(s.ks)&&s.r, JSON.stringify(s));
+ await tecla('1'); s=await st(); ok('Tecla 1 escolhe a 1ª máquina → defeito', s.f==='defeito'&&s.cap==='', JSON.stringify(s));
+ await tecla('0'); s=await st(); ok('Tecla 0 = Voltar (volta para a máquina)', s.f==='maquina', JSON.stringify(s));
+ await tecla('1'); await tecla('2'); s=await st(); ok('1 e 2 → pergunta se parou', s.f==='impacto', JSON.stringify(s));
+ await tecla('1'); await H.dorme(1500); s=await st(); const ch=await p.evaluate(()=>{ const c=(__T.S().chamados||[]).slice().sort((a,b)=>(+b.numero||0)-(+a.numero||0))[0]; return c&&{n:c.numero,imp:c.impacto,nome:c.nome}; });
+ ok('Tecla 1 = "Sim, parou": chamado aberto sem mouse', s.f==='ok'&&ch&&ch.imp==='parou'&&ch.nome==='Ana Souza', JSON.stringify({s,ch}));
+ await tecla('Enter'); s=await st(); ok('Enter na tela "Chamado aberto" volta ao início', s.f==='espera', JSON.stringify(s));
+ await bip('777888'); s=await st(); ok('Técnico bipa: lista com o botão numerado', s.f==='tecnico'&&/1/.test(s.ks), JSON.stringify(s));
+ await tecla('1'); await H.dorme(1200); const c2=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {tec:c.exec&&c.exec.tecnico,f:__T.S().tt.fase}; },ch.n);
+ ok('Tecla 1 = "Começar o conserto"', c2.tec==='Bruno Lima', JSON.stringify(c2));
+ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; }); await bip('777888'); await tecla('Escape'); s=await st(); ok('Esc volta ao início', s.f==='espera', JSON.stringify(s));
+ await p.screenshot({path:'/tmp/ck-tela.png'});
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
