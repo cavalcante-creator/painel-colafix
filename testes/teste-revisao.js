@@ -1,8 +1,8 @@
 /* Revisão por usuário (12/10): botões de gravar só para quem pode, "Produção (consulta)" sem editar a programação, textos e telas de celular. */
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs; const agora=new Date().toISOString();
- /* a ordem 5001 fica na terça da semana que o calendário mostra (seg a dom), para o teste não depender do dia (fim de semana / feriado na segunda) */
- { const t=new Date(); const dw=(t.getDay()+6)%7; t.setDate(t.getDate()-dw+1); const iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); if(D['ordens/5001']) D['ordens/5001'].data=iso; }
+ /* a ordem 5001 fica na terça da semana que o calendário mostra (seg a sex; no fim de semana, a próxima), para o teste não depender do dia (fim de semana / feriado na segunda) */
+ { const t=new Date(); const dw=(t.getDay()+6)%7; t.setDate(t.getDate()-dw+1+(dw>=5?7:0)); /* no sábado/domingo o calendário abre na semana que vem */ const iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); if(D['ordens/5001']) D['ordens/5001'].data=iso; }
   D['ordens/5001'].rancho='123456'; D['ranchos/123456']={numero:'123456',criadoEm:agora,ordens:[{num:'5001'}],itens:[{c:'MP001',d:'Cimento',um:'kg',q:500}]};
   D['chamados/os-00001']={numero:1,linha:'Linha 1',defeito:'teste',impacto:'parou',nome:'Ana',status:'Aberta',criado:agora};
   const add=(u,ac)=>{ const uid='u'+u; d.users[u+'@painel-colafix.app']={uid,pass:'x12345',nome:u}; D['perfis/'+uid]={nome:u,usuario:u}; D['acessos/'+uid]=Object.assign({locais:[],ativo:true},ac); };

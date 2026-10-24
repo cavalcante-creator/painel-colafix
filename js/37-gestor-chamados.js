@@ -42,7 +42,7 @@ function vGxChamados(){ const G=S.gch, {m,xs}=gchLista(), ab=m.abertos, ag=ab.fi
    <div class="gch-bar"><div class="gx-chips" role="group" aria-label="Mostrar">${chip('abertos','Abertos')}${chip('minhas','Minhas tarefas')}${chip('feitos','Feitos')}${chip('todos','Todos')}</div>
     <label class="gch-q">${ic('lupa',16,2)}<input id="gch-q" placeholder="Buscar: o que, onde, técnico, nº" aria-label="Buscar chamado" data-gchq></label></div>
    <section class="card gch-lst">${xs.length?xs.map(card).join(''):`<div class="empty">${G.f==='abertos'?'Nenhum chamado aberto. Tudo em dia.':'Nada aqui.'}</div>`}</section>
-   <p class="gx-p">As tarefas aparecem para a manutenção no computador de chamados, no posto das linhas e no monitor. O técnico assume ao tocar em "Começar"; quando terminar, ele mesmo conclui — ou você marca como feito aqui.</p>
+   <p class="gx-p">As tarefas aparecem no computador da manutenção (oficina), que toca o alarme, e no monitor. O técnico aceita passando o crachá; quando ele termina, a tarefa vem para você conferir em "Para conferir" — ou você marca como feito aqui.</p>
    ${G.nova?gchForm():''}`; }
 
 function gchForm(){ const F=S.gch.fm||(S.gch.fm={onde:'',tipo:'',prio:'normal',prazo:addDias(hojeStr(),2),tec:'',texto:'',local:'',parou:false}), L=linhasOrd(), tecs=gchTecs();

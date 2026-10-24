@@ -6,7 +6,7 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
   d.docs['silos/c2']={saldoKg:9500,medidoKg:10000,medidoEm:new Date().toISOString(),atualizadoEm:new Date().toISOString(),origem:'consumo'}; });
  // ---- dona: escolhe o cargo e a linha do Fernando ----
  let B=await H.abrir(); await B.ctx.clock.setFixedTime(hoje); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
- await p.evaluate(()=>{ __T.S().eq.aba='cargos'; __T.go('acessos'); }); await H.dorme(400);
+ await p.evaluate(()=>{ __T.S().eq.aba='cargos'; __T.S().eq.maisCg=true; __T.go('acessos'); }); await H.dorme(400);
  ok('Cargo pronto "Silos e calendário (só consulta)" aparece em Equipe e cargos', /Silos e calendário \(só consulta\)/.test(await p.evaluate(()=>document.getElementById('view').innerText)));
  await p.evaluate(()=>{ __T.S().eq.aba='pessoas'; __T.go('acessos'); }); await H.dorme(400);
  await p.selectOption('select[data-eq-linhas="uFER"]','Linha 1'); await H.dorme(600);

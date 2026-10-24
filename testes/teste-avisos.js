@@ -5,7 +5,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  await B.ctx.route('https://ntfy.sh/**',async r=>{ if(r.request().method()==='OPTIONS') return r.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST'}});
    if(falhar>0){ falhar--; return r.abort('internetdisconnected'); } env.push(JSON.parse(r.request().postData()||'{}')); return r.fulfill({status:200,headers:{'access-control-allow-origin':'*'},body:'{}'}); });
  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
- const ir=async sid=>{ await p.evaluate(sid=>{ __T.S().siloSel=sid; __T.go('silos'); },sid); await H.dorme(300); };
+ const ir=async sid=>{ await p.evaluate(sid=>{ __T.S().siloSel=sid; __T.S()._ajCfgAb=true; __T.go('silos'); },sid); await H.dorme(300); };
  await ir('c2'); await p.click('[data-act="av-novo"]'); await H.dorme(600);
  let srv=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const av=srv['config/geral'].avisos;
  ok('Administradora cria o tópico e liga os avisos (tópico longo e aleatório, QR e instruções na tela)', av&&av.ativo&&/^colafix-silos-[a-z2-9]{9}$/.test(av.topico)&&/App Store/.test(await p.evaluate(()=>document.getElementById('view').innerText))&&await p.evaluate(()=>!!document.querySelector('.av-top svg')), av&&av.topico);

@@ -1,0 +1,90 @@
+{
+ "res": [
+  {
+   "n": "Configuração: silo de consumo por linha salva",
+   "ok": true,
+   "det": "{\"Linha 1\":\"c2\",\"Linha 2\":\"c1\"}"
+  },
+  {
+   "n": "Saldo inicial por medição 📏 = 10.000 kg",
+   "ok": true,
+   "det": "saldo=10000"
+  },
+  {
+   "n": "T1 10.000 − 500 = 9.500 kg no banco e no painel",
+   "ok": true,
+   "det": "banco=9500 | tanque: SILO GRANDE 9,5t de 70 t 13,6%Crítico ⚙️ 19:14"
+  },
+  {
+   "n": "T2 depois de recarregar continua 9.500 kg",
+   "ok": true,
+   "det": "AGORA 9,5 t 13,6% Crítico 9.500 kg · Última atualização: 24/10/2026 19:14 · Origem: ⚙️ Atualização automática"
+  },
+  {
+   "n": "T3 9.500 − 300 = 9.200 kg",
+   "ok": true,
+   "det": "saldo=9200"
+  },
+  {
+   "n": "T4 consumo maior que o saldo: bloqueado e avisado, saldo não fica negativo",
+   "ok": true,
+   "det": "saldo=9200 | aviso: Estoque insuficiente no silo Silo Grande (cimento): saldo 9.200 kg, consumo de 10.000 kg (ordem 5001). O apont"
+  },
+  {
+   "n": "T5 medição manual: saldo 8.950, registrada como MEDIÇÃO (não consumo)",
+   "ok": true,
+   "det": "diferença na tela antes de salvar: −250 kg | mov: antes 9200, medido 8950, dif -250, novo 8950, motivo Inventário"
+  },
+  {
+   "n": "T6 depois de recarregar continua 8.950 kg (origem medição manual)",
+   "ok": true,
+   "det": "AGORA 9,0 t 12,8% Crítico 8.950 kg · Última atualização: 24/10/2026 19:14 · Origem: 📏 Medição manual"
+  },
+  {
+   "n": "T7 histórico com todas as movimentações (2 consumos, 1 recusado, 2 medições)",
+   "ok": true,
+   "det": "consumos=2 medições=2 recusados=1"
+  },
+  {
+   "n": "T8 o mesmo apontamento não desconta duas vezes",
+   "ok": true,
+   "det": "saldo antes 8950 depois 8950 · retorno [{\"sid\":\"c2\",\"kg\":500,\"dup\":true},{\"sid\":\"c2\",\"kg\":500,\"dup\":true}]"
+  },
+  {
+   "n": "Extra A: desfazer apontamento devolve 100 kg ao silo",
+   "ok": true,
+   "det": "8850 → 8950"
+  },
+  {
+   "n": "Extra B: \"Nova medição\" (tela antiga) atualiza o saldo dos silos",
+   "ok": true,
+   "det": "10000 / 8000 / 5000 kg"
+  },
+  {
+   "n": "Extra C: Cimento × programação usa o mesmo saldo dos tanques (23 t)",
+   "ok": true,
+   "det": "estimado=23 t"
+  },
+  {
+   "n": "Extra D: apontamento que não descontou (sem internet) é descontado depois, uma vez só",
+   "ok": true,
+   "det": "Silo Pequeno: 9800 kg"
+  },
+  {
+   "n": "Extra E: linha sem silo configurado não desconta e avisa",
+   "ok": true,
+   "det": "A Linha 2 não tem silo de consumo configurado (Silos → Consumo automático). O apontamento "
+  }
+ ],
+ "erros": [
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+ ]
+}

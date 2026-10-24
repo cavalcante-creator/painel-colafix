@@ -68,7 +68,7 @@ document.head.insertAdjacentHTML('beforeend',`<style id="tva-css">
 const AV_TN=Object.fromEntries(Object.entries(AV_TIPOS).map(([k,v])=>[k,v.n]));
 function avPodeEditar(){ try{ if(dbMaster()) return true; const pf=S.acs&&S.acs.doc&&S.acs.doc.perfil; return !!pf&&!['ver','tv','cal','silosver','consulta','tvtodas','rh','tablet','chamados','producao','auditor','tvman'].includes(pf); }catch(e){ return false; } }
 function avEditor(){ if(!avPodeEditar()) return ''; return '<div style="margin-top:16px">'+window.avxRender({pre:'av-',idp:'av-',avisos:S.avTV||[],form:S.avf,linhas:linhasOrd(),sub:'Passam no rodapé das TVs. Escolha toda a fábrica ou uma linha. O RH também publica em RH → Início.'})+'</div>'; }
-document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="av-"]'); if(!b) return; const a=b.dataset.act, h=hojeStr();
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="av-"]'); if(!b||!b.closest('.avx')) return; /* os avisos do celular (Ajustes, js/08) também usam av-novo/av-teste */ const a=b.dataset.act, h=hojeStr();
   const le=()=>{ const g=(i,d)=>{ const e=document.getElementById(i); return e?e.value:d; }; if(S.avf) Object.assign(S.avf,{t:g('av-t',S.avf.t||''),sub:g('av-s',S.avf.sub||''),de:g('av-de',S.avf.de),ate:g('av-ate',S.avf.ate)}); };
   const salva=async(xs,msg)=>{ try{ await S.db.doc('config/feriados').set({avisos:xs},{merge:true}); S.avTV=xs; S.avf=null; toast(msg); }catch(e){ toast('Não foi possível salvar: '+((e&&e.message)||e)); } render(); };
   if(a==='av-novo'){ S.avf={tipo:'info',linhas:[],per:'hoje',de:h,ate:h}; render(); return; }

@@ -24,7 +24,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>window.__dbRestaura()); await zera();
  await p.evaluate(()=>{ window.__dbRestaura(); const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(600);
  const bts=await p.evaluate(()=>[...document.querySelectorAll('.cq-tema .cq-sec')].map(b=>b.innerText));
- ok('Espera tem "Tela cheia" e "Sair"', bts.includes('Tela cheia')&&bts.includes('Sair'), bts.join(' · '));
+ ok('Espera tem "Tela cheia" e "Sair"', bts.map(x=>x.replace(/^\d/,'')).includes('Tela cheia')&&bts.map(x=>x.replace(/^\d/,'')).includes('Sair'), bts.join(' · '));
  p.once('dialog',dl=>dl.accept()); await p.click('[data-act="cq-sair"]'); await H.dorme(2500);
  ok('"Sair" (com confirmação) encerra a sessão e volta para a entrada', await p.evaluate(()=>!!document.querySelector('#lg, .login, input[type=password]')));
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

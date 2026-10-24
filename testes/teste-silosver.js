@@ -11,7 +11,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  });
  // ---- administradora: o perfil pronto aparece em Equipe e cargos ----
  let B=await H.abrir(); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(1800);
- await p.evaluate(()=>{ __T.S().eq.aba='cargos'; __T.go('acessos'); }); await H.dorme(500); const eq=await p.evaluate(()=>document.getElementById('view').innerText);
+ await p.evaluate(()=>{ __T.S().eq.aba='cargos'; __T.S().eq.maisCg=true; __T.go('acessos'); }); await H.dorme(500); const eq=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Perfil pronto "Silos (só consulta)" disponível em Equipe e cargos', /Silos \(só consulta\)/.test(eq) && /Só olha o nível dos silos/.test(eq));
  await B.browser.close();
  // ---- a pessoa da consulta ----
@@ -25,7 +25,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  ok('Não consegue abrir nenhuma outra tela (medição, cargas, ajustes, produção…)', tent.every(x=>x.endsWith('→silosver')), tent.join(' '));
  await p.evaluate(()=>{ const v=JSON.parse(localStorage.getItem('__srv')); v.docs['silos/c2'].saldoKg=8900; v.docs['silos/c2'].atualizadoEm=new Date().toISOString(); localStorage.setItem('__srv',JSON.stringify(v)); window.__mockReconnect(); }); await H.dorme(800);
  ok('Atualiza sozinho quando o saldo muda (sem recarregar)', /8,9\s*t/.test(await p.evaluate(()=>document.getElementById('view').innerText)));
- ok('No banco, o perfil é tratado como "só ver"', await p.evaluate(()=>{ try{ return true; }catch(e){ return false; } }) && require('fs').readFileSync('/home/claude/painel-colafix-main/firestore.rules','utf8').includes("'cal', 'silosver'"));
+ ok('No banco, o perfil é tratado como "só ver"', await p.evaluate(()=>{ try{ return true; }catch(e){ return false; } }) && require('fs').readFileSync(''+require('path').join(__dirname,'..','firestore.rules')+'','utf8').includes("'cal', 'silosver'"));
  await p.setViewportSize({width:390,height:844}); await H.dorme(400); await p.screenshot({path:'/tmp/silos-consulta-celular.png',fullPage:true});
  const larg=await p.evaluate(()=>[document.documentElement.scrollWidth,innerWidth]);
  ok('No celular: sem rolagem lateral', larg[0]<=larg[1], larg.join(' / '));
