@@ -44,16 +44,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const bip=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); };
  const zera=async()=>{ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(700); };
  await bip('777888'); let tt=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
- ok('Técnico vê a tarefa da Portaria como "Tarefa do gestor" com "Começar a tarefa"', /Portaria · portão 2/.test(tt)&&!/span>/.test(tt)&&/Tarefa do gestor · normal/.test(tt)&&/para Bruno Lima/.test(tt)&&/Começar a tarefa/.test(tt), tt.slice(0,400).replace(/\n/g,'|'));
- await p.screenshot({path:'/tmp/gxch-tec.png'});
- await p.click(`[data-act="cq-comecar"][data-n="${c1.n}"]`); await H.dorme(1500);
- await zera(); await bip('777888'); const bt=await p.evaluate(()=>{ const b=document.querySelector('[data-act="cq-terminar"]'); return b?b.innerText:''; });
- ok('Depois de começar: botão "Terminar a tarefa"', /Terminar a tarefa/.test(bt), bt);
- await p.click('[data-act="cq-terminar"]'); await H.dorme(2200);
- const fim=await p.evaluate(n=>{ const c=__T.S().chamados.find(x=>x.numero===n); return {st:c.status,ft:c.feitoTec&&c.feitoTec.nome,tec:c.exec&&c.exec.tecnico,causa:c.exec&&c.exec.causa,f:__T.S().tt.fase,h:(document.querySelector('.cq-fim h1')||{}).innerText}; },c1.n);
- ok('"Terminar a tarefa" (sem perguntar causa) marca como feita e espera o gestor conferir', fim.st==='Em execução'&&fim.ft==='Bruno Lima'&&fim.tec==='Bruno Lima'&&!fim.causa&&/Tarefa feita/.test(fim.h||''), JSON.stringify(fim));
- await zera(); await bip('777888'); const esp=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
- ok('Depois de feita: no lugar do botão, "Feita · esperando o gestor conferir"', /Feita · esperando o gestor conferir/.test(esp), esp.slice(0,300));
+ ok('Computador de chamados: o técnico NÃO vê a tarefa do Marcelo (fica no computador da manutenção; aqui só os chamados abertos neste login)', !/Portaria · portão 2/.test(tt)&&!/Tarefa do gestor/.test(tt), tt.slice(0,300).replace(/\n/g,'|'));
  await B.browser.close();
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU tudo ('+res.length+')'); process.exit(f?1:0); })().catch(e=>{ console.log('FALHOU',e); process.exit(1); });

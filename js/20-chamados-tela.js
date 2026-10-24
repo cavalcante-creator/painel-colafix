@@ -6,6 +6,8 @@
 const cqEsc=()=>{ try{ return localStorage.getItem('colafix.chEscuro')==='1'; }catch(e){ return false; } };
 const cqDefeitos=()=>((S.cfg||{}).manDefeitos&&S.cfg.manDefeitos.length?S.cfg.manDefeitos:TT_DEFEITOS);
 const cqCausas=()=>((S.cfg||{}).manCausas&&S.cfg.manCausas.length?S.cfg.manCausas:MZ_CAUSAS);
+/* técnico no computador de chamados: só os chamados abertos POR ESTE LOGIN (os do Marcelo, preventivas e de outros computadores ficam no computador da manutenção). Pedido de 24/10. */
+function cqTecLista(){ const xs=cqAbertos(); try{ if(typeof poOn==='function'&&poOn()) return xs; if(typeof ofOn==='function'&&ofOn()) return xs; if(typeof ttSoChamados==='function'&&ttSoChamados()&&S.uid) return xs.filter(c=>c.por===S.uid); }catch(e){} return xs; }
 const cqAbertos=()=>(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)&&c.status!=='Concluída');
 function cqEstado(l){ const xs=cqAbertos().filter(c=>c.linha===l);
   const par=xs.find(c=>c.impacto==='parou'&&!(c.exec&&c.exec.tecnico)), exe=xs.find(c=>c.exec&&c.exec.tecnico), ag=xs.find(c=>!(c.exec&&c.exec.tecnico));
@@ -33,7 +35,7 @@ function vChamados(){ const T=S.tt, L=ttLinhas(), h=new Date(), esc_=cqEsc();
   else if(T.fase==='defeito'){ c=`${cqEtapas(2)}<h1 class="cq-h">O que aconteceu${T.equip?' com <em>'+esc(T.equip)+'</em>':''}?</h1><div class="cq-g">${cqDefeitos().map(d=>cqBt('cq-def',d,`data-v="${esc(d)}"`)).join('')}</div>${msg}${cqRod('Um toque escolhe e já passa para a próxima pergunta.','cq-volta-maq','Voltar')}`; }
   else if(T.fase==='impacto'){ c=`${cqEtapas(3)}<h1 class="cq-h">${T.equip?esc(T.equip):'A máquina'} <em>parou</em>?</h1><div class="cq-g2">${cqBt('cq-imp','Sim, parou','data-v="parou"'+(T.enviando?' disabled':''),'crit','A linha fica marcada como parada até o técnico liberar')}${cqBt('cq-imp','Não, ainda funciona','data-v="reduziu"'+(T.enviando?' disabled':''),'warn','Funciona com problema; o técnico vem assim que puder')}</div>${msg}${cqRod('Ao tocar, o chamado é aberto e a manutenção já vê no painel e na TV.','cq-volta-def','Voltar')}`; }
   else if(T.fase==='ok'){ const ch=manDoc(T.numero); c=`<section class="cq-fim"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg><h1>Chamado aberto · OS ${manNum(T.numero)}</h1><p>${esc(T.linha||'')}${T.equip?' · '+esc(T.equip):''}${T.defeito?' · '+esc(T.defeito):''}${ch&&ch.impacto==='parou'?' · <b class="crit">máquina parada</b>':''}</p><p class="cq-p2">A manutenção já foi avisada. Esta tela volta para o início sozinha.</p></section>`; }
-  else if(T.fase==='tecnico'){ const xs=cqAbertos(), meu=c0=>c0.exec&&c0.exec.tecnico&&tecEh(c0,T.p.nome);
+  else if(T.fase==='tecnico'){ const xs=cqTecLista(), meu=c0=>c0.exec&&c0.exec.tecnico&&tecEh(c0,T.p.nome);
     const peso=c0=>meu(c0)?0:(c0.impacto==='parou'&&!(c0.exec&&c0.exec.tecnico))?1:!(c0.exec&&c0.exec.tecnico)?2:3;
     const ord=xs.slice().sort((a,b)=>peso(a)-peso(b)||String(a.criado||'').localeCompare(String(b.criado||'')));
     const mine=ord.filter(meu);

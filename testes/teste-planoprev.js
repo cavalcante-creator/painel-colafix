@@ -7,12 +7,13 @@ let XLSX; try{ XLSX=require('xlsx'); }catch(e){ console.log('FALHOU — falta a 
 const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 const loc=x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10), hj=loc(new Date());
 const addD=(s,n)=>{ const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+n); return loc(d); };
-const util=d=>{ for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00').getDay(); if(w!==0&&w!==6) return d; d=addD(d,1); } return d; };
+const util=d=>{ for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00').getDay(); if(w!==0&&w!==6&&!['01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25'].includes(d.slice(5))) return d; d=addD(d,1); } return d; };
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs, t=new Date().toISOString();
  D['config/geral'].linhasOrdem=['Linha 1','Linha 2'];
  D['crachas/ABCD2345']={codigo:'ABCD2345',nome:'Ana Souza',linha:'Linha 1',papel:'operador',ativo:true,adesivo:'000123',criadoEm:t};
  D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',ativo:true,adesivo:'777888',criadoEm:t};
  d.users['chamados@painel-colafix.app']={uid:'uCH',pass:'ch1234',nome:'Chamados'}; D['perfis/uCH']={nome:'Computador de chamados',usuario:'chamados'}; D['acessos/uCH']={perfil:'chamados',mods:['tablet'],locais:[],ativo:true};
+ d.users['oficina@painel-colafix.app']={uid:'uOF',pass:'of1234',nome:'Oficina'}; D['perfis/uOF']={nome:'Computador da manutenção',usuario:'oficina'}; D['acessos/uOF']={perfil:'oficina',mods:['tablet'],locais:[],ativo:true};
  d.users['posto@painel-colafix.app']={uid:'uPO',pass:'po1234',nome:'Posto'}; D['perfis/uPO']={nome:'Posto',usuario:'posto'}; D['acessos/uPO']={perfil:'posto',mods:['tablet'],locais:[],ativo:true};
  d.users['nexus@painel-colafix.app']={uid:'uNX',pass:'nx1234',nome:'Nexus'}; D['perfis/uNX']={nome:'Nexus',usuario:'nexus'}; D['acessos/uNX']={perfil:'nexus',mods:['tablet'],locais:[],ativo:true};
  /* planilha no formato da real */
@@ -112,15 +113,16 @@ const util=d=>{ for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00').getDay();
  await p.evaluate(()=>__T.go('gxch')); await H.dorme(700); tx=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('A tarefa programada NÃO aparece em Chamados (lá só o imediato)', !/Revisar o portão/.test(tx), tx.slice(0,300).replace(/\n/g,'|'));
  await salva(p); await B.browser.close();
- /* 2) computador de chamados: técnico começa e faz o checklist */
- ({B,p}=await abre('chamados','ch1234',1600));
+ /* 2) computador da manutenção (oficina): técnico começa e faz o checklist (desde 24/10 o computador de chamados só mostra os chamados abertos nele) */
+ ({B,p}=await abre('oficina','of1234',1600));
  const bip=async c=>{ await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); };
  const zera=async()=>{ await p.evaluate(()=>{ const T=__T.S().tt; T.recente={}; Object.assign(T,{fase:'espera',p:null,msg:''}); __T.go('mantotem'); }); await H.dorme(700); };
- await bip('777888'); tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
- ok('Técnico vê a preventiva ("Preventiva do plano · 3 itens", "Começar a preventiva") e a tarefa programada', /Preventiva do plano · 3 itens/.test(tx)&&/Começar a preventiva/.test(tx)&&/Revisar o portão da portaria/.test(tx), tx.slice(0,500).replace(/\n/g,'|'));
- await p.click(`[data-act="cq-comecar"][data-n="${os.n}"]`); await H.dorme(1500); await zera(); await bip('777888');
+ await bip('777888'); if(await p.evaluate(()=>__T.S().tt.fase==='ofacc')){ await p.keyboard.press('Escape'); await H.dorme(400); }
+ await p.keyboard.press('3'); await H.dorme(700); tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
+ ok('Oficina › Preventivas: a preventiva do plano (3 itens) com "Começar"', /3 itens/.test(tx)&&!!(await p.$(`[data-act="of-comecar"][data-n="${os.n}"]`)), tx.slice(0,300).replace(/\n/g,'|'));
+ await p.click(`[data-act="of-comecar"][data-n="${os.n}"]`); await H.dorme(1500); await zera(); await bip('777888'); if(await p.evaluate(()=>__T.S().tt.fase==='ofacc')){ await p.keyboard.press('Escape'); await H.dorme(400); } await p.keyboard.press('2'); await H.dorme(700);
  const bt=await p.evaluate(n=>{ const b=document.querySelector(`[data-act="cq-terminar"][data-n="${n}"]`); return b?b.innerText:''; },os.n);
- ok('Depois de começar: "Fazer o checklist e concluir"', /Fazer o checklist e concluir/.test(bt), bt);
+ ok('Depois de começar: "Fazer o checklist"', /Fazer o checklist/.test(bt), bt);
  await p.click(`[data-act="cq-terminar"][data-n="${os.n}"]`); await H.dorme(700);
  tx=await p.evaluate(()=>(document.querySelector('.cq')||document.body).innerText);
  const dis=await p.evaluate(()=>{ const b=document.querySelector('[data-act="cqk-fim"]'); return b?b.disabled:null; });
