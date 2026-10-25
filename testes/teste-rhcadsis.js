@@ -15,7 +15,7 @@ const somaDias=n=>{ const d=new Date(); d.setDate(d.getDate()+n); return d.getFu
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2800);
   const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), view=()=>p.evaluate(()=>document.getElementById('view').innerText);
   const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.textContent.trim()).join('|'));
-  ok('Menu do RH: Terceirizados saiu do menu (fica dentro de Funcionários) e Cadastros é o último', nav==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Cadastros', nav);
+  ok('Menu do RH: Terceirizados saiu do menu (fica dentro de Funcionários) e Cadastros é o último', nav==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Vagas|Cadastros', nav);
   await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); await p.click('[data-act="rh-fview"][data-v="terc"]'); await H.dorme(300); const vt=await view();
   await p.evaluate(()=>__T.go('rhterc')); await H.dorme(400); const vw=await p.evaluate(()=>__T.S().view);
   ok('Funcionários › aba Terceirizados mostra os terceirizados; o atalho antigo (rhterc) cai nessa aba', /Limpeza Já/.test(vt)&&/Novo terceirizado/.test(vt)&&vw==='rhfunc', vw+' | '+vt.slice(0,200).replace(/\n/g,' | '));

@@ -1,0 +1,26 @@
+/* Pedido 11 (24/10): o Marcelo autoriza a hora extra direto (sem pedido) e o RH vê no fechamento. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs, hj=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10))(new Date());
+ D['presenca/'+hj]={dia:hj,exp:true,p:[{n:'ANA SOUZA',s:'Linha 1',e:'07:20',g:'COLAFIX'},{n:'CARLOS PEREIRA',s:'Linha 2',e:'07:25',g:'COLAFIX'}],f:[{n:'JOAO LIMA',s:'Linha 1',m:'Sem registro'}],em:new Date().toISOString()};
+ d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor'],locais:[],ativo:true};
+ let B=await H.abrir({viewport:{width:1440,height:900}}); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
+ const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.dataset.go));
+ ok('Menu do gestor tem "Hora extra" logo depois de Pessoas hoje', menu.indexOf('gxhe')===menu.indexOf('gxpres')+1, menu.join(','));
+ await p.evaluate(()=>__T.go('gxhe')); await H.dorme(1200); let s=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Tela mostra quem veio hoje (do Face ID) para escolher', /ANA SOUZA/.test(s)&&/CARLOS PEREIRA/.test(s)&&/não veio/.test(s), s.slice(0,300).replace(/\n/g,' | '));
+ await p.click('[data-act="he-tg"][data-v="ANA SOUZA"]'); await H.dorme(200); await p.click('[data-act="he-tg"][data-v="CARLOS PEREIRA"]'); await H.dorme(200);
+ await p.fill('#he-q','Motorista Zeca'); await H.dorme(400); await p.click('[data-act="he-add"]'); await H.dorme(300);
+ await p.type('#he-ini','1730'); await p.type('#he-fim','2000'); await p.fill('#he-mot','Terminar a ordem 5001'); await H.dorme(200);
+ const v=await p.evaluate(()=>[document.getElementById('he-ini').value,document.getElementById('he-fim').value]); ok('Hora digitada vira 17:30 e 20:00', v.join(' ')==='17:30 20:00', v.join(' '));
+ await p.click('[data-act="he-ok"]'); await H.dorme(1200);
+ const ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const he=Object.entries(ds).filter(([k])=>k.startsWith('horaextra/')).map(([,x])=>x);
+ ok('Grava horaextra: 3 pessoas, '+hj+', 17:30 às 20:00, motivo e quem autorizou', he.length===1&&he[0].nomes.length===3&&he[0].ini==='17:30'&&he[0].fim==='20:00'&&he[0].dia===hj&&he[0].porNome==='Marcelo Souza'&&/5001/.test(he[0].mot), JSON.stringify(he));
+ s=await p.evaluate(()=>document.getElementById('view').innerText); ok('Lista do mês: "1 autorização · 7h30 no total" e ANA SOUZA 2h30', /1 autorização · 7h30 no total/.test(s)&&/ANA SOUZA 2h30/.test(s), (s.match(/AUTORIZADAS[\s\S]{0,200}/)||[''])[0].replace(/\n/g,' | '));
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close();
+ B=await H.abrir({viewport:{width:1440,height:900}}); p=B.page; await H.preparar(p,Object.assign(d,{docs:Object.assign(D,ds)})); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(4000);
+ const hr=await p.evaluate(m=>window.HoraExtra&&[HoraExtra.horasDe('Ana Souza',m),HoraExtra.horasDe('Ana Maria Souza',m),HoraExtra.horasDe('João Lima',m)],hj.slice(0,7));
+ ok('RH: HoraExtra.horasDe acha "Ana Souza" (2,5 h; primeiro e último nome) e não acha quem não fez', hr&&hr[0]===2.5&&hr[1]===2.5&&hr[2]===0, JSON.stringify(hr));
+ await p.evaluate(()=>__T.go('gxhe')); await H.dorme(800); await p.click('[data-act="he-x"]'); await H.dorme(300); await p.click('[data-act="he-x"]'); await H.dorme(900);
+ const ds2=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const x2=Object.entries(ds2).filter(([k])=>k.startsWith('horaextra/')).map(([,x])=>x)[0];
+ ok('"Tirar" (dois toques) marca a hora extra como tirada', x2&&x2.removido===true, JSON.stringify(x2).slice(0,120));
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

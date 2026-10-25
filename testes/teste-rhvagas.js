@@ -1,0 +1,30 @@
+/* Pedido 34 (24/10): RH › Vagas — vagas abertas e candidatos etapa por etapa até a admissão. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+ D['rh/config']={setores:['Linha 1','Expedição']}; D['rh/dados/funcoes/fn1']={nome:'Operador de produção',epis:[]};
+ const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+ const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), view=()=>p.evaluate(()=>document.getElementById('view').innerText), col=async c=>Object.entries(await srv()).filter(([k])=>k.startsWith(c+'/')).map(([k,v])=>Object.assign({_k:k},v));
+ const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.dataset.go));
+ ok('Menu do RH tem "Vagas" antes de Cadastros', menu.indexOf('rhvagas')>=0&&menu.indexOf('rhvagas')===menu.indexOf('rhfuncoes')-1, menu.join(','));
+ await p.evaluate(()=>__T.go('rhvagas')); await H.dorme(1000); let s=await view(); ok('Tela vazia: "Nenhuma vaga aberta"', /Vagas e candidatos/.test(s)&&/Nenhuma vaga aberta/.test(s), s.slice(0,200).replace(/\n/g,' | '));
+ await p.click('[data-act="rhv-vnova"]'); await H.dorme(400); await p.fill('#rhv-fn','Operador de produção'); await p.fill('#rhv-st','Linha 1'); await p.fill('#rhv-qt','2'); await p.selectOption('#rhv-mo','substituicao'); await p.fill('#rhv-sb','José'); await p.click('[data-act="rhv-vok"]'); await H.dorme(900);
+ let vs=await col('rh/dados/vagasab'); ok('Abre a vaga: Operador de produção · Linha 1 · 2 pessoas · substituição de José', vs.length===1&&vs[0].funcao==='Operador de produção'&&vs[0].qtd===2&&vs[0].motivo==='substituicao'&&vs[0].status==='aberta', JSON.stringify(vs));
+ const amanha=(()=>{ const x=new Date(Date.now()+864e5); return new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10); })();
+ await p.click('[data-act="rhv-cnovo"]'); await H.dorme(400); await p.fill('#rhv-cn','Maria Teste'); await p.fill('#rhv-ct','(51) 99999-1234'); await p.selectOption('#rhv-co','Indicação'); await p.fill('#rhv-cv',amanha+'T09:30'); await p.click('[data-act="rhv-cok"]'); await H.dorme(900);
+ await p.click('[data-act="rhv-cnovo"]'); await H.dorme(400); await p.fill('#rhv-cn','Pedro Teste'); await p.click('[data-act="rhv-cok"]'); await H.dorme(900);
+ let cs=await col('rh/dados/candidatos'); ok('Dois candidatos na vaga, etapa "novo"', cs.length===2&&cs.every(c=>c.etapa==='novo'&&c.vagaId===vs[0]._k.split('/').pop()), JSON.stringify(cs.map(c=>[c.nome,c.etapa])));
+ s=await view(); ok('Números: 1 vaga aberta, 2 candidatos, 1 entrevista nos próximos 7 dias; WhatsApp no cartão', /1\s*vagas abertas/.test(s)&&/2\s*candidatos em andamento/.test(s)&&/1\s*entrevistas nos próximos 7 dias/.test(s)&&!!(await p.$('a[href^="https://wa.me/5551999991234"]')), s.slice(0,300).replace(/\n/g,' | '));
+ const mid=cs.find(c=>c.nome==='Maria Teste')._k.split('/').pop(), pid=cs.find(c=>c.nome==='Pedro Teste')._k.split('/').pop();
+ for(let i=0;i<3;i++){ await p.click(`[data-act="rhv-et"][data-id="${mid}"]:not(.lnk)`); await H.dorme(500); }
+ await p.click(`[data-act="rhv-et"][data-id="${pid}"][data-v="desistiu"]`); await H.dorme(600);
+ cs=await col('rh/dados/candidatos'); const m=cs.find(c=>c.nome==='Maria Teste'), pe=cs.find(c=>c.nome==='Pedro Teste');
+ ok('Maria passa por triagem → entrevista → aprovada (com histórico); Pedro desistiu', m.etapa==='aprovado'&&m.hist.length===4&&pe.etapa==='desistiu', m.etapa+' '+(m.hist||[]).map(h=>h.para).join('>')+' / '+pe.etapa);
+ s=await view(); ok('Encerrados (1) com o Pedro', /Encerrados \(1\)/.test(s));
+ await p.click(`[data-act="rhv-adm"][data-id="${mid}"]`); await H.dorme(1200);
+ const st=await p.evaluate(()=>({v:__T.S().view,h:document.getElementById('view').innerHTML}));
+ cs=await col('rh/dados/candidatos'); ok('"Começar admissão": abre a Nova admissão com o nome e marca a Maria como admitida', st.v==='rhfunc'&&/Maria Teste/.test(st.h)&&/Operador de produção/.test(st.h)&&cs.find(c=>c.nome==='Maria Teste').etapa==='admitido', st.v);
+ await p.evaluate(()=>__T.go('rhvagas')); await H.dorme(800); s=await view(); ok('Vaga mostra "1 de 2 preenchidas"', /1 de 2 preenchidas/.test(s), (s.match(/\d de \d preenchida\w*/)||[''])[0]);
+ await p.click('[data-act="rhv-vst"][data-v="fechada"]'); await H.dorme(300); await p.click('[data-act="rhv-vst"][data-v="fechada"]'); await H.dorme(800);
+ vs=await col('rh/dados/vagasab'); ok('Fechar vaga (dois toques) grava fechada', vs[0].status==='fechada'&&!!vs[0].fechadaEm, vs[0].status);
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

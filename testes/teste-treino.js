@@ -1,0 +1,26 @@
+/* Pedido 48 (24/10): modo treinamento — lê o banco de verdade, mas o que grava fica só na memória do aparelho. */
+const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=H.seed();
+ const B=await H.abrir({viewport:{width:1366,height:850}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(3000);
+ const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+ const loga=async()=>{ await H.dorme(1500); if(await p.$('#lg-e')){ await H.entrar(p,'iasmyn','senha123'); } await H.dorme(3000); };
+ ok('Fora do treinamento não há faixa', !(await p.$('#treino-fx')));
+ await p.click('.quem'); await H.dorme(400); const bt=await p.$('#pf-menu [data-m="treino"]'); ok('Menu do usuário tem "Modo treinamento neste aparelho"', !!bt, bt?await bt.innerText():'');
+ await Promise.all([p.waitForNavigation({timeout:15000}).catch(()=>null),bt.click()]); await loga();
+ let fx=await p.evaluate(()=>{ const e=document.getElementById('treino-fx'); return e&&e.innerText; }); ok('Ligado: faixa "MODO TREINAMENTO · nada é gravado de verdade"', /MODO TREINAMENTO/.test(fx||'')&&/nada é gravado/.test(fx||''), fx);
+ const antes=(await srv())['ordens/5001'];
+ await p.evaluate(()=>__T.S().db.doc('ordens/5001').update({obs:'feito no treino'})); await H.dorme(1200);
+ let r=await p.evaluate(()=>(__T.S().ordens.find(o=>o._id==='5001')||{}).obs); let s=await srv();
+ ok('Alterar uma ordem: a tela mostra a mudança, mas o banco não muda', r==='feito no treino'&&s['ordens/5001'].obs===antes.obs, r+' / banco: '+s['ordens/5001'].obs);
+ await p.evaluate(()=>__T.S().db.collection('paradas').add({linha:'Linha 1',inicio:new Date().toISOString(),motivo:'Treino',por:__T.S().uid})); await H.dorme(1200);
+ r=await p.evaluate(()=>(__T.S().paradas||[]).some(x=>x.motivo==='Treino')); s=await srv();
+ ok('Registrar parada (add): aparece na lista, mas não vai para o banco', r&&!Object.values(s).some(x=>x&&x.motivo==='Treino'), String(r));
+ const tr=await p.evaluate(async()=>{ const fs=window.claude._fs(); await fs.runTransaction(async t=>{ const g=await t.get(fs.doc('silos/c1')); t.set(fs.doc('silos/c1'),{saldoKg:123,em:new Date().toISOString()},{merge:true}); t.set(fs.doc('silomov/treino1'),{tipo:'consumo',deltaKg:-1}); }); return true; }).catch(e=>'ERRO '+e.message); await H.dorme(1200);
+ s=await srv(); r=await p.evaluate(()=>(__T.S().siloSaldo&&__T.S().siloSaldo.c1||{}).saldoKg);
+ ok('Transação (desconto do silo): fica no treino, o banco não muda', tr===true&&r===123&&!s['silomov/treino1']&&!(s['silos/c1']&&s['silos/c1'].saldoKg===123), JSON.stringify({tr,r}));
+ const cu=await p.evaluate(()=>window.claude.criarUsuario('teste','Teste','123456').then(()=>'criou',e=>e.code)); ok('Criar login é recusado no treino', cu==='treino', cu);
+ fx=await p.evaluate(()=>document.getElementById('treino-fx').innerText); ok('Faixa conta os registros de treino', /\d+ registros? de treino/.test(fx), fx);
+ await Promise.all([p.waitForNavigation({timeout:15000}).catch(()=>null),p.click('#treino-fx [data-act="treino-sair"]')]); await loga();
+ r=await p.evaluate(()=>({fx:!!document.getElementById('treino-fx'),obs:(__T.S().ordens.find(o=>o._id==='5001')||{}).obs,par:(__T.S().paradas||[]).some(x=>x.motivo==='Treino'),fl:localStorage.getItem('colafix.treino')}));
+ ok('Sair do treinamento: faixa some e o que foi feito no treino desaparece', !r.fx&&r.obs===antes.obs&&!r.par&&!r.fl, JSON.stringify(r));
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
