@@ -129,3 +129,53 @@ document.head.insertAdjacentHTML('beforeend',`<style id="gce-css">
 .gce-pz{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px}.gce-pz span{font-size:13px;color:var(--muted)}.gce-pz small{color:var(--muted)}
 @media(max-width:640px){.gce-acs{align-items:stretch;width:100%}.gce-pr{justify-content:flex-start}.gce-o{font-size:19px}}
 </style>`);
+/* ---------- prévia da OS na tela (26/10): mesmo padrão e mesmos dados do PDF novo (antes era a tabela antiga com faixas azuis) ---------- */
+manSheet=function(o){ const E=o.exec||{}, f=s=>s?dm(String(s).slice(0,10))+' '+String(s).slice(11,16):'', v=x=>x==null||x===''?'&nbsp;':esc(String(x));
+  const tec=E.tecnico?(typeof tecNomes==='function'?tecNomes(o):E.tecnico):'';
+  const cel=(t,x,k)=>`<div class="gce-os-cel" style="flex:${k||1} 1 0"><span>${esc(t)}</span><b>${v(x)}</b></div>`;
+  const lin=xs=>`<div class="gce-os-lin">${xs.map(x=>cel(x[0],x[1],x[2])).join('')}</div>`;
+  const ck=(on,t)=>`<span class="gce-os-ck${on?' on':''}"><i></i>${esc(t)}</span>`;
+  const cks=(t,ops,sel,cols)=>`<div class="gce-os-cel gce-os-cks">${t?`<span>${esc(t)}</span>`:''}<div class="gce-os-ckg"${cols?` style="grid-template-columns:repeat(${cols},minmax(0,1fr))"`:''}>${ops.map(op=>ck(sel(op),op)).join('')}</div></div>`;
+  const area=(t,x,h)=>`<div class="gce-os-cel gce-os-area" style="min-height:${h||54}px"><span>${esc(t)}</span><b>${v(x)}</b></div>`;
+  const sec=(t,n)=>`<div class="gce-os-sec"><b>${esc(t)}</b>${n?`<small>${esc(n)}</small>`:''}</div>`;
+  const ms=String(E.materiais||'').split('\n').map(z=>z.trim()).filter(Boolean); while(ms.length<4) ms.push('');
+  const tot=E.inicio&&E.fim?((new Date(E.fim)-new Date(E.inicio))/36e5):null;
+  const ass=(t,n)=>`<div class="gce-os-ass"><b>${esc(t)}</b>${[['Nome',n],['Assinatura',''],['Data','']].map(([l,x])=>`<span>${l}</span><div>${v(x)}</div>`).join('')}</div>`;
+  return `<div class="gce-os">
+  <div class="gce-os-capa"><img src="icons/logo-colafix-escuro.png" alt="Colafix" onerror="this.style.display='none'"><div><b>Ordem de serviço · OS ${esc(manNum(o.numero))}</b><small>Manutenção · ${esc(o.linha||'')}${o.local?' · '+esc(o.local):''} · ${esc(o.status||'')}</small></div></div>
+  ${sec('1. Abertura do chamado','OS '+manNum(o.numero))}
+  ${lin([['Linha / local',(o.linha||'')+(o.local?' · '+o.local:''),1.2],['Data / horário da ocorrência',f(o.quando)],['Aberta em',o.criado?dm(o.criado.slice(0,10))+' '+hora(o.criado):'']])}
+  ${lin([['Solicitante',o.nome||''],['Equipamento / sistema',o.equip||'',1.6]])}
+  ${o.tarefa||o.prazo?lin([['Prazo',o.prazo?dm(o.prazo):''],['Para quem',o.paraTec||(o.tarefa?'Qualquer técnico':'')],['Urgência',o.tarefa?gchPrio(o.prioridade)[1]:'']]):''}
+  ${cks('Impacto na produção',Object.keys(MAN_IMP).map(k=>MAN_IMP[k][0]),t=>!!MAN_IMP[o.impacto]&&MAN_IMP[o.impacto][0]===t)}
+  ${cks('Status',MAN_ST,t=>o.status===t,3)}
+  ${sec('2. Defeito / descrição do problema')}${area('Descrição',o.defeito,60)}
+  ${sec('3. Tipo')}${cks('Tipo de manutenção',MAN_TIPO,t=>E.tipo===t,6)}${lin([['Equipamento / sistema',o.equip||'',2],['Patrimônio / TAG','']])}
+  ${sec('4. Serviços executados / procedimentos')}${E.diagnostico||E.causa?lin([['Diagnóstico',E.diagnostico||'',2],['Causa',E.causa||'']]):''}${area('Serviço realizado',E.servicos,72)}
+  ${sec('5. Materiais / peças utilizados')}<table class="gce-os-tb"><thead><tr><th style="width:9%">Item</th><th>Descrição</th><th style="width:14%;text-align:right">Qtd.</th><th style="width:14%">Unid.</th></tr></thead><tbody>${ms.slice(0,12).map((m,i)=>{ const q=m.match(/[—-]\s*([\d.,]+)\s*([a-zA-Z]*)\s*$/); return `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${v(q?m.slice(0,q.index).trim():m)}</td><td style="text-align:right">${q?esc(q[1]):''}</td><td>${q?esc(q[2]):''}</td></tr>`; }).join('')}</tbody></table>
+  ${sec('6. Condição após a manutenção')}${cks('',MAN_COND,t=>E.condicao===t,3)}
+  ${sec('7. Horas de serviço')}${lin([['Início',f(E.inicio)],['Término',f(E.fim)],['Total de horas',tot!=null&&tot>=0?tot.toFixed(2).replace('.',','):''],['Técnico responsável',tec,1.6]])}
+  ${sec('8. Segurança')}${cks('Condições verificadas?',['Sim','Não','N/A'],()=>false)}${cks('',['Desenergização','Bloqueio / LOTO','Ausência de tensão','EPI','Isolamento / sinalização','Permissão de Trabalho','Outros:'],()=>false,4)}
+  ${sec('9. Pendências / recomendações')}${area('Observações / pendências',E.pendencias,48)}
+  ${sec('10. Aprovação do serviço')}<div class="gce-os-asg">${ass('Responsável pela execução',tec)}${ass('Responsável pela produção','')}</div>
+  <p class="gce-os-rod">Preencher todos os campos aplicáveis e anexar evidências quando necessário.</p></div>`; };
+document.head.insertAdjacentHTML('beforeend',`<style id="gce-os-css">
+.man-sheet:has(.gce-os){background:#fff;padding:0;border:1px solid var(--line,#E3E8EC);border-radius:10px;overflow:hidden}
+.gce-os{font:13px/1.35 Archivo,system-ui,sans-serif;color:#1D2B33;background:#fff;padding:0 18px 16px}
+.gce-os-capa{display:flex;align-items:center;gap:16px;background:#143F54;color:#fff;margin:0 -18px 6px;padding:14px 18px}.gce-os-capa img{height:30px;width:auto}
+.gce-os-capa b{display:block;font-size:18px;font-weight:600}.gce-os-capa small{display:block;font-size:12px;opacity:.8;margin-top:2px}
+.gce-os-sec{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-left:4px solid #E3312D;padding:2px 0 2px 10px;margin:16px 0 8px}.gce-os-sec b{font-size:14px;font-weight:600;color:#143F54}.gce-os-sec small{color:#55666F;font-size:12px}
+.gce-os-lin{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.gce-os-cel{background:#F3F6F8;border-radius:6px;padding:7px 10px;min-width:150px;margin-bottom:8px}.gce-os-lin .gce-os-cel{margin-bottom:0}
+.gce-os-cel>span{display:block;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#55666F}
+.gce-os-cel>b{display:block;font-weight:400;font-size:13px;margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}
+.gce-os-ckg{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:5px}.gce-os-ckg[style]{display:grid}
+.gce-os-ck{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}.gce-os-ck i{width:12px;height:12px;border:1px solid #55666F;border-radius:2px;flex:none;position:relative}
+.gce-os-ck.on{font-weight:600}.gce-os-ck.on i::after{content:"";position:absolute;inset:2px;background:#143F54}
+.gce-os-tb{width:100%;border-collapse:collapse;font-size:12.5px}.man-sheet .gce-os-tb th,.gce-os-tb th{border:0;background:#143F54;color:#fff;font-weight:600;text-align:left;padding:6px 8px;font-size:11px}
+.man-sheet .gce-os-tb td,.gce-os-tb td{border:0;padding:6px 8px;border-bottom:1px solid #E3E8EC}.gce-os-tb tr:nth-child(even) td{background:#F8FAFB}
+.gce-os-asg{display:grid;grid-template-columns:1fr 1fr;gap:10px}.gce-os-ass{background:#F3F6F8;border-radius:6px;padding:9px 12px}.gce-os-ass>b{display:block;font-weight:600;font-size:12.5px;margin-bottom:4px}
+.gce-os-ass>span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#55666F;margin-top:8px}.gce-os-ass>div{border-bottom:1px solid #C9D3DA;min-height:20px;font-size:13px}
+.gce-os-rod{color:#55666F;font-size:11.5px;margin:12px 0 0}
+@media(max-width:640px){.gce-os{padding:0 12px 12px}.gce-os-capa{margin:0 -12px 6px}.gce-os-asg{grid-template-columns:1fr}.gce-os-ckg[style]{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+</style>`);
