@@ -26,7 +26,15 @@ function eswSemanas(){ const h=hojeStr(), cp=h.slice(0,7), ini=cp+'-01', y=+cp.s
 function eswCalc(r,W){ if(r._esw) return r._esw; const meta=r.pvm>0?r.pvm/4:0; const tinha=r.pvT==null?0:r.pvT, feito=r.pvF||0;
   const o={meta,tinha,feito,pos:meta?(tinha+feito)/meta-W.s:null,cobre:meta?Math.max(0,r.tot)/meta:null,pedS:meta&&r.dc>0?r.dc/meta:null,
     acima:!r.int&&r.dc>0&&r.dc>Math.max(0,r.tot),faltaAt:Math.max(0,(r.dc||0)-Math.max(0,r.tot)),fam:eswFam(r.d),emb:eswEmb(r.d),g:eswGrupo(r)};
+  o.dev=meta?meta*W.s:null; o.tem=tinha+feito; o.difS=meta?o.tem-o.dev:null; r.sem=o.pos==null?99:o.pos;
   r._esw=o; return o; }
+/* coluna "Até hoje na semana" e cor da linha pela semana (pedido de 26/10 16:50) */
+function eswTom(o){ return o.pos==null?null:o.pos<=-0.5?'crit':o.pos<0?'warn':'ok'; }
+function eswCor(r,def){ const t=eswTom(eswCalc(r,eswSemanas())); return t||(def==='ok'?'neu':def); }
+function eswTh(){ const F=S.anl.es||{}; return `<th class="nr srt esw-thd" data-act="anl-esort" data-k="sem" title="Meta da semana = previsão do mês ÷ 4. Deveria ter = meta × semanas já passadas do mês. Tem = estoque do dia 1º + feito no mês. A cor da linha vem daqui: verde em dia, amarelo atrasado menos de meia semana, vermelho meia semana ou mais.">Até hoje na semana${F.col==='sem'?(F.dir>0?' ↑':' ↓'):''}</th>`; }
+function eswCel(r){ const o=eswCalc(r,eswSemanas()); if(o.pos==null) return '<td class="nr esw-sc"><span class="t-mut">sem previsão</span></td>';
+  const t=eswTom(o), d=Math.round(o.difS), sg=o.pos>=0?'+':'−';
+  return `<td class="nr num esw-sc"><small>deveria ter <b>${anlN(Math.round(o.dev))}</b></small><small>tem <b>${anlN(Math.round(o.tem))}</b> · meta/sem ${anlN(Math.round(o.meta))}</small><span class="anl-bdg ${t}" title="${d>=0?'Sobram':'Faltam'} ${anlN(Math.abs(d))} sacos para estar em dia">${sg}${eswF1(Math.abs(o.pos))} sem. · ${d>=0?'+':'−'}${anlN(Math.abs(d))}</span></td>`; }
 /* filtro novo (o js/03 chama para cada item antes das visões antigas) */
 function eswOk(r){ const E=S.esw, W=eswSemanas(), o=eswCalc(r,W);
   if(E.fam&&o.fam!==E.fam) return false; if(E.emb&&o.emb!==E.emb) return false;
@@ -170,7 +178,7 @@ async function eswPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com
     dcl(Co.cinza); doc.setLineWidth(.4); doc.setLineDashPattern([1,1],0); for(let i=1;i<C.prev.length;i++) doc.line(X(i-1),Y(C.prev[i-1]),X(i),Y(C.prev[i])); doc.setLineDashPattern([],0);
     dcl(Co.teal); doc.setLineWidth(.8); for(let i=1;i<C.real.length;i++) doc.line(X(i-1),Y(C.real[i-1]),X(i),Y(C.real[i])); }
   /* tabela */
-  y=54; const cols=[['CÓDIGO',17,'l'],['PRODUTO',0,'l'],['ESTOQUE',17,'r'],['EST. SEG.',15,'r'],['PEDIDOS',16,'r'],['META SEM.',16,'r'],['PREVISÃO',17,'r'],['FEITO',16,'r'],['NO MÊS (SEM.)',19,'r'],['FALTA PROG.',18,'r'],['FALTA FAT.',17,'r'],['QUANDO ACABA',30,'l']];
+  y=54; const cols=[['CÓDIGO',17,'l'],['PRODUTO',0,'l'],['ESTOQUE',17,'r'],['EST. SEG.',15,'r'],['PEDIDOS',16,'r'],['META SEM.',15,'r'],['DEVERIA/TEM',24,'r'],['PREVISÃO',16,'r'],['FEITO',16,'r'],['NO MÊS (SEM.)',19,'r'],['FALTA PROG.',18,'r'],['FALTA FAT.',17,'r'],['QUANDO ACABA',30,'l']];
   const fixo=cols.reduce((a,c)=>a+c[1],0); cols[1][1]=PW-2*M-fixo; const cx0=[]; let ax=M; cols.forEach(c=>{ cx0.push(ax); ax+=c[1]; });
   const cab=()=>{ fc(Co.pet); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.3); tc([255,255,255]); cols.forEach((c,i)=>doc.text(c[0],c[2]==='r'?cx0[i]+c[1]-1.5:cx0[i]+1.5,y+4,{align:c[2]==='r'?'right':'left'})); y+=6; };
   const pag=()=>{ doc.addPage(); if(img&&img.claro) doc.addImage(img.claro.d,'PNG',M,6,22,22*img.claro.h/img.claro.w); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); tc(Co.ink); doc.text('Necessidades de produção · '+mes,PW-M,10,{align:'right'}); y=18; cab(); };
@@ -179,22 +187,23 @@ async function eswPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com
   rows.forEach(x=>{ if(y>PH-20) pag();
     if(x.g!==g0){ g0=x.g; zi=0; fc(Co.soft); doc.rect(M,y,PW-2*M,5,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.5); tc(tone[x.g]); doc.text(ESW_GT[x.g],M+1.5,y+3.5); y+=5; }
     if(zi++%2){ fc(Co.zeb); doc.rect(M,y,PW-2*M,5.4,'F'); }
-    const o=x.o, cel=[x.c,(x.d||'')+(nm==='A fábrica'&&x.lin?' · '+x.lin:''),n(x.tot),n(x.seg),x.dc?n(x.dc):'—',o.meta?n(o.meta):'—',x.pvm?n(x.pvm):'—',n(x.feito),o.pos==null?'—':(o.pos>=0?'+':'−')+eswF1(Math.abs(o.pos)),x.falta?n(x.falta):'—',x.fat==null?'—':n(x.fat),x.acaba];
-    doc.setFontSize(7); cols.forEach((c,i)=>{ let t=cel[i]; doc.setFont('helvetica',i===0||i===9||i===8?'bold':'normal'); tc(i===0?Co.teal:i===4&&o.acima?Co.crit:i===8&&o.pos!=null?(o.pos<=-0.5?Co.crit:o.pos<0?Co.warn:Co.ok):i===9?Co.ink:Co.ink);
+    const o=x.o, cel=[x.c,(x.d||'')+(nm==='A fábrica'&&x.lin?' · '+x.lin:''),n(x.tot),n(x.seg),x.dc?n(x.dc):'—',o.meta?n(o.meta):'—',o.dev==null?'—':n(Math.round(o.dev))+' / '+n(Math.round(o.tem)),x.pvm?n(x.pvm):'—',n(x.feito),o.pos==null?'—':(o.pos>=0?'+':'−')+eswF1(Math.abs(o.pos)),x.falta?n(x.falta):'—',x.fat==null?'—':n(x.fat),x.acaba];
+    doc.setFontSize(7); cols.forEach((c,i)=>{ let t=cel[i]; doc.setFont('helvetica',i===0||i===10||i===9||i===6?'bold':'normal'); tc(i===0?Co.teal:i===4&&o.acima?Co.crit:(i===9||i===6)&&o.pos!=null?(o.pos<=-0.5?Co.crit:o.pos<0?Co.warn:Co.ok):Co.ink);
       t=fit(t,c[1]-3); doc.text(t,c[2]==='r'?cx0[i]+c[1]-1.5:cx0[i]+1.5,y+3.7,{align:c[2]==='r'?'right':'left'}); });
+    if(o.pos!=null){ fc(o.pos<=-0.5?Co.crit:o.pos<0?Co.warn:Co.ok); doc.rect(M,y,0.9,5.4,'F'); }
     dcl(Co.lin); doc.setLineWidth(.15); doc.line(M,y+5.4,PW-M,y+5.4); y+=5.4; });
   if(y>PH-20) pag(); fc([226,236,241]); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(7.5); tc(Co.ink);
-  doc.text('Total · '+rows.length+' itens',cx0[1]+1.5,y+4); doc.text(anlN(rows.filter(x=>!x.r.enc).reduce((a,x)=>a+x.falta,0)),cx0[9]+cols[9][1]-1.5,y+4,{align:'right'}); doc.text(anlN(rows.reduce((a,x)=>a+(x.fat||0),0)),cx0[10]+cols[10][1]-1.5,y+4,{align:'right'});
+  doc.text('Total · '+rows.length+' itens',cx0[1]+1.5,y+4); doc.text(anlN(rows.filter(x=>!x.r.enc).reduce((a,x)=>a+x.falta,0)),cx0[10]+cols[10][1]-1.5,y+4,{align:'right'}); doc.text(anlN(rows.reduce((a,x)=>a+(x.fat||0),0)),cx0[11]+cols[11][1]-1.5,y+4,{align:'right'});
   const np=doc.getNumberOfPages?doc.getNumberOfPages():1;
   for(let p=1;p<=np;p++){ if(doc.setPage) doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); tc(Co.mut);
-    doc.text('Meta sem. = previsão do mês ÷ 4. No mês = semanas cobertas (estoque do dia 1º + feito) menos as que já passaram. Falta fat. = previsão − faturado no mês (Focco). Quando acaba = dia em que o estoque zera com os pedidos.',M,PH-6);
+    doc.text('Meta sem. = previsão do mês ÷ 4. Deveria/Tem = meta × semanas já passadas / estoque do dia 1º + feito (cor da linha). No mês = semanas cobertas (estoque do dia 1º + feito) menos as que já passaram. Falta fat. = previsão − faturado no mês (Focco). Quando acaba = dia em que o estoque zera com os pedidos.',M,PH-6);
     doc.text('Página '+p+' de '+np,PW-M,PH-6,{align:'right'}); }
   const nomeArq='Necessidades-'+(nm==='A fábrica'?'todas':nm.replace(/\s+/g,''))+'-'+W.cp+'.pdf'; doc.save(nomeArq); S.esw._ult={tipo:'pdf',nome:nomeArq,n:rows.length}; toast('PDF baixado: '+nomeArq); }
 /* ---------- Excel com cores (ExcelJS); sem ele, planilha simples ---------- */
 async function eswXls(){ const W=eswSemanas(), rows=eswLinhas(), nm=eswEscopoNome(), all=S.esw.all||[], esc0=eswEscopo(all), Rz=eswResumo(esc0,W), C=eswCurva(esc0,W), mes=ESW_MES[+W.cp.slice(5,7)-1]+' de '+W.cp.slice(0,4);
   const nomeArq='Necessidades-'+(nm==='A fábrica'?'todas':nm.replace(/\s+/g,''))+'-'+W.cp+'.xlsx';
-  const head=['Código','Produto','Linha','Estoque','Est. seg.','Pedidos','Sai por dia','Meta da semana','No mês (semanas)','Cobre (semanas)','Previsão','Feito no mês','Tinha no dia 1º','Em ordem','Falta programar','Falta faturar','Quando acaba','Situação'];
-  const val=x=>[x.c,x.d,x.lin,x.tot,x.seg==null?null:x.seg,x.dc||null,x.md||null,x.o.meta?Math.round(x.o.meta):null,x.o.pos==null?null:Math.round(x.o.pos*10)/10,x.o.cobre==null?null:Math.round(x.o.cobre*10)/10,x.pvm||null,x.feito,x.tinha,x.ofa||null,x.falta||null,x.fat,x.acaba,x.st];
+  const head=['Código','Produto','Linha','Estoque','Est. seg.','Pedidos','Sai por dia','Meta da semana','Deveria ter até hoje','Tem (dia 1º + feito)','Falta / sobra até hoje','No mês (semanas)','Cobre (semanas)','Previsão','Feito no mês','Tinha no dia 1º','Em ordem','Falta programar','Falta faturar','Quando acaba','Situação'];
+  const val=x=>[x.c,x.d,x.lin,x.tot,x.seg==null?null:x.seg,x.dc||null,x.md||null,x.o.meta?Math.round(x.o.meta):null,x.o.dev==null?null:Math.round(x.o.dev),x.o.meta?Math.round(x.o.tem):null,x.o.difS==null?null:Math.round(x.o.difS),x.o.pos==null?null:Math.round(x.o.pos*10)/10,x.o.cobre==null?null:Math.round(x.o.cobre*10)/10,x.pvm||null,x.feito,x.tinha,x.ofa||null,x.falta||null,x.fat,x.acaba,x.st];
   const baixa=(blob)=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nomeArq; document.body.appendChild(a); a.click(); a.remove(); S.esw._ult={tipo:'xls',nome:nomeArq,n:rows.length}; toast('Excel baixado: '+nomeArq); };
   try{ await carregarScript(ESW_EXCELJS); }catch(e){}
   const XJ=window.ExcelJS;
@@ -212,21 +221,21 @@ async function eswXls(){ const W=eswSemanas(), rows=eswLinhas(), nm=eswEscopoNom
   rk.forEach((k,i)=>{ const rw=r0.getRow(4+i); rw.values=k; rw.getCell(1).font={bold:true,color:{argb:'FF143F54'}}; rw.getCell(2).font={bold:true,size:12}; rw.getCell(2).numFmt=Number.isInteger(k[1])?'#,##0':'0.0'; rw.getCell(3).font={color:{argb:'FF5E6E77'}}; rw.eachCell(c=>c.border=borda); });
   /* Necessidades */
   const ws=wb.addWorksheet('Necessidades',{views:[{state:'frozen',xSplit:2,ySplit:4,showGridLines:false}]});
-  ws.columns=[11,44,14,11,10,11,10,12,12,11,11,12,12,10,13,12,22,18].map(w=>({width:w}));
+  ws.columns=[11,44,14,11,10,11,10,12,13,13,13,12,11,11,12,12,10,13,12,22,18].map(w=>({width:w}));
   ws.mergeCells(1,1,1,head.length); const t1=ws.getCell(1,1); t1.value='NECESSIDADES DE PRODUÇÃO · '+(nm==='A fábrica'?'TODAS AS LINHAS':nm.toUpperCase())+' · '+mes.toUpperCase(); t1.font={bold:true,size:14,color:{argb:'FFFFFFFF'}}; t1.fill=fill(PET); t1.alignment={vertical:'middle'}; ws.getRow(1).height=28;
   ws.mergeCells(2,1,2,head.length); ws.getCell(2,1).value='Emitido em '+new Date().toLocaleString('pt-BR')+' · meta da semana '+anlN(Rz.metaT)+' · '+(Rz.metaT?(Rz.pos<0?'−':'+')+eswF1(Math.abs(Rz.pos))+' semana no mês':'sem previsão')+' · falta programar '+anlN(rows.filter(x=>!x.r.enc).reduce((a,x)=>a+x.falta,0))+' sacos'; ws.getCell(2,1).font={color:{argb:'FF44545D'}};
-  const hr=ws.getRow(4); hr.values=head; hr.height=30; hr.eachCell((c,i)=>{ c.font={bold:true,size:10,color:{argb:PET}}; c.fill=fill(TINT); c.alignment={vertical:'middle',wrapText:true,horizontal:i>3&&i<17?'right':'left'}; c.border={bottom:{style:'medium',color:{argb:PET}}}; });
+  const hr=ws.getRow(4); hr.values=head; hr.height=30; hr.eachCell((c,i)=>{ c.font={bold:true,size:10,color:{argb:PET}}; c.fill=fill(TINT); c.alignment={vertical:'middle',wrapText:true,horizontal:i>3&&i<20?'right':'left'}; c.border={bottom:{style:'medium',color:{argb:PET}}}; });
   ws.autoFilter={from:{row:4,column:1},to:{row:4,column:head.length}};
   let ri=5, g0=null; const first=ri;
   rows.forEach(x=>{ if(x.g!==g0){ g0=x.g; const gr=ws.getRow(ri++); gr.getCell(1).value=ESW_GT[x.g]; for(let i=1;i<=head.length;i++){ const c=gr.getCell(i); c.fill=fill(SOFT); c.font={bold:true,color:{argb:T[x.g][1]}}; } }
-    const rw=ws.getRow(ri++); rw.values=val(x); rw.eachCell({includeEmpty:true},(c,i)=>{ c.border=borda; if(i>=4&&i<=16) c.numFmt=(i===9||i===10)?'+0.0;-0.0;0.0':'#,##0'; });
-    rw.getCell(1).font={bold:true,color:{argb:'FF2B6A87'}}; rw.getCell(15).font={bold:true,color:{argb:PET}};
+    const rw=ws.getRow(ri++); rw.values=val(x); rw.eachCell({includeEmpty:true},(c,i)=>{ c.border=borda; if(i>=4&&i<=19) c.numFmt=(i===12||i===13)?'+0.0;-0.0;0.0':i===11?'+#,##0;-#,##0;0':'#,##0'; });
+    rw.getCell(1).font={bold:true,color:{argb:'FF2B6A87'}}; rw.getCell(18).font={bold:true,color:{argb:PET}};
     if(x.o.acima) rw.getCell(6).font={bold:true,color:{argb:'FFB5473F'}};
-    if(x.o.pos!=null){ const k=x.o.pos<=-0.5?'hoje':x.o.pos<0?'semana':'calma'; rw.getCell(9).font={bold:true,color:{argb:T[k][1]}}; }
-    [17,18].forEach(i=>{ rw.getCell(i).fill=fill(T[x.g][0]); rw.getCell(i).font={bold:true,color:{argb:T[x.g][1]}}; }); });
-  const last=ri-1, tr=ws.getRow(ri); tr.getCell(2).value='TOTAL · '+rows.length+' itens'; tr.getCell(15).value={formula:'SUM(O'+first+':O'+last+')'}; tr.getCell(16).value={formula:'SUM(P'+first+':P'+last+')'};
-  for(let i=1;i<=head.length;i++){ const c=tr.getCell(i); c.fill=fill(PET); c.font={bold:true,color:{argb:'FFFFFFFF'}}; if(i>=15&&i<=16) c.numFmt='#,##0'; } tr.height=22;
-  ws.getRow(ri+2).getCell(1).value='Meta da semana = previsão do mês ÷ 4 · No mês = semanas cobertas (estoque do dia 1º + feito) − semanas já passadas · Falta faturar = previsão − faturado no mês (Focco).'; ws.getRow(ri+2).getCell(1).font={italic:true,color:{argb:'FF5E6E77'}};
+    if(x.o.pos!=null){ const k=x.o.pos<=-0.5?'hoje':x.o.pos<0?'semana':'calma'; [11,12].forEach(i=>rw.getCell(i).font={bold:true,color:{argb:T[k][1]}}); rw.getCell(1).border=Object.assign({},borda,{left:{style:'thick',color:{argb:T[k][1]}}}); }
+    [20,21].forEach(i=>{ rw.getCell(i).fill=fill(T[x.g][0]); rw.getCell(i).font={bold:true,color:{argb:T[x.g][1]}}; }); });
+  const last=ri-1, tr=ws.getRow(ri); tr.getCell(2).value='TOTAL · '+rows.length+' itens'; tr.getCell(18).value={formula:'SUM(R'+first+':R'+last+')'}; tr.getCell(19).value={formula:'SUM(S'+first+':S'+last+')'};
+  for(let i=1;i<=head.length;i++){ const c=tr.getCell(i); c.fill=fill(PET); c.font={bold:true,color:{argb:'FFFFFFFF'}}; if(i>=18&&i<=19) c.numFmt='#,##0'; } tr.height=22;
+  ws.getRow(ri+2).getCell(1).value='Meta da semana = previsão do mês ÷ 4 · Deveria ter até hoje = meta × semanas já passadas · Tem = estoque do dia 1º + feito · No mês = semanas cobertas (estoque do dia 1º + feito) − semanas já passadas · Falta faturar = previsão − faturado no mês (Focco).'; ws.getRow(ri+2).getCell(1).font={italic:true,color:{argb:'FF5E6E77'}};
   /* Por almoxarifado */
   const wa=wb.addWorksheet('Por almoxarifado',{views:[{state:'frozen',ySplit:1}]}); wa.columns=[{header:'Código',width:11},{header:'Produto',width:44},{header:'Almox 3',width:11},{header:'Almox 30',width:11},{header:'Empresa 1',width:11},{header:'Empresa 9',width:11},{header:'Total',width:11}];
   wa.getRow(1).eachCell(c=>{ c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill=fill(PET); });
@@ -238,6 +247,7 @@ async function eswXls(){ const W=eswSemanas(), rows=eswLinhas(), nm=eswEscopoNom
   const buf=await wb.xlsx.writeBuffer(); baixa(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); }
 window.Painel=window.Painel||{}; window.Painel.estoquesSemana={semanas:eswSemanas,linhas:eswLinhas,estado:()=>S.esw};
 document.head.insertAdjacentHTML('beforeend',`<style id="esw-css">
+.esw-sc small{display:block;white-space:nowrap}.esw-sc .anl-bdg{margin-top:3px;white-space:nowrap}.esw-thd{min-width:132px}
 .esw{display:flex;flex-direction:column;gap:14px}
 .esw-hd{margin-bottom:0}.esw-rb{position:relative;display:inline-flex;align-items:center;gap:8px}.esw-rbn{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--crit);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
 .esw-drf{position:fixed;inset:0;background:rgba(20,40,50,.28);z-index:60}

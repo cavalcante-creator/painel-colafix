@@ -25,6 +25,11 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  const lin=await p.evaluate(()=>Painel.estoquesSemana.linhas().map(x=>({c:x.c,g:x.g,pos:x.o.pos,meta:x.o.meta,acima:x.o.acima})));
  const l5=lin.find(x=>x.c==='AC0005');
  ok('Conta da semana (AC0005): meta 42.500 e "no mês" = (tinha + feito) ÷ meta − semanas passadas', l5&&Math.round(l5.meta)===42500&&Math.abs(l5.pos-pos5)<1e-6, JSON.stringify(l5)+' s='+W.s);
+ const tom=v=>v<=-0.5?'crit':v<0?'warn':'ok';
+ const cel=await p.evaluate(()=>['AC0005','AC0019','AC0002'].map(c=>{ const tr=document.querySelector('table.anl-t tr[data-c="'+c+'"]'); const td=tr&&tr.querySelector('.esw-sc'); return {c,cls:tr&&tr.className,t:td&&td.innerText.replace(/\n/g,' | ')}; }));
+ const dev5=Math.round(42500*W.s).toLocaleString('pt-BR');
+ ok('Coluna "Até hoje na semana": deveria ter (meta × semanas passadas), tem (dia 1º + feito) e a diferença', /Até hoje na semana/i.test(await p.evaluate(()=>document.querySelector('table.anl-t thead').innerText))&&cel[0].t&&cel[0].t.includes('deveria ter '+dev5)&&cel[0].t.includes('tem 119.933')&&/meta\/sem 42\.500/.test(cel[0].t), JSON.stringify(cel));
+ ok('Cor da linha pela semana (vermelho ≤ −0,5 sem., amarelo < 0, verde em dia)', cel[0].cls==='b-'+tom(pos5)&&cel[1].cls==='b-'+tom((176+3917)/1320-W.s)&&cel[2].cls==='b-'+tom((23)/4000-W.s), JSON.stringify(cel.map(x=>x.c+':'+x.cls))+' pos5='+pos5.toFixed(2)+' pos9='+pos9.toFixed(2));
  ok('Frase do resumo e 4 números (no mês, atrasados, adiantados, falta programar)', /já passaram .* semanas do mês e o que tinha mais o que foi feito cobre/.test(s)&&(await p.$$('.esw-k')).length===4&&/Itens adiantados/.test(s)&&/AC0009 \+/.test(s), (await p.evaluate(()=>document.querySelector('.esw-res').innerText)).replace(/\n/g,' | '));
  const vd=await p.evaluate(()=>(document.querySelector('.esw-vd')||{}).innerText||'');
  ok('"Vendeu mais que o previsto": AC0019 com pedidos 2.464, faltam 1.409 e "entrou +1.464 desde ontem"', /AC0019/.test(vd)&&/Pedidos de 2\.464/.test(vd)&&/Faltam 1\.409/.test(vd)&&/Entrou \+1\.464/.test(vd)&&!/AC0009/.test(vd), vd.replace(/\n/g,' | '));
@@ -61,7 +66,7 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  await p.click('[data-act="esw-limpar"]').catch(()=>{}); await H.dorme(400); await p.selectOption('[data-esw="sit"]','todas'); await H.dorme(500); await p.click('[data-act="esw-res"]'); await H.dorme(500);
  const [dx]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('.esw-dr [data-act="esw-xls"]')]);
  let xok=false, xinfo=''; if(dx){ const f='/tmp/esw.xlsx'; await dx.saveAs(f); try{ const XLSX=require('xlsx'); const wb=XLSX.readFile(f); const sh=wb.Sheets['Necessidades']; const aoa=XLSX.utils.sheet_to_json(sh,{header:1});
-   xinfo=wb.SheetNames.join(',')+' · '+JSON.stringify(aoa[3]).slice(0,120); xok=wb.SheetNames.includes('Resumo')&&wb.SheetNames.includes('Curva S')&&/Meta da semana/.test(JSON.stringify(aoa[3]))&&aoa.some(r=>r[0]==='AC0019')&&/<f>SUM\(O5:O\d+\)<\/f>/.test(require('child_process').execSync('unzip -p '+f+' xl/worksheets/sheet2.xml').toString()); }catch(e){ xinfo=String(e); } }
+   xinfo=wb.SheetNames.join(',')+' · '+JSON.stringify(aoa[3]).slice(0,120); xok=wb.SheetNames.includes('Resumo')&&wb.SheetNames.includes('Curva S')&&/Meta da semana/.test(JSON.stringify(aoa[3]))&&/Deveria ter até hoje/.test(JSON.stringify(aoa[3]))&&aoa.some(r=>r[0]==='AC0019')&&/<f>SUM\(R5:R\d+\)<\/f>/.test(require('child_process').execSync('unzip -p '+f+' xl/worksheets/sheet2.xml').toString()); }catch(e){ xinfo=String(e); } }
  ok('Baixar Excel: abas Resumo, Necessidades (com Meta da semana, No mês e total com fórmula), Por almoxarifado e Curva S', xok, xinfo);
  const [dp]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('.esw-dr [data-act="esw-pdf"]')]);
  let pinfo=''; if(dp){ await dp.saveAs('/tmp/esw.pdf'); pinfo=fs.statSync('/tmp/esw.pdf').size+' bytes'; }
