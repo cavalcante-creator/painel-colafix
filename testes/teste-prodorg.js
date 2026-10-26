@@ -7,7 +7,8 @@ const ago=m=>new Date(Date.now()-m*60000).toISOString();
  const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('programacao')); await H.dorme(900);
  const abas=await p.evaluate(()=>[...document.querySelectorAll('.tabs a, .tabs button, nav.tabs *')].map(x=>(x.innerText||'').trim()).filter(Boolean));
- ok('Menu da Produção: Painel primeiro e os Indicadores novos antes do detalhado (sem tirar nenhuma aba)', abas[0]==='Painel'&&abas[1]==='Programação'&&abas.indexOf('Indicadores')>=0&&abas.indexOf('Indicadores')<abas.indexOf('Indicadores (detalhado)'), abas.slice(0,8).join(' · '));
+ /* desde 26/10 a administradora vê só Painel · Programação · Calendário · Conferir apontamentos; os indicadores ficam em Relatórios (teste-prodmenu.js) */
+ ok('Menu da Produção: Painel primeiro (administradora: só Painel · Programação · Calendário · Conferir apontamentos)', abas[0]==='Painel'&&abas[1]==='Programação'&&abas.join('|')==='Painel|Programação|Calendário|Conferir apontamentos', abas.slice(0,8).join(' · '));
  await p.evaluate(()=>__T.go('prodpainel')); await H.dorme(1200);
  const pn=await p.evaluate(()=>({k:[...document.querySelectorAll('.mo-k')].map(k=>k.innerText.replace(/\n/g,' ')),ln:document.querySelectorAll('.pd-ln').length,par:(document.querySelector('.mo-col')||{}).innerText||''}));
  ok('Painel da produção: números do dia, uma linha por linha da fábrica e a parada aberta (Linha 2 · falta de cimento)', pn.k.some(x=>/Produzido hoje/.test(x))&&pn.k.some(x=>/^1 Linha parada/.test(x))&&pn.ln>=2&&/Linha 2[\s\S]*Falta de cimento/.test(pn.par), pn.k.join(' | ')+' · linhas '+pn.ln);

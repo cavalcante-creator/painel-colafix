@@ -8,7 +8,7 @@
    Busca na lateral (a mesma caixa do js/55, `#gxs`): cada perfil com o que é dele — vazia mostra os avisos; digitando acha
      ações, telas, ordens/ranchos/fichas/itens (busca do topo, tpBusca), chamados abertos e pessoas do RH (window.RHBusca). */
 "use strict";
-const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','tabprod']},{g:'Almoxarifado',ms:['premix','almox','monitor']},{g:'Silos',ms:['silos','silosver','silocel']},
+const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios','tabprod']},{g:'Almoxarifado',ms:['premix','almox','monitor']},{g:'Silos',ms:['silos','silosver','silocel']},
   {id:'manut'},{id:'rh'},{id:'gestor'},{id:'telas'},{g:'Sistema',ic:'ajuste',ms:['meumenu','backup']}];
 const RHG=[{v:'rhinicio'},{g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhpres','Pessoas na empresa'],['rhvagas','Vagas']]},
   {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhferias','Férias e prazos']]},{g:'Documentos',ic:'folha',vs:[['rhfichas','Fichas do mês'],['rhdocs','Documentos e contratos']]},
@@ -17,14 +17,22 @@ const RH_SUB={rhterc:'rhfunc'};
 function sbRhSolo(){ try{ const ms=modsVis(); return ms.length===1&&ms[0].id==='rh'; }catch(e){ return false; } }
 function sbPerfil(){ try{ if(typeof gxSolo==='function'&&gxSolo()) return 'gx'; if(!S.acs||!S.acs.pronto) return ''; if(sbRhSolo()) return 'rh'; if(S.acs.dono) return 'adm'; }catch(e){} return ''; }
 /* ---------------- administradora ---------------- */
+/* Produção da administradora (pedidos de 26/10): abas só Painel · Programação · Calendário · Conferir apontamentos;
+   os indicadores vão para "Relatórios" (item próprio no grupo Produção, com as abas dele) e a TV sai das abas. */
+const ADM_PROD=['prodpainel','programacao','calendario','apconf'], ADM_REL=['prodind','indicadores'];
+const admRelVis=()=>ADM_REL.filter(v=>{ try{ return !!VIEWS[v]&&viewOk(v); }catch(e){ return false; } });
+const admEhRel=()=>S.mod==='producao'&&ADM_REL.includes(S.view);
+{ const _mt=mTabs; mTabs=function(m){ const r=_mt.apply(this,arguments); try{ if(sbPerfil()!=='adm'||!m||m.id!=='producao') return r; if(admEhRel()) return admRelVis(); const xs=ADM_PROD.filter(v=>r.includes(v)); return xs.length?xs:r; }catch(e){ return r; } }; }
 function admNav(){ const nl=$('#navlist'); if(!nl) return; const ms=modsVis(), por={}; ms.forEach(m=>por[m.id]=m); const usados=new Set();
-  const fora=['ajustes','itens','acessos'].includes(S.view), cur=id=>S.mod===id&&!fora;
-  const um=m=>`<button class="navbtn" data-mod="${m.id}" ${cur(m.id)?'aria-current="page"':''}>${ic(m.ic)}<span>${esc(m.nome)}</span></button>`;
+  const rv=admRelVis(); if(por.producao&&rv.length) por.relatorios={id:'relatorios',nome:'Relatórios',ic:'grafico',go:rv[0]};
+  const fora=['ajustes','itens','acessos'].includes(S.view), cur=id=>!fora&&(id==='relatorios'?admEhRel():id==='producao'?S.mod==='producao'&&!admEhRel():S.mod===id);
+  const alvo=m=>m.go?`data-go="${m.go}"`:`data-mod="${m.id}"`;
+  const um=m=>`<button class="navbtn" ${alvo(m)} ${cur(m.id)?'aria-current="page"':''}>${ic(m.ic)}<span>${esc(m.nome)}</span></button>`;
   let h=''; ADMG.forEach(g=>{ if(!g.ms){ const m=por[g.id]; if(m){ usados.add(m.id); h+=um(m); } return; }
     const xs=g.ms.map(id=>por[id]).filter(Boolean); xs.forEach(m=>usados.add(m.id)); if(!xs.length) return; if(xs.length===1){ h+=um(xs[0]); return; }
     const ab=xs.some(m=>cur(m.id));
-    h+=`<button class="navbtn gxn-nb gxg-gr" data-mod="${xs[0].id}" ${ab?'data-aberto="1"':''}>${ic(g.ic||xs[0].ic)}<span>${esc(g.g)}</span></button>`
-      +(ab?`<div class="gxg-sub">${xs.map(m=>`<button class="navbtn gxg-si" data-mod="${m.id}" ${cur(m.id)?'aria-current="page"':''}><span>${esc(m.nome)}</span></button>`).join('')}</div>`:''); });
+    h+=`<button class="navbtn gxn-nb gxg-gr" ${alvo(xs[0])} ${ab?'data-aberto="1"':''}>${ic(g.ic||xs[0].ic)}<span>${esc(g.g)}</span></button>`
+      +(ab?`<div class="gxg-sub">${xs.map(m=>`<button class="navbtn gxg-si" ${alvo(m)} ${cur(m.id)?'aria-current="page"':''}><span>${esc(m.nome)}</span></button>`).join('')}</div>`:''); });
   ms.filter(m=>!usados.has(m.id)).forEach(m=>{ h+=um(m); });
   nl.innerHTML=h; nl.dataset.sbg='adm'; gxsMonta(nl); }
 /* ---------------- RH ---------------- */
@@ -87,4 +95,6 @@ function sbItensRh(q){ const r=[], ws=sbN(q).trim(); if(!ws){ let xs=[]; try{ xs
 document.addEventListener('keydown',ev=>{ const p=sbPerfil(); if(p!=='adm'&&p!=='rh') return; if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='k'){ ev.preventDefault(); const i=$('#gxs-q'); i&&i.focus(); } });
 document.head.insertAdjacentHTML('beforeend',`<style id="sbg-css">
 body.sbg-adm #navlist .navbtn>span{flex:1;min-width:0}
+.side .navlist{overflow-y:auto;min-height:0;flex:0 1 auto;margin-right:-6px;padding-right:6px;scrollbar-width:thin}
+.side .navlist::-webkit-scrollbar{width:6px}.side .navlist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:3px}
 </style>`);
