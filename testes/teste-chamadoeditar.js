@@ -1,0 +1,31 @@
+/* 26/10: o Marcelo edita e prorroga chamados; detalhe da OS com "O que fazer"; OS em PDF no padrão dos relatórios. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString(), hj=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10))(new Date()), mais=n=>{ const x=new Date(hj+'T12:00:00'); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
+ d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
+ D['crachas/T1']={codigo:'T1',nome:'CARLOS RANNA',papel:'tecnico',ativo:true,criadoEm:t}; D['crachas/T2']={codigo:'T2',nome:'YURI',papel:'tecnico',ativo:true,criadoEm:t};
+ D['chamados/os-00009']={numero:9,linha:'Prédio / escritório',local:'ADM',quando:t,defeito:'Trocar a lâmpada da sala do PCP',tipo:'eletrico',impacto:'nao',prioridade:'normal',prazo:mais(2),paraTec:'CARLOS RANNA',tarefa:true,nome:'Marcelo Souza',equip:'ADM · Tarefa · Elétrico',status:'Aberta',criado:t,por:'uMAR',origem:'gestor',hist:[{em:t,por:'uMAR',o:'Tarefa criada'}]};
+ const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
+ const doc=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['chamados/os-00009']);
+ await p.evaluate(()=>__T.go('gxch')); await H.dorme(900);
+ ok('Chamados do gestor: botão "Editar / prorrogar" no chamado aberto', !!(await p.$('[data-act="gce-abrir"][data-n="9"]')));
+ await p.click('[data-act="gce-abrir"][data-n="9"]'); await H.dorme(500);
+ let s=await p.evaluate(()=>(document.querySelector('.gx-mc')||{}).innerText||''); const tx=await p.inputValue('#gch-tx');
+ ok('Janela "Editar chamado · OS 00009" já preenchida, com Prorrogar e Motivo', /Editar chamado · OS 00009/.test(s)&&tx==='Trocar a lâmpada da sala do PCP'&&/Prorrogar o prazo/.test(s)&&/Motivo da mudança/.test(s)&&/Salvar alterações/.test(s), s.slice(0,200).replace(/\n/g,' | '));
+ await p.fill('#gch-tx','Trocar as 2 lâmpadas da sala do PCP'); await p.selectOption('#gch-tc','YURI'); await p.click('[data-act="gce-mais"][data-v="3"]'); await H.dorme(300);
+ const pz=await p.inputValue('#gch-pz'); ok('+3 dias muda o prazo de '+mais(2)+' para '+mais(5), pz===mais(5), pz);
+ await p.fill('#gce-mot','esperando a lâmpada chegar'); await p.click('[data-act="gce-salvar"]'); await H.dorme(1200);
+ let c=await doc(); const hh=c.hist[c.hist.length-1].o;
+ ok('Salvar grava o texto, o técnico e o prazo novos', c.defeito==='Trocar as 2 lâmpadas da sala do PCP'&&c.paraTec==='YURI'&&c.prazo===mais(5)&&c.prazoAntes&&c.prazoAntes[0].de===mais(2), JSON.stringify({d:c.defeito,t:c.paraTec,p:c.prazo}));
+ ok('Linha do tempo: "Editado por Marcelo Souza: … prazo prorrogado … (motivo: esperando a lâmpada chegar)"', /Editado por Marcelo Souza/.test(hh)&&/prazo prorrogado de/.test(hh)&&/para quem de CARLOS RANNA para YURI/.test(hh)&&/motivo: esperando a lâmpada chegar/.test(hh), hh);
+ ok('Janela fecha depois de salvar', !(await p.$('.gx-mc')));
+ await p.click('[data-act="man-abrir"][data-n="9"]'); await H.dorme(1000); s=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Detalhe da OS: cartão "O QUE FAZER" com o texto, onde, tipo, prazo, para quem e técnico', /O QUE FAZER/.test(s)&&/Trocar as 2 lâmpadas da sala do PCP/.test(s)&&/Prédio \/ escritório · ADM/.test(s)&&/Elétrico/.test(s)&&/Para quem\s*YURI/i.test(s)&&/prorrogado 1×/.test(s)&&/Faltam 5 dias/.test(s), s.slice(0,600).replace(/\n/g,' | '));
+ ok('O cartão antigo (Equipamento / Setor / Responsável) saiu', !/SETOR \/ LINHA/.test(s));
+ await p.click('[data-act="gce-pr"][data-v="1"]'); await H.dorme(1000); c=await doc();
+ ok('"+1 dia" no detalhe prorroga para '+mais(6)+' e anota na linha do tempo', c.prazo===mais(6)&&/Prazo prorrogado de .* para .* por Marcelo Souza/.test(c.hist[c.hist.length-1].o), c.prazo+' '+c.hist[c.hist.length-1].o);
+ await p.click('.gce-c [data-act="gce-abrir"]'); await H.dorme(400); ok('Editar também abre no detalhe da OS', !!(await p.$('.gx-mc #gch-tx'))); await p.keyboard.press('Escape'); await H.dorme(300);
+ await p.screenshot({path:'/tmp/claude-0/os-detalhe.png',fullPage:false});
+ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:15000}).catch(()=>null),p.click('[data-act="man-imprimir"]')]);
+ ok('"Baixar OS para imprimir" gera o PDF novo (OS_00009_…)', dl&&/^OS_00009_/.test(dl.suggestedFilename()), dl&&dl.suggestedFilename());
+ if(dl&&process.env.JSPDF_REAL){ await dl.saveAs('/tmp/claude-0/os.pdf'); }
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
