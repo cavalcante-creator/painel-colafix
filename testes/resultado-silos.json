@@ -13,12 +13,12 @@
   {
    "n": "T1 10.000 − 500 = 9.500 kg no banco e no painel",
    "ok": true,
-   "det": "banco=9500 | tanque: SILO GRANDE 9,5t de 70 t 13,6%Crítico ⚙️ 19:14"
+   "det": "banco=9500 | tanque: SILO GRANDE 9,5t de 70 t 13,6%Crítico ⚙️ 08:26"
   },
   {
    "n": "T2 depois de recarregar continua 9.500 kg",
    "ok": true,
-   "det": "AGORA 9,5 t 13,6% Crítico 9.500 kg · Última atualização: 24/10/2026 19:14 · Origem: ⚙️ Atualização automática"
+   "det": "AGORA 9,5 t 13,6% Crítico 9.500 kg · Última atualização: 26/10/2026 08:26 · Origem: ⚙️ Atualização automática"
   },
   {
    "n": "T3 9.500 − 300 = 9.200 kg",
@@ -38,7 +38,7 @@
   {
    "n": "T6 depois de recarregar continua 8.950 kg (origem medição manual)",
    "ok": true,
-   "det": "AGORA 9,0 t 12,8% Crítico 8.950 kg · Última atualização: 24/10/2026 19:14 · Origem: 📏 Medição manual"
+   "det": "AGORA 9,0 t 12,8% Crítico 8.950 kg · Última atualização: 26/10/2026 08:27 · Origem: 📏 Medição manual"
   },
   {
    "n": "T7 histórico com todas as movimentações (2 consumos, 1 recusado, 2 medições)",

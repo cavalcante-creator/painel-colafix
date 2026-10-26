@@ -12,7 +12,7 @@ if(typeof LEIT_CONHECIDOS!=='undefined'&&!LEIT_CONHECIDOS.includes('silocel')) L
 registrarPerfil('silocel',{nome:'Celular dos silos (areia, cimento e premix)',mods:['silocel'],pos:4,desc:'Para o celular de quem fica perto dos silos: registra a areia e o cimento que chegam (nota e quantidade) e confirma o premix que o almoxarifado entrega nas linhas 1 e 2.'});
 { const _vo=viewOk; viewOk=function(v){ if(v==='silorec'){ try{ const p=acsP(); if(p&&!p.tudo&&(p.mods||[]).includes('silocel')) return true; }catch(e){} } return _vo.apply(this,arguments); }; }
 function sclSo(){ try{ const A=S.acs; if(!A||A.dono) return false; const p=acsP(); return !!p&&!p.tudo&&(p.mods||[]).includes('silocel')&&!(p.mods||[]).includes('silos'); }catch(e){ return false; } }
-{ const _mv=modsVis; modsVis=function(){ const r=_mv.apply(this,arguments); if(!sclSo()) return r; const s=r.filter(m=>m.id==='silocel'); return s.concat(r.filter(m=>m.id!=='silocel'&&m.id!=='silos'&&m.id!=='almoxcel')); }; }
+{ const _mv=modsVis; modsVis=function(){ const r=_mv.apply(this,arguments); if(!sclSo()){ let tem=false; try{ const p=acsP(); tem=!!(S.acs&&S.acs.dono)||!!(p&&(p.mods||[]).includes('silocel')); }catch(e){} return tem?r:r.filter(m=>m.id!=='silocel'); } const s=r.filter(m=>m.id==='silocel'); return s.concat(r.filter(m=>m.id!=='silocel'&&m.id!=='silos'&&m.id!=='almoxcel')); }; }
 { const _md=modDe; modDe=function(v){ if(v==='silorec'&&sclSo()) return 'silocel'; return _md.apply(this,arguments); }; }
 S.scl={ab:null,q:'',ln:'',rec:'',salv:false};
 function sclTem(){ try{ return viewOk('silocel'); }catch(e){ return false; } }

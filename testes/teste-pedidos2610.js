@@ -1,0 +1,31 @@
+/* Pedidos de 23/10: (1) Estoques com feito/tinha ao lado da previsão, (2) avisos só do PCP no painel da administradora,
+   (3) ensacado para apontar, (4) nova medição sem silo preenchido avisa. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString(), cp=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,7))(new Date());
+ D['chamados/os-00011']={numero:11,linha:'Linha 2',equip:'Ensacadeira',defeito:'x',impacto:'parou',nome:'Ana',status:'Aberta',criado:t};
+ D['pedmat/m1']={ordem:'5001',num:'5001',linha:'Linha 1',item:'CIM01 CIMENTO',qtd:5,um:'sc',urgente:true,status:'aberto',em:t};
+ Object.assign(D['ordens/5001'],{produto:'RJ1001 - REJUNTE FLEXIVEL CINZA 5KG',ensaca:'9001'});
+ D['entregas/eold']={ordem:'5001',num:'5001',linha:'Linha 1',em:'2026-10-20T15:00:00.000Z',por:'uDONA',qtd:100};
+ D['entregas/enew']={ordem:'5001',num:'5001',linha:'Linha 1',em:t,por:'uDONA',qtd:300};
+ D['pcpbase/meta']={em:t,hist:[]}; D['pcpbase/perfil']={}; D['pcpbase/vendas']={mensal:{RJ1001:{[cp]:[200,100]}}}; D['pcpbase/prev']={mes:{[cp]:{RJ1001:3000}},est:{[cp]:{RJ1001:1000}}};
+ D['pcpbase/itens']={l:{RJ1001:{d:'REJUNTE FLEXIVEL CINZA 5KG',sal:1,a3:900,a30:100}},atual:{SALDO:t},em:t};
+ d.users['manut@painel-colafix.app']={uid:'uMN',pass:'mn1234',nome:'Bruno Manut'}; D['perfis/uMN']={nome:'Bruno Manut',usuario:'manut'}; D['acessos/uMN']={perfil:'manut',mods:['manut'],locais:[],ativo:true};
+ let B=await H.abrir({viewport:{width:1440,height:950}}); let p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(4500);
+ const sino=async()=>{ await p.evaluate(()=>document.getElementById('tp-sino').click()); await H.dorme(400); const s=await p.evaluate(()=>(document.querySelector('.tp-pop')||{}).innerText||''); await p.evaluate(()=>document.getElementById('tp-sino').click()); await H.dorme(200); return s; };
+ let s=await sino(); ok('Sino da administradora sem o aviso da manutenção, com "Ensacado para apontar"', !/máquina parada/i.test(s)&&/Ensacado para apontar/.test(s), s.replace(/\n/g,' | ').slice(0,300));
+ await p.evaluate(()=>__T.go('meudia')); await H.dorme(800); s=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Meu dia: sem "Chamado com máquina parada" nem "Material urgente"; com "Apontar o ensacado 9001"', !/máquina parada/i.test(s)&&!/Material urgente/.test(s)&&/Apontar o ensacado 9001 no sistema/.test(s), s.slice(0,500).replace(/\n/g,' | '));
+ await p.evaluate(()=>__T.go('programacao')); await H.dorme(900); s=await p.evaluate(()=>(document.querySelector('.ens-c')||{}).innerText||'');
+ ok('Programação: "ENSACADO PARA APONTAR" com o ensacado 9001, ordem 5001 e só o apontamento novo (300)', /ENSACADO PARA APONTAR/.test(s)&&/Ensacado 9001/.test(s)&&/ordem 5001/.test(s)&&/300 /.test(s)&&/1 apontamento/.test(s), s.replace(/\n/g,' | '));
+ await p.click('[data-act="ens-ok"]'); await H.dorme(1200);
+ const ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); ok('"Apontei" grava ensAp no apontamento e o aviso some', ds['entregas/enew'].ensAp&&ds['entregas/enew'].ensAp.por==='uDONA'&&!ds['entregas/eold'].ensAp&&!(await p.$('.ens-c')), JSON.stringify(ds['entregas/enew'].ensAp));
+ await p.evaluate(()=>__T.go('anlest')); await H.dorme(1500); s=await p.evaluate(()=>{ const r=document.querySelector('tr[data-c="RJ1001"]'); return r?r.innerText:''; });
+ ok('Estoques: ao lado da previsão "feito 400 · tinha 1.000" (painel 400 > Focco 200)', /3\.000/.test(s)&&/feito 400 · tinha 1\.000/.test(s), s.replace(/\n/g,' | '));
+ await p.evaluate(()=>__T.go('medicao')); await H.dorme(700); await p.evaluate(()=>{ const b=document.getElementById('m-salvar'); b.disabled=false; b.click(); }); await H.dorme(400);
+ s=await p.evaluate(()=>(document.getElementById('toast')||{}).innerText||''); ok('Nova medição sem nenhum silo: avisa para preencher', /pelo menos um silo/.test(s), s);
+ await p.fill('#m-c1','25'); await p.click('#m-salvar'); await H.dorme(1500); const nm=await p.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('__srv')).docs).filter(k=>k.startsWith('medicoes/')).length);
+ ok('Nova medição com um silo salva', nm===1, nm);
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close();
+ B=await H.abrir({viewport:{width:1440,height:950}}); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'manut','mn1234'); await H.dorme(4000);
+ s=await sino(); ok('A manutenção continua vendo o aviso dela no sino', /máquina parada/i.test(s), s.replace(/\n/g,' | ').slice(0,200));
+ console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
