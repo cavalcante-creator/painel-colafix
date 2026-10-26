@@ -63,7 +63,7 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  let pinfo=''; if(dp){ await dp.saveAs('/tmp/esw.pdf'); pinfo=fs.statSync('/tmp/esw.pdf').size+' bytes'; }
  ok('Baixar PDF (A4 deitada) com o nome Necessidades-todas-<mês>.pdf', dp&&/^Necessidades-todas-\d{4}-\d{2}\.pdf$/.test(dp.suggestedFilename()), (dp&&dp.suggestedFilename())+' '+pinfo);
  await p.evaluate(()=>__T.go('anlnec')); await H.dorme(800);
- ok('A tela Necessidades continua a de antes', /Necessidades/.test(await txt())&&!(await p.$('.esw-top')));
+ ok('Link antigo de Necessidades abre O que precisa produzir', await p.evaluate(()=>__T.S().view)==='anlest'&&!!(await p.$('.esw-top')));
  await p.evaluate(()=>__T.go('anlest')); await H.dorme(900); await p.screenshot({path:'/tmp/esw-tela.png',fullPage:true});
  console.log('erros:',B.erros.filter(x=>!/404/.test(x)));
  console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
