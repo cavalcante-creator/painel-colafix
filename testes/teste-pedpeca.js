@@ -1,0 +1,72 @@
+/* Pedidos de peça (js/54): técnico pede vários itens na oficina; Marcelo responde, manda para o compras (PDF + mensagem);
+   técnico vê a resposta. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+const SP=process.env.SHOTS||'/tmp';
+(async()=>{ const {d}=seedManut(); const D=d.docs, agora=Date.now(), iso=m=>new Date(agora-m*6e4).toISOString();
+ D['crachas/BCDE3456']={codigo:'BCDE3456',nome:'Bruno Lima',linha:'',papel:'tecnico',area:'Mecânica',ativo:true,adesivo:'777888',criadoEm:iso(999)};
+ Object.keys(D).filter(k=>k.startsWith('chamados/')).forEach(k=>delete D[k]);
+ d.users['oficina@painel-colafix.app']={uid:'uOF',pass:'of1234',nome:'Oficina'}; D['perfis/uOF']={nome:'Computador da manutenção',usuario:'oficina'}; D['acessos/uOF']={perfil:'oficina',mods:['tablet'],locais:[],ativo:true};
+ d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
+ const erros=[];
+ let B=await H.abrir({viewport:{width:1600,height:900}}); let p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'oficina','of1234'); await H.dorme(3500);
+ const bip=async c=>{ await p.evaluate(()=>{ __T.S().tt.recente={}; }); await p.keyboard.type(c,{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); };
+ await bip('777888'); await p.keyboard.press('4'); await H.dorme(700);
+ let s=await p.evaluate(()=>__T.S().tt.fase); ok('Tecla 4 abre "Pedir peça"', s==='ofpeca', s);
+ await p.fill('#of-pt','Rolamento 6205 2RS'); await p.fill('#of-pq','4'); await p.selectOption('#of-pu0','pç'); await p.fill('#of-pr0','SKF ou NSK');
+ await p.click('[data-act="ofp-mais"]'); await H.dorme(300);
+ await p.fill('#of-pt1','Correia A-42'); await p.fill('#of-pq1','2'); await p.selectOption('#of-pu1','un');
+ await p.click('[data-act="ofp-mais"]'); await H.dorme(300); await p.fill('#of-pt2','apagar este');
+ await p.click('[data-act="ofp-tira"][data-v="2"]'); await H.dorme(300);
+ s=await p.evaluate(()=>({n:document.querySelectorAll('.ofp-it').length,a:document.getElementById('of-pt').value,b:document.getElementById('of-pt1').value,bt:(document.querySelector('[data-act="of-peca-ok"]')||{}).innerText}));
+ ok('Vários itens: + Mais um item e × tirar mantêm o que foi digitado', s.n===2&&s.a==='Rolamento 6205 2RS'&&s.b==='Correia A-42'&&/Mandar 2 itens/.test(s.bt), JSON.stringify(s));
+ await p.fill('#of-ploc','Linha 2 · misturador'); await p.fill('#of-pobs','O rolamento do eixo está fazendo barulho');
+ await p.click('[data-act="of-urg"][data-v="hoje"]'); await H.dorme(300);
+ await p.screenshot({path:SP+'/pp-oficina.png'});
+ await p.click('[data-act="of-peca-ok"]'); await H.dorme(1500);
+ let pp=await p.evaluate(()=>(__T.S().pedpecas||[])[0]);
+ ok('Pedido gravado com os itens, onde, detalhes e urgência', pp&&pp.itens.length===2&&pp.itens[0].qtd==='4'&&pp.itens[0].un==='pç'&&pp.itens[0].ref==='SKF ou NSK'&&pp.itens[1].t==='Correia A-42'&&pp.onde==='Linha 2 · misturador'&&/barulho/.test(pp.obs)&&pp.urg==='hoje'&&pp.qtd==='2 itens'&&pp.status==='enviado', JSON.stringify(pp).slice(0,300));
+ const srv=await p.evaluate(()=>localStorage.getItem('__srv')); await B.browser.close();
+ /* Marcelo */
+ B=await H.abrir({viewport:{width:1440,height:1000}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,JSON.parse(srv)); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
+ await p.click('#navlist [data-go="gxpec"]'); await H.dorme(1200);
+ let t=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Marcelo vê a tabela de itens, para onde e os detalhes', /Rolamento 6205 2RS/.test(t)&&/4 pç/.test(t)&&/SKF ou NSK/.test(t)&&/Correia A-42/.test(t)&&/Linha 2 · misturador/.test(t)&&/fazendo barulho/.test(t), t.slice(0,600).replace(/\n/g,'|'));
+ await p.click('[data-act="gpx-resp"]'); await H.dorme(300); await p.click('[data-act="gpx-pronta"][data-v="2"]'); await H.dorme(100); await p.click('[data-act="gpx-rok"]'); await H.dorme(1200);
+ pp=await p.evaluate(()=>(__T.S().pedpecas||[])[0]);
+ ok('Responder grava a resposta (pronta) e aparece no cartão', pp.resp&&pp.resp[0].t==='Vou pedir para o compras hoje.'&&pp.resp[0].por==='Marcelo Souza'&&/Você respondeu/.test(await p.evaluate(()=>document.getElementById('view').innerText)), JSON.stringify(pp.resp));
+ await p.screenshot({path:SP+'/pp-marcelo.png'});
+ /* Marcelo inclui um item no pedido do Bruno */
+ await p.click('[data-act="gpx-ed"]'); await H.dorme(400); await p.click('[data-act="gpx-pmais"]'); await H.dorme(300); await p.fill('#ppe-t2','Graxa de lítio'); await p.fill('#ppe-q2','1'); await p.selectOption('#ppe-u2','balde'); await p.fill('#ppe-mot','incluí a graxa'); await p.screenshot({path:SP+'/pp-edita.png'}); await p.click('[data-act="gpx-psalva"]'); await H.dorme(1200);
+ pp=await p.evaluate(()=>(__T.S().pedpecas||[]).find(x=>/Rolamento/.test(x.t)));
+ ok('Marcelo inclui item no pedido do técnico (com recado)', pp.itens.length===3&&pp.itens[2].t==='Graxa de lítio'&&pp.itens[2].un==='balde'&&pp.resp.some(r=>r.t==='incluí a graxa')&&/1 item incluído/.test(pp.hist[pp.hist.length-1].o), JSON.stringify(pp.itens));
+ /* Marcelo cria um pedido dele */
+ await p.click('[data-act="gpx-novo"]'); await H.dorme(400); await p.fill('#ppe-t0','Lâmpada LED 40W tubular'); await p.fill('#ppe-q0','10'); await p.fill('#ppe-onde','Galpão das linhas'); await p.click('[data-act="gpx-purg"][data-v="sem"]'); await H.dorme(200); await p.click('[data-act="gpx-psalva"]'); await H.dorme(1200);
+ let nv=await p.evaluate(()=>(__T.S().pedpecas||[]).find(x=>/Lâmpada/.test(x.t)));
+ ok('Marcelo cria pedido próprio', nv&&nv.porNome==='Marcelo Souza'&&nv.origem==='gestor'&&nv.urg==='sem'&&nv.onde==='Galpão das linhas'&&nv.status==='visto', JSON.stringify(nv).slice(0,200));
+ /* recusar */
+ await p.click(`[data-act="gpc-st"][data-v="nao"][data-id="${nv._id}"]`); await H.dorme(300); await p.fill('#gpc-mot','Tem no almoxarifado'); await p.click('[data-act="gpc-ok"]'); await H.dorme(1200);
+ nv=await p.evaluate(id=>(__T.S().pedpecas||[]).find(x=>x._id===id),nv._id);
+ ok('Recusar grava o motivo', nv.status==='nao'&&nv.mot==='Tem no almoxarifado', JSON.stringify({st:nv.status,m:nv.mot}));
+ await p.click('[data-act="gpc-f"][data-v="abertos"]').catch(()=>{}); await H.dorme(300); await p.check('[data-ppcsel]'); await H.dorme(400); await p.click('[data-act="gpx-comp"]'); await H.dorme(500);
+ s=await p.evaluate(()=>({m:!!document.querySelector('.ppc-m'),msg:(document.getElementById('ppc-msg')||{}).value||''}));
+ ok('"Mandar para o compras" abre a janela com a mensagem pronta', s.m&&/Pedido de compra da manutenção MAN-/.test(s.msg)&&/1\. Rolamento 6205 2RS — 4 pç \(SKF ou NSK\)/.test(s.msg)&&/URGENTE/.test(s.msg)&&/Autorizado por: Marcelo Souza/.test(s.msg), s.msg);
+ await p.fill('#ppc-cn','Paula Compras'); await p.fill('#ppc-ct','(51) 99876-5432'); await p.fill('#ppc-ce','compras@colafix.com'); await H.dorme(200);
+ s=await p.evaluate(()=>document.getElementById('ppc-msg').value); ok('Nome do compras entra na mensagem', /^Olá, Paula\./.test(s), s.slice(0,40));
+ await p.screenshot({path:SP+'/pp-compras.png'});
+ const dl=p.waitForEvent('download',{timeout:8000}).catch(()=>null); await p.click('[data-act="gpx-pdf"]'); const f=await dl; await H.dorme(1200);
+ ok('Baixar PDF gera "Pedido-compra-MAN-…pdf"', f&&/^Pedido-compra-MAN-\d{6}-\d{4}\.pdf$/.test(f.suggestedFilename()), f&&f.suggestedFilename());
+ if(f&&process.env.JSPDF_REAL) await f.saveAs(SP+'/pedido-compra.pdf');
+ s=await p.evaluate(()=>{ const S=__T.S(), x=S.pedpecas.find(y=>/Rolamento/.test(y.t)); return {st:x.status,c:x.compras,k:S.cfg.comprasContato}; });
+ ok('Pedido fica "Vai comprar", com o número do compras, e o contato fica guardado', s.st==='comprar'&&s.c&&/^MAN-/.test(s.c.num)&&s.c.via.includes('PDF')&&s.k&&s.k.nome==='Paula Compras'&&s.k.tel==='(51) 99876-5432', JSON.stringify(s));
+ await p.click('[data-act="gpx-mfecha"]'); await H.dorme(400);
+ t=await p.evaluate(()=>document.getElementById('view').innerText); ok('Cartão mostra "No compras · MAN-…"', /No compras · MAN-/.test(t));
+ const srv2=await p.evaluate(()=>localStorage.getItem('__srv')); await B.browser.close();
+ /* técnico vê a resposta */
+ B=await H.abrir({viewport:{width:1600,height:900}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,JSON.parse(srv2)); await p.goto(H.BASE); await H.entrar(p,'oficina','of1234'); await H.dorme(3500);
+ await bip('777888'); t=await p.evaluate(()=>document.querySelector('.cq').innerText);
+ ok('Menu do técnico avisa "1 resposta nova do Marcelo"', /1 resposta nova do Marcelo/.test(t), t.slice(0,400).replace(/\n/g,'|'));
+ await p.keyboard.press('4'); await H.dorme(900); t=await p.evaluate(()=>document.querySelector('.cq').innerText);
+ pp=await p.evaluate(()=>(__T.S().pedpecas||[]).find(y=>/Rolamento/.test(y.t)));
+ ok('"Seus pedidos" mostra a resposta e o andamento, e marca como vista', /respondeu às/.test(t)&&/Vou pedir para o compras hoje/.test(t)&&/vai comprar/i.test(t)&&/incluí a graxa/.test(t)&&!!pp.respVista, t.slice(0,600).replace(/\n/g,'|'));
+ ok('Sem erros no console', !erros.length, erros.join(' | '));
+ console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
