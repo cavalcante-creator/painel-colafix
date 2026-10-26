@@ -13,7 +13,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   await p.evaluate(()=>__T.go('dbfila')); await H.dorme(400); const alm=await abas(); const tf=await p.evaluate(()=>document.querySelector('#view h1').innerText);
   await p.evaluate(()=>__T.go('tvapres')); await H.dorme(300); const tel=await abas();
   await p.evaluate(()=>__T.go('linhatv')); await H.dorme(300); const tab=await abas();
-  ok('Produção: Painel, Programação, Calendário, Indicadores e Indicadores (detalhado)', JSON.stringify(prod.slice(0,5))===JSON.stringify(['prodpainel','programacao','calendario','prodind','indicadores']), JSON.stringify(prod));
+  ok('Produção (administradora): Painel, Programação, Calendário e Conferir apontamentos (os indicadores ficam em Relatórios)', JSON.stringify(prod.slice(0,4))===JSON.stringify(['prodpainel','programacao','calendario','apconf']), JSON.stringify(prod));
   const mods=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-mod]')].map(b=>b.dataset.mod));
   ok('Almoxarifado começa pela Fila do almox, depois Diário (Monitor virou módulo próprio, logo depois)', alm[0]==='dbfila'&&alm[1]==='diario'&&!alm.includes('dbmon')&&alm.includes('pmxfichas')&&tf==='Fila do almox'&&mods.includes('premix'), JSON.stringify(alm)+' '+tf+' '+JSON.stringify(mods));
   ok('TV da fábrica em Telas de TV; Tela da linha e Paradas no Tablet da produção', tel.includes('tvfab')&&JSON.stringify(tab)===JSON.stringify(['linhatv','paradas']), JSON.stringify(tel)+' '+JSON.stringify(tab));

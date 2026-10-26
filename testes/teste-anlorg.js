@@ -9,7 +9,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  D['ordens/7001']={num:'7001',produto:'AC0005 - ARGAMASSA CINZA AC3 EMB PAPEL 20 KG',linha:'Linha 1',data:mais(9),turno:'Dia todo',total:5000,status:'aberta',criadaEm:t};
  const B=await H.abrir({viewport:{width:1440,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
  await p.evaluate(()=>__T.go('anlres')); await H.dorme(1500);
- ok('Link antigo do Resumo abre "O que precisa produzir"', await p.evaluate(()=>__T.S().view)==='anlest'&&!!(await p.$('.esw-top')));
+ ok('Link antigo do Resumo abre "O que precisa produzir"', await p.evaluate(()=>__T.S().view)==='anlest'&&!!(await p.$('.esw-hd')));
  const tabs=await p.evaluate(()=>[...document.querySelectorAll('[data-grp],.tabs [data-go]')].map(x=>x.innerText.trim()).filter(Boolean).join('|'));
  const tx=await p.evaluate(()=>(document.querySelector('.tabs')||document.querySelector('.navsub')||document.body).innerText);
  ok('Abas da Análise PCP: Produzir · Mês · Linhas · Sistema (sem Hoje, Estoque, Capacidade, Outros)', /Produzir/.test(tx)&&/Mês/.test(tx)&&/Linhas/.test(tx)&&/Sistema/.test(tx)&&!/\bHoje\b/.test(tx)&&!/Outros/.test(tx)&&!/Capacidade/.test(tx), tx.replace(/\n/g,' | ').slice(0,200));

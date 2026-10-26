@@ -949,7 +949,7 @@ function vProgramacao(){
   xs.sort(O.mostrar==='encerradas'&&!q&&!temData?(a,b)=>dataEf(b).localeCompare(dataEf(a)):(a,b)=>dataEf(a).localeCompare(dataEf(b))||String(a.linha).localeCompare(String(b.linha))||String(a.num).localeCompare(String(b.num)));
   if(O.mostrar!=='encerradas'){ let ps=prevAtivas(); if(O.linha!=='todas') ps=ps.filter(p=>p.linha===O.linha); if(q) ps=ps.filter(casa); if(temData){ const de=O.de||'0000-00-00', ate=O.ate||'9999-99-99'; ps=ps.filter(p=>{ const d=p.data<h?h:p.data; return d>=de&&d<=ate; }); } xs=xs.concat(ps); }
   if(O.mostrar==='pend') xs=xs.filter(o=>pendDe(o).length);
-  const nConc=xs.filter(o=>!o._pv).length, nPlan=xs.length-nConc; if(O.tipo==='conc') xs=xs.filter(o=>!o._pv); else if(O.tipo==='plan') xs=xs.filter(o=>o._pv);
+  const nConc=xs.filter(o=>!o._pv).length, nPlan=xs.length-nConc; if(O.tipo==='conc') xs=xs.filter(o=>!o._pv); else if(O.tipo==='plan') xs=xs.filter(o=>o._pv); if(typeof ranFiltro==='function') xs=ranFiltro(xs);
   const nPend=ordAbertas().concat(prevAtivas()).filter(o=>pendDe(o).length).length;
   const agrupar=!(O.mostrar==='encerradas'&&!q&&!temData);
   if(agrupar){ const kd=o=>{ const d=dataEf(o); return (o._pv||o.status==='aberta')&&d<h?h:d; }; xs.sort((a,b)=>kd(a).localeCompare(kd(b))||L.indexOf(a.linha)-L.indexOf(b.linha)||seqCmp(a,b)); }

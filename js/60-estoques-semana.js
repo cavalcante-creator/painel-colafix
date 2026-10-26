@@ -69,9 +69,11 @@ function eswCurvaSvg(C){ const w=600,h=210,x0=60,x1=590,y0=170,yt=18, top=Math.m
 /* ---------- a tela ---------- */
 function eswEscopoNome(){ const F=S.anl.es||{}; return F.linha&&F.linha!=='__sem'?F.linha:F.linha==='__sem'?'Sem linha':'A fábrica'; }
 function eswCap(){ const F=S.anl.es||{}; if(F.linha&&F.linha!=='__sem') return capDe(F.linha)||0; return linhasOrd().reduce((a,l)=>a+(capDe(l)||0),0); }
-function eswTopo(W){ const at=((S.anl.base.itens||{}).atual)||{}, sa=at.SALDO?String(at.SALDO):''; const m=ESW_MES[+W.cp.slice(5,7)-1];
-  return `<div class="esw-top"><img src="icons/logo-colafix-escuro.png" alt="Colafix"><div class="esw-tt"><h1>O que precisa produzir</h1><span>Análise PCP · ${m} de ${W.cp.slice(0,4)}, ${W.n}ª semana · atualizado ${sa?dm(sa.slice(0,10))+(sa.length>10?' às '+sa.slice(11,16):''):'—'}</span></div>
-    <div class="esw-tb"><button class="esw-bo" data-act="esw-pdf">${ic('baixar',16,2)}Baixar PDF</button><button class="esw-bo" data-act="esw-xls">${ic('baixar',16,2)}Baixar Excel</button></div></div>`; }
+function eswTopo(W,Rz,va){ const at=((S.anl.base.itens||{}).atual)||{}, sa=at.SALDO?String(at.SALDO):''; const m=ESW_MES[+W.cp.slice(5,7)-1]; const nm=eswEscopoNome();
+  const pos=Rz&&Rz.metaT?` · ${esc(nm)} ${Rz.pos<0?'<b class="t-crit">'+eswSemTxt(Rz.pos)+' atrasad'+(nm==='A fábrica'?'a':'a')+'</b>':'<b class="t-ok">'+eswSemTxt(Rz.pos)+' adiantad'+(nm==='A fábrica'?'a':'a')+'</b>'}`:'';
+  const nv=(va||[]).length;
+  return `<div class="head esw-hd"><div><div class="eyebrow">ANÁLISE PCP · ${m.toUpperCase()}, ${W.n}ª SEMANA</div><h1>O que precisa produzir</h1><div class="sub">Atualizado ${sa?dm(sa.slice(0,10))+(sa.length>10?' às '+sa.slice(11,16):''):'—'}${pos}</div></div>
+    <button class="btn sec esw-rb" data-act="esw-res" aria-expanded="${!!S.esw.res}">${ic('grafico',16,2)}Resumo, Curva S, PDF e Excel${nv?`<span class="esw-rbn" title="Venderam mais que o previsto">${nv}</span>`:''}</button></div>`; }
 function eswFiltros(all,n,tot){ const E=S.esw, F=S.anl.es||{}; const famO=['AC1','AC2','AC3','PIC'].concat(all.some(r=>eswFam(r.d)==='Outros')?['Outros']:[]), embO=['Papel','Plástica'].concat(all.some(r=>eswEmb(r.d)==='Outra')?['Outra']:[]);
   const sel=(k,rot,ops,def)=>`<label class="esw-sl ${E[k]!==def?'on':''}"><span>${rot}</span><select data-esw="${k}">${ops.map(([v,l])=>`<option value="${esc(v)}" ${E[k]===v?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
   const L=[['','Todas as linhas']].concat(linhasOrd().map(l=>[l,l]));
@@ -117,14 +119,21 @@ function eswMonta(R,h){ const ia=h.indexOf('<!--esw:a-->'), ib=h.indexOf('<!--es
   const vazio=!xs.length?`<section class="card"><div class="empty">Nenhum item com esses filtros. <button class="lnk" data-act="esw-limpar">Limpar filtros</button></div></section>`:'';
   const tabela=xs.length?tab.replace('<div class="anl-tw">','<div class="anl-tw">'+eswGrpCont(xs,W)):'';
   const capH=cap.trim()?`<details class="card esw-capd" ${S.esw.capAb?'open':''}><summary>Capacidade dos almoxarifados e por item</summary>${cap}</details>`:'';
-  return `<div class="esw">${eswTopo(W)}${eswFiltros(all,xs.length,tot)}${S.esw.mais?mais:''}${Rz.html}<div class="esw-g2">${eswCurvaHtml(C)}${eswVendeuHtml(va)}</div>${vazio}${tabela}${nota}<p class="sub esw-como">Como ler: <b>meta da semana</b> = previsão do mês ÷ 4. <b>No mês</b> = semanas que o estoque do dia 1º mais o que já foi feito cobrem, menos as semanas que já passaram (hoje ${eswF1(W.s)}). Exemplo: mês de 100, meta da semana 25; começou com 50 = 2 semanas adiantado.</p>${capH}</div>`; }
+  const como=`<p class="sub esw-como">Como ler: <b>meta da semana</b> = previsão do mês ÷ 4. <b>No mês</b> = semanas que o estoque do dia 1º mais o que já foi feito cobrem, menos as semanas que já passaram (hoje ${eswF1(W.s)}). Exemplo: mês de 100, meta da semana 25; começou com 50 = 2 semanas adiantado.</p>`;
+  const dr=S.esw.res?`<div class="esw-drf" data-act="esw-resx"></div><aside class="esw-dr" role="dialog" aria-label="Resumo da semana"><div class="esw-drh"><div><div class="eyebrow">ANÁLISE PCP</div><h2>Resumo da semana</h2></div><button class="btn sec" data-act="esw-resx" aria-label="Fechar">✕</button></div>
+     <div class="esw-tb"><button class="btn sec" data-act="esw-pdf">${ic('baixar',16,2)}Baixar PDF</button><button class="btn sec" data-act="esw-xls">${ic('baixar',16,2)}Baixar Excel</button><span class="sub" style="margin:0;font-size:12.5px">com os filtros da tela</span></div>
+     ${Rz.html}${eswVendeuHtml(va)}${eswCurvaHtml(C)}${como}</aside>`:'';
+  return `<div class="esw">${eswTopo(W,Rz,va)}${eswFiltros(all,xs.length,tot)}${S.esw.mais?mais:''}${vazio}${tabela}${nota}${capH}</div>${dr}`; }
 /* ---------- ações ---------- */
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="esw-"]'); if(!b) return; const a=b.dataset.act, E=S.esw; if(!S.anl.es) return;
   if(a==='esw-ln'){ S.anl.es.linha=b.dataset.v||''; render(); return; }
   if(a==='esw-mais'){ E.mais=!E.mais; render(); return; }
+  if(a==='esw-res'){ E.res=!E.res; render(); return; }
+  if(a==='esw-resx'){ E.res=false; render(); return; }
   if(a==='esw-limpar'){ Object.assign(E,{sit:'acao',fam:'',emb:'',tipo:''}); const F=S.anl.es; Object.assign(F,{q:'',vis:'principal',linha:'',cob:'',dp:'',col:''}); render(); return; }
   if(a==='esw-pdf'){ eswPdf(); return; }
   if(a==='esw-xls'){ eswXls(); return; } });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.esw.res&&S.view==='anlest'){ S.esw.res=false; render(); } });
 document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!t.dataset||!t.dataset.esw) return; S.esw[t.dataset.esw]=t.value; render(); });
 document.addEventListener('toggle',ev=>{ const t=ev.target; if(t&&t.classList&&t.classList.contains('esw-capd')) S.esw.capAb=t.open; },true);
 /* ---------- dados para o PDF e o Excel (o que está na tela) ---------- */
@@ -229,7 +238,12 @@ async function eswXls(){ const W=eswSemanas(), rows=eswLinhas(), nm=eswEscopoNom
   const buf=await wb.xlsx.writeBuffer(); baixa(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); }
 window.Painel=window.Painel||{}; window.Painel.estoquesSemana={semanas:eswSemanas,linhas:eswLinhas,estado:()=>S.esw};
 document.head.insertAdjacentHTML('beforeend',`<style id="esw-css">
-.esw{display:flex;flex-direction:column;gap:16px}
+.esw{display:flex;flex-direction:column;gap:14px}
+.esw-hd{margin-bottom:0}.esw-rb{position:relative;display:inline-flex;align-items:center;gap:8px}.esw-rbn{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--crit);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.esw-drf{position:fixed;inset:0;background:rgba(20,40,50,.28);z-index:60}
+.esw-dr{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:var(--ground);z-index:61;overflow-y:auto;padding:18px 18px 28px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;box-shadow:-8px 0 30px rgba(20,40,50,.18)}
+.esw-drh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.esw-drh h2{margin:0;font-size:21px;color:var(--teal-strong)}
+.esw-dr .esw-ks{grid-template-columns:repeat(2,minmax(0,1fr))}.esw-dr .esw-tb{align-items:center}
 .esw-top{display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:#143F54;color:#fff;border-radius:14px;padding:18px 22px}
 .esw-top img{height:34px;width:auto}.esw-tt{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:3px}.esw-tt h1{margin:0;font-size:24px;font-weight:600;color:#fff}.esw-tt span{font-size:13.5px;color:#C7D7E0}
 .esw-tb{display:flex;gap:8px;flex-wrap:wrap}.esw-bo{height:42px;padding:0 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,.75);background:transparent;color:#fff;font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.esw-bo:hover{background:rgba(255,255,255,.12)}
