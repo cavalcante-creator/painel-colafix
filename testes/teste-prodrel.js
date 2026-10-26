@@ -22,7 +22,7 @@ const SP=process.env.SHOTS||'/tmp';
  ok('Tempo parado por motivo, sem o setup', /Falta de cimento/.test(t)&&/Manutenção/.test(t)&&!/Setup/.test(t.split('Resultado')[0].split('Linhas:')[1]||'')&&/2 h 30|2,5 h/.test(t), t.replace(/\n/g,' | ').slice(0,400));
  await p.click('[data-act="pra-ln"][data-v="Linha 1"]'); await H.dorme(1200); t=await txt(); ok('Filtro de linha: só Linha 1', /Manutenção/.test(t)&&!/Falta de cimento/.test(t), t.replace(/\n/g,' | ').slice(0,300));
  await p.click('[data-act="pra-sug"][data-i="1"]'); await H.dorme(2500); t=await txt(); ok('Pronta "Toneladas por semana"', /semana de/.test(t)&&/ t/.test(t)&&/últimos 30 dias/.test(t), t.replace(/\n/g,' | ').slice(0,300));
- await p.click('[data-act="pra-sug"][data-i="0"]'); await H.dorme(1500);
+ await p.click('[data-act="pra-sug"][data-i="0"]'); await H.dorme(1500); if(!(await p.isChecked('[data-pra="comp"]'))){ await p.check('[data-pra="comp"]'); await H.dorme(1500); }
  await p.click('[data-act="pra-salvar"]'); await H.dorme(400); await p.fill('#pra-nome','Por produto'); await p.click('[data-act="pra-salvar-ok"]'); await H.dorme(1200);
  const sv=await p.evaluate(()=>__T.S().db.doc('perfis/'+__T.S().uid).get().then(g=>g.data().prodAnalises));
  ok('Salvar análise grava no perfil, marcada para o relatório do mês', sv&&sv.length===1&&sv[0].nome==='Por produto'&&sv[0].noMes===true, JSON.stringify(sv));

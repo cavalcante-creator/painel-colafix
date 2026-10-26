@@ -37,3 +37,22 @@ document.head.insertAdjacentHTML('beforeend',`<style id="mdn-css">
 #mdn-av .mdn-t{font-weight:700;font-size:15px}#mdn-av ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
 #mdn-av .mdn-b{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
 </style>`);
+/* ---------- cota de leituras do Firebase acabou (resource-exhausted) ----------
+   A medição em si grava (gravação ainda tem cota), mas a transação do saldo precisa LER o silo no servidor e falha.
+   Medição feita agora não precisa ler nada: o nível passa a ser o medido. Então, se a transação falhar por cota/contenção/tempo,
+   grava o movimento e o saldo direto (sem transação), com o "antes" da tela, e já mostra o nível novo neste aparelho. */
+const MDN_SEMTX=['resource-exhausted','aborted','deadline-exceeded','failed-precondition'];
+async function mdnSemTransacao(p,e){ const fs=siloFs(); if(!fs) throw e; const agora=new Date().toISOString(), em=p.agora||p.forcar?agora:(p.em||agora), eu=siloEu(), movId='m_'+p.medicaoId+'_'+p.sid;
+  const d=S.siloSaldo[p.sid]||{}, antes=d.saldoKg!=null?siloR(d.saldoKg):null, kg=siloR(p.kg), comparar=typeof smComparar==='function'&&smComparar()&&!p.usarComoSaldo&&antes!=null;
+  const mov={tipo:'medicao',silo:p.sid,medicaoId:p.medicaoId,motivo:p.motivo||'Medição física',obs:p.obs||null,medidoPor:p.medidoPor||null,refEm:em,em:agora,medidoEm:em,origem:'medicao',...eu,
+    antesKg:antes,medidoKg:kg,diferencaKg:antes==null?null:siloR(kg-antes),deltaKg:comparar||antes==null?0:siloR(kg-antes),depoisKg:comparar?antes:kg,aplicado:!comparar,comparacao:comparar||undefined,semTransacao:true,erroTransacao:(e&&e.code)||'erro',
+    nota:comparar?'Comparação: medição manual registrada; o saldo automático foi mantido':'Gravado sem transação (cota do Firebase): o nível passou a ser o medido'};
+  Object.keys(mov).forEach(k=>mov[k]===undefined&&delete mov[k]);
+  const sil=comparar?{manualKg:kg,manualEm:em,manualAutoKg:antes,manualMov:movId}:{saldoKg:kg,medidoKg:kg,medidoEm:em,medicaoId:p.medicaoId,atualizadoEm:agora,origem:'medicao',ultimoMov:movId,...eu};
+  await fs.doc('silomov/'+movId).set(mov,{merge:true}); await fs.doc('silos/'+p.sid).set(sil,{merge:true});
+  /* a leitura ao vivo pode estar parada pela cota: mostra já neste aparelho */
+  S.siloSaldo[p.sid]=Object.assign({},S.siloSaldo[p.sid]||{},sil); try{ if(!S.siloMov.some(m=>m._id===movId)) S.siloMov=[Object.assign({_id:movId},mov)].concat(S.siloMov); }catch(x){}
+  try{ render(); }catch(x){}
+  return {ok:true,antes,novo:comparar?antes:kg,aplicado:!comparar,comparacao:comparar,semTransacao:true}; }
+{ const _rm=siloRegistrarMedicao; siloRegistrarMedicao=async function(p){ try{ return await _rm.apply(this,arguments); }
+    catch(e){ const c=e&&e.code; if(!(p&&(p.agora||p.forcar))||!MDN_SEMTX.includes(c)) throw e; console.warn('[medição] sem transação por',c); return mdnSemTransacao(p,e); } }; }

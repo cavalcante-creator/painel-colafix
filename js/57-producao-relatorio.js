@@ -10,7 +10,7 @@
    Dados: busca sob demanda, só o período escolhido (`entregas` por `em`, `paradas` por `inicio`, `perdas` por `em`, com limite) e
    guarda na memória da tela. Prefixo `pra`. */
 "use strict";
-S.pra=S.pra||{f:{per:'mes',de:'',ate:'',med:'sc',por:'produto',ls:[],prod:'',semSetup:true,comp:true},cache:{},salvas:null,salvando:false};
+S.pra=S.pra||{f:{per:'mes',de:'',ate:'',med:'sc',por:'produto',ls:[],prod:'',semSetup:true,comp:false},cache:{},salvas:null,salvando:false};
 const PRA_MED={sc:'Produção (sacos)',t:'Produção (toneladas)',par:'Tempo parado',npar:'Número de paradas',perda:'Perdas (sacos)'};
 const PRA_POR={dia:'Dia',semana:'Semana',mes:'Mês',linha:'Linha',produto:'Produto',familia:'Família do produto',motivo:'Motivo da parada'};
 const PRA_PER={mes:'Este mês',mesant:'Mês passado',d7:'Últimos 7 dias',d30:'Últimos 30 dias',ano:'Este ano',datas:'Escolher datas'};
@@ -42,14 +42,25 @@ function praAnterior(f,P){ if(f.per==='mes'||f.per==='mesant'){ const a=praMesAn
   const n=praDias(P.de,P.ate), ate=addDias(P.de,-1), de=addDias(ate,-(n-1)); return {de,ate,txt:praDmy(de)+' a '+praDmy(ate)}; }
 
 /* ---------- busca sob demanda (só o período) ---------- */
-function praBusca(de,ate){ const k=de+'|'+ate, C=S.pra.cache; if(C[k]) return C[k].pr;
+/* 26/10 (economia de leituras): o que já está carregado na tela é usado direto — o mês da Curva S (S._ritEnt), os apontamentos,
+   paradas e perdas mais recentes — e só o que falta é buscado no servidor. */
+function praLocal(de,ate){ const ini=new Date(de+'T00:00:00').toISOString(), fim=new Date(addDias(ate,1)+'T00:00:00').toISOString(), cp=de.slice(0,7), o={};
+  const cobre=(xs,campo,lim)=>{ if(!Array.isArray(xs)) return null; if(xs.length&&xs.length<lim) return xs; const menor=xs.reduce((a,x)=>x[campo]&&x[campo]<a?x[campo]:a,'9'); return menor<=ini?xs:null; };
+  const dentro=(xs,campo)=>xs.filter(x=>x[campo]&&x[campo]>=ini&&x[campo]<fim);
+  if(ate.slice(0,7)===cp&&S._ritEnt&&S._ritEnt[cp]) o.ent=S._ritEnt[cp]; else { const e=cobre(S.entregas,'em',1000); if(e) o.ent=dentro(e,'em'); }
+  const pa=cobre(S.paradas,'inicio',1000); if(pa) o.par=dentro(pa,'inicio');
+  const pe=cobre(S.perdas,'em',300); if(pe) o.per=dentro(pe,'em').filter(x=>!x.removido);
+  return o; }
+function praBusca(de,ate){ const k=de+'|'+ate, C=S.pra.cache; const L=praLocal(de,ate);
+  if(L.ent&&L.par&&L.per){ const d={ent:L.ent,par:L.par,per:L.per}; return Promise.resolve(d); }
+  if(C[k]) return C[k].pr;
   const ini=new Date(de+'T00:00:00').toISOString(), fim=new Date(addDias(ate,1)+'T00:00:00').toISOString(), db=S.db;
   const q=(col,campo,n)=>db.collection(col).where(campo,'>=',ini).where(campo,'<',fim).orderBy(campo).limit(n).get().then(s=>s.docs.map(d=>Object.assign({_id:d.id},d.data()))).catch(e=>{ console.warn('[análise] '+col,e); return null; });
   const it={d:null,err:false}; C[k]=it;
-  it.pr=Promise.all([q('entregas','em',8000),q('paradas','inicio',3000),q('perdas','em',3000)]).then(([ent,par,per])=>{ it.err=ent==null; it.d={ent:ent||[],par:par||[],per:(per||[]).filter(x=>!x.removido)}; return it.d; });
+  it.pr=Promise.all([L.ent?Promise.resolve(L.ent):q('entregas','em',5000),L.par?Promise.resolve(L.par):q('paradas','inicio',2000),L.per?Promise.resolve(L.per):q('perdas','em',2000)]).then(([ent,par,per])=>{ it.err=ent==null; it.d={ent:ent||[],par:par||[],per:(per||[]).filter(x=>!x.removido)}; if(it.err) delete C[k]; return it.d; });
   return it.pr; }
-function praTem(de,ate){ const it=S.pra.cache[de+'|'+ate]; if(it&&it.d) return it.d; praBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
-
+function praTem(de,ate){ const L=praLocal(de,ate); if(L.ent&&L.par&&L.per) return {ent:L.ent,par:L.par,per:L.per};
+  const it=S.pra.cache[de+'|'+ate]; if(it&&it.d) return it.d; praBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
 /* ---------- conta ---------- */
 function praSemana(d){ const x=new Date(d+'T12:00:00'), w=(x.getDay()+6)%7; return addDias(d,-w); }
 function praProd(o){ const c=codigoDe(o); let n=''; try{ n=ritNome(c); }catch(e){} if(!n||n===c) n=String(o.produto||'').replace(/^\S+\s*[-—]\s*/,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b.*$/i,''); return {c,n:(c+' · '+n).trim()}; }

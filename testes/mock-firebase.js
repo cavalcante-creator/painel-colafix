@@ -98,7 +98,7 @@
     return {
       settings() {}, useEmulator() {}, enablePersistence: () => Promise.resolve(),
       doc: p => Ref(p), collection: p => Query(p, [], [], 0),
-      runTransaction: async fn => { await espera(); if (ctl().offline) throw err('unavailable');
+      runTransaction: async fn => { await espera(); if (ctl().offline) throw err('unavailable'); if (ctl().txErro) throw err(ctl().txErro); /* ex.: 'resource-exhausted' (cota de leituras do Firebase) */
         const pend = []; const t = {
           get: async r => { const d = srv().docs[r.path]; return DocSnap(r.path, clone(d), false); },
           set: (r, d, o) => { pend.push([r.path, ant => (o && o.merge) ? merge(ant, d) : clone(d)]); return t; },
