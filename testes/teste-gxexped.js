@@ -12,7 +12,7 @@ const addD=(s,n)=>{ const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+n); r
  D['paradas/pA']={linha:'Linha 1',motivo:'Quebra da ensacadeira',inicio:iso(seg,'16:00'),fim:iso(qua,'09:00'),por:'uDONA'};
  D['paradas/pB']={linha:'Linha 2',motivo:'Falta de cimento',inicio:iso(sex,'17:00'),fim:iso(seg,'08:00'),por:'uDONA'};
  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3000);
- await p.click('#navlist [data-go="gxpar"]'); await H.dorme(800); await p.click('[data-act="gx-par-n"][data-v="30"]'); await H.dorme(800);
+ await p.click('#navlist [data-go="gxprod"]'); await H.dorme(600); await p.click('#navlist [data-go="gxpar"]'); await H.dorme(800); await p.click('[data-act="gx-par-n"][data-v="30"]'); await H.dorme(800);
  const linhas=await p.evaluate(()=>[...document.querySelectorAll('.gx-tb tbody tr')].map(r=>[...r.cells].map(c=>c.innerText.trim())));
  const la=linhas.find(r=>/Quebra da ensacadeira/.test(r.join('|'))), lb=linhas.find(r=>/Falta de cimento/.test(r.join('|')));
  ok('Parada de segunda 16:00 a quarta 09:00: só o expediente (2 h + 10h30 + 1h30 = 14 h) → "1 dia e 3 h 30"', la&&la.includes('1 dia e 3 h 30'), JSON.stringify(la));

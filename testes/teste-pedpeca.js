@@ -28,7 +28,7 @@ const SP=process.env.SHOTS||'/tmp';
  const srv=await p.evaluate(()=>localStorage.getItem('__srv')); await B.browser.close();
  /* Marcelo */
  B=await H.abrir({viewport:{width:1440,height:1000}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,JSON.parse(srv)); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
- await p.click('#navlist [data-go="gxpec"]'); await H.dorme(1200);
+ await p.click('#navlist [data-go="gxch"]'); await H.dorme(600); await p.click('#navlist [data-go="gxpec"]'); await H.dorme(1200);
  let t=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Marcelo vê a tabela de itens, para onde e os detalhes', /Rolamento 6205 2RS/.test(t)&&/4 pç/.test(t)&&/SKF ou NSK/.test(t)&&/Correia A-42/.test(t)&&/Linha 2 · misturador/.test(t)&&/fazendo barulho/.test(t), t.slice(0,600).replace(/\n/g,'|'));
  await p.click('[data-act="gpx-resp"]'); await H.dorme(300); await p.click('[data-act="gpx-pronta"][data-v="2"]'); await H.dorme(100); await p.click('[data-act="gpx-rok"]'); await H.dorme(1200);

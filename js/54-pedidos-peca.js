@@ -79,21 +79,24 @@ Object.assign(S.gpc,{sel:S.gpc.sel||new Set(),resp:null,rtx:'',comp:null});
 function ppcContato(){ const c=(S.cfg&&S.cfg.comprasContato)||{}; return {nome:c.nome||'',email:c.email||'',tel:c.tel||''}; }
 function ppcNum(){ const d=new Date(); return 'MAN-'+String(d.getFullYear()).slice(2)+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes()); }
 function ppcCard(p){ const G=S.gpc, s=OF_PST[p.status||'enviado']||OF_PST.enviado, u=OF_URG.find(x=>x[0]===p.urg)||OF_URG[1], ed=G.ed&&G.ed.id===p._id?G.ed:null, its=ppcItens(p), ab=ofPecAberto(p);
-  const bts=[['comprar','Vai comprar'],['comprado','Comprado'],['chegou','Chegou'],['nao','Recusar']].filter(([k])=>k!==p.status).map(([k,t])=>`<button class="btn sec gx-bs ${k==='nao'?'gx-del':''}" data-act="gpc-st" data-id="${esc(p._id)}" data-v="${k}">${t}</button>`).join('');
+  const bts=[['comprar','Vai comprar'],['comprado','Comprado'],['chegou','Chegou'],['nao','Recusar']].filter(([k])=>k!==p.status).map(([k,t])=>`<button class="ppc-lk ${k==='nao'?'del':''}" data-act="gpc-st" data-id="${esc(p._id)}" data-v="${k}">${t}</button>`).join('');
   const st=({enviado:'Novo',visto:(p.resp||[]).length?'Respondido':'Visto',comprar:'Vai comprar'})[p.status||'enviado']||s[0];
-  const resp=G.resp===p._id;
-  return `<article class="gch-c ppc-c ${p.urg==='hoje'&&ab?'crit':''} ${ab?'':'fe'}" data-b="${esc((its.map(i=>i.t+' '+(i.ref||'')).join(' ')+' '+(p.porNome||'')+' '+(p.osTxt||'')+' '+(p.onde||'')+' '+(p.os?manNum(p.os):'')).toLowerCase())}">
-    <div class="ppc-top">${ab?`<label class="ppc-ck" title="Escolher para mandar ao compras"><input type="checkbox" data-ppcsel="${esc(p._id)}" ${G.sel.has(p._id)?'checked':''} aria-label="Escolher para o compras"></label>`:''}
-     <div class="ppc-hd"><div class="gch-h"><span class="gx-st ${u[2]==='crit'?'atr':u[2]==='pri'?'and':'pen'}">${esc(u[1])}</span><span class="gx-st ${s[1]==='ok'?'ok':s[1]==='crit'?'atr':s[1]==='warn'?'and':'pen'}">${esc(st)}${p.status==='comprado'&&p.prev?' · chega '+dm(p.prev):''}${p.status==='nao'&&p.mot?' · '+esc(p.mot):''}</span>${p.compras?`<span class="gx-st pen">No compras · ${esc(p.compras.num)}</span>`:''}</div>
-      <span class="gch-s">Pedido por <b>${esc(p.porNome||'—')}</b> · ${dm(hojeStr(new Date(p.em)))} às ${ofHm(p.em)} · para <b>${esc(ppcPara(p))}</b></span></div></div>
-    <table class="ppc-tb"><thead><tr><th>Item</th><th class="r">Qtd.</th><th>Marca / medida / referência</th></tr></thead><tbody>${its.map(i=>`<tr><td>${esc(i.t)}</td><td class="r">${esc(ppcQtd(i)||'—')}</td><td>${esc(i.ref||'—')}</td></tr>`).join('')}</tbody></table>
-    ${p.obs?`<p class="ppc-ob"><span>Detalhes do técnico</span>${esc(p.obs)}</p>`:''}
-    ${(p.resp||[]).length?`<div class="ppc-rs">${p.resp.map(r=>`<p><b>Você respondeu</b> <small>${dm(hojeStr(new Date(r.em)))} ${ofHm(r.em)}</small> ${esc(r.t)}</p>`).join('')}${p.respVista&&String(p.respVista)>=String(p.resp[p.resp.length-1].em)?'<small class="ppc-vi">O técnico já viu.</small>':'<small class="ppc-vi">O técnico vê quando passar o crachá na oficina.</small>'}</div>`:''}
-    ${resp?`<div class="gch-cf ppc-rf"><label class="gx-f">Resposta para ${esc(String(p.porNome||'o técnico').split(' ')[0])}<textarea id="ppc-rt" rows="2" maxlength="300" placeholder="Escreva ou toque numa resposta pronta">${esc(G.rtx)}</textarea></label>
+  const resp=G.resp===p._id, nm=String(p.porNome||'—');
+  return `<article class="gch-c ppc-c ${p.urg==='hoje'&&ab?'crit':''} ${ab?'':'fe'} ${G.sel.has(p._id)?'sel':''}" data-b="${esc((its.map(i=>i.t+' '+(i.ref||'')).join(' ')+' '+(p.porNome||'')+' '+(p.osTxt||'')+' '+(p.onde||'')+' '+(p.os?manNum(p.os):'')).toLowerCase())}">
+    <div class="ppc-ck">${ab?`<input type="checkbox" data-ppcsel="${esc(p._id)}" ${G.sel.has(p._id)?'checked':''} aria-label="Escolher para mandar ao compras" title="Escolher para mandar ao compras">`:''}</div>
+    <div class="ppc-mn">
+     <div class="ppc-who"><span class="ppc-av" aria-hidden="true">${esc(nm[0])}</span><div><b>${esc(nm)}</b><small>${dm(hojeStr(new Date(p.em)))} às ${ofHm(p.em)} · para ${esc(ppcPara(p))}</small></div></div>
+     <div class="ppc-tags"><span class="gx-st ${u[2]==='crit'?'atr':u[2]==='pri'?'and':'pen'}">${esc(u[1])}</span><span class="gx-st ${s[1]==='ok'?'ok':s[1]==='crit'?'atr':s[1]==='warn'?'and':'pen'}">${esc(st)}${p.status==='comprado'&&p.prev?' · chega '+dm(p.prev):''}${p.status==='nao'&&p.mot?' · '+esc(p.mot):''}</span>${p.compras?`<span class="gx-st pen">No compras · ${esc(p.compras.num)}</span>`:''}</div>
+     <ul class="ppc-its" aria-label="Itens do pedido">${its.map(i=>`<li><span class="ppc-q">${esc(ppcQtd(i)||'—')}</span><span class="ppc-it">${esc(i.t)}${i.ref?`<small>${esc(i.ref)}</small>`:''}</span></li>`).join('')}</ul>
+     ${p.obs?`<p class="ppc-ob"><span>Detalhes do técnico</span>${esc(p.obs)}</p>`:''}
+     ${(p.resp||[]).length?`<div class="ppc-rs">${p.resp.map(r=>`<p><b>Você respondeu</b> <small>${dm(hojeStr(new Date(r.em)))} ${ofHm(r.em)}</small> ${esc(r.t)}</p>`).join('')}${p.respVista&&String(p.respVista)>=String(p.resp[p.resp.length-1].em)?'<small class="ppc-vi">O técnico já viu.</small>':'<small class="ppc-vi">O técnico vê quando passar o crachá na oficina.</small>'}</div>`:''}
+     ${resp?`<div class="gch-cf ppc-rf"><label class="gx-f">Resposta para ${esc(nm.split(' ')[0])}<textarea id="ppc-rt" rows="2" maxlength="300" placeholder="Escreva ou toque numa resposta pronta">${esc(G.rtx)}</textarea></label>
       <div class="ppc-pr">${PPC_RESP.map((t,i)=>`<button class="gx-chip" data-act="gpx-pronta" data-v="${i}">${esc(t)}</button>`).join('')}</div>
       <div class="gch-cfb"><button class="btn sec" data-act="gpx-rcanc">Voltar</button><button class="btn" data-act="gpx-rok" data-id="${esc(p._id)}" ${G.busy?'disabled':''}>Mandar resposta</button></div></div>`:''}
-    <div class="gch-a ppc-a"><button class="btn gx-bs" data-act="gpx-resp" data-id="${esc(p._id)}">Responder</button>${ab?`<button class="btn sec gx-bs" data-act="gpx-um" data-id="${esc(p._id)}">Mandar para o compras</button><button class="btn sec gx-bs" data-act="gpx-ed" data-id="${esc(p._id)}">Editar / incluir itens</button>`:''}${bts}</div>
-    ${ed?`<div class="gch-cf"><label class="gx-f">${ed.v==='nao'?'Por que está recusando? (o técnico vê)':'Chega quando? (opcional)'}${ed.v==='nao'?`<input id="gpc-mot" maxlength="120" placeholder="Ex.: tem no estoque do almox">`:`<input id="gpc-prev" type="date">`}</label><div class="gch-cfb"><button class="btn sec" data-act="gpc-canc">Voltar</button><button class="btn" data-act="gpc-ok" data-id="${esc(p._id)}" ${G.busy?'disabled':''}>Confirmar</button></div></div>`:''}</article>`; }
+     ${ed?`<div class="gch-cf"><label class="gx-f">${ed.v==='nao'?'Por que está recusando? (o técnico vê)':'Chega quando? (opcional)'}${ed.v==='nao'?`<input id="gpc-mot" maxlength="120" placeholder="Ex.: tem no estoque do almox">`:`<input id="gpc-prev" type="date">`}</label><div class="gch-cfb"><button class="btn sec" data-act="gpc-canc">Voltar</button><button class="btn" data-act="gpc-ok" data-id="${esc(p._id)}" ${G.busy?'disabled':''}>Confirmar</button></div></div>`:''}
+    </div>
+    <div class="ppc-ac"><button class="btn gx-bs" data-act="gpx-resp" data-id="${esc(p._id)}">Responder</button>${ab?`<button class="btn sec gx-bs" data-act="gpx-um" data-id="${esc(p._id)}">Mandar para o compras</button><button class="btn sec gx-bs" data-act="gpx-ed" data-id="${esc(p._id)}">Editar / incluir itens</button>`:''}
+     <div class="ppc-lks">${bts}</div></div></article>`; }
 function ppcModal(){ const G=S.gpc, C=G.comp; if(!C) return ''; const ps=C.ids.map(id=>ofPeds().find(p=>p._id===id)).filter(Boolean), k=ppcContato();
   const n=ps.reduce((a,p)=>a+ppcItens(p).length,0);
   return `<div class="gx-modal" role="dialog" aria-modal="true" aria-labelledby="ppc-mt"><div class="card gx-mc ppc-m"><h2 id="ppc-mt">Mandar para o compras</h2>
@@ -198,6 +201,23 @@ document.head.insertAdjacentHTML('beforeend',`<style id="ppc-css">
 .ppc-mb{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}.ppc-mb>span{flex:1}
 .ppc-ur{color:var(--crit,#C0392B);font-size:11px;letter-spacing:.04em}
 @media(max-width:640px){.ppc-g3{grid-template-columns:1fr}.ppc-tb{font-size:13px}}
+
+.ppc-c.ppc-c{display:grid;grid-template-columns:28px minmax(0,1fr) 220px;gap:6px 16px;align-items:start;padding:16px 14px;border-left:3px solid transparent}
+.ppc-c.crit{border-left-color:var(--crit,#C0392B)}.ppc-c.sel{background:rgba(43,106,135,.06)}
+.ppc-ck{padding-top:6px}.ppc-ck input{width:20px;height:20px;accent-color:var(--teal,#2B6A87);cursor:pointer}
+.ppc-mn{min-width:0;display:flex;flex-direction:column;gap:8px}
+.ppc-who{display:flex;align-items:center;gap:10px}.ppc-who b{display:block;font-size:15px;font-weight:600}.ppc-who small{display:block;font-size:12.5px;color:var(--muted)}
+.ppc-av{width:32px;height:32px;border-radius:50%;background:rgba(43,106,135,.12);color:var(--teal-strong,#143F54);display:grid;place-items:center;font-weight:600;flex:none}
+.ppc-tags{display:flex;gap:6px;flex-wrap:wrap}
+.ppc-its{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line,#E3E8EC);border-radius:10px;overflow:hidden;max-width:640px}
+.ppc-its li{display:grid;grid-template-columns:76px minmax(0,1fr);gap:10px;align-items:baseline;padding:8px 12px;border-top:1px solid var(--line,#E3E8EC)}.ppc-its li:first-child{border-top:0}
+.ppc-q{font-variant-numeric:tabular-nums;font-weight:600;text-align:right;white-space:nowrap}
+.ppc-it{font-size:14.5px;overflow-wrap:anywhere}.ppc-it small{display:block;font-size:12.5px;color:var(--muted)}
+.ppc-ac{display:flex;flex-direction:column;gap:6px}.ppc-ac .btn{width:100%;justify-content:center}
+.ppc-lks{display:flex;flex-wrap:wrap;gap:2px 10px;justify-content:center;margin-top:2px}
+.ppc-lk{border:0;background:transparent;font:inherit;font-size:13px;color:var(--teal-strong,#143F54);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px 2px}.ppc-lk.del{color:var(--crit,#C0392B)}
+.ppc-c+.ppc-c{border-top:1px solid var(--line,#E3E8EC)}
+@media(max-width:900px){.ppc-c.ppc-c{grid-template-columns:28px minmax(0,1fr)}.ppc-ac{grid-column:2;flex-direction:row;flex-wrap:wrap}.ppc-ac .btn{width:auto}.ppc-lks{justify-content:flex-start}}
 </style>`);
 
 /* ===================== Marcelo: criar pedido, editar/incluir itens, recusar (pedido de 26/10) ===================== */

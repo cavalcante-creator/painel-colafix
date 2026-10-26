@@ -9,7 +9,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  /* 1) Marcelo cria a tarefa */
  let B=await H.abrir({viewport:{width:1440,height:1000}}); let p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3000);
  const nav=await p.evaluate(()=>document.getElementById('navlist').innerText);
- ok('Menu do Marcelo tem "Chamados"', /Chamados/.test(nav), nav.replace(/\n/g,'|'));
+ ok('Menu do Marcelo tem "Manutenção" (Chamados dentro)', /Manutenção/.test(nav), nav.replace(/\n/g,'|'));
  await p.click('#navlist [data-go="gxch"]'); await H.dorme(800);
  let t1=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Tela "Chamados e tarefas" abre com os números e o botão de nova tarefa', /Chamados e tarefas/.test(t1)&&/aguardando técnico/.test(t1)&&/Nova tarefa para a manutenção/.test(t1), t1.slice(0,200).replace(/\n/g,'|'));

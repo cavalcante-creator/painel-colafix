@@ -15,7 +15,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  for(let i=0;i<40&&!(await p.evaluate(()=>!!(window.__T&&__T.S()._chamLido&&__T.S().ordens.length&&__T.S().anl&&__T.S().anl.base&&__T.S().anl.base.prev)));i++) await H.dorme(250); await H.dorme(800);
  const tx=()=>p.evaluate(()=>document.getElementById('view').innerText);
  let e=await p.evaluate(()=>({v:__T.S().view,nav:document.getElementById('navlist').innerText+' || '+document.getElementById('view').innerText.slice(0,200)}));
- ok('Marcelo entra no Início novo; o menu da Visão do gestor tem Início, Produção, Relatórios, Plano de ação, Segurança, Preventivas, Turnos e TVs', e.v==='gxinicio'&&['Início','Produção','Relatórios','Plano de ação','Segurança','Preventivas','Turnos','TVs da fábrica'].every(x=>e.nav.includes(x))&&!/Relatório do mês/.test(e.nav), e.v+' | '+e.nav.replace(/\n/g,'|'));
+ ok('Marcelo entra no Início novo; o menu da Visão do gestor tem Início, Produção, Relatórios, Plano de ação, Segurança, Preventivas, Turnos e TVs', e.v==='gxinicio'&&['Início','Produção','Manutenção','Pessoas','Plano de ação','TVs da fábrica','Cadastros'].every(x=>e.nav.includes(x))&&!/Relatório do mês/.test(e.nav), e.v+' | '+e.nav.replace(/\n/g,'|'));
  let t=await tx();
  ok('Início: "Precisa de você" com a Linha 2 parada e o chamado sem técnico', /Precisa de você/.test(t)&&/Linha 2 parada há/.test(t)&&/Chamado 00001 sem técnico/.test(t), t.slice(0,400).replace(/\n/g,'|'));
  /* 500 sacos de 20 kg + 400 de 25 kg = 10 t + 10 t = 20,0 t */

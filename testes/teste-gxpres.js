@@ -29,7 +29,7 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
  D['presenca/'+hj]=doc;
  B=await H.abrir({viewport:{width:1440,height:1000}}); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3000);
  let nav=await p.evaluate(()=>({t:document.getElementById('navlist').innerText,lb:document.querySelector('.side .modulo').innerText,v:__T.S().view,tabs:getComputedStyle(document.querySelector('#view>nav.tabs')||document.body).display}));
- ok('Menu do Marcelo: só as telas da Visão do gestor (sem sistemas completos, sem repetir)', nav.v==='gxinicio'&&/VISÃO DO GESTOR/i.test(nav.lb)&&/Pessoas hoje/.test(nav.t)&&!/SISTEMAS COMPLETOS|Manutenção|Silos|Nível dos silos|Monitor do rancho|Telas de TV/i.test(nav.t)&&nav.t.split('\n').filter(x=>x==='Produção').length===1, nav.t.replace(/\n/g,'|'));
+ ok('Menu do Marcelo: só as telas da Visão do gestor (sem sistemas completos, sem repetir)', nav.v==='gxinicio'&&/VISÃO DO GESTOR/i.test(nav.lb)&&/Pessoas/.test(nav.t)&&!/SISTEMAS COMPLETOS|Silos|Nível dos silos|Monitor do rancho|Telas de TV/i.test(nav.t)&&nav.t.split('\n').filter(x=>x==='Produção').length===1, nav.t.replace(/\n/g,'|'));
  ok('Na Visão do gestor as abas de cima somem (o menu é a lateral)', nav.tabs==='none', nav.tabs);
  let t=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Início novo: saudação, meta do dia e "Pessoas hoje" com o Face ID', /Marcelo/.test(t)&&/Pessoas hoje/.test(t)&&/Na empresa agora/.test(t)&&/Precisa de você|Tudo em ordem/.test(t), t.slice(0,300).replace(/\n/g,'|'));

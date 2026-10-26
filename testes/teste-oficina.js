@@ -93,11 +93,11 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const c
  /* Marcelo */
  B=await H.abrir({viewport:{width:1440,height:1000}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,JSON.parse(srv)); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
  const nav=await p.evaluate(()=>document.getElementById('navlist').innerText);
- ok('Menu do Marcelo tem "Pedidos de peça"', /Pedidos de peça/.test(nav), nav.replace(/\n/g,'|'));
+ ok('Menu do Marcelo tem "Manutenção" (Pedidos de peça dentro)', /Manutenção/.test(nav), nav.replace(/\n/g,'|'));
  const alt=await p.evaluate(()=>{ document.querySelector('#tp-sino').click(); return new Promise(r=>setTimeout(()=>r(document.getElementById('tp-pop').innerText),300)); });
  ok('Sino: peça urgente e tarefas para conferir', /Peça urgente: Graxa de lítio/.test(alt)&&/2 tarefas feitas esperando você conferir/.test(alt), alt.replace(/\n/g,'|'));
  await p.keyboard.press('Escape');
- await p.click('#navlist [data-go="gxpec"]'); await H.dorme(1200); t=await p.evaluate(()=>document.getElementById('view').innerText);
+ await p.click('#navlist [data-go="gxch"]'); await H.dorme(600); await p.click('#navlist [data-go="gxpec"]'); await H.dorme(1200); t=await p.evaluate(()=>document.getElementById('view').innerText);
  let pp=await p.evaluate(()=>(__T.S().pedpecas||[])[0]);
  ok('Tela "Pedidos de peça" mostra o pedido e marca como visto', /Graxa de lítio/.test(t)&&/Bruno Lima/.test(t)&&pp.status==='visto', pp&&pp.status);
  await p.click(`[data-act="gpc-st"][data-v="comprado"]`); await H.dorme(300); await p.fill('#gpc-prev','2026-12-01'); await p.click('[data-act="gpc-ok"]'); await H.dorme(1200);

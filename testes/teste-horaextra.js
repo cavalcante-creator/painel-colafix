@@ -4,8 +4,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  D['presenca/'+hj]={dia:hj,exp:true,p:[{n:'ANA SOUZA',s:'Linha 1',e:'07:20',g:'COLAFIX'},{n:'CARLOS PEREIRA',s:'Linha 2',e:'07:25',g:'COLAFIX'}],f:[{n:'JOAO LIMA',s:'Linha 1',m:'Sem registro'}],em:new Date().toISOString()};
  d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor'],locais:[],ativo:true};
  let B=await H.abrir({viewport:{width:1440,height:900}}); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
- const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.dataset.go));
- ok('Menu do gestor tem "Hora extra" logo depois de Pessoas hoje', menu.indexOf('gxhe')===menu.indexOf('gxpres')+1, menu.join(','));
+ await p.click('#navlist [data-go="gxpres"]'); await H.dorme(800); const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.dataset.go));
+ ok('Menu do gestor: Pessoas tem "Hora extra" logo depois de Quem está hoje', menu.indexOf('gxhe')===menu.indexOf('gxpres')+1&&menu.includes('gxhe'), menu.join(','));
  await p.evaluate(()=>__T.go('gxhe')); await H.dorme(1200); let s=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Tela mostra quem veio hoje (do Face ID) para escolher', /ANA SOUZA/.test(s)&&/CARLOS PEREIRA/.test(s)&&/não veio/.test(s), s.slice(0,300).replace(/\n/g,' | '));
  await p.click('[data-act="he-tg"][data-v="ANA SOUZA"]'); await H.dorme(200); await p.click('[data-act="he-tg"][data-v="CARLOS PEREIRA"]'); await H.dorme(200);
