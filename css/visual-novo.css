@@ -48,3 +48,10 @@ textarea.txt{height:auto;min-height:88px;padding:10px 12px;line-height:1.45}
 th{background:var(--surface);border-bottom:1px solid var(--line);font-size:11.5px;padding-top:10px;padding-bottom:10px}
 td{padding-top:9px;padding-bottom:9px}
 tbody tr:hover>td{background:var(--surface-2)}
+
+/* 26/10 · logo no tema escuro: sem a placa branca, usa a logo com o "fix" branco.
+   Só troca o desenho na tela (content); o src continua o da logo clara, que os PDFs e impressões usam. */
+:root[data-theme="dark"] .brand img:not(.assin),:root[data-theme="dark"] .mob-brand img:not(.assin){content:url(../icons/logo-colafix-escuro.png);background:none!important;padding:0!important;border-radius:0}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .brand img:not(.assin),:root:not([data-theme="light"]) .mob-brand img:not(.assin){content:url(../icons/logo-colafix-escuro.png);background:none!important;padding:0!important;border-radius:0}
+}
