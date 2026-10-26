@@ -968,10 +968,10 @@ function alxAvisoMeuDia(){ const P=acsP(); if(!P||!(P.tudo||P.mods.includes('alm
 
 // ---------------- conexão ----------------
 function inscrever(nome,mk,on){ let tent=0, unsub=null;
-  const vai=()=>{ try{ unsub=mk().onSnapshot(snap=>{ tent=0; if(S.dbErro&&S.dbErro.k===nome){ S.dbErro=null; rerenderSeguro(); } on(snap); },
+  const vai=()=>{ try{ unsub=mk().onSnapshot(snap=>{ if(tent>6&&S.dbOk===false&&S.dbErro&&S.dbErro.k===nome) S.dbOk=true; /* voltou depois da cota/conexão: tira o aviso */ tent=0; if(S.dbErro&&S.dbErro.k===nome){ S.dbErro=null; rerenderSeguro(); } on(snap); },
       e=>{ const code=(e&&e.code)||'erro'; console.warn('db',nome,code,e&&e.message); try{ unsub&&unsub(); }catch(_){}
         tent++; S.dbErro={k:nome,code};
-        if(tent<=6){ setTimeout(vai,Math.min(30000,2000*tent)); rerenderSeguro(); } else { S.dbOk=false; rerenderSeguro(); } }); }
+        if(tent<=6){ setTimeout(vai,Math.min(30000,2000*tent)); rerenderSeguro(); } else { S.dbOk=false; rerenderSeguro(); /* 26/10: cota do Firebase esgotada / sem conexão: continua tentando a cada 5 min (as TVs voltam sozinhas quando a cota renova) */ if(code==='resource-exhausted'||code==='unavailable'||code==='deadline-exceeded') setTimeout(vai,300000); } }); }
     catch(e){ S.dbErro={k:nome,code:(e&&e.code)||'erro'}; tent++; if(tent<=6) setTimeout(vai,2000*tent); else { S.dbOk=false; rerenderSeguro(); } } };
   vai(); }
 function assinar(col,key,lim){
