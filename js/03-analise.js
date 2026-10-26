@@ -984,8 +984,8 @@ async function anlEnc(c){ const C=anlCfg(); const s=new Set(C.enc); if(s.has(c))
 
 // ---------- acerto da projeção (fotos diárias) ----------
 function anlSnap(R){ const k=Math.min(10,R.dias.length); const p={}, s={};
-  R.itens.forEach(x=>{ s[x.c]=Math.round(x.base); if(x.st!=='sem') p[x.c]=x.proj.slice(0,k).map(z=>Math.round(z.s)); });
-  return {em:new Date().toISOString(),data:R.sDia||hojeStr(),d:R.dias.slice(0,k),s,p}; }
+  const dc={}; R.itens.forEach(x=>{ s[x.c]=Math.round(x.base); if(x.cart>0) dc[x.c]=Math.round(x.cart); if(x.st!=='sem') p[x.c]=x.proj.slice(0,k).map(z=>Math.round(z.s)); });
+  return {em:new Date().toISOString(),data:R.sDia||hojeStr(),d:R.dias.slice(0,k),s,p,dc}; }
 async function anlSnapSalvar(){ const R=anlCalc(); if(!R||!S.db) return; const sn=anlSnap(R); try{ await S.db.doc('pcpsnap/'+sn.data).set(sn); S.anl.snaps=null; }catch(e){ console.warn('snap',e); } }
 async function anlSnapsLer(){ if(S.anl.snaps||S.anl._lendoSnaps||!S.db) return; S.anl._lendoSnaps=true;
   try{ const q=await S.db.collection('pcpsnap').limit(120).get(); S.anl.snaps=q.docs.map(d=>d.data()).sort((a,b)=>String(a.data).localeCompare(String(b.data))); }catch(e){ S.anl.snaps=[]; }
@@ -1094,7 +1094,7 @@ function anlEstX(r){ const x=r.x, it=x.it||{}; r.int=/^M\d/.test(r.c)||/PREMIX|E
 const ANL_SIT={ZERADO:['Zerado','crit'],ABAIXO:['Abaixo seg.','warn'],OK:['OK','ok'],SEMGIRO:['Sem giro','neu'],ENC:['Sob encomenda','teal'],ENC_FALTA:['Pedido sem estoque','crit'],INT:['Intermediário','neu']};
 function vAnlEst(R){ const A=S.anl; if(!A.es||A.es.v!==2) A.es={v:2,q:'',vis:'principal',linha:'',cob:'',dp:'',ord:'risco',col:'',dir:1,agr:true,mais:false}; const F=A.es;
   const all=anlEstRows(R).map(anlEstX), q=anlNorm(F.q), B=S.anl.base, at=((B.itens||{}).atual)||{}, V=B.vendas||{};
-  const base=all.filter(r=>{ if(q&&!anlNorm(r.c+' '+r.d).includes(q)) return false; if(F.linha==='__sem'&&r.lp.length) return false; if(F.linha&&F.linha!=='__sem'&&!r.lp.includes(F.linha)) return false; return true; });
+  const base=all.filter(r=>{ if(q&&!anlNorm(r.c+' '+r.d).includes(q)) return false; if(F.linha==='__sem'&&r.lp.length) return false; if(F.linha&&F.linha!=='__sem'&&!r.lp.includes(F.linha)) return false; if(typeof eswOk==='function'&&!eswOk(r)) return false; return true; });
   const VIS=[['principal','Todos',r=>!r.int&&r.sit2!=='SEMGIRO'],['agir','Precisa agir',r=>r.agir],['ZERADO','Zerado com demanda',r=>r.sit2==='ZERADO'],['ABAIXO','Abaixo do seg.',r=>r.sit2==='ABAIXO'],['OK','OK',r=>r.sit2==='OK'],['enc','Sob encomenda',r=>r.sit2==='ENC'||r.sit2==='ENC_FALTA'],['SEMGIRO','Sem giro',r=>r.sit2==='SEMGIRO'],['INT','Intermediários',r=>r.sit2==='INT']];
   const vf=(VIS.find(v=>v[0]===F.vis)||VIS[0])[2];
   let xs=base.filter(r=>{ if(!q&&!vf(r)) return false; if(q&&F.vis!=='principal'&&!vf(r)) return false;
@@ -1102,7 +1102,7 @@ function vAnlEst(R){ const A=S.anl; if(!A.es||A.es.v!==2) A.es={v:2,q:'',vis:'pr
     if(F.dp==='com'&&!(r.dc>0)) return false; if(F.dp==='sem'&&r.dc>0) return false; if(F.dp==='risco'&&!(r.dc>0&&r.dc>r.tot)) return false; return true; });
   const cv=v=>v>=999?9999:v;
   const S1={risco:(a,b)=>(b.agir-a.agir)||ANL_RISCO[b.risco].o-ANL_RISCO[a.risco].o||cv(a.cob)-cv(b.cob),falta:(a,b)=>b.falta-a.falta,cob_asc:(a,b)=>cv(a.cob)-cv(b.cob),est_desc:(a,b)=>b.tot-a.tot,dp_desc:(a,b)=>b.dc-a.dc,codigo:(a,b)=>a.c.localeCompare(b.c)};
-  if(F.col){ const k=F.col; xs.sort((a,b)=>{ const va=k==='c'?a.c:cv(a[k]||0), vb=k==='c'?b.c:cv(b[k]||0); return (va<vb?-1:va>vb?1:0)*F.dir; }); } else xs.sort(S1[F.ord]||S1.risco);
+  if(F.col){ const k=F.col; xs.sort((a,b)=>{ const va=k==='c'?a.c:cv(a[k]||0), vb=k==='c'?b.c:cv(b[k]||0); return (va<vb?-1:va>vb?1:0)*F.dir; }); } else xs.sort(S1[F.ord]||S1.risco); if(typeof eswXs==='function') eswXs(xs,all);
   const sm=(arr,k)=>arr.reduce((a,r)=>a+(r[k]||0),0), prin=all.filter(r=>!r.int);
   const qd=iso=>iso?dm(String(iso).slice(0,10))+(String(iso).length>10?' '+String(iso).slice(11,16):''):'—';
   const k7=prin.filter(r=>r.rup!==null&&r.rup<=7&&r.dem&&!r.enc);
@@ -1138,18 +1138,18 @@ function vAnlEst(R){ const A=S.anl; if(!A.es||A.es.v!==2) A.es={v:2,q:'',vis:'pr
     corpo=ord.map(k=>{ const rs=grp.get(k), f=sm(rs.filter(r=>!r.enc),'falta'), cap=k!=='__sem'?capDe(k):0;
       return `<tr class="anl-gh"><td colspan="${ncol}"><b>${k==='__sem'?'Sem linha cadastrada':esc(k)}</b><span>${rs.length} ${rs.length===1?'item':'itens'}</span>${f>0?`<span>falta programar <b class="t-crit num">${anlN(f)}</b>${cap?` · ≈ ${(f/cap).toFixed(1).replace('.',',')} dia${f/cap>=2?'s':''} de linha (${anlN(cap)}/dia)`:''}</span>`:'<span class="t-ok">nada a programar</span>'}</td></tr>`+rs.map(row).join(''); }).join(''); }
   else corpo=xs.map(row).join('');
-  return `${anlHead('Análise de Estoques','Posição · cobertura × demanda · o que falta programar, por linha',`<button class="btn sec" data-act="anl-xls" data-v="est" style="height:42px">${ic('baixar',16,2)}Exportar Excel</button>`)}
-  ${anlKpis(kp)}
+  return `<!--esw:a-->${anlHead('Análise de Estoques','Posição · cobertura × demanda · o que falta programar, por linha',`<button class="btn sec" data-act="anl-xls" data-v="est" style="height:42px">${ic('baixar',16,2)}Exportar Excel</button>`)}
+  ${anlKpis(kp)}<!--esw:b-->
   <section class="card anl-tcard"><div class="anl-th"><div class="label">MOSTRAR</div><span class="fcount num">${xs.length} ${xs.length===1?'item':'itens'}</span><button class="btn sec" data-act="anl-es-limpar" style="height:36px;margin-left:8px">Limpar</button></div>
    <div class="chips anl-esv">${chips}</div>
    <div class="anl-fl"><label class="srch" style="max-width:none;margin:0;flex:2 1 220px">${ic('lupa',16,2)}<input class="txt" id="anl-esq" value="${esc(F.q)}" placeholder="Buscar código ou produto (procura em tudo)…" autocomplete="off"></label>
     <select class="txt anl-sel" data-anl-es="linha"><option value="">Todas as linhas</option>${linhasOrd().map(l=>`<option value="${esc(l)}" ${F.linha===l?'selected':''}>${esc(l)}</option>`).join('')}<option value="__sem" ${F.linha==='__sem'?'selected':''}>Sem linha cadastrada</option></select>
     ${sel('cob',[['','Toda cobertura'],['0','Zerada (com demanda)'],['3','Até 3 dias'],['7','Até 7 dias'],['15','Até 15 dias'],['30','Até 30 dias'],['30+','Mais de 30 dias']])}${sel('dp',[['','Com e sem pedido'],['com','Com pedido (DC)'],['sem','Sem pedido'],['risco','Pedido maior que o saldo']])}
     ${sel('ord',[['risco','Prioridade'],['falta','Maior falta programar'],['cob_asc','Menor cobertura'],['est_desc','Maior estoque'],['dp_desc','Maior pedido'],['codigo','Código A→Z']])}
-    <label class="ck" style="font-size:13px"><input type="checkbox" data-anl-esc="agr" ${F.agr?'checked':''}> Agrupar por linha</label><label class="ck" style="font-size:13px"><input type="checkbox" data-anl-esc="mais" ${F.mais?'checked':''}> Mais colunas</label></div></section>
+    <label class="ck" style="font-size:13px"><input type="checkbox" data-anl-esc="agr" ${F.agr?'checked':''}> Agrupar por linha</label><label class="ck" style="font-size:13px"><input type="checkbox" data-anl-esc="mais" ${F.mais?'checked':''}> Mais colunas</label></div></section><!--esw:c-->
   <section class="card anl-tcard"><div class="anl-tw"><table class="anl-t"><thead><tr>${th('c','Código')}<th>Produto</th>${th('tot','Saldo',1,'E1 + E9 · almox 3 + 30')}${M?th('a3','Almox 3',1)+th('a30','Almox 30',1):''}<th class="nr">Est. seg.</th>${th('dc','Pedidos (DC)',1)}${th('cob','Cobertura')}<th class="nr" title="Previsão do Focco para o mês · embaixo, o já feito no mês, o estoque que já tinha no começo do mês e o planejado no painel">Previsão ${anlPvMesLab()}</th>${th('ofa','Em ordem',1,'Saldo das ordens abertas programadas no horizonte')}${th('falta','Falta programar',1,'Lotes novos (respeitando lote mínimo e múltiplo) além do que já está em ordem ou previsão')}${M?'<th class="nr">Giro/mês</th>':''}<th>Ruptura prev.</th><th>Situação</th><th></th></tr></thead>
    <tbody>${corpo}</tbody></table>
-   ${xs.length?'':`<div class="empty">Nenhum item${q?' com "'+esc(F.q)+'"':''} nesta visão.${F.vis!=='principal'||F.linha||F.cob||F.dp?' <button class="lnk" data-act="anl-es-limpar">Limpar filtros</button>':''}</div>`}</div></section>
+   ${xs.length?'':`<div class="empty">Nenhum item${q?' com "'+esc(F.q)+'"':''} nesta visão.${F.vis!=='principal'||F.linha||F.cob||F.dp?' <button class="lnk" data-act="anl-es-limpar">Limpar filtros</button>':''}</div>`}</div></section><!--esw:d-->
   <div class="sub" style="font-size:12px;margin:0 0 8px">Cobertura = saldo ÷ venda média por dia útil (só para itens com venda). Falta programar = lotes novos que a análise sugere para não ficar abaixo do estoque de segurança no horizonte, já descontando ordens abertas e previsões. Premix e ensacado ficam em "Intermediários"; exportação (RE…) e Quero Quero em "Sob encomenda".</div>`; }
 
 

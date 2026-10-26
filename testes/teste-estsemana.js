@@ -1,0 +1,69 @@
+/* Análise PCP › Estoques repaginada (js/60): semanas, filtros novos, Curva S em semanas, vendeu mais que o previsto, PDF e Excel. */
+const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=H.seed(); const D=d.docs; const now=new Date(), loc=x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+ const hj=loc(now), cp=hj.slice(0,7); let du=new Date(now); while([0,6].includes(du.getDay())) du=new Date(du.getTime()+864e5); const dDC=loc(du);
+ const ontem=loc(new Date(now.getTime()-864e5)), t=now.toISOString();
+ const IT={AC0005:{d:'ARGAMASSA CINZA AC3 EMB PAPEL 20 KG',a3:5851,seg:5808},AC0019:{d:'ARGAMASSA CINZA AC3 QUERO QUERO EMB PAPEL 20 KG',a3:1055},AC0009:{d:'ARGAMASSA CINZA PIC EMB PAPEL 20 KG',a3:767,seg:440},
+   AC0002:{d:'ARGAMASSA CINZA AC1 EMB PLASTICA 20 KG',a3:29,seg:2200},RJ0001:{d:'REJUNTE FLEX CINZA 5KG',a3:900,seg:100,ln:['Linha 2']}};
+ const l={}; for(const c in IT) l[c]=Object.assign({sal:1,a30:0,ln:['Linha 1']},IT[c]);
+ D['pcpbase/itens']={l,atual:{SALDO:t},em:t}; D['pcpbase/meta']={em:t,hist:[]};
+ D['pcpbase/perfil']={atual:t,l:[['AC0005','DC',dDC,-6403],['AC0019','DC',dDC,-2464]]};
+ D['pcpbase/vendas']={mensal:{AC0005:{[cp]:[118223,100000]},AC0019:{[cp]:[3917,3000]},AC0009:{[cp]:[0,500]},AC0002:{[cp]:[0,0]},RJ0001:{[cp]:[600,400]}}};
+ D['pcpbase/prev']={mes:{[cp]:{AC0005:170000,AC0019:5280,AC0009:1000,AC0002:16000,RJ0001:2000}},est:{[cp]:{AC0005:1710,AC0019:176,AC0009:1408,AC0002:23,RJ0001:500}}};
+ D['pcpsnap/'+ontem]={data:ontem,em:t,d:[],s:{},p:{},dc:{AC0019:1000,AC0005:6403}};
+ const B=await H.abrir({viewport:{width:1440,height:1000},acceptDownloads:true}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
+ await p.evaluate(()=>__T.go('anlest')); await H.dorme(1800);
+ const txt=()=>p.evaluate(()=>document.getElementById('view').innerText);
+ let s=await txt();
+ ok('Cabeçalho azul "O que precisa produzir" com a semana do mês e os botões Baixar PDF / Baixar Excel', /O que precisa produzir/.test(s)&&/Análise PCP · .* de 20\d\d, \dª semana · atualizado/.test(s)&&await p.$('.esw-top [data-act="esw-pdf"]')&&await p.$('.esw-top [data-act="esw-xls"]'), s.slice(0,200));
+ const W=await p.evaluate(()=>Painel.estoquesSemana.semanas());
+ /* AC0005: meta 42.500; (1.710 + 118.223) ÷ 42.500 − s */
+ const pos5=(1710+118223)/42500-W.s, pos9=(1408+0)/250-W.s;
+ const lin=await p.evaluate(()=>Painel.estoquesSemana.linhas().map(x=>({c:x.c,g:x.g,pos:x.o.pos,meta:x.o.meta,acima:x.o.acima})));
+ const l5=lin.find(x=>x.c==='AC0005');
+ ok('Conta da semana (AC0005): meta 42.500 e "no mês" = (tinha + feito) ÷ meta − semanas passadas', l5&&Math.round(l5.meta)===42500&&Math.abs(l5.pos-pos5)<1e-6, JSON.stringify(l5)+' s='+W.s);
+ ok('Frase do resumo e 4 números (no mês, atrasados, adiantados, falta programar)', /já passaram .* semanas do mês e o que tinha mais o que foi feito cobre/.test(s)&&(await p.$$('.esw-k')).length===4&&/Itens adiantados/.test(s)&&/AC0009 \+/.test(s), (await p.evaluate(()=>document.querySelector('.esw-res').innerText)).replace(/\n/g,' | '));
+ const vd=await p.evaluate(()=>(document.querySelector('.esw-vd')||{}).innerText||'');
+ ok('"Vendeu mais que o previsto": AC0019 com pedidos 2.464, faltam 1.409 e "entrou +1.464 desde ontem"', /AC0019/.test(vd)&&/Pedidos de 2\.464/.test(vd)&&/Faltam 1\.409/.test(vd)&&/Entrou \+1\.464/.test(vd)&&!/AC0009/.test(vd), vd.replace(/\n/g,' | '));
+ ok('Curva S em semanas com previsto (tracejado), realizado e "hoje"', await p.evaluate(()=>{ const v=document.querySelector('.esw-cv'); return !!v&&/Meta da semana/.test(v.innerText)&&/Deveria ter hoje/.test(v.innerText)&&v.querySelectorAll('svg path').length===2&&/hoje/.test(v.querySelector('svg').textContent); }));
+ const th=await p.evaluate(()=>[...document.querySelectorAll('table.anl-t thead th')].map(x=>x.innerText.trim()).join('|'));
+ ok('Tabela de sempre: Saldo, Est. seg., Pedidos (DC), Cobertura, Previsão, Em ordem, Falta programar, Ruptura prev., Situação e + planejar', /Saldo/i.test(th)&&/Est\. seg\./i.test(th)&&/Pedidos \(DC\)/i.test(th)&&/Cobertura/i.test(th)&&/Em ordem/i.test(th)&&/Falta programar/i.test(th)&&/Ruptura prev\./i.test(th)&&/Situação/i.test(th)&&await p.$('table.anl-t [data-act="anl-sug"]'), th);
+ const nPad=await p.evaluate(()=>document.querySelectorAll('table.anl-t tbody tr[data-act="anl-item"]').length);
+ await p.selectOption('[data-esw="sit"]','todas'); await H.dorme(600);
+ const nTod=await p.evaluate(()=>document.querySelectorAll('table.anl-t tbody tr[data-act="anl-item"]').length);
+ ok('Situação "Pede ação" (padrão) mostra menos que "Todas"; a lista que filtra ganha a borda azul', nTod>nPad&&await p.$('.esw-sl.on [data-esw="sit"]'), nPad+' / '+nTod);
+ await p.selectOption('[data-esw="fam"]','AC3'); await H.dorme(600);
+ let cods=await p.evaluate(()=>[...document.querySelectorAll('table.anl-t tbody tr[data-act="anl-item"]')].map(r=>r.dataset.c).sort().join(','));
+ ok('Família AC3: só AC0005 e AC0019; "X de Y itens" e o link Limpar', cods==='AC0005,AC0019'&&/2 de 5 itens/.test(await txt())&&await p.$('.esw-n [data-act="esw-limpar"]'), cods);
+ await p.selectOption('[data-esw="tipo"]','enc'); await H.dorme(600);
+ cods=await p.evaluate(()=>[...document.querySelectorAll('table.anl-t tbody tr[data-act="anl-item"]')].map(r=>r.dataset.c).join(','));
+ ok('Tipo "Sob encomenda": só o Quero Quero', cods==='AC0019', cods);
+ await p.selectOption('[data-esw="emb"]','Plástica'); await H.dorme(600);
+ ok('Nada no filtro: "Nenhum item com esses filtros. Limpar filtros"', /Nenhum item com esses filtros/.test(await txt())&&!(await p.$('table.anl-t')));
+ await p.click('.esw .empty [data-act="esw-limpar"]'); await H.dorme(600);
+ ok('Limpar volta tudo ao padrão (Pede ação, sem família/embalagem/tipo)', await p.evaluate(()=>{ const E=Painel.estoquesSemana.estado(); return E.sit==='acao'&&!E.fam&&!E.emb&&!E.tipo; })&&!(await p.$('.esw-sl.on')));
+ await p.click('[data-act="esw-ln"][data-v="Linha 2"]'); await H.dorme(600); await p.selectOption('[data-esw="sit"]','todas'); await H.dorme(600);
+ cods=await p.evaluate(()=>[...document.querySelectorAll('table.anl-t tbody tr[data-act="anl-item"]')].map(r=>r.dataset.c).join(','));
+ ok('Linha 2: só o rejunte; a frase fala da Linha 2', cods==='RJ0001'&&/Linha 2 está/.test(await p.evaluate(()=>document.querySelector('.esw-fr').innerText)), cods);
+ await p.click('[data-act="esw-ln"][data-v=""]'); await H.dorme(500);
+ await p.click('[data-act="esw-mais"]'); await H.dorme(500);
+ ok('"Mais filtros" mostra as visões e filtros antigos (cobertura, pedidos, ordem, colunas) sem repetir a busca', await p.$('[data-act="anl-es-vis"]')&&await p.$('[data-anl-es="cob"]')&&await p.$('[data-anl-esc="mais"]')&&(await p.$$('#anl-esq')).length===1&&!(await p.$('[data-anl-es="linha"]')));
+ await p.focus('#anl-esq'); await p.keyboard.type('quero',{delay:30}); await H.dorme(900);
+ cods=await p.evaluate(()=>[...document.querySelectorAll('table.anl-t tbody tr[data-act="anl-item"]')].map(r=>r.dataset.c).join(','));
+ ok('Procurar filtra enquanto digita ("quero" → AC0019)', cods==='AC0019', cods);
+ ok('Capacidade dos almoxarifados continua na tela (recolhida embaixo)', await p.$('details.esw-capd .aj-capw'));
+ ok('Sino: "Vendeu mais que o previsto" (venda nova desde a última base)', await p.evaluate(()=>{ document.getElementById('tp-sino').click(); return new Promise(r=>setTimeout(()=>{ const x=(document.querySelector('.tp-pop')||{}).innerText||''; document.getElementById('tp-sino').click(); r(/Vendeu mais que o previsto/.test(x)); },400)); }));
+ /* Excel */
+ await p.click('[data-act="esw-limpar"]').catch(()=>{}); await H.dorme(400); await p.selectOption('[data-esw="sit"]','todas'); await H.dorme(500);
+ const [dx]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('[data-act="esw-xls"]')]);
+ let xok=false, xinfo=''; if(dx){ const f='/tmp/esw.xlsx'; await dx.saveAs(f); try{ const XLSX=require('xlsx'); const wb=XLSX.readFile(f); const sh=wb.Sheets['Necessidades']; const aoa=XLSX.utils.sheet_to_json(sh,{header:1});
+   xinfo=wb.SheetNames.join(',')+' · '+JSON.stringify(aoa[3]).slice(0,120); xok=wb.SheetNames.includes('Resumo')&&wb.SheetNames.includes('Curva S')&&/Meta da semana/.test(JSON.stringify(aoa[3]))&&aoa.some(r=>r[0]==='AC0019')&&/<f>SUM\(O5:O\d+\)<\/f>/.test(require('child_process').execSync('unzip -p '+f+' xl/worksheets/sheet2.xml').toString()); }catch(e){ xinfo=String(e); } }
+ ok('Baixar Excel: abas Resumo, Necessidades (com Meta da semana, No mês e total com fórmula), Por almoxarifado e Curva S', xok, xinfo);
+ const [dp]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('[data-act="esw-pdf"]')]);
+ let pinfo=''; if(dp){ await dp.saveAs('/tmp/esw.pdf'); pinfo=fs.statSync('/tmp/esw.pdf').size+' bytes'; }
+ ok('Baixar PDF (A4 deitada) com o nome Necessidades-todas-<mês>.pdf', dp&&/^Necessidades-todas-\d{4}-\d{2}\.pdf$/.test(dp.suggestedFilename()), (dp&&dp.suggestedFilename())+' '+pinfo);
+ await p.evaluate(()=>__T.go('anlnec')); await H.dorme(800);
+ ok('A tela Necessidades continua a de antes', /Necessidades/.test(await txt())&&!(await p.$('.esw-top')));
+ await p.evaluate(()=>__T.go('anlest')); await H.dorme(900); await p.screenshot({path:'/tmp/esw-tela.png',fullPage:true});
+ console.log('erros:',B.erros.filter(x=>!/404/.test(x)));
+ console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

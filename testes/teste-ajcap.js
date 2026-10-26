@@ -8,7 +8,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  D['pcpbase/meta']={em:new Date().toISOString(),hist:[]}; D['pcpbase/perfil']={}; D['pcpbase/vendas']={}; D['pcpbase/prev']={};
  D['pcpbase/itens']={l:{AC3001:{d:'ARGAMASSA AC3 20KG',sal:1,a3:960,a30:480},AC0005:{d:'ARGAMASSA CINZA 20KG',sal:1,a3:400,a30:0},XX0001:{d:'ITEM SEM PALETE',sal:1,a3:50,a30:0}},atual:{SALDO:new Date().toISOString()},em:new Date().toISOString()};
  const {browser,page:p}=await H.abrir({viewport:{width:1440,height:1000}}); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
- await p.evaluate(()=>__T.go('anlest')); await H.dorme(1500);
+ await p.evaluate(()=>{ __T.S().esw.capAb=true; __T.go('anlest'); }); await H.dorme(1500);
  let c=await p.evaluate(()=>(document.querySelector('.aj-capw')||{}).innerText||'');
  ok('Quadro "Capacidade física dos almoxarifados" na tela de Estoques', /CAPACIDADE FÍSICA DOS ALMOXARIFADOS/.test(c), c.replace(/\n/g,' | ').slice(0,200));
  const caps=await p.evaluate(()=>[...document.querySelectorAll('.aj-cap')].map(x=>x.innerText.replace(/\n/g,' | ')));

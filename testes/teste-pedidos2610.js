@@ -19,7 +19,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Programação: "ENSACADO PARA APONTAR" com o ensacado 9001, ordem 5001 e só o apontamento novo (300)', /ENSACADO PARA APONTAR/.test(s)&&/Ensacado 9001/.test(s)&&/ordem 5001/.test(s)&&/300 /.test(s)&&/1 apontamento/.test(s), s.replace(/\n/g,' | '));
  await p.click('[data-act="ens-ok"]'); await H.dorme(1200);
  const ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); ok('"Apontei" grava ensAp no apontamento e o aviso some', ds['entregas/enew'].ensAp&&ds['entregas/enew'].ensAp.por==='uDONA'&&!ds['entregas/eold'].ensAp&&!(await p.$('.ens-c')), JSON.stringify(ds['entregas/enew'].ensAp));
- await p.evaluate(()=>__T.go('anlest')); await H.dorme(1500); s=await p.evaluate(()=>{ const r=document.querySelector('tr[data-c="RJ1001"]'); return r?r.innerText:''; });
+ await p.evaluate(()=>{ __T.S().esw.sit='todas'; __T.go('anlest'); }); await H.dorme(1500); s=await p.evaluate(()=>{ const r=document.querySelector('tr[data-c="RJ1001"]'); return r?r.innerText:''; });
  ok('Estoques: ao lado da previsão "feito 400 · tinha 1.000" (painel 400 > Focco 200)', /3\.000/.test(s)&&/feito 400 · tinha 1\.000/.test(s), s.replace(/\n/g,' | '));
  await p.evaluate(()=>__T.go('medicao')); await H.dorme(700); await p.evaluate(()=>{ const b=document.getElementById('m-salvar'); b.disabled=false; b.click(); }); await H.dorme(400);
  s=await p.evaluate(()=>(document.getElementById('toast')||{}).innerText||''); ok('Nova medição sem nenhum silo: avisa para preencher', /pelo menos um silo/.test(s), s);

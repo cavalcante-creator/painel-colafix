@@ -24,6 +24,7 @@ async function abrir(op) {
     const u = route.request().url();
     if (u.includes('gstatic.com/firebasejs/')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('app-compat') ? MOCK : '' });
     if (u.includes('cdnjs.cloudflare.com') && u.includes('pptxgenjs') && fs.existsSync(__dirname + '/node_modules/pptxgenjs/dist/pptxgen.bundle.js')) return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(__dirname + '/node_modules/pptxgenjs/dist/pptxgen.bundle.js', 'utf8') }); /* PowerPoint de verdade (npm i --no-save pptxgenjs@3.12.0) */
+    if (u.includes('cdnjs.cloudflare.com') && u.includes('/exceljs/') && fs.existsSync(__dirname + '/node_modules/exceljs/dist/exceljs.min.js')) return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(__dirname + '/node_modules/exceljs/dist/exceljs.min.js', 'utf8') }); /* npm i --no-save exceljs@4.4.0 */
     if (u.includes('cdnjs.cloudflare.com')) return route.fulfill({ contentType: 'text/javascript', body: u.includes('jspdf') ? fs.readFileSync(process.env.JSPDF_REAL ? __dirname + '/node_modules/jspdf/dist/jspdf.umd.min.js' : __dirname + '/jspdf-falso.js', 'utf8') : '' }); /* JSPDF_REAL=1: PDF de verdade (npm i --no-save jspdf@2.5.1) */
     if (u.startsWith(BASE)) { let p = decodeURIComponent(new URL(u).pathname.slice(1)) || 'index.html';
       if (p === 'modulos/rh-epi-padrao.json' && !process.env.EPI_PADRAO) return route.fulfill({ status: 404, body: '' }); /* funções da planilha do EPI: só no teste que pede (EPI_PADRAO=1) */
