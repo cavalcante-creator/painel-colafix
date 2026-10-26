@@ -176,7 +176,8 @@ function siloAgoraSub(s,u){ if(!u) return 'sem medição';
 
 /* ---------- consumo pelo apontamento (entregas) ---------- */
 let siloFila=Promise.resolve();
-const siloEmFila=fn=>(siloFila=siloFila.then(fn,fn));
+/* 26/10: um trabalho travado (sem resposta do servidor) não segura a fila para sempre: depois de 30 s a fila segue (o trabalho continua sozinho) */
+const siloEmFila=fn=>{ const job=()=>Promise.race([Promise.resolve().then(fn),new Promise(r=>setTimeout(()=>r({tempo:true}),30000))]); return (siloFila=siloFila.then(job,job)); };
 /* quando o cimento saiu do silo: hora do apontamento (antecipado conta a partir de quando foi registrado, como no resto do painel) */
 function siloRefEm(e){ return (e.antecipado&&e.registradoEm)?e.registradoEm:(e.em||e.registradoEm||''); }
 function siloConsumoDe(e){ const o=ordById(e.ordem); const linha=(o&&o.linha)||e.linha; if(!linha||!usaCimFab(linha)) return null;
@@ -230,16 +231,17 @@ async function siloRegistrarMedicao(p){ const fs=siloFs(); if(!fs) throw {code:'
     let novo, aplicado=true, nota=null;
     if(p.corrige&&d&&d.medicaoId===p.corrige&&p.corrigeKg!=null){ novo=Math.max(0,siloR(antes+(p.kg-p.corrigeKg))); nota='Correção da medição anterior: diferença aplicada sobre o saldo atual'; }
     else if(p.corrige){ aplicado=false; novo=antes; nota='Correção de uma medição antiga: já existe medição mais nova, saldo mantido'; }
-    else if(d&&d.medidoEm&&d.medidoEm>em){ aplicado=false; novo=antes; nota='Medição com hora anterior à última medição: registrada no histórico, saldo mantido'; }
+    /* 26/10: medição feita agora (sem hora informada) sempre vale; medidoEm no futuro (relógio adiantado de outro aparelho) não conta */
+    else if(d&&d.medidoEm&&d.medidoEm>em&&!p.forcar&&!(p.agora&&!p.horaManual)&&d.medidoEm<=new Date(Date.now()+120000).toISOString()){ aplicado=false; novo=antes; nota='Medição com hora anterior à última medição: registrada no histórico, saldo mantido'; }
     else { novo=Math.max(0,siloR(p.kg+depoisDaMedicao)); if(depoisDaMedicao) nota='Medição com hora informada: '+fkgS(depoisDaMedicao)+' de apontamentos lançados depois dessa hora continuam valendo'; }
     t.set(mref,Object.assign(base,{antesKg:antes,medidoKg:siloR(p.kg),diferencaKg:antes==null?null:siloR(p.kg-antes),deltaKg:antes==null?null:siloR(novo-antes),depoisKg:novo,aplicado,nota}));
     if(aplicado) t.set(sref,{saldoKg:novo,medidoKg:p.corrige?siloR((d.medidoKg||0)+(p.kg-p.corrigeKg)):siloR(p.kg),medidoEm:p.corrige?d.medidoEm:em,medicaoId:p.corrige?p.medicaoId:p.medicaoId,atualizadoEm:agora,origem:'medicao',ultimoMov:movId,...eu},{merge:true});
     return {ok:true,antes,novo,aplicado,nota}; }); }
 /* medição salva pela tela "Nova medição" (vários silos de uma vez): cada silo medido atualiza o saldo */
-async function siloMedicaoSalva(id,doc){ const corr=doc.corrige?S.medicoes.find(m=>m._id===doc.corrige):null; const res=[];
+async function siloMedicaoSalva(id,doc,op){ const corr=doc.corrige?S.medicoes.find(m=>m._id===doc.corrige):null; const res=[];
   for(const sid of Object.keys(doc.itens||{})){ const t=+doc.itens[sid]; if(isNaN(t)) continue;
     const orig=corr&&corr.itens&&corr.itens[sid]!=null?+corr.itens[sid]*1000:null;
-    try{ res.push(await siloRegistrarMedicao({sid,kg:t*1000,motivo:doc.motivo||(doc.corrige?'Correção de divergência':'Medição física'),obs:doc.obs,medidoPor:doc.medidoPor,em:doc.em,horaManual:!!doc.horaManual,medicaoId:id,corrige:orig!=null?doc.corrige:null,corrigeKg:orig})); }
+    try{ res.push(await siloRegistrarMedicao({sid,kg:t*1000,motivo:doc.motivo||(doc.corrige?'Correção de divergência':'Medição física'),obs:doc.obs,medidoPor:doc.medidoPor,em:doc.em,horaManual:!!doc.horaManual,agora:!!(op&&op.agora),medicaoId:id,corrige:orig!=null?doc.corrige:null,corrigeKg:orig})); }
     catch(e){ console.warn('[silos] medição',sid,e); siloAviso('A medição foi salva, mas o saldo do '+siloNome(sid)+' não foi atualizado agora ('+((e&&e.code)||'erro')+'). Tente registrar de novo.','erro'); } }
   return res; }
 
@@ -248,7 +250,7 @@ async function siloMedicaoSalva(id,doc){ const corr=doc.corrige?S.medicoes.find(
     if(col==='medicoes') doc.saldoV=2; /* marca: medição que alimenta o saldo (para a rede de segurança) */
     let id; try{ const ref=S.db.collection(col).doc(); id=ref.id; await ref.set(doc); }catch(e){ erro(e); return false; }
     if(col==='entregas') siloEmFila(()=>siloProcessarEntrega(id,doc).catch(e=>{ console.warn('[silos] consumo',e); siloAviso('O apontamento foi salvo, mas não consegui descontar o silo agora ('+((e&&e.code)||'erro')+'). O painel tenta de novo sozinho.'); }));
-    else { await siloEmFila(()=>siloMedicaoSalva(id,doc)); try{ avMedicao(id,doc); }catch(e){ console.warn('[avisos]',e); } }
+    else { await siloEmFila(()=>siloMedicaoSalva(id,doc,{agora:true})); try{ avMedicao(id,doc); }catch(e){ console.warn('[avisos]',e); } }
     return true; }; }
 /* rede de segurança: apontamentos que não descontaram (sem internet, aba fechada no meio, aparelho com versão antiga) são processados por qualquer painel aberto */
 async function siloReconciliar(){ if(!S.db||!siloFs()||!S.siloSub||S._siloRec||(typeof soVer==='function'&&soVer())) return;
@@ -319,8 +321,8 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
     F.salvando=true; render(); const em=new Date().toISOString(); const obs=String(($('#sm-obs')||{}).value||F.obs||'').trim();
     try{ const ref=S.db.collection('medicoes').doc(); const doc={em,por:S.uid,itens:{[F.silo]:Math.round(kg/100)/10},caps:Object.fromEntries(S.cfg.silos.map(x=>[x.id,x.cap])),medidoPor:(S.uid&&S.nomes[S.uid])||'',motivo,origem:'silo-medicao',saldoV:2}; if(obs) doc.obs=obs;
       await ref.set(doc);
-      const r=await siloEmFila(()=>siloRegistrarMedicao({sid:F.silo,kg,motivo,obs,em,medicaoId:ref.id})); try{ avMedicao(ref.id,doc); }catch(e){ console.warn('[avisos]',e); }
-      S.sm=null; toast(r&&r.ok?`Medição salva · ${siloNome(F.silo)}: ${fkg(r.novo)}${r.antes!=null?' (diferença '+fkgS(kg-r.antes)+')':''}`:'Medição salva.'); render(); }
+      const r=await siloEmFila(()=>siloRegistrarMedicao({sid:F.silo,kg,motivo,obs,em,medicaoId:ref.id,agora:true})); try{ avMedicao(ref.id,doc); }catch(e){ console.warn('[avisos]',e); } try{ if(typeof mdnRelata==='function') mdnRelata(ref.id,doc,[r],true); }catch(e){}
+      S.sm=null; toast(r&&r.ok&&r.aplicado!==false?`Medição salva · ${siloNome(F.silo)}: ${fkg(r.novo)}${r.antes!=null?' (diferença '+fkgS(kg-r.antes)+')':''}`:'Medição salva.'); render(); }
     catch(e){ console.warn('[silos] medição',e); F.salvando=false; render(); siloAviso(e&&e.code==='unavailable'?'Não foi possível conectar ao servidor. A medição não foi salva. Verifique sua conexão e tente novamente.':'A medição não foi salva ('+((e&&e.code)||'erro')+').','erro'); }
     return; } });
 
