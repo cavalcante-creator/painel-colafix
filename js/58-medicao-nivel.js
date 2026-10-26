@@ -54,5 +54,7 @@ async function mdnSemTransacao(p,e){ const fs=siloFs(); if(!fs) throw e; const a
   S.siloSaldo[p.sid]=Object.assign({},S.siloSaldo[p.sid]||{},sil); try{ if(!S.siloMov.some(m=>m._id===movId)) S.siloMov=[Object.assign({_id:movId},mov)].concat(S.siloMov); }catch(x){}
   try{ render(); }catch(x){}
   return {ok:true,antes,novo:comparar?antes:kg,aplicado:!comparar,comparacao:comparar,semTransacao:true}; }
-{ const _rm=siloRegistrarMedicao; siloRegistrarMedicao=async function(p){ try{ return await _rm.apply(this,arguments); }
-    catch(e){ const c=e&&e.code; if(!(p&&(p.agora||p.forcar))||!MDN_SEMTX.includes(c)) throw e; console.warn('[medição] sem transação por',c); return mdnSemTransacao(p,e); } }; }
+/* depois do 1º resource-exhausted, por 30 min a medição já vai direto (a transação gasta vários segundos tentando de novo antes de falhar) */
+{ const _rm=siloRegistrarMedicao; siloRegistrarMedicao=async function(p){ if(p&&(p.agora||p.forcar)&&S.mdn.cotaAte&&Date.now()<S.mdn.cotaAte) return mdnSemTransacao(p,{code:'resource-exhausted'});
+    try{ return await _rm.apply(this,arguments); }
+    catch(e){ const c=e&&e.code; if(!(p&&(p.agora||p.forcar))||!MDN_SEMTX.includes(c)) throw e; if(c==='resource-exhausted') S.mdn.cotaAte=Date.now()+30*60000; console.warn('[medição] sem transação por',c); return mdnSemTransacao(p,e); } }; }
