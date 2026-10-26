@@ -27,7 +27,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
 
   // ---- Início
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
-  ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Vagas|Cadastros'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
+  ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Pessoas|Prazos|Documentos|Almoço|Cadastros'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
   ok('Início: 9 no quadro (8 CLT, 1 PJ), 1 de férias, 1 afastado, 2 contratos de terceirizados (sem contar desligado e encerrado)', /9\s*no quadro\s*8 CLT · 1 PJ/.test(v0)&&/1\s*de férias agora/.test(v0)&&/1\s*afastado/.test(v0)&&/2 contratos ativos/.test(v0), v0.replace(/\n/g,' ').slice(0,200));
   ok('Início em painel: pessoas por setor, vínculo, tempo de casa e próximos 30 dias; sem as fichas', /Por setor/.test(v0)&&/Quadro/.test(v0)&&/Tempo de casa/.test(v0)&&/Próximos 7 dias/.test(v0)&&/Precisa de você/.test(v0)&&!/assinadas e anexadas/.test(v0), v0.replace(/\n/g,' ').slice(0,300));
   ok('Avisos: contrato vencido, contrato vencendo e função sem EPI (com quantas pessoas)', /Contrato: LIMPA TUDO LTDA\s*venceu há (1 dia|2 dias)/.test(v0)&&/Contrato: SEGURA VIGILÂNCIA\s*vence em (9|10) dias/.test(v0)&&/Função "Mecânico" sem EPI cadastrado\s*a ficha de 2 pessoas sai sem itens/.test(v0)&&!/ANTIGO/.test(v0), (v0.match(/Avisos[\s\S]{0,400}/)||[''])[0].replace(/\n/g,' | '));

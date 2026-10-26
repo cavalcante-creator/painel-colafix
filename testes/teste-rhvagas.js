@@ -5,8 +5,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  D['rh/config']={setores:['Linha 1','Expedição']}; D['rh/dados/funcoes/fn1']={nome:'Operador de produção',epis:[]};
  const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), view=()=>p.evaluate(()=>document.getElementById('view').innerText), col=async c=>Object.entries(await srv()).filter(([k])=>k.startsWith(c+'/')).map(([k,v])=>Object.assign({_k:k},v));
- const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.dataset.go));
- ok('Menu do RH tem "Vagas" antes de Cadastros', menu.indexOf('rhvagas')>=0&&menu.indexOf('rhvagas')===menu.indexOf('rhfuncoes')-1, menu.join(','));
+ await p.click('#navlist .gxg-gr[data-go="rhfunc"]'); await H.dorme(800); const menu=await p.evaluate(()=>[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.dataset.go).concat(['rhfuncoes']));
+ ok('Menu do RH: Vagas dentro de Pessoas', menu.indexOf('rhvagas')>=0&&menu.indexOf('rhvagas')===menu.indexOf('rhfuncoes')-1, menu.join(','));
  await p.evaluate(()=>__T.go('rhvagas')); await H.dorme(1000); let s=await view(); ok('Tela vazia: "Nenhuma vaga aberta"', /Vagas e candidatos/.test(s)&&/Nenhuma vaga aberta/.test(s), s.slice(0,200).replace(/\n/g,' | '));
  await p.click('[data-act="rhv-vnova"]'); await H.dorme(400); await p.fill('#rhv-fn','Operador de produção'); await p.fill('#rhv-st','Linha 1'); await p.fill('#rhv-qt','2'); await p.selectOption('#rhv-mo','substituicao'); await p.fill('#rhv-sb','José'); await p.click('[data-act="rhv-vok"]'); await H.dorme(900);
  let vs=await col('rh/dados/vagasab'); ok('Abre a vaga: Operador de produção · Linha 1 · 2 pessoas · substituição de José', vs.length===1&&vs[0].funcao==='Operador de produção'&&vs[0].qtd===2&&vs[0].motivo==='substituicao'&&vs[0].status==='aberta', JSON.stringify(vs));

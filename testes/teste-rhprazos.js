@@ -18,7 +18,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   const espera=async(f,ms)=>{ const t0=Date.now(); while(Date.now()-t0<(ms||8000)){ if(await p.evaluate(f).catch(()=>false)) return true; await H.dorme(200); } return false; };
 
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
-  ok('Menu ganhou "Férias e prazos"', nav==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Vagas|Cadastros', nav);
+  ok('Menu ganhou "Férias e prazos"', nav==='Início|Pessoas|Prazos|Documentos|Almoço|Cadastros', nav);
   ok('Início avisa: férias perto do prazo e vencida, troca do PJ perto e atrasada (e não a que está em dia)',
     /(Atenção|Vencido)\s*Férias: ANA SOUZA\s*(conceder até|passou do dia de avisar)/i.test(v0)&&/Vencido\s*Férias: CARLOS LIMA\s*o prazo para conceder venceu/.test(v0)&&/Atenção\s*Troca do PJ: PEDRO ALVES\s*próxima troca/.test(v0)&&/Atrasada\s*Troca do PJ: JOAO PJ/.test(v0)&&!/BRUNO ROCHA|RAFAEL NUNES/.test(v0), v0.replace(/\n/g,' | ').slice(300,700));
 

@@ -1910,6 +1910,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   P.registrarModulo({ id:'rh', nome:'RH', ic:'equipe', telas:TELAS, iniciar });
   P.registrarPerfil('rh',{ nome:'RH (funcionários, fichas, documentos, terceirizados)', mods:['rh'], soVer:true, pos:2, desc:'Só o módulo RH: funcionários, fichas de EPI e uniforme do mês, documentos e contratos, funções e EPIs e terceirizados. Não vê nem muda nada da fábrica.' });
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
+  window.RHBusca={pessoas:()=>(R.func||[]).filter(f=>f&&f.nome&&!f.removido).map(f=>({id:f._id,nome:f.nome,setor:f.setor||'',funcao:f.funcao||'',status:f.status||''}))}; /* busca da lateral (js/56) */
   function navSolo(){ const ms=P.modsVis?P.modsVis():[], solo=ms.length===1&&ms[0]==='rh'&&!!TELAS[P.S.view]; document.body.classList.toggle('rh-solo',solo); if(!solo) return;
     const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhpres:'fabrica',rhfichas:'folha',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhvagas:'mais',rhfuncoes:'ajuste'};
     const h=Object.keys(TELAS).filter(v=>P.viewOk(v)&&TELAS[v].menu!==false).map(v=>`<button class="navbtn" data-go="${v}" ${P.S.view===v?'aria-current="page"':''}>${NIC[v]?P.ic(NIC[v],18):''}${esc(TELAS[v].nome)}</button>`).join('');

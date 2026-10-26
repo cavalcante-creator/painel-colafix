@@ -1047,7 +1047,7 @@ S.tp={pop:null,q:'',sel:0};
 function tpAvisos(){ const out=[], h=hojeStr(), dono=!!(S.acs&&S.acs.dono), ok=v=>{ try{ return viewOk(v); }catch(e){ return false; } };
   const add=(n,t,s,acao,c)=>{ if(n>0) out.push({n,t,s,acao,c:c||'warn'}); };
   if(dono){ const A=S.acs; const pend=(A.pedidos||[]).filter(p=>!(A.lista||[]).some(l=>l._id===p._id)).length; add(pend,'Pedido'+(pend>1?'s':'')+' de acesso','Alguém abriu o painel e espera liberação','acessos','crit'); }
-  if(ok('programacao')){ const ab=ordAbertas(); const atr=ab.filter(o=>ordAtras(o,h)).length; add(atr,'Ordem'+(atr>1?'s':'')+' atrasada'+(atr>1?'s':''),'Programadas para dias que já passaram','atrasadas','crit');
+  if(ok('programacao')){ const ab=ordAbertas(); const atr=ab.filter(o=>ordAtras(o,h)).length; add(atr,atr>1?'Ordens atrasadas':'Ordem atrasada','Programadas para dias que já passaram','atrasadas','crit');
     const se=ab.filter(o=>faltaEns(o)).length; add(se,'Sem ordem de ensacado','Rejunte flexível/siliconizado sem o nº do ensacado','semens');
     const d=S._div; const nd=d?(d.n||0)+(d.pend||[]).length:0; add(nd,'Divergência'+(nd>1?'s':'')+' com o sistema','Ordem aberta/encerrada ou pendente diferente do Focco','div');
     const sl=S.ordens.filter(o=>o.status==='aberta'&&!o.linha).length; add(sl,'Ordem'+(sl>1?'s':'')+' sem linha','Importadas e ainda não programadas','aprogramar'); }
