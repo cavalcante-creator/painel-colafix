@@ -85,9 +85,13 @@ function praDiv(c){ const LO=linhasOrd(), B=(S.anl&&S.anl.base)||{}, it=((B.iten
   /* 27/10: o que a usuária acertou em Ajustes › Itens (uma linha só) vale antes do Focco (ex.: chapisco = Fixcol) */
   try{ const pi=typeof itemDe==='function'?itemDe(c):null, cl=((pi&&pi.linhas)||[]).filter(l=>LO.includes(l)); if(cl.length===1) return {d:{[cl[0]]:1},f:'cad'}; }catch(e){}
   const fl=(it.ln||[]).filter(l=>LO.includes(l)); if(fl.length===1) return um(fl[0]);
-  try{ const r=ritReal(c,LO); if(r&&r.d&&Object.keys(r.d).length) return {d:r.d,f:'real'}; }catch(e){}
-  try{ const ci=(ritCfg().itens||{})[c]; if(ci&&ci.d){ const d={}; let t=0; for(const l in ci.d){ const v=+ci.d[l]||0; if(v>0&&LO.includes(l)){ d[l]=v; t+=v; } } if(t>0){ for(const l in d) d[l]/=t; return {d,f:'cfg'}; } } }catch(e){}
-  let cad=[]; try{ cad=anlLinhasDe(c,it); }catch(e){} if(cad.length===1) return {d:{[cad[0]]:1},f:'cad'};
+  let cad=[]; try{ cad=anlLinhasDe(c,it); }catch(e){}
+  /* 27/10 ("por que só apareceu essa?"): o apontado recente e a % da Curva S (que só tem L1/L2) só dividem o item se
+     cobrem todas as linhas onde o Focco diz que ele pode ser feito; senão não dá para saber (ex.: AC0002 Focco L1/L3, Curva S L1) */
+  const pode=fl.length?fl:cad.filter(l=>LO.includes(l)), cobre=d=>!pode.length||pode.every(l=>(d[l]||0)>0);
+  try{ const r=ritReal(c,LO); if(r&&r.d&&Object.keys(r.d).length&&cobre(r.d)) return {d:r.d,f:'real'}; }catch(e){}
+  try{ const ci=(ritCfg().itens||{})[c]; if(ci&&ci.d){ const d={}; let t=0; for(const l in ci.d){ const v=+ci.d[l]||0; if(v>0&&LO.includes(l)){ d[l]=v; t+=v; } } if(t>0&&cobre(d)){ for(const l in d) d[l]/=t; return {d,f:'cfg'}; } } }catch(e){}
+  if(cad.length===1) return {d:{[cad[0]]:1},f:'cad'};
   return {d:null,ls:fl.length?fl:cad}; }
 function praFocItem(c){ const B=(S.anl&&S.anl.base)||{}, it=((B.itens||{}).l||{})[c]||{}; let ls=[]; try{ ls=anlLinhasDe(c,it); }catch(e){}
   let n=''; try{ n=ritNome(c); }catch(e){} if(!n||n===c) n=String(it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||'').replace(/^ARGAMASSA\s+/i,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b.*$/i,'');
