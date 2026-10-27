@@ -84,6 +84,8 @@ async function panoXls(){ const L=panoLinhas(); if(!L) return; try{ await carreg
 /* PDF para a diretoria (27/10, "preciso enviar para os chefes"): página 1 = resumo (sacos, toneladas, média, melhor e pior
    mês, participação na fábrica), gráfico mês a mês e quadro mês a mês; depois a tabela por produto/linha com toneladas.
    Só os meses até o mês atual. Itens sem linha definida não aparecem por nome (só somam no total da fábrica). */
+/* 27/10 ("pode deixar só o concreto"): o PDF mostra só a produção com linha certa; os itens sem linha não aparecem (false volta a página à parte) */
+const PANO_SO_CERTO=true;
 async function panoPdfDados(){ const A=S.pano, f=panoF(A), P=panoPer(A.ano); try{ await praEsp(f,P.de,P.ate); if(A.comp){ const Q=panoPer(A.ano-1); await praEsp(f,Q.de,Q.ate); } }catch(e){}
   const mat=o=>{ for(let i=0;i<3;i++){ const X=panoMat(Object.assign({},A,o),A.ano); if(!X.carregando) return X; } return null; };
   const X=panoDados(); if(!X||!X.rows) return null;
@@ -150,7 +152,7 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
   linhasQ.forEach((r,j)=>{ if(j%2){ fc(Co.zeb); doc.rect(M,yy,PW-2*M,5.4,'F'); } doc.setFont('helvetica','bold'); doc.setFontSize(7.2); tc(Co.ink); doc.text(r[0],M+1.5,yy+3.8);
     doc.setFont('helvetica','normal'); r[1].forEach((v,i)=>doc.text(v,cx(i+1)+cw-1.5,yy+3.8,{align:'right'})); doc.setFont('helvetica','bold'); doc.text(r[2],cx(cols.length-1)+cw-1.5,yy+3.8,{align:'right'}); yy+=5.4; });
   /* itens que podem ter passado pela linha escolhida, mas o Focco não separa (pedido de 27/10): fora do total */
-  const sd=(Sc.R&&Sc.R.semDiv)||[], sdT={}; ((Tn.R&&Tn.R.semDiv)||[]).forEach(o=>sdT[o.c]=o.v); const sdTot=sd.reduce((a,o)=>a+o.v,0), sdTt=sd.reduce((a,o)=>a+(sdT[o.c]||0),0), nomeLs=A.ls.join(' + ');
+  const sd=PANO_SO_CERTO?[]:((Sc.R&&Sc.R.semDiv)||[]), sdT={}; ((Tn.R&&Tn.R.semDiv)||[]).forEach(o=>sdT[o.c]=o.v); const sdTot=sd.reduce((a,o)=>a+o.v,0), sdTt=sd.reduce((a,o)=>a+(sdT[o.c]||0),0), nomeLs=A.ls.join(' + ');
   if(sd.length){ const by=yy+6; fc([253,246,232]); doc.roundedRect(M,by,PW-2*M,13,1.5,1.5,'F'); fc(Co.warn); doc.rect(M,by,1.3,13,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(8); tc(Co.ink); doc.text(fit('Fora do total: '+sd.length+(sd.length===1?' item que pode':' itens que podem')+' ter sido feito'+(sd.length===1?'':'s')+' na '+nomeLs+' somam '+nS(sdTot)+' sc ('+nT(sdTt)+' t) no ano.',PW-2*M-8),M+4,by+5.2);
     doc.setFont('helvetica','normal'); doc.setFontSize(7); tc(Co.mut); doc.text(fit('O Focco registra quanto foi produzido do item, mas não em qual linha. Esses itens podem ser feitos em mais de uma linha, por isso ficam à parte (detalhe na última página).',PW-2*M-8),M+4,by+9.8); }
@@ -187,7 +189,7 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
     caixa(nomeLs+' se todos esses itens tivessem sido feitos nela: até '+nS(Sc.tot+sdTot)+' sc · '+nT(Tn.tot+sdTt)+' t','É o máximo possível. O número real fica entre os dois; para saber, é preciso dizer a linha (ou a divisão) desses itens em Ajustes › Itens.',Co.warn); }
   /* rodapé */
   const np=doc.getNumberOfPages?doc.getNumberOfPages():1; for(let p=1;p<=np;p++){ if(doc.setPage) doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); tc(Co.mut);
-    doc.text(fit(A.fonte==='focco'?'Fonte: Extrato do Focco (EPP), sacos produzidos por item e dia. A linha é a do item em Ajustes › Itens (ou a do Focco). Toneladas = sacos × peso do saco.':'Fonte: apontamentos lançados no painel. Toneladas = sacos × peso do saco.',PW-2*M-30),M,PH-5); doc.text('Página '+p+' de '+np,PW-M,PH-5,{align:'right'}); }
+    doc.text(fit(A.fonte==='focco'?'Fonte: Extrato do Focco (EPP). Linha = a da ordem de produção no painel; sem a ordem, a do item (Ajustes › Itens ou Focco). Só entra o que tem linha certa. Toneladas = sacos × peso do saco.':'Fonte: apontamentos lançados no painel. Toneladas = sacos × peso do saco.',PW-2*M-30),M,PH-5); doc.text('Página '+p+' de '+np,PW-M,PH-5,{align:'right'}); }
   const nome='Producao-'+A.ano+(A.ls.length?'-'+A.ls.join('-').replace(/\s+/g,''):'')+'.pdf'; doc.save(nome); toast('PDF baixado: '+nome); }
 /* ---------- ações ---------- */
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="pano-"]'); if(!b) return; const a=b.dataset.act, A=S.pano;

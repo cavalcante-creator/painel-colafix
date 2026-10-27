@@ -71,11 +71,25 @@ function praTem(de,ate){ const L=praLocal(de,ate); if(L.ent&&L.par&&L.per) retur
    de uma linha entra com as linhas juntas ("Linha 1 / Linha 3") e conta no filtro de qualquer uma delas. Lê 1 documento por mês. */
 const praFocoOk=f=>f.fonte==='focco'&&(f.med==='sc'||f.med==='t');
 function praMeses(de,ate){ const xs=[]; let cp=de.slice(0,7); for(let i=0;i<40&&cp<=ate.slice(0,7);i++){ xs.push(cp); const [y,m]=cp.split('-').map(Number); cp=m===12?(y+1)+'-01':y+'-'+String(m+1).padStart(2,'0'); } return xs; }
+/* 27/10 ("pode colocar no relatório, deixar só o concreto"): o Extrato guarda, por item e dia, os sacos de cada ordem
+   de produção (op, nº do documento da EPP). A linha da ordem no painel é a linha onde foi feito, de verdade.
+   praOpLn: nº da ordem → linha ('' = a ordem não está no painel). Busca só os números que faltam, 10 por consulta. */
+function praOpCache(){ if(S.pra.opLn) return S.pra.opLn; let c={}; try{ c=JSON.parse(localStorage.getItem('colafix.opLn')||'{}')||{}; }catch(e){}
+  const agora=Date.now(); for(const k in c){ if(c[k]&&c[k].n===''&&agora-(c[k].em||0)>3*864e5) delete c[k]; } S.pra.opLn=c; return c; }
+function praOpGuarda(){ try{ localStorage.setItem('colafix.opLn',JSON.stringify(S.pra.opLn||{})); }catch(e){} }
+function praOpLinha(num){ const c=praOpCache()[num]; return c?c.n:undefined; }
+async function praOpCarrega(nums){ const C=praOpCache(), falta=[];
+  const loc=n=>{ const o=(S.ordens||[]).find(x=>String(x.num)===n)||Object.values(S.ritOrdX||{}).find(x=>x&&String(x.num)===n); return o&&o.linha?o.linha:null; };
+  [...new Set(nums)].forEach(n=>{ if(C[n]) return; const l=loc(n); if(l) C[n]={n:l}; else falta.push(n); });
+  for(let i=0;i<falta.length;i+=50){ const lote=[]; for(let j=i;j<Math.min(i+50,falta.length);j+=10) lote.push(falta.slice(j,j+10));
+    await Promise.all(lote.map(ns=>S.db.collection('ordens').where('num','in',ns).get().then(g=>{ const ach={}; g.docs.forEach(d=>{ const x=d.data(); if(x&&x.linha) ach[String(x.num)]=x.linha; }); ns.forEach(n=>{ C[n]=ach[n]?{n:ach[n]}:{n:'',em:Date.now()}; }); }).catch(e=>{ console.warn('[análise] ordens do extrato',e); }))); }
+  praOpGuarda(); }
 function praFocBusca(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,ate);
   return Promise.all(ms.map(cp=>{ if(C[cp]&&C[cp].pr) return C[cp].pr; const it={d:null}; C[cp]=it;
-    it.pr=S.db.doc('pcpvendas/'+cp).get().then(g=>{ it.d=g.exists?(g.data().d||{}):{}; return it.d; }).catch(e=>{ console.warn('[análise] extrato '+cp,e); delete C[cp]; return {}; }); return it.pr; })); }
+    it.pr=S.db.doc('pcpvendas/'+cp).get().then(g=>{ const x=g.exists?g.data():{}; it.op=x.op||{}; const ns=[]; for(const c in it.op) for(const dd in it.op[c]) for(const n in it.op[c][dd]) ns.push(n);
+      return praOpCarrega(ns).catch(()=>{}).then(()=>{ it.d=x.d||{}; return it.d; }); }).catch(e=>{ console.warn('[análise] extrato '+cp,e); delete C[cp]; return {}; }); return it.pr; })); }
 function praFocTem(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,ate);
-  if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[], cov={}; ms.forEach(cp=>{ const M=C[cp].d, ds=new Set(); for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q){ foc.push({d:cp+'-'+dd,c,q}); ds.add(dd); } } cov[cp]=ds.size; }); return {foc,cov,ent:[],par:[],per:[]}; }
+  if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[], cov={}; ms.forEach(cp=>{ const M=C[cp].d, O=C[cp].op||{}, ds=new Set(); for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q){ foc.push({d:cp+'-'+dd,c,q,op:(O[c]||{})[dd]||null}); ds.add(dd); } } cov[cp]=ds.size; }); return {foc,cov,ent:[],par:[],per:[]}; }
   praFocBusca(de,ate).then(()=>{ try{ if(S.view==='prodind'||S.view==='prodano') render(); }catch(e){} }); return null; }
 /* 27/10 (2º pedido "não está puxando só da linha"): a linha onde o item É FEITO, nesta ordem:
    0) a linha do item em Ajustes › Itens, quando é uma só (a usuária acertou ali); 1) a linha do Focco (base: itens.l[c].ln), quando é uma só; 2) o que as linhas apontaram no painel nos últimos 60 dias (ritReal);
@@ -110,7 +124,10 @@ function praFam(nome){ const w=String(nome||'').replace(/^\S+\s·\s/,'').replace
 function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.ls.length||f.ls.includes(l), pq=praN(f.prod).trim(); let faltam=0;
   const add=(d,l,p,mot,v,semLs)=>{ if(d<de||d>ate||(!semLs&&!lsOk(l||'—'))) return; if(pq&&p&&!praN(p.n).includes(pq)) return; it.push({d,l:l||'—',p:p?p.n:'',fam:p?praFam(p.n):'',mot:mot||'',v}); };
   var semDiv={}, dvF={};
-  if(dados.foc&&praFocoOk(f)){ const DV={}; dados.foc.forEach(x=>{ const I=praFocItem(x.c), D=DV[x.c]||(DV[x.c]=praDiv(x.c)), v=f.med==='t'?x.q*(()=>{ try{ return ritKg(x.c); }catch(e){ return 20; } })()/1000:x.q;
+  if(dados.foc&&praFocoOk(f)){ const DV={}; dados.foc.forEach(x0=>{ const I=praFocItem(x0.c), D=DV[x0.c]||(DV[x0.c]=praDiv(x0.c)), kf=f.med==='t'?(()=>{ try{ return ritKg(x0.c); }catch(e){ return 20; } })()/1000:1;
+      /* 27/10: o que tem ordem de produção com linha no painel vai para essa linha; só o resto segue a regra do item */
+      let x=x0; if(x0.op){ let ja=0; for(const n in x0.op){ const l=praOpLinha(n), q=+x0.op[n]||0; if(l&&q>0){ const qq=Math.min(q,x0.q-ja); if(qq<=0) continue; ja+=qq; dvF.op=(dvF.op||0)+1; add(x0.d,l,I.p,'',qq*kf); } } if(ja>=x0.q-0.001) return; if(ja) x=Object.assign({},x0,{q:x0.q-ja}); }
+      const v=x.q*kf;
       if(D.d){ dvF[D.f]=(dvF[D.f]||0)+1; for(const l in D.d) add(x.d,l,I.p,'',v*D.d[l]); return; }
       /* sem divisão: fora do filtro de linha; sem filtro, aparece com as linhas juntas */
       if(f.ls&&f.ls.length){ if(D.ls.some(l=>f.ls.includes(l))){ if(x.d>=de&&x.d<=ate&&(!pq||praN(x.c+' '+I.p.n).includes(pq))){ const k=x.c; semDiv[k]=semDiv[k]||{c:k,p:I.p.n,ls:D.ls,v:0,m:Array(12).fill(0)}; semDiv[k].v+=v; semDiv[k].m[+x.d.slice(5,7)-1]+=v; } } return; }
@@ -159,7 +176,7 @@ function praFocAvisos(R,X,F){ const V=((S.anl&&S.anl.base)||{}).vendas||{}, h=ho
   if(vaz.length) out.push(`<div class="pra-av">Sem Extrato importado em ${vaz.map(k=>MS[+k.slice(5)-1]+'/'+k.slice(0,4)).join(', ')}: esses meses não entram no total. Importe o Extrato desses meses em Análise PCP › Sistema › Base de dados.</div>`);
   if((R.semDiv||[]).length){ const t=R.semDiv.reduce((a,x)=>a+x.v,0);
     out.push(`<details class="pra-av"><summary>${praFmt(F.med,t)} de ${R.semDiv.length} ${R.semDiv.length===1?'item':'itens'} ficaram de fora: o item pode ser feito em mais de uma linha e não há como saber quanto foi nesta linha</summary><div style="margin-top:6px">${R.semDiv.slice(0,15).map(x=>esc(x.p)+' ('+esc(x.ls.join(' / ')||'sem linha')+'): '+praFmt(F.med,x.v)).join('<br>')}</div><div style="margin-top:6px">Para entrarem, diga a linha do item no Focco ou a divisão em Análise PCP › Mês › Previsto × Realizado › Configurar.</div></details>`); }
-  out.push('<div class="sub" style="margin:0;font-size:12.5px">No Extrato não vem a linha. A linha é a do item em Ajustes › Itens (ou a do Focco); item de mais de uma linha é dividido pelo que as linhas apontaram no painel nos últimos 60 dias ou, sem isso, pela % da Curva S.</div>');
+  out.push('<div class="sub" style="margin:0;font-size:12.5px">Quando a ordem de produção está no painel, vale a linha da ordem. Sem a ordem, a linha é a do item em Ajustes › Itens (ou a do Focco); item de mais de uma linha é dividido pelo que as linhas apontaram no painel nos últimos 60 dias ou, sem isso, pela % da Curva S.</div>');
   return out.join(''); }
 /* ---------- tela ---------- */
 function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=linhasOrd(), sv=S.pra.salvas||[];

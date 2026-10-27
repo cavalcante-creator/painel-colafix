@@ -327,9 +327,9 @@ function anlParamLinhas(rows,br){ const hi=Math.max(0,rows.findIndex(r=>(r||[]).
   return {l}; }
 // EXTRATO: só EPP (produzido) e NFS (faturado)
 function anlExtLinhas(rows,br){ const hi=Math.max(0,rows.findIndex(r=>(r||[]).some(c=>anlNorm(c)==='LCTO')));
-  const c=anlCols(rows[hi],{d:[['DATA','DT'],1],sg:[['SIGLA'],3],q:[['QTDE'],5],cod:[['COD. ITEM','COD ITEM','CODIGO','ITEM'],12]});
+  const c=anlCols(rows[hi],{d:[['DATA','DT'],1],sg:[['SIGLA'],3],q:[['QTDE'],5],cod:[['COD. ITEM','COD ITEM','CODIGO','ITEM'],12],doc:[['NRO DOC','NRO. DOC','DOCUMENTO'],2]});
   const N=br?anlNumBR:anlNum, out=[]; let ini='', ate='';
-  rows.slice(hi+1).forEach(r=>{ const sg=anlNorm(r[c.sg]); if(sg!=='EPP'&&sg!=='NFS') return; const k=anlCod(r[c.cod]), d=anlData(r[c.d]), q=Math.abs(N(r[c.q])); if(!anlOkCod(k)||!d||!q) return; out.push([k,d,sg==='EPP'?0:1,q]); if(d>ate) ate=d; if(!ini||d<ini) ini=d; });
+  rows.slice(hi+1).forEach(r=>{ const sg=anlNorm(r[c.sg]); if(sg!=='EPP'&&sg!=='NFS') return; const k=anlCod(r[c.cod]), d=anlData(r[c.d]), q=Math.abs(N(r[c.q])); if(!anlOkCod(k)||!d||!q) return; out.push(sg==='EPP'?[k,d,0,q,String(r[c.doc]==null?'':r[c.doc]).trim()]:[k,d,1,q]); /* 27/10: nº do documento da EPP = nº da ordem de produção (linha da ordem no painel) */ if(d>ate) ate=d; if(!ini||d<ini) ini=d; });
   return {rows:out,ini,ate}; }
 // arquivos .xls do Focco (tabela HTML) — Parâmetros ou Extrato
 function anlTabelaHtml(txt){ const doc=new DOMParser().parseFromString(txt,'text/html'); const rows=[];
@@ -435,7 +435,11 @@ function anlMontar(partes,base,meses,agora){
     Object.keys(tocados).forEach(cp=>{ const old=(meses[cp]&&meses[cp].d)||{}, nd={};
       // mantém os dias fora do período do arquivo; os dias do período são substituídos pelo arquivo (sem duplicar)
       for(const k in old) for(const dd in old[k]){ const iso=cp+'-'+dd; if(iso>=e.ini&&iso<=e.ate) continue; (nd[k]=nd[k]||{})[dd]=old[k][dd]; }
-      mesesOut[cp]={d:nd,em}; });
+      /* 27/10: op = sacos por ordem de produção (nº do documento da EPP), {item:{dia:{ordem:sacos}}}; mesma regra dos dias */
+      const oldOp=(meses[cp]&&meses[cp].op)||{}, nop={};
+      for(const k in oldOp) for(const dd in oldOp[k]){ const iso=cp+'-'+dd; if(iso>=e.ini&&iso<=e.ate) continue; (nop[k]=nop[k]||{})[dd]=oldOp[k][dd]; }
+      mesesOut[cp]={d:nd,op:nop,em}; });
+    e.rows.forEach(([k,d,i,q,doc])=>{ if(i!==0||!doc) return; const cp=d.slice(0,7), dd=d.slice(8,10), m=mesesOut[cp].op, o=((m[k]=m[k]||{})[dd]=m[k][dd]||{}); o[doc]=Math.round(((o[doc]||0)+q)*100)/100; });
     e.rows.forEach(([k,d,i,q])=>{ const cp=d.slice(0,7), dd=d.slice(8,10); const m=mesesOut[cp].d; ((m[k]=m[k]||{})[dd]=m[k][dd]||[0,0])[i]+=q; });
     for(const cp in mesesOut){ const m=mesesOut[cp].d; for(const k in m) for(const dd in m[k]) m[k][dd]=[Math.round(m[k][dd][0]*100)/100,Math.round(m[k][dd][1]*100)/100]; }
     const V0=base.vendas||{}; const todos=Object.assign({},meses,mesesOut);
