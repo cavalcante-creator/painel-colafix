@@ -64,7 +64,7 @@ function praBusca(de,ate){ const k=de+'|'+ate, C=S.pra.cache; const L=praLocal(d
   it.pr=Promise.all([L.ent?Promise.resolve(L.ent):q('entregas','em',5000),L.par?Promise.resolve(L.par):q('paradas','inicio',2000),L.per?Promise.resolve(L.per):q('perdas','em',2000)]).then(([ent,par,per])=>{ it.err=ent==null; it.d={ent:ent||[],par:par||[],per:(per||[]).filter(x=>!x.removido)}; if(it.err) delete C[k]; return it.d; });
   return it.pr; }
 function praTem(de,ate){ const L=praLocal(de,ate); if(L.ent&&L.par&&L.per) return {ent:L.ent,par:L.par,per:L.per};
-  const it=S.pra.cache[de+'|'+ate]; if(it&&it.d) return it.d; praBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
+  const it=S.pra.cache[de+'|'+ate]; if(it&&it.d) return it.d; praBusca(de,ate).then(()=>{ try{ if(S.view==='prodind'||S.view==='prodano') render(); }catch(e){} }); return null; }
 /* ---------- 27/10: produção pelo Extrato do Focco (EPP por item e dia, coleção pcpvendas/<AAAA-MM>) ----------
    Pedido "ele pode pegar do extrato do item? preciso da quantidade produzida da linha 3 nesse ano". O Extrato não diz a linha:
    a linha vem do item (cadastro de Itens; senão a linha do Focco na base, igual à Análise PCP — anlLinhasDe). Item feito em mais
@@ -76,7 +76,7 @@ function praFocBusca(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,
     it.pr=S.db.doc('pcpvendas/'+cp).get().then(g=>{ it.d=g.exists?(g.data().d||{}):{}; return it.d; }).catch(e=>{ console.warn('[análise] extrato '+cp,e); delete C[cp]; return {}; }); return it.pr; })); }
 function praFocTem(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,ate);
   if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[], cov={}; ms.forEach(cp=>{ const M=C[cp].d, ds=new Set(); for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q){ foc.push({d:cp+'-'+dd,c,q}); ds.add(dd); } } cov[cp]=ds.size; }); return {foc,cov,ent:[],par:[],per:[]}; }
-  praFocBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
+  praFocBusca(de,ate).then(()=>{ try{ if(S.view==='prodind'||S.view==='prodano') render(); }catch(e){} }); return null; }
 /* 27/10 (2º pedido "não está puxando só da linha"): a linha onde o item É FEITO, nesta ordem:
    1) a linha do Focco (base: itens.l[c].ln), quando é uma só; 2) a divisão em % da Curva S (Previsto × Realizado › Configurar);
    3) o que as linhas apontaram no painel nos últimos 60 dias (ritReal); 4) o cadastro de Itens, quando é uma linha só.
@@ -119,7 +119,7 @@ function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.l
     var rows=Object.entries(g).map(([k,v])=>({k,v,l:k.split(PRA_SEP)[0]})).sort((a,b)=>ix(a.l)-ix(b.l)||a.l.localeCompare(b.l)||b.v-a.v); rows.tl=tl; }
   else var rows=Object.entries(g).map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);
   const tot=it.reduce((a,x)=>a+x.v,0), dias=new Set(it.filter(x=>x.v>0).map(x=>x.d)).size;
-  return {rows,tot,dias,n:it.length,por,faltam,semDiv:Object.values(semDiv).sort((a,b)=>b.v-a.v)}; }
+  return {rows,tot,dias,n:it.length,por,faltam,semDiv:Object.values(semDiv).sort((a,b)=>b.v-a.v),it}; }
 const PRA_SEP=' › ';
 function praRot(por,k){ if(por==='dia'){ const w=['dom','seg','ter','qua','qui','sex','sáb'][new Date(k+'T12:00:00').getDay()]; return praDm(k)+' '+w; } if(por==='semana') return 'semana de '+praDm(k); if(por==='mes') return pdMes(k); return k; }
 function praFmt(med,v){ if(med==='t') return (Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' t'; if(med==='par') return pdHrs(v); if(med==='npar') return Math.round(v)+(Math.round(v)===1?' parada':' paradas'); return Math.round(v).toLocaleString('pt-BR')+' sc'; }

@@ -9,7 +9,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  let s=await st(); ok('Abas da Produção: Painel · Programação · Calendário · Conferir apontamentos', [...new Set(s.tabs)].join('|')==='Painel|Programação|Calendário|Conferir apontamentos', JSON.stringify(s));
  ok('Grupo Produção: Produção · Análise PCP · Relatórios', s.sub.join('|').startsWith('Produção*|Análise PCP|Relatórios'), JSON.stringify(s.sub));
  await p.click('#navlist .gxg-si:has-text("Relatórios")'); await H.dorme(900); s=await st();
- ok('Relatórios abre os indicadores com as abas dele', s.v==='prodind'&&[...new Set(s.tabs)].join('|')==='Indicadores|Indicadores (detalhado)'&&s.sub.includes('Relatórios*')&&s.sub.includes('Produção'), JSON.stringify(s));
+ ok('Relatórios abre os indicadores com as abas dele', s.v==='prodind'&&[...new Set(s.tabs)].join('|')==='Indicadores|Indicadores (detalhado)|Produção do ano'&&s.sub.includes('Relatórios*')&&s.sub.includes('Produção'), JSON.stringify(s));
  await p.click('nav.tabs .tab:has-text("detalhado")'); await H.dorme(800); s=await st(); ok('Aba Indicadores (detalhado) continua em Relatórios', s.v==='indicadores'&&s.sub.includes('Relatórios*'), JSON.stringify(s));
  await p.click('#navlist .gxg-si:has-text("Análise PCP")'); await H.dorme(800); s=await st(); ok('Análise PCP abre dentro do grupo Produção', await p.evaluate(()=>__T.S().mod==='analise')&&s.sub.includes('Análise PCP*'), JSON.stringify(s.sub));
  const m=await p.evaluate(()=>{ const nl=document.getElementById('navlist'), aj=[...document.querySelectorAll('.side button,.side a')].pop(); nl.scrollTop=9999; return {rola:nl.scrollHeight>nl.clientHeight?nl.scrollTop>0:true,ajBottom:Math.round(aj.getBoundingClientRect().bottom),h:innerHeight}; });
