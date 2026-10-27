@@ -81,22 +81,95 @@ function panoDesc(A){ return 'Produção '+(A.med==='t'?'em toneladas':'em sacos
 async function panoXls(){ const L=panoLinhas(); if(!L) return; try{ await carregarScript(ANL_XLSX); }catch(e){} if(!window.XLSX){ toast('Não foi possível carregar o gerador de Excel.'); return; }
   const XL=window.XLSX, ws=XL.utils.aoa_to_sheet([[panoDesc(L.A)],[],L.head].concat(L.rows,[L.tot])); ws['!cols']=L.head.map((h,i)=>({wch:i===0?(L.A.ver==='linha'?14:44):i===1&&L.A.ver!=='linha'?24:10}));
   const wb=XL.utils.book_new(); XL.utils.book_append_sheet(wb,ws,'Produção '+L.A.ano); XL.writeFile(wb,'Producao-'+L.A.ano+(L.A.ls.length?'-'+L.A.ls.join('-').replace(/\s+/g,''):'')+'.xlsx'); toast('Excel baixado.'); }
-async function panoPdf(){ const L=panoLinhas(); if(!L) return; try{ await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }catch(e){}
+/* PDF para a diretoria (27/10, "preciso enviar para os chefes"): página 1 = resumo (sacos, toneladas, média, melhor e pior
+   mês, participação na fábrica), gráfico mês a mês e quadro mês a mês; depois a tabela por produto/linha com toneladas.
+   Só os meses até o mês atual. Itens sem linha definida não aparecem por nome (só somam no total da fábrica). */
+async function panoPdfDados(){ const A=S.pano, f=panoF(A), P=panoPer(A.ano); try{ await praEsp(f,P.de,P.ate); if(A.comp){ const Q=panoPer(A.ano-1); await praEsp(f,Q.de,Q.ate); } }catch(e){}
+  const mat=o=>{ for(let i=0;i<3;i++){ const X=panoMat(Object.assign({},A,o),A.ano); if(!X.carregando) return X; } return null; };
+  const X=panoDados(); if(!X||!X.rows) return null;
+  const Sc=mat({med:'sc'}), Tn=mat({med:'t'}), Fb=mat({med:'sc',ls:[],q:'',ver:'linha'}), FbT=mat({med:'t',ls:[],q:'',ver:'linha'});
+  if(!Sc||!Tn||!Fb||!FbT) return null; return {A,X,Sc,Tn,Fb,FbT}; }
+async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados(); if(!D){ toast('Os dados ainda estão carregando. Tente de novo em alguns segundos.'); return; }
+  try{ await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }catch(e){}
   const J=window.jspdf&&window.jspdf.jsPDF; if(!J){ toast('O gerador de PDF não carregou. Confira a internet e tente de novo.'); return; }
-  const img=await gpImgs(), Co=GPDF.cor, doc=new J({unit:'mm',format:'a4',orientation:'landscape'}), PW=297, PH=210, M=10;
-  const fc=c=>doc.setFillColor(c[0],c[1],c[2]), tc=c=>doc.setTextColor(c[0],c[1],c[2]), fit=(t,w)=>{ t=String(t==null?'':t); if(doc.getTextWidth(t)<=w) return t; while(t.length>1&&doc.getTextWidth(t+'…')>w) t=t.slice(0,-1); return t+'…'; };
-  fc(Co.pet); doc.rect(0,0,PW,20,'F'); if(img&&img.escuro) doc.addImage(img.escuro.d,'PNG',M,5,30,30*img.escuro.h/img.escuro.w);
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); tc([255,255,255]); doc.text('Produção do ano · '+L.A.ano,M+38,10); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); tc([199,215,224]); doc.text(fit(panoDesc(L.A),PW-M*2-80),M+38,15.5);
-  doc.setFontSize(7.5); doc.text('Emitido em '+new Date().toLocaleString('pt-BR'),PW-M,10,{align:'right'});
-  const nTxt=L.head.length, wNome=L.A.ver==='linha'?28:L.A.ver==='produto'?70:46, wExtra=L.A.ver!=='linha'?(L.A.ver==='produto'?26:40):0;
-  const fixo=[wNome].concat(L.A.ver!=='linha'?[wExtra]:[]), resto=(PW-2*M-fixo.reduce((a,b)=>a+b,0))/(nTxt-fixo.length), ws=fixo.concat(Array(nTxt-fixo.length).fill(resto)), xs=[]; let ax=M; ws.forEach(w=>{ xs.push(ax); ax+=w; });
-  let y=26; const cab=()=>{ fc(Co.pet); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.5); tc([255,255,255]); L.head.forEach((h,i)=>{ const r=i>=fixo.length; doc.text(fit(h,ws[i]-2),r?xs[i]+ws[i]-1:xs[i]+1,y+4,{align:r?'right':'left'}); }); y+=6; };
-  const fmt=(v,i)=>i<fixo.length?String(v==null?'':v):v===''||v==null?'':typeof v==='number'?(L.head[i]==='%'||/Varia/.test(L.head[i])?String(v).replace('.',',')+'%':v.toLocaleString('pt-BR')):String(v);
-  const linha=(r,b,zeb)=>{ if(y>PH-14){ doc.addPage(); y=12; cab(); } if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,5,'F'); } if(b){ fc([226,236,241]); doc.rect(M,y,PW-2*M,5.4,'F'); }
-    doc.setFont('helvetica',b?'bold':'normal'); doc.setFontSize(6.8); tc(Co.ink); r.forEach((v,i)=>{ const t=fit(fmt(v,i),ws[i]-2), rr=i>=fixo.length; if(t) doc.text(t,rr?xs[i]+ws[i]-1:xs[i]+1,y+3.6,{align:rr?'right':'left'}); }); y+=b?5.4:5; };
-  cab(); L.rows.forEach((r,i)=>linha(r,false,i%2)); linha(L.tot,true);
-  const np=doc.getNumberOfPages?doc.getNumberOfPages():1; for(let p=1;p<=np;p++){ if(doc.setPage) doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); tc(Co.mut); doc.text(L.A.fonte==='focco'?'Fonte: Extrato do Focco (EPP). A linha é a do item no Focco; item de mais de uma linha dividido pela % da Curva S ou pelo apontado no painel.':'Fonte: apontamentos lançados no painel.',M,PH-5); doc.text('Página '+p+' de '+np,PW-M,PH-5,{align:'right'}); }
-  const nome='Producao-'+L.A.ano+(L.A.ls.length?'-'+L.A.ls.join('-').replace(/\s+/g,''):'')+'.pdf'; doc.save(nome); toast('PDF baixado: '+nome); }
+  const {A,X,Sc,Tn,Fb,FbT}=D, img=await gpImgs(), Co=GPDF.cor, doc=new J({unit:'mm',format:'a4',orientation:'landscape'}), PW=297, PH=210, M=10;
+  const fc=c=>doc.setFillColor(c[0],c[1],c[2]), tc=c=>doc.setTextColor(c[0],c[1],c[2]), dc=c=>doc.setDrawColor(c[0],c[1],c[2]);
+  const fit=(t,w)=>{ t=String(t==null?'':t); if(doc.getTextWidth(t)<=w) return t; while(t.length>1&&doc.getTextWidth(t+'…')>w) t=t.slice(0,-1); return t+'…'; };
+  const nS=v=>Math.round(v).toLocaleString('pt-BR'), nT=v=>(Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}), pc=(a,b)=>b?(Math.round(a/b*1000)/10).toLocaleString('pt-BR')+'%':'—';
+  const anoH=+hojeStr().slice(0,4), hm=A.ano===anoH?+hojeStr().slice(5,7)-1:11, nM=hm+1, MS=PANO_M.slice(0,nM);
+  const andamento=A.ano===anoH&&hojeStr()<A.ano+'-'+String(hm+1).padStart(2,'0')+'-'+String(new Date(A.ano,hm+1,0).getDate()).padStart(2,'0');
+  const fech=Sc.mes.slice(0,andamento?hm:nM).map((v,i)=>({i,v})), fechP=fech.filter(o=>o.v>0);
+  const media=fechP.length?fechP.reduce((a,o)=>a+o.v,0)/fechP.length:0, melhor=fechP.length?fechP.reduce((b,o)=>o.v>b.v?o:b):null, pior=fechP.length?fechP.reduce((b,o)=>o.v<b.v?o:b):null;
+  const filtrado=!!(A.ls.length||A.q), nomeSel=A.ls.length?A.ls.join(' + '):A.q?'Produto "'+A.q+'"':'Fábrica', MC=n=>PANO_M[n].replace(/^./,c=>c.toUpperCase());
+  const titulo='Produção '+A.ano+' · '+(A.ls.length?A.ls.join(', '):'todas as linhas')+(A.q?' · produto "'+A.q+'"':'');
+  /* cabeçalho */
+  const topo=(t,sub)=>{ fc(Co.pet); doc.rect(0,0,PW,20,'F'); if(img&&img.escuro) doc.addImage(img.escuro.d,'PNG',M,5,30,30*img.escuro.h/img.escuro.w);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); tc([255,255,255]); doc.text(fit(t,PW-2*M-90),M+38,10); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); tc([199,215,224]); doc.text(fit(sub,PW-2*M-90),M+38,15.5);
+    doc.setFontSize(7.5); doc.text('Emitido em '+new Date().toLocaleDateString('pt-BR')+' às '+hora(new Date().toISOString()),PW-M,10,{align:'right'}); doc.text('Jan a '+PANO_M[hm]+' de '+A.ano+(andamento?' ('+PANO_M[hm]+' até '+hojeStr().slice(8,10)+'/'+hojeStr().slice(5,7)+')':''),PW-M,15.5,{align:'right'}); };
+  const secao=(t,x,y)=>{ fc(Co.red); doc.rect(x,y-3.2,1.2,4.2,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); tc(Co.ink); doc.text(t,x+3,y); };
+  topo(titulo,'Resumo para a diretoria · '+(A.fonte==='focco'?'Extrato do Focco (EPP)':'apontamentos do painel'));
+  /* quadros */
+  const fbTot=Fb.tot, part=filtrado&&fbTot?Sc.tot/fbTot:null;
+  const K=[[nS(Sc.tot)+' sc','Produzido no ano',X.ant?(X.ant.tot?((Sc.tot>=X.ant.tot?'+':'')+Math.round((X.tot-X.ant.tot)/X.ant.tot*100)+'% × '+(A.ano-1)):'sem dados em '+(A.ano-1)):'jan a '+PANO_M[hm]],
+    [nT(Tn.tot)+' t','Em toneladas','peso do saco × sacos'],
+    [nS(media)+' sc','Média por mês',fechP.length+' '+(fechP.length===1?'mês fechado':'meses fechados')],
+    [melhor?MC(melhor.i):'—','Melhor mês',melhor?nS(melhor.v)+' sc':''],
+    [pior?MC(pior.i):'—','Mês mais fraco',pior?nS(pior.v)+' sc':''],
+    part!=null?[pc(Sc.tot,fbTot),'Da produção da fábrica',nS(fbTot)+' sc no total']:[String(X.rows.length),A.ver==='linha'?'Linhas':'Produtos','com produção no ano']];
+  const kw=(PW-2*M-5*4)/6; K.forEach((k,i)=>{ const x=M+i*(kw+4), y=25; fc(Co.soft); doc.roundedRect(x,y,kw,21,1.5,1.5,'F'); fc(i===5&&part!=null?Co.red:Co.teal); doc.rect(x,y,1.3,21,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(13.5); tc(Co.ink); doc.text(fit(k[0],kw-6),x+4,y+8.5); doc.setFont('helvetica','normal'); doc.setFontSize(7.5); tc(Co.ink); doc.text(fit(k[1],kw-6),x+4,y+14); tc(Co.mut); doc.setFontSize(6.8); doc.text(fit(k[2],kw-6),x+4,y+18.3); });
+  /* gráfico mês a mês */
+  const gx=M, gw=178, gy=60, gh=78; secao('Produção mês a mês (sacos)',gx,gy-4);
+  const ant=X.ant&&A.med==='sc'?X.ant.mes:null, mx=Math.max(1,...Sc.mes.slice(0,nM),...(ant?ant.slice(0,nM):[0])), passo=Math.pow(10,Math.floor(Math.log10(mx))), top=Math.ceil(mx/passo*1.1)*passo;
+  const x0=gx+14, x1=gx+gw, y0=gy+gh, Y=v=>y0-(gh-6)*v/top, bw=(x1-x0)/12;
+  doc.setFontSize(6.5); for(let i=0;i<=4;i++){ const v=top*i/4; dc(Co.lin); doc.setLineWidth(.2); doc.line(x0,Y(v),x1,Y(v)); tc(Co.mut); doc.text(nS(v),x0-1.5,Y(v)+1,{align:'right'}); }
+  Sc.mes.forEach((v,i)=>{ const cx=x0+bw*i; if(i<nM){ if(ant){ fc(Co.cinza); doc.rect(cx+bw*.14,Y(ant[i]),bw*.3,y0-Y(ant[i]),'F'); }
+      const bx=ant?cx+bw*.46:cx+bw*.18, bww=ant?bw*.4:bw*.64; fc(melhor&&i===melhor.i?Co.ok:andamento&&i===hm?[140,178,190]:Co.pet2); if(v>0) doc.rect(bx,Y(v),bww,y0-Y(v),'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.6); tc(Co.ink); if(v>0) doc.text(nS(v),bx+bww/2,Y(v)-1.2,{align:'center'}); }
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); tc(i<nM?Co.ink:Co.cinza); doc.text(PANO_M[i],cx+bw/2,y0+4,{align:'center'}); });
+  dc(Co.mut); doc.setLineWidth(.3); doc.line(x0,y0,x1,y0);
+  doc.setFontSize(6.5); tc(Co.mut); let lx=x0; const leg=(c,t)=>{ fc(c); doc.rect(lx,y0+7,3,2.4,'F'); doc.text(t,lx+4,y0+9.1); lx+=doc.getTextWidth(t)+9; };
+  leg(Co.pet2,String(A.ano)); if(melhor) leg(Co.ok,'melhor mês'); if(andamento) leg([140,178,190],PANO_M[hm]+' em andamento'); if(ant) leg(Co.cinza,String(A.ano-1));
+  /* participação na fábrica, por linha */
+  const px=M+gw+9, pw=PW-M-px; secao('Participação na fábrica',px,gy-4);
+  const LO=linhasOrd(), ix=l=>{ const i=LO.indexOf(l); return i<0?999:i; }, tT={}; (FbT.rows||[]).forEach(o=>tT[o.k]=o.tot);
+  let bars=[], semL=0, semLt=0; (Fb.rows||[]).forEach(o=>{ if(/\s\/\s/.test(o.k)||!o.k||o.k==='—'){ semL+=o.tot; semLt+=tT[o.k]||0; } else bars.push({k:o.k,v:o.tot,t:tT[o.k]||0}); });
+  bars.sort((a,b)=>ix(a.k)-ix(b.k)); /* itens de mais de uma linha, sem divisão: não aparecem (pedido de 27/10); só somam no total da fábrica */
+  const bmx=Math.max(1,...bars.map(b=>b.v)), rowH=Math.min(9.5,(gh-4)/Math.max(1,bars.length)), lw=27, bwM=pw-lw-30;
+  bars.forEach((b,i)=>{ const y=gy+1+i*rowH, sel=A.ls.length?A.ls.includes(b.k):!b.sem; doc.setFont('helvetica',sel&&A.ls.length?'bold':'normal'); doc.setFontSize(7.4); tc(b.sem?Co.mut:Co.ink); doc.text(fit(b.k,lw-2),px,y+4);
+    fc(b.sem?Co.lin:sel?(A.ls.length?Co.red:Co.pet2):Co.cinza); doc.rect(px+lw,y+1,Math.max(.6,bwM*b.v/bmx),4.2,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); tc(Co.ink); doc.text(pc(b.v,fbTot),PW-M,y+3.2,{align:'right'}); doc.setFont('helvetica','normal'); doc.setFontSize(6); tc(Co.mut); doc.text(nS(b.v)+' sc · '+nT(b.t)+' t',PW-M,y+6.2,{align:'right'}); });
+  doc.setFontSize(6.5); tc(Co.mut); doc.text(fit('Fábrica no ano: '+nS(fbTot)+' sc · '+nT(FbT.tot)+' t'+'',pw),px,y0+9.1);
+  /* quadro mês a mês */
+  const ty=y0+17; secao('Mês a mês',M,ty);
+  const fbM=Fb.mes, cols=[''].concat(MS.map((_,i)=>MC(i)),['Total']), cw0=36, cw=(PW-2*M-cw0)/(cols.length-1), cx=i=>i===0?M:M+cw0+cw*(i-1);
+  const linhasQ=[['Sacos',Sc.mes.slice(0,nM).map(nS),nS(Sc.tot)],['Toneladas',Tn.mes.slice(0,nM).map(nT),nT(Tn.tot)]];
+  if(filtrado) linhasQ.push(['% da fábrica',Sc.mes.slice(0,nM).map((v,i)=>pc(v,fbM[i])),pc(Sc.tot,fbTot)]);
+  if(X.ant&&A.med==='sc') linhasQ.push([String(A.ano-1)+' (sacos)',X.ant.mes.slice(0,nM).map(nS),nS(X.ant.mes.slice(0,nM).reduce((a,v)=>a+v,0))]);
+  let yy=ty+3; fc(Co.pet); doc.rect(M,yy,PW-2*M,5.5,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(7); tc([255,255,255]); cols.forEach((c,i)=>{ if(i) doc.text(c,cx(i)+cw-1.5,yy+3.8,{align:'right'}); }); yy+=5.5;
+  linhasQ.forEach((r,j)=>{ if(j%2){ fc(Co.zeb); doc.rect(M,yy,PW-2*M,5.4,'F'); } doc.setFont('helvetica','bold'); doc.setFontSize(7.2); tc(Co.ink); doc.text(r[0],M+1.5,yy+3.8);
+    doc.setFont('helvetica','normal'); r[1].forEach((v,i)=>doc.text(v,cx(i+1)+cw-1.5,yy+3.8,{align:'right'})); doc.setFont('helvetica','bold'); doc.text(r[2],cx(cols.length-1)+cw-1.5,yy+3.8,{align:'right'}); yy+=5.4; });
+  /* tabela detalhada */
+  doc.addPage(); topo(titulo,'Detalhe '+(A.ver==='linha'?'por linha':A.ver==='linprod'?'por linha e produto':'por produto')+' · sacos e toneladas');
+  const verL=A.ver==='linha', colLin=A.ver==='produto'&&A.ls.length!==1, tK={}; (Tn.rows||[]).forEach(o=>tK[o.k]=o.tot);
+  const head=[verL?'Linha':'Produto'].concat(colLin?['Linhas']:[]).concat(MS,['Total sc','Total t','%']).concat(X.ant&&A.med==='sc'?[String(A.ano-1),'Var.']:[]);
+  const wNome=verL?34:colLin?78:96, wL=colLin?24:0, fixo=[wNome].concat(colLin?[wL]:[]), resto=(PW-2*M-fixo.reduce((a,b)=>a+b,0))/(head.length-fixo.length);
+  const ws=fixo.concat(Array(head.length-fixo.length).fill(resto)), xs=[]; let ax=M; ws.forEach(w=>{ xs.push(ax); ax+=w; });
+  let y=26; const cab=()=>{ fc(Co.pet); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.6); tc([255,255,255]); head.forEach((h,i)=>{ const r=i>=fixo.length; doc.text(fit(h,ws[i]-2),r?xs[i]+ws[i]-1:xs[i]+1,y+4,{align:r?'right':'left'}); }); y+=6; };
+  const lin=(r,tipo,zeb)=>{ if(y>PH-14){ doc.addPage(); y=12; cab(); } const h=tipo?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='t'){ fc([226,236,241]); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='g'){ fc(Co.soft); doc.rect(M,y,PW-2*M,h,'F'); }
+    doc.setFont('helvetica',tipo?'bold':'normal'); doc.setFontSize(6.8); tc(tipo==='g'?Co.teal:Co.ink); r.forEach((v,i)=>{ const t=fit(v,ws[i]-2), rr=i>=fixo.length; if(t) doc.text(t,rr?xs[i]+ws[i]-1:xs[i]+1,y+3.6,{align:rr?'right':'left'}); }); y+=h; };
+  const nv=v=>v?nS(v):'–';
+  const linhaDe=(nome,ls,m,tot,tt,a)=>[nome].concat(colLin?[ls||'']:[]).concat(m.slice(0,nM).map(nv),[nS(tot),nT(tt),pc(tot,Sc.tot)]).concat(X.ant&&A.med==='sc'?[a?nS(a):'–',a?((tot>=a?'+':'')+Math.round((tot-a)/a*100)+'%'):'']:[]);
+  /* tabela usa as linhas em sacos (Sc), para ter sc e t lado a lado */
+  const rowsS=Sc.rows, antK=X.ant&&A.med==='sc'?X.antK:null; cab(); let lAnt=null, z=0;
+  rowsS.forEach(o=>{ if(A.ver==='linprod'&&o.l!==lAnt){ lAnt=o.l; const rs=rowsS.filter(r=>r.l===o.l), sm=Array(12).fill(0); rs.forEach(r=>r.m.forEach((v,i)=>sm[i]+=v)); const st=sm.reduce((a,v)=>a+v,0), stt=rs.reduce((a,r)=>a+(tK[r.k]||0),0);
+      lin([o.l+' · '+rs.length+(rs.length===1?' produto':' produtos')].concat(sm.slice(0,nM).map(nS),[nS(st),nT(stt),pc(st,Sc.tot)]).concat(antK?['','']:[]),'g'); z=0; }
+    const r=linhaDe(A.ver==='linprod'?o.p:o.k,(o.ls||[]).join(', '),o.m,o.tot,tK[o.k]||0,antK?antK[o.k]||0:0); lin(r,'',z++%2); });
+  lin(['Total'].concat(colLin?['']:[]).concat(Sc.mes.slice(0,nM).map(nS),[nS(Sc.tot),nT(Tn.tot),'100%']).concat(antK?[nS(X.ant.tot),X.ant.tot?((Sc.tot>=X.ant.tot?'+':'')+Math.round((Sc.tot-X.ant.tot)/X.ant.tot*100)+'%'):'']:[]),'t');
+  /* rodapé */
+  const np=doc.getNumberOfPages?doc.getNumberOfPages():1; for(let p=1;p<=np;p++){ if(doc.setPage) doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); tc(Co.mut);
+    doc.text(fit(A.fonte==='focco'?'Fonte: Extrato do Focco (EPP), sacos produzidos por item e dia. A linha é a do item em Ajustes › Itens (ou a do Focco). Toneladas = sacos × peso do saco.':'Fonte: apontamentos lançados no painel. Toneladas = sacos × peso do saco.',PW-2*M-30),M,PH-5); doc.text('Página '+p+' de '+np,PW-M,PH-5,{align:'right'}); }
+  const nome='Producao-'+A.ano+(A.ls.length?'-'+A.ls.join('-').replace(/\s+/g,''):'')+'.pdf'; doc.save(nome); toast('PDF baixado: '+nome); }
 /* ---------- ações ---------- */
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="pano-"]'); if(!b) return; const a=b.dataset.act, A=S.pano;
   if(a==='pano-set'){ const k=b.dataset.k; A[k]=b.dataset.v; A.tudo=false; render(); return; }
