@@ -307,7 +307,10 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
   const wNome=verL?34:colLin?78:96, wL=colLin?24:0, fixo=[wNome].concat(colLin?[wL]:[]), resto=(PW-2*M-fixo.reduce((a,b)=>a+b,0))/(head.length-fixo.length);
   const ws=fixo.concat(Array(head.length-fixo.length).fill(resto)), xs=[]; let ax=M; ws.forEach(w=>{ xs.push(ax); ax+=w; });
   let y=26; const cab=()=>{ fc(Co.pet); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.6); tc([255,255,255]); head.forEach((h,i)=>{ const r=i>=fixo.length; doc.text(fit(h,ws[i]-2),r?xs[i]+ws[i]-1:xs[i]+1,y+4,{align:r?'right':'left'}); }); y+=6; };
-  const lin=(r,tipo,zeb)=>{ if(y>PH-14){ doc.addPage(); y=12; cab(); } const h=tipo?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='t'){ fc([226,236,241]); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='g'){ fc(Co.soft); doc.rect(M,y,PW-2*M,h,'F'); }
+  /* quebra de página sem deixar sobra: o fim da tabela (últimas linhas + Total) nunca vai sozinho para a página seguinte,
+     e o título de uma linha (agrupado) não fica sozinho no pé da página (pedido de 27/10) */
+  let rest=Sc.rows.length+1+(A.ver==='linprod'?new Set(Sc.rows.map(o=>o.l)).size:0); const LIM=PH-14, cabe=()=>LIM>=y?Math.floor((LIM-y)/5)+1:0;
+  const lin=(r,tipo,zeb)=>{ const c=cabe(), sobra=rest-c; if(y>LIM||(sobra>0&&sobra<5&&rest<=6)||(tipo==='g'&&c<4&&rest>c)){ doc.addPage(); y=12; cab(); } rest--; const h=tipo?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='t'){ fc([226,236,241]); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='g'){ fc(Co.soft); doc.rect(M,y,PW-2*M,h,'F'); }
     doc.setFont('helvetica',tipo?'bold':'normal'); doc.setFontSize(6.8); tc(tipo==='g'?Co.teal:Co.ink); r.forEach((v,i)=>{ const t=fit(v,ws[i]-2), rr=i>=fixo.length; if(t) doc.text(t,rr?xs[i]+ws[i]-1:xs[i]+1,y+3.6,{align:rr?'right':'left'}); }); y+=h; };
   const nv=v=>v?nS(v):'–';
   const linhaDe=(nome,ls,m,tot,tt,a)=>[nome].concat(colLin?[ls||'']:[]).concat(m.slice(0,nM).map(nv),[nS(tot),nT(tt),pc(tot,Sc.tot)]).concat(X.ant&&A.med==='sc'?[a?nS(a):'–',a?((tot>=a?'+':'')+Math.round((tot-a)/a*100)+'%'):'']:[]);
@@ -351,6 +354,11 @@ VIEWS.prodano={nome:'Produção do ano',ic:'grafico',mob:'Ano'}; CRUMB.prodano='
 function panoReg(){ const M=MODS.find(x=>x.id==='producao'); if(M&&!M.views.includes('prodano')){ const i=M.views.indexOf('indicadores'); if(i>=0) M.views.splice(i+1,0,'prodano'); else M.views.push('prodano'); }
   try{ if(typeof ADM_REL!=='undefined'&&!ADM_REL.includes('prodano')) ADM_REL.push('prodano'); }catch(e){} }
 panoReg(); setTimeout(panoReg,0); setTimeout(panoReg,1600);
+/* 27/10: o Marcelo (Visão do gestor) também vê a Produção do ano, em Produção › Produção do ano */
+{ const _vo=viewOk; viewOk=function(v){ if(v==='prodano'){ try{ const p=acsP(); if(p&&(p.mods||[]).includes('gestor')) return true; }catch(e){} } return _vo.apply(this,arguments); }; }
+{ const _md=modDe; modDe=function(v){ if(v==='prodano'){ try{ if(gxSolo()) return 'gestor'; }catch(e){} } return _md.apply(this,arguments); }; }
+try{ const g=GXG.find(x=>x.id==='g-prod'); if(g&&!g.tabs.some(t=>t[0]==='prodano')){ g.tabs.push(['prodano','Produção do ano']);
+  const f=S.extViews.prodano; S.extViews.prodano=function(){ const h=f.apply(this,arguments); try{ if(!gxSolo()) return h; return gxgAbas('prodano')+h; }catch(e){ return h; } }; } }catch(e){}
 window.Painel=window.Painel||{}; window.Painel.producaoAno={dados:()=>panoDados(),estado:()=>S.pano};
 document.head.insertAdjacentHTML('beforeend',`<style id="pano-css">
 .pano-f{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:14px 16px}

@@ -18,6 +18,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click('#navlist [data-go="gxprod"]'); await H.dorme(800); await p.click('.gxg-tabs [data-go="gxdia"]'); await H.dorme(800);
  s=await p.evaluate(()=>({v:__T.S().view,cur:(document.querySelector('.gxg-tabs [aria-current]')||{}).innerText}));
  ok('Produção › Relatórios', s.v==='gxdia'&&s.cur==='Relatórios', JSON.stringify(s));
+ await p.click('.gxg-tabs [data-go="prodano"]'); await H.dorme(1500);
+ s=await p.evaluate(()=>({v:__T.S().view,cur:(document.querySelector('.gxg-tabs [aria-current]')||{}).innerText,tabs:[...document.querySelectorAll('.gxg-tabs .gxg-tb')].map(b=>b.innerText.trim()).join('|'),h:(document.querySelector('#view h1')||{}).innerText,mod:document.body.classList.contains('gx-mod')}));
+ ok('Produção › Produção do ano (o gestor também vê)', s.v==='prodano'&&s.cur==='Produção do ano'&&/Produção do ano/.test(s.h)&&s.mod&&/Relatórios\|Produção do ano/.test(s.tabs), JSON.stringify(s));
  /* busca */
  await p.click('#gxs-q'); await H.dorme(400);
  s=await p.evaluate(()=>document.getElementById('gxs-res').innerText); ok('Busca vazia mostra "Precisa de você"', /PRECISA DE VOCÊ/i.test(s)&&/Chamado 00017/.test(s), s.replace(/\n/g,'|').slice(0,300));
