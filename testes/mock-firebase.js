@@ -83,10 +83,10 @@
       where: (c, op, v) => Query(col, filtros.concat([[c, op, v]]), ordem, lim),
       orderBy: (c, d) => Query(col, filtros, ordem.concat([[c, d || 'asc']]), lim),
       limit: n => Query(col, filtros, ordem, n),
-      get: async (o) => { await espera(); if (ctl().offline) { if (o && o.source === 'server') throw err('unavailable'); return exec(false); } const q = exec(true); window.__leit += Math.max(1, q.docs.length); return q; },
+      get: async (o) => { await espera(); if (ctl().offline) { if (o && o.source === 'server') throw err('unavailable'); return exec(false); } const q = exec(true); window.__leit += Math.max(1, q.docs.length); (window.__leitPor=window.__leitPor||{})[col]=(window.__leitPor[col]||0)+Math.max(1,q.docs.length); return q; },
       onSnapshot: function (a, b, c) { let ok, er; if (typeof a === 'function') { ok = a; er = b; } else { ok = b; er = c; }
         let ultimo = '', vivo = true;
-        let primeira = true; const l = { servidor: () => { if (!vivo || ctl().offline) return; const q = exec(true); if (primeira) { window.__leit += Math.max(1, q.docs.length); primeira = false; } const k = JSON.stringify(q.docs.map(d => [d.id, d.data()])); if (k !== ultimo) { ultimo = k; ok(q); } } };
+        let primeira = true; const l = { servidor: () => { if (!vivo || ctl().offline) return; const q = exec(true); if (primeira) { window.__leit += Math.max(1, q.docs.length); (window.__leitPor=window.__leitPor||{})[col]=(window.__leitPor[col]||0)+Math.max(1,q.docs.length); primeira = false; } const k = JSON.stringify(q.docs.map(d => [d.id, d.data()])); if (k !== ultimo) { ultimo = k; ok(q); } } };
         ouvintes.add(l); setTimeout(() => { if (!vivo) return; if (ctl().offline) { ok(exec(false)); return; } l.servidor(); }, 0);
         return () => { vivo = false; ouvintes.delete(l); }; },
       add: async d => { await espera(); const id = Math.random().toString(36).slice(2, 12); await gravar(col + '/' + id, () => clone(d)); return Ref(col + '/' + id); },

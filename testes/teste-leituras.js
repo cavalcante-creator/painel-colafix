@@ -22,7 +22,7 @@ function bancoGrande(){ const {d}=seedManut(); const D=d.docs; const ago=n=>new 
   d.users['tecnico@painel-colafix.app'].pass='x12345'; d.users['operador@painel-colafix.app'].pass='x12345'; d.users['iasmyn@painel-colafix.app'].pass='x12345';
   return d; }
 (async()=>{ const raiz=process.env.RAIZ; const out=[];
-  for(const [u,rot] of [['tablet','Tablet da parede'],['fernando','Fernando (silos + calendário)'],['silos','Silos (só consulta)'],['tecnico','Manutenção'],['almox','Almoxarifado'],['operador','Produção'],['tvfab','TV da fábrica'],['iasmyn','Administradora']]){
+  for(const [u,rot] of (process.env.SO?[[process.env.SO,process.env.SO]]:null)||[['tablet','Tablet da parede'],['fernando','Fernando (silos + calendário)'],['silos','Silos (só consulta)'],['tecnico','Manutenção'],['almox','Almoxarifado'],['operador','Produção'],['tvfab','TV da fábrica'],['iasmyn','Administradora']]){
     const B=await H.abrir(); const p=B.page; await H.preparar(p,bancoGrande()); await p.goto(H.BASE); await H.entrar(p,u,'x12345'); await H.dorme(3500);
-    const n=await p.evaluate(()=>window.__leit); out.push([rot,n]); await B.browser.close(); }
+    const n=await p.evaluate(()=>window.__leit); out.push([rot,n]); if(process.env.POR) console.log(rot,n,JSON.stringify(Object.entries(await p.evaluate(()=>window.__leitPor||{})).sort((a,b)=>b[1]-a[1]))); await B.browser.close(); }
   console.log(JSON.stringify(out)); process.exit(0); })().catch(e=>{ console.error(e); process.exit(1); });

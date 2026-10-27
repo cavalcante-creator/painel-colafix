@@ -45,7 +45,7 @@ function praAnterior(f,P){ if(f.per==='mes'||f.per==='mesant'){ const a=praMesAn
 /* 26/10 (economia de leituras): o que já está carregado na tela é usado direto — o mês da Curva S (S._ritEnt), os apontamentos,
    paradas e perdas mais recentes — e só o que falta é buscado no servidor. */
 function praLocal(de,ate){ const ini=new Date(de+'T00:00:00').toISOString(), fim=new Date(addDias(ate,1)+'T00:00:00').toISOString(), cp=de.slice(0,7), o={};
-  const cobre=(xs,campo,lim)=>{ if(!Array.isArray(xs)) return null; if(xs.length&&xs.length<lim) return xs; const menor=xs.reduce((a,x)=>x[campo]&&x[campo]<a?x[campo]:a,'9'); return menor<=ini?xs:null; };
+  const cobre=(xs,campo,lim)=>{ if(!Array.isArray(xs)) return null; const jn=S._jan&&S._jan[campo==='inicio'?'paradas':'']; if(xs.length&&xs.length<lim&&(!jn||jn<=ini)) return xs; const menor=xs.reduce((a,x)=>x[campo]&&x[campo]<a?x[campo]:a,'9'); return menor<=ini?xs:null; };
   const dentro=(xs,campo)=>xs.filter(x=>x[campo]&&x[campo]>=ini&&x[campo]<fim);
   if(ate.slice(0,7)===cp&&S._ritEnt&&S._ritEnt[cp]) o.ent=S._ritEnt[cp]; else { const e=cobre(S.entregas,'em',1000); if(e) o.ent=dentro(e,'em'); }
   const pa=cobre(S.paradas,'inicio',1000); if(pa) o.par=dentro(pa,'inicio');

@@ -35,7 +35,7 @@ function pmxFichasVis(){ return S.pmx.fichas.filter(f=>f.status!=='excluida'); }
 function pmxAssinar(db){ const q=(col,key,mk)=>inscrever(col,mk,snap=>{ S.pmx[key]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&typeof x==='object'); rerenderSeguro(); });
   q('pmxrec','rec',()=>db.collection('pmxrec').limit(500));
   q('pmxfichas','fichas',()=>db.collection('pmxfichas').orderBy('alteradoEm','desc').limit(1000));
-  inscrever('pmxbaixas',()=>db.collection('pmxbaixas').orderBy('em','desc').limit(1000),snap=>{ S.pmx.baixas=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>String(b.em||'').localeCompare(String(a.em||''))); rerenderSeguro(); });
+  inscrever('pmxbaixas',()=>db.collection('pmxbaixas').where('em','>=',leitDesde('pmxbaixas')).orderBy('em','desc').limit(1000),snap=>{ S.pmx.baixas=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>String(b.em||'').localeCompare(String(a.em||''))); rerenderSeguro(); });
   db.doc('config/premix').onSnapshot(s=>{ S.pmx.mats=(s.exists&&s.data().materiais)||[]; rerenderSeguro(); },()=>{}); }
 function pmxPodeEd(){ return dbMaster(); }
 function pmxApModal(){ const A=S.pmx.ap; if(!A) return ''; const f=S.pmx.fichas.find(x=>x._id===A.id); if(!f){ S.pmx.ap=null; return ''; }
@@ -520,7 +520,7 @@ async function alxResolverNomes(){ if(!S.user) return; const ids=new Set(); cons
   X.recebimentos.forEach(r=>{ if(r.por) ids.add(r.por); if(r.apontadoPor) ids.add(r.apontadoPor); }); X.fila.forEach(f=>{ if(f.por) ids.add(f.por); });
   const falta=[...ids].filter(i=>!(i in S.nomes)); if(!falta.length) return;
   try{ const ps=await S.user.profiles(falta); falta.forEach(i=>{ S.nomes[i]=(ps&&ps[i]&&ps[i].name)||''; }); rerenderSeguro(); }catch(e){} }
-function alxAssinar(db){ const q=(col,key,mk)=>inscrever(col,mk,snap=>{ S.alx[key]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&typeof x==='object'); alxResolverNomes(); rerenderSeguro(); });
+function alxAssinar(db){ const q=(col,key,mk)=>inscrever(col,mk,snap=>{ S.alx[key]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&typeof x==='object'); S.alx['_l_'+key]=true; alxResolverNomes(); rerenderSeguro(); });
   q('conferencias','conferencias',()=>db.collection('conferencias').orderBy('em','desc').limit(800));
   q('auditorias','auditorias',()=>db.collection('auditorias').orderBy('em','desc').limit(1000));
   q('recebimentos','recebimentos',()=>db.collection('recebimentos').orderBy('em','desc').limit(600));
@@ -1008,22 +1008,30 @@ const LEIT_GRUPOS={
 function leitPrecisa(g){ const A=S.acs; if(!A||!A.pronto) return false; if(A.dono) return true; let p=null; try{ p=acsP(); }catch(e){} if(!p) return false; if(p.tudo) return true;
   const m=p.mods||[]; if(m.some(x=>!LEIT_CONHECIDOS.includes(x))) return true; return (LEIT_GRUPOS[g]||[]).some(x=>m.includes(x)); }
 const _leit={};
+/* 27/10 (cota do Firebase): janelas de tempo nas listas grandes. Antes cada abertura do painel lia até 1.000 documentos de cada
+   lista (anos de histórico); agora só os últimos meses. O que é mais antigo é buscado quando uma tela pede (Curva S do mês,
+   Análise personalizada, Carregar cargas mais antigas, ordem de fora pelo número). S._jan guarda o começo de cada janela. */
+const LEIT_JAN={ordens:100,paradas:100,medicoes:120,cargas:100,ranchos:90,pmxbaixas:100,pmxfichas:100};
+S._jan={}; function leitDesde(k){ const d=new Date(Date.now()-LEIT_JAN[k]*864e5); const v=k==='ordens'?d.toISOString().slice(0,10):d.toISOString(); S._jan[k]=v; return v; }
+/* administradora: o inventário (conferências, auditorias, recebimentos) só carrega quando ela abre essa parte */
+const LEIT_ALX_TELAS=/^(alx|inventario|alxfila)/;
+function leitAlxAgora(){ if(!(S.acs&&S.acs.dono)) return true; if(S._leitAlx) return true; if(LEIT_ALX_TELAS.test(S.view||'')){ S._leitAlx=true; S._leitAlxEm=Date.now(); return true; } return false; }
 function assinaPorPerfil(db){ if(!db||!S.acs||!S.acs.pronto) return; const vez=(k,f)=>{ if(_leit[k]) return; _leit[k]=true; try{ f(); }catch(e){ _leit[k]=false; console.warn('[leituras]',k,e); } };
   const fil=key=>snap=>{ S[key]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&(x.em||x.criadaEm||x.inicio)); resolverNomes(); rerenderSeguro(); };
   if(leitPrecisa('prod')){ vez('anl',()=>anlAssinar(db));
-    vez('ordens',()=>{ assinarQ(()=>db.collection('ordens').where('status','==','aberta').limit(1000),'_ordA'); assinarQ(()=>db.collection('ordens').orderBy('data','desc').limit(1000),'_ordB'); });
+    vez('ordens',()=>{ assinarQ(()=>db.collection('ordens').where('status','==','aberta').limit(1000),'_ordA'); assinarQ(()=>db.collection('ordens').where('data','>=',leitDesde('ordens')).orderBy('data','desc').limit(1000),'_ordB'); });
     vez('itens',()=>assinarQ(()=>db.collection('itens').limit(1000),'itens')); vez('previsoes',()=>assinarQ(()=>db.collection('previsoes').limit(1000),'previsoes'));
     vez('entregas',()=>{ assinarQ(()=>db.collection('entregas').orderBy('em','desc').limit(1000),'_entViva'); assinarQ(()=>db.collection('entregasarq').limit(500),'_entArq'); }); }
   if(leitPrecisa('silos')){ /* mais recentes primeiro (antes vinham 1.000 quaisquer) */
-    vez('medicoes',()=>inscrever('medicoes',()=>db.collection('medicoes').orderBy('em','desc').limit(1000),fil('medicoes')));
+    vez('medicoes',()=>inscrever('medicoes',()=>db.collection('medicoes').where('em','>=',leitDesde('medicoes')).orderBy('em','desc').limit(1000),fil('medicoes')));
     vez('premix',()=>assinar('premix','premix',500));
-    vez('cargas',()=>inscrever('cargas',()=>S.db.collection('cargas').orderBy('criadaEm','desc').limit(1000),snap=>{ S.cargas=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&(x.em||x.criadaEm||x.inicio)); resolverNomes(); rerenderSeguro(); })); }
-  if(leitPrecisa('paradas')) vez('paradas',()=>inscrever('paradas',()=>db.collection('paradas').orderBy('inicio','desc').limit(1000),fil('paradas')));
+    vez('cargas',()=>inscrever('cargas',()=>S.db.collection('cargas').where('criadaEm','>=',leitDesde('cargas')).orderBy('criadaEm','desc').limit(1000),snap=>{ S.cargas=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&(x.em||x.criadaEm||x.inicio)); resolverNomes(); rerenderSeguro(); })); }
+  if(leitPrecisa('paradas')) vez('paradas',()=>inscrever('paradas',()=>db.collection('paradas').where('inicio','>=',leitDesde('paradas')).orderBy('inicio','desc').limit(1000),fil('paradas')));
   else if(leitPrecisa('chamados')){ const n=S.acs&&acsP()&&(acsP().mods||[]).includes('manut')?200:60; /* manutenção e tablet: só as recentes (ligar/fechar a parada do chamado) */
     vez('paradas',()=>inscrever('paradas',()=>db.collection('paradas').orderBy('inicio','desc').limit(n),fil('paradas'))); }
   if(leitPrecisa('chamados')) vez('chamados',()=>inscrever('chamados',()=>db.collection('chamados').orderBy('numero','desc').limit(300),snap=>{ S.chamados=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>x&&typeof x==='object'); S._chamLido=true; resolverNomes(); rerenderSeguro(); }));
-  if(leitPrecisa('diario')) vez('diario',()=>{ assinarQ(()=>db.collection('diario').limit(1000),'diario'); assinarQ(()=>db.collection('ranchos').orderBy('criadoEm','desc').limit(1000),'ranchos'); });
-  if(leitPrecisa('alx')) vez('alx',()=>alxAssinar(db));
+  if(leitPrecisa('diario')) vez('diario',()=>{ assinarQ(()=>db.collection('diario').limit(1000),'diario'); assinarQ(()=>db.collection('ranchos').where('criadoEm','>=',leitDesde('ranchos')).orderBy('criadoEm','desc').limit(1000),'ranchos'); });
+  if(leitPrecisa('alx')&&leitAlxAgora()) vez('alx',()=>alxAssinar(db));
   if(leitPrecisa('pmx')) vez('pmx',()=>pmxAssinar(db)); }
 async function iniciar(){
   tick(); setInterval(()=>{ tick(); rerenderSeguro(); },30000);
