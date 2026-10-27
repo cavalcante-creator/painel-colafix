@@ -84,97 +84,141 @@ function panoDesc(A){ return 'Produção '+(A.med==='t'?'em toneladas':'em sacos
 async function panoXlsSimples(){ const L=panoLinhas(); if(!L) return; try{ await carregarScript(ANL_XLSX); }catch(e){} if(!window.XLSX){ toast('Não foi possível carregar o gerador de Excel.'); return; }
   const XL=window.XLSX, ws=XL.utils.aoa_to_sheet([[panoDesc(L.A)],[],L.head].concat(L.rows,[L.tot])); ws['!cols']=L.head.map((h,i)=>({wch:i===0?(L.A.ver==='linha'?14:44):i===1&&L.A.ver!=='linha'?24:10}));
   const wb=XL.utils.book_new(); XL.utils.book_append_sheet(wb,ws,'Produção '+L.A.ano); XL.writeFile(wb,'Producao-'+L.A.ano+(L.A.ls.length?'-'+L.A.ls.join('-').replace(/\s+/g,''):'')+'.xlsx'); toast('Excel baixado.'); }
+/* 27/10 (2º pedido "ainda dá para melhorar o layout"): gráficos desenhados em canvas e colados como imagem no Excel */
+function panoCanvas(w,h,fn){ const k=2, c=document.createElement('canvas'); c.width=w*k; c.height=h*k; const g=c.getContext('2d'); g.scale(k,k); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.font='12px Arial'; fn(g); return c.toDataURL('image/png'); }
+function panoPngMes(o){ /* o: {meses, v, ant, melhor, andamento, n} */ const W=1100,H=300; return panoCanvas(W,H,g=>{
+  const x0=60,x1=W-20,y0=H-40,yt=24, mx=Math.max(1,...o.v.slice(0,o.n),...(o.ant?o.ant.slice(0,o.n):[0])), passo=Math.pow(10,Math.floor(Math.log10(mx))), top=Math.ceil(mx/passo*1.12)*passo, Y=v=>y0-(y0-yt)*v/top, bw=(x1-x0)/12;
+  g.strokeStyle='#E3E8EC'; g.fillStyle='#5E6E77'; g.textAlign='right'; g.lineWidth=1;
+  for(let i=0;i<=4;i++){ const v=top*i/4, y=Math.round(Y(v))+.5; g.beginPath(); g.moveTo(x0,y); g.lineTo(x1,y); g.stroke(); g.fillText(Math.round(v).toLocaleString('pt-BR'),x0-8,y+4); }
+  o.v.forEach((v,i)=>{ const cx=x0+bw*i; if(i<o.n){ if(o.ant){ const a=o.ant[i]||0; g.fillStyle='#C9D3DA'; g.fillRect(cx+bw*.14,Y(a),bw*.3,y0-Y(a)); }
+      const bx=o.ant?cx+bw*.46:cx+bw*.18, bww=o.ant?bw*.4:bw*.64; g.fillStyle=o.melhor===i?'#3C8A63':o.andamento===i?'#8CB2BE':'#1B5168'; if(v>0) g.fillRect(bx,Y(v),bww,y0-Y(v));
+      if(v>0){ g.fillStyle='#143F54'; g.font='bold 12px Arial'; g.textAlign='center'; g.fillText(Math.round(v).toLocaleString('pt-BR'),bx+bww/2,Y(v)-6); } }
+    g.font='12px Arial'; g.textAlign='center'; g.fillStyle=i<o.n?'#143F54':'#C9D3DA'; g.fillText(o.meses[i],cx+bw/2,y0+18); });
+  g.strokeStyle='#5E6E77'; g.beginPath(); g.moveTo(x0,y0+.5); g.lineTo(x1,y0+.5); g.stroke();
+  let lx=x0; const leg=(c,t)=>{ g.fillStyle=c; g.fillRect(lx,H-14,12,9); g.fillStyle='#5E6E77'; g.textAlign='left'; g.font='11px Arial'; g.fillText(t,lx+16,H-6); lx+=g.measureText(t).width+34; };
+  leg('#1B5168',String(o.ano)); if(o.melhor!=null) leg('#3C8A63','melhor mês'); if(o.andamento!=null) leg('#8CB2BE',o.meses[o.andamento]+' em andamento'); if(o.ant) leg('#C9D3DA',String(o.ano-1)); }); }
+function panoPngPart(bars,tot,sel){ const W=560,H=Math.max(38,bars.length*38); return panoCanvas(W,H,g=>{
+  const lw=110, bx=lw, bwM=W-lw-150, mx=Math.max(1,...bars.map(b=>b.v));
+  bars.forEach((b,i)=>{ const y=i*38+5, on=sel.includes(b.k); g.fillStyle=on?'#143F54':'#2B3A42'; g.font=(on?'bold ':'')+'13px Arial'; g.textAlign='left'; g.fillText(b.k,4,y+18);
+    g.fillStyle='#EEF2F4'; g.fillRect(bx,y+6,bwM,16); g.fillStyle=on?'#E3312D':(sel.length?'#AEBBC3':'#1B5168'); g.fillRect(bx,y+6,Math.max(2,bwM*b.v/mx),16);
+    g.fillStyle='#143F54'; g.font='bold 13px Arial'; g.textAlign='right'; g.fillText((tot?Math.round(b.v/tot*1000)/10:0).toLocaleString('pt-BR')+'%',W-6,y+18);
+    g.fillStyle='#5E6E77'; g.font='11px Arial'; g.fillText(Math.round(b.v).toLocaleString('pt-BR')+' sc',W-62,y+18); }); }); }
 async function panoXls(){ toast('Montando o Excel…'); const D=await panoPdfDados(); if(!D){ toast('Os dados ainda estão carregando. Tente de novo em alguns segundos.'); return; }
   try{ await carregarScript(typeof ESW_EXCELJS!=='undefined'?ESW_EXCELJS:'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'); }catch(e){}
   const XJ=window.ExcelJS; if(!XJ){ return panoXlsSimples(); }
+  let img=null; try{ img=await gpImgs(); }catch(e){}
   const {A,X,Sc,Tn,Fb,FbT}=D, anoH=+hojeStr().slice(0,4), hm=A.ano===anoH?+hojeStr().slice(5,7)-1:11, nM=hm+1, MC=i=>PANO_M[i].replace(/^./,c=>c.toUpperCase());
   const andamento=A.ano===anoH&&hojeStr()<A.ano+'-'+String(hm+1).padStart(2,'0')+'-'+String(new Date(A.ano,hm+1,0).getDate()).padStart(2,'0');
   const fech=Sc.mes.slice(0,andamento?hm:nM).map((v,i)=>({i,v})).filter(o=>o.v>0), media=fech.length?fech.reduce((a,o)=>a+o.v,0)/fech.length:0;
   const melhor=fech.length?fech.reduce((b,o)=>o.v>b.v?o:b):null, pior=fech.length?fech.reduce((b,o)=>o.v<b.v?o:b):null, filtrado=!!(A.ls.length||A.q);
   const ant=X.ant&&A.med==='sc'?X.ant:null, tK={}; (Tn.rows||[]).forEach(o=>tK[o.k]=o.tot); const tF={}; (FbT.rows||[]).forEach(o=>tF[o.k]=o.tot);
-  const r1=v=>Math.round(v), r10=v=>Math.round(v*10)/10;
-  const titulo=('Produção '+A.ano+' · '+(A.ls.length?A.ls.join(', '):'todas as linhas')+(A.q?' · produto "'+A.q+'"':'')).toUpperCase();
+  const r1=v=>Math.round(v), r10=v=>Math.round(v*10)/10, fN=v=>Math.round(v).toLocaleString('pt-BR');
+  const escopo=(A.ls.length?A.ls.join(', '):'Todas as linhas')+(A.q?' · produto "'+A.q+'"':'');
   const fonteTxt=A.fonte==='focco'?'Extrato do Focco (EPP). Linha = a da ordem de produção no painel; sem a ordem, a do item (Ajustes › Itens ou Focco). Só entra o que tem linha certa.':'Apontamentos lançados no painel.';
-  const emit='Emitido em '+new Date().toLocaleDateString('pt-BR')+' às '+hora(new Date().toISOString())+' · janeiro a '+PANO_M[hm]+' de '+A.ano+(andamento?' ('+PANO_M[hm]+' até '+hojeStr().slice(8,10)+'/'+hojeStr().slice(5,7)+')':'')+' · Painel Colafix';
-  const wb=new XJ.Workbook(); wb.creator='Painel Colafix'; try{ wb.calcProperties.fullCalcOnLoad=true; }catch(e){} const PET='FF143F54', TINT='FFE2ECF1', SOFT='FFF4F6F8', MUT='FF5E6E77', RED='FFB5473F', OK='FF2F6E4F';
-  const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}}), linhaB={bottom:{style:'thin',color:{argb:'FFE3E3E3'}}};
-  const faixa=(ws,row,n,txt,sub)=>{ ws.mergeCells(row,1,row,n); const c=ws.getCell(row,1); c.value=txt; c.font={bold:true,size:14,color:{argb:'FFFFFFFF'}}; c.fill=fill(PET); c.alignment={vertical:'middle',indent:1}; ws.getRow(row).height=30;
-    if(sub){ ws.mergeCells(row+1,1,row+1,n); const s2=ws.getCell(row+1,1); s2.value=sub; s2.font={italic:true,color:{argb:MUT}}; s2.alignment={indent:1}; } };
-  const secao=(ws,row,n,txt)=>{ ws.mergeCells(row,1,row,n); const c=ws.getCell(row,1); c.value=txt; c.font={bold:true,size:12,color:{argb:PET}}; c.border={bottom:{style:'medium',color:{argb:'FFE3312D'}}}; ws.getRow(row).height=20; };
-  const cab=(ws,row,vals,dir)=>{ const r=ws.getRow(row); r.values=vals; r.height=22; r.eachCell((c,i)=>{ c.font={bold:true,size:10,color:{argb:PET}}; c.fill=fill(TINT); c.alignment={vertical:'middle',horizontal:i>dir?'right':'left',wrapText:true}; c.border={bottom:{style:'medium',color:{argb:PET}}}; }); };
+  const per='Janeiro a '+PANO_M[hm]+' de '+A.ano+(andamento?' ('+PANO_M[hm]+' até '+hojeStr().slice(8,10)+'/'+hojeStr().slice(5,7)+')':'');
+  const emit='Emitido em '+new Date().toLocaleDateString('pt-BR')+' às '+hora(new Date().toISOString())+' · Painel Colafix';
+  const wb=new XJ.Workbook(); wb.creator='Painel Colafix'; try{ wb.calcProperties.fullCalcOnLoad=true; }catch(e){}
+  const PET='FF143F54', PET2='FF1B5168', TINT='FFE2ECF1', SOFT='FFF4F6F8', MUT='FF5E6E77', RED='FFE3312D', OK='FF3C8A63', LIN='FFE3E8EC', FNT='Calibri';
+  const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}}), linhaB={bottom:{style:'thin',color:{argb:LIN}}};
+  const fnt=(o)=>Object.assign({name:FNT,size:10,color:{argb:'FF2B3A42'}},o||{});
+  const logoId=img&&img.escuro?wb.addImage({base64:img.escuro.d,extension:'png'}):null;
   const col=n=>{ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
-  /* ---------- Resumo ---------- */
-  const rs=wb.addWorksheet('Resumo',{views:[{showGridLines:false}]}); const NR=Math.max(7,nM+2);
-  rs.columns=[{width:26}].concat(Array(NR-1).fill({width:12}));
-  faixa(rs,1,NR,titulo,emit);
-  secao(rs,4,NR,'Números do ano');
-  const K=[['Produzido no ano',r1(Sc.tot),'sacos','#,##0'],['Em toneladas',r10(Tn.tot),'t (sacos × peso do saco)','#,##0.0'],['Média por mês',r1(media),'sacos · '+fech.length+(fech.length===1?' mês fechado':' meses fechados'),'#,##0'],
-    ['Melhor mês',melhor?MC(melhor.i):'—',melhor?r1(melhor.v)+' sacos':'',null],['Mês mais fraco',pior?MC(pior.i):'—',pior?r1(pior.v)+' sacos':'',null]];
-  if(filtrado&&Fb.tot) K.push(['Da produção da fábrica',Sc.tot/Fb.tot,'de '+r1(Fb.tot).toLocaleString('pt-BR')+' sacos no total','0.0%']);
-  if(ant&&ant.tot) K.push(['Comparado a '+(A.ano-1),(Sc.tot-ant.tot)/ant.tot,r1(ant.tot).toLocaleString('pt-BR')+' sacos em '+(A.ano-1)+' (ano inteiro)','+0%;-0%;0%']);
-  K.forEach((k,i)=>{ const r=rs.getRow(5+i); r.getCell(1).value=k[0]; r.getCell(1).font={bold:true,color:{argb:PET}}; const v=r.getCell(2); v.value=k[1]; v.font={bold:true,size:13,color:{argb:PET}}; if(k[3]) v.numFmt=k[3]; v.alignment={horizontal:'right'};
-    rs.mergeCells(5+i,3,5+i,NR); r.getCell(3).value=k[2]; r.getCell(3).font={color:{argb:MUT}}; r.getCell(3).alignment={indent:1}; r.height=19; for(let c=1;c<=NR;c++) r.getCell(c).border=linhaB; });
-  /* mês a mês */
-  let y=5+K.length+1; secao(rs,y,NR,'Mês a mês'); y++;
-  cab(rs,y,['']. concat(Array.from({length:nM},(_,i)=>MC(i)),['Total']),1); const yC=y; y++;
-  const linhasMes=[['Sacos',Sc.mes,'#,##0',true],['Toneladas',Tn.mes,'#,##0.0',true]];
-  if(filtrado) linhasMes.push(['% da fábrica',Sc.mes.map((v,i)=>Fb.mes[i]?v/Fb.mes[i]:null),'0.0%',false]);
-  if(ant) linhasMes.push([String(A.ano-1)+' (sacos)',ant.mes,'#,##0',true]);
-  const yS=y; linhasMes.forEach((L,j)=>{ const r=rs.getRow(y); r.getCell(1).value=L[0]; r.getCell(1).font={bold:true,color:{argb:PET}};
-    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); const v=L[1][i]; c.value=v==null?null:(L[2]==='0.0%'?v:(L[2]==='#,##0'?r1(v):r10(v))); c.numFmt=L[2]; }
-    const t=r.getCell(2+nM); if(L[3]) t.value={formula:'SUM('+col(2)+y+':'+col(1+nM)+y+')'}; else t.value=Fb.tot?Sc.tot/Fb.tot:null; t.numFmt=L[2]; t.font={bold:true};
-    if(j%2) for(let c=1;c<=nM+2;c++) r.getCell(c).fill=fill(SOFT); for(let c=1;c<=nM+2;c++) r.getCell(c).border=linhaB;
-    if(melhor) r.getCell(2+melhor.i).font={bold:true,color:{argb:OK}}; y++; });
-  rs.getRow(yC).getCell(1).value='';
-  /* participação */
-  y++; secao(rs,y,NR,'Participação na fábrica (todas as linhas)'); y++;
-  cab(rs,y,['Linha','Sacos','Toneladas','% da fábrica'],1); y++;
+  const faixa=(ws,n,titulo,sub)=>{ ws.mergeCells(1,1,1,n); ws.mergeCells(2,1,2,n); ws.getRow(1).height=40; ws.getRow(2).height=18; ws.getRow(3).height=8;
+    const c=ws.getCell(1,1); c.value=titulo; c.font=fnt({bold:true,size:16,color:{argb:'FFFFFFFF'}}); c.fill=fill(PET); c.alignment={vertical:'middle',indent:logoId?16:1};
+    const s2=ws.getCell(2,1); s2.value=sub; s2.font=fnt({size:9,color:{argb:'FFC7D7E0'}}); s2.fill=fill(PET); s2.alignment={vertical:'top',indent:logoId?16:1};
+    if(logoId){ const lw=118, lh=img.escuro.h/img.escuro.w*lw; ws.addImage(logoId,{tl:{col:0.15,row:0.18},ext:{width:lw,height:Math.min(lh,44)}}); } };
+  const secao=(ws,row,n,txt,a)=>{ ws.mergeCells(row,a||1,row,n); const c=ws.getCell(row,a||1); c.value=txt.toUpperCase(); c.font=fnt({bold:true,size:11,color:{argb:PET}}); c.border={bottom:{style:'medium',color:{argb:RED}}}; c.alignment={vertical:'bottom'}; ws.getRow(row).height=24; };
+  const cab=(ws,row,vals,dir,c0)=>{ const r=ws.getRow(row); vals.forEach((v,i)=>{ const c=r.getCell((c0||1)+i); c.value=v; c.font=fnt({bold:true,size:9,color:{argb:'FFFFFFFF'}}); c.fill=fill(PET2); c.alignment={vertical:'middle',horizontal:i>=dir?'right':'left',wrapText:true,indent:i<dir?1:0}; }); r.height=22; };
+  /* ===================== Resumo ===================== */
+  const NC=14; const rs=wb.addWorksheet('Resumo',{views:[{showGridLines:false}],properties:{tabColor:{argb:PET}}}); rs.columns=Array(NC).fill(0).map(()=>({width:11.5}));
+  faixa(rs,NC,'PRODUÇÃO '+A.ano+' · '+escopo.toUpperCase(),per+' · '+(A.fonte==='focco'?'Extrato do Focco':'apontamentos do painel')+' · '+emit);
+  /* quadros */
+  const K=[['PRODUZIDO NO ANO',r1(Sc.tot),'#,##0','sacos',PET2],['EM TONELADAS',r10(Tn.tot),'#,##0.0','toneladas',PET2],['MÉDIA POR MÊS',r1(media),'#,##0','sacos · '+fech.length+(fech.length===1?' mês fechado':' meses fechados'),PET2],
+    ['MELHOR MÊS',melhor?MC(melhor.i):'—',null,melhor?fN(melhor.v)+' sacos':'',OK],['MÊS MAIS FRACO',pior?MC(pior.i):'—',null,pior?fN(pior.v)+' sacos':'','FFAD8432']];
+  if(filtrado&&Fb.tot) K.push(['DA FÁBRICA',Sc.tot/Fb.tot,'0.0%','de '+fN(Fb.tot)+' sacos',RED]); else K.push(['ITENS',X.rows.length,'0',A.ver==='linha'?'linhas com produção':'produtos com produção',PET2]);
+  if(ant&&ant.tot) K.push(['COMPARADO A '+(A.ano-1),(Sc.tot-ant.tot)/ant.tot,'+0%;-0%;0%',fN(ant.tot)+' sacos em '+(A.ano-1),Sc.tot>=ant.tot?OK:RED]);
+  rs.getRow(4).height=20; rs.getRow(5).height=34; rs.getRow(6).height=20;
+  K.forEach((k,i)=>{ const c0=1+i*2; [4,5,6].forEach(r=>rs.mergeCells(r,c0,r,c0+1));
+    for(let r=4;r<=6;r++) for(let c=c0;c<=c0+1;c++){ const x=rs.getCell(r,c); x.fill=fill(SOFT); x.border={left:c===c0?{style:'thick',color:{argb:k[4]}}:undefined,bottom:r===6?{style:'thin',color:{argb:LIN}}:undefined,top:r===4?{style:'thin',color:{argb:LIN}}:undefined}; }
+    const l=rs.getCell(4,c0); l.value=k[0]; l.font=fnt({bold:true,size:8,color:{argb:MUT}}); l.alignment={vertical:'bottom',indent:1};
+    const v=rs.getCell(5,c0); v.value=k[1]; if(k[2]) v.numFmt=k[2]; v.font=fnt({bold:true,size:18,color:{argb:PET}}); v.alignment={vertical:'middle',horizontal:'left',indent:1};
+    const n=rs.getCell(6,c0); n.value=k[3]; n.font=fnt({size:8,color:{argb:MUT}}); n.alignment={vertical:'top',indent:1,wrapText:true}; });
+  /* gráfico mês a mês */
+  let y=8; secao(rs,y,NC,'Produção mês a mês (sacos)'); y++;
+  const gMes=wb.addImage({base64:panoPngMes({meses:PANO_M,v:Sc.mes,ant:ant?ant.mes:null,n:nM,melhor:melhor?melhor.i:null,andamento:andamento?hm:null,ano:A.ano}),extension:'png'});
+  rs.addImage(gMes,{tl:{col:0.1,row:y-1+0.3},ext:{width:1050,height:286}}); for(let r=y;r<y+15;r++) rs.getRow(r).height=15; y+=16;
+  /* tabela mês a mês */
+  secao(rs,y,NC,'Mês a mês'); y++;
+  cab(rs,y,['']. concat(Array.from({length:nM},(_,i)=>MC(i)),['Total']),1); y++;
+  const linhasMes=[['Sacos',Sc.mes,'#,##0',true,true],['Toneladas',Tn.mes,'#,##0.0',true,false]];
+  if(filtrado) linhasMes.push(['% da fábrica',Sc.mes.map((v,i)=>Fb.mes[i]?v/Fb.mes[i]:null),'0.0%',false,false]);
+  if(ant) linhasMes.push([String(A.ano-1),ant.mes,'#,##0',true,false]);
+  linhasMes.forEach((L,j)=>{ const r=rs.getRow(y); r.height=19; const a=r.getCell(1); a.value=L[0]; a.font=fnt({bold:true,color:{argb:PET}}); a.alignment={indent:1,vertical:'middle'};
+    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); const v=L[1][i]; c.value=!v?null:(L[2]==='0.0%'?v:(L[2]==='#,##0'?r1(v):r10(v))); c.numFmt=L[2]==='0.0%'?L[2]:L[2]+';-'+L[2]+';"–"'; c.alignment={vertical:'middle'}; c.font=fnt(); c.alignment={vertical:'middle'}; }
+    const t=r.getCell(2+nM); if(L[3]) t.value={formula:'SUM('+col(2)+y+':'+col(1+nM)+y+')'}; else t.value=Fb.tot?Sc.tot/Fb.tot:null; t.numFmt=L[2]; t.font=fnt({bold:true,color:{argb:PET}}); t.fill=fill(TINT); t.alignment={vertical:'middle'};
+    for(let c=1;c<=nM+1;c++){ r.getCell(c).border=linhaB; if(j%2&&!L[4]) r.getCell(c).fill=fill(SOFT); }
+    if(L[4]) rs.addConditionalFormatting({ref:col(2)+y+':'+col(1+nM)+y,rules:[{type:'colorScale',cfvo:[{type:'min'},{type:'max'}],color:[{argb:'FFF4F8FA'},{argb:'FF9CC2D1'}]}]});
+    if(L[4]&&melhor) r.getCell(2+melhor.i).font=fnt({bold:true,color:{argb:OK}}); y++; });
+  /* participação na fábrica */
+  y++; rs.getRow(y).addPageBreak&&rs.getRow(y-1).addPageBreak(); secao(rs,y,NC,'Participação na fábrica (todas as linhas)'); y++;
   const LO=linhasOrd(), ix=l=>{ const i=LO.indexOf(l); return i<0?999:i; };
-  const bars=(Fb.rows||[]).filter(o=>o.k&&o.k!=='—'&&!/\s\/\s/.test(o.k)).sort((a,b)=>ix(a.k)-ix(b.k)); const yP=y;
-  bars.forEach(o=>{ const r=rs.getRow(y); r.values=[o.k,r1(o.tot),r10(tF[o.k]||0),Fb.tot?o.tot/Fb.tot:0]; r.getCell(2).numFmt='#,##0'; r.getCell(3).numFmt='#,##0.0'; r.getCell(4).numFmt='0.0%';
-    const sel=A.ls.includes(o.k); for(let c=1;c<=4;c++){ r.getCell(c).border=linhaB; if(sel){ r.getCell(c).font={bold:true,color:{argb:RED}}; } } y++; });
-  { const r=rs.getRow(y); r.values=['Fábrica (total)',r1(Fb.tot),r10(FbT.tot),1]; r.getCell(2).numFmt='#,##0'; r.getCell(3).numFmt='#,##0.0'; r.getCell(4).numFmt='0.0%'; for(let c=1;c<=4;c++){ r.getCell(c).font={bold:true,color:{argb:PET}}; r.getCell(c).fill=fill(TINT); } y++; }
-  rs.getCell(y,1).value='O total da fábrica inclui os itens feitos em mais de uma linha sem como separar; por isso as linhas podem não somar 100%.'; rs.getCell(y,1).font={italic:true,size:9,color:{argb:MUT}}; y+=2;
-  secao(rs,y,NR,'Como foi contado'); y++;
-  [fonteTxt,'Toneladas = sacos × peso do saco (do nome do produto).','Média, melhor e mais fraco mês: só os meses já fechados'+(andamento?' ('+PANO_M[hm]+' ainda em andamento).':'.')].forEach(t=>{ rs.mergeCells(y,1,y,NR); const c=rs.getCell(y,1); c.value='• '+t; c.alignment={wrapText:true,vertical:'top'}; c.font={color:{argb:MUT}}; rs.getRow(y).height=t.length>110?30:16; y++; });
-  /* ---------- Detalhe ---------- */
+  const bars=(Fb.rows||[]).filter(o=>o.k&&o.k!=='—'&&!/\s\/\s/.test(o.k)).sort((a,b)=>ix(a.k)-ix(b.k)).map(o=>({k:o.k,v:o.tot,m:o.m}));
+  const yPt=y; cab(rs,y,['Linha','','Sacos','Toneladas','% da fábrica'],2); rs.mergeCells(y,1,y,2); y++;
+  bars.forEach((b,j)=>{ const r=rs.getRow(y); r.height=28.5; rs.mergeCells(y,1,y,2); const sel=A.ls.includes(b.k);
+    r.getCell(1).value=b.k; r.getCell(3).value=r1(b.v); r.getCell(4).value=tF[b.k]||0; r.getCell(5).value=Fb.tot?b.v/Fb.tot:0;
+    r.getCell(3).numFmt='#,##0'; r.getCell(4).numFmt='#,##0.0'; r.getCell(5).numFmt='0.0%';
+    for(let c=1;c<=5;c++){ const x=r.getCell(c); x.border=linhaB; x.font=fnt(sel?{bold:true,color:{argb:RED}}:{}); x.alignment={vertical:'middle',indent:c===1?1:0}; if(j%2) x.fill=fill(SOFT); } y++; });
+  { const r=rs.getRow(y); r.height=20; rs.mergeCells(y,1,y,2); r.getCell(1).value='Fábrica (total)'; r.getCell(3).value=r1(Fb.tot); r.getCell(4).value=FbT.tot; r.getCell(5).value=1;
+    r.getCell(3).numFmt='#,##0'; r.getCell(4).numFmt='#,##0.0'; r.getCell(5).numFmt='0.0%'; for(let c=1;c<=5;c++){ const x=r.getCell(c); x.font=fnt({bold:true,color:{argb:PET}}); x.fill=fill(TINT); x.alignment={vertical:'middle',indent:c===1?1:0}; x.border={top:{style:'medium',color:{argb:PET}}}; } y++; }
+  const gPt=wb.addImage({base64:panoPngPart(bars,Fb.tot,A.ls),extension:'png'}); rs.addImage(gPt,{tl:{col:6.3,row:yPt},ext:{width:560,height:Math.max(38,bars.length*38)}}); y++; rs.getCell(y,1).value='O total da fábrica inclui itens feitos em mais de uma linha sem como separar; por isso as linhas podem não somar 100%.'; rs.getCell(y,1).font=fnt({italic:true,size:8,color:{argb:MUT}}); y+=2;
+  secao(rs,y,NC,'Como foi contado'); y++;
+  [fonteTxt,'Toneladas = sacos × peso do saco (do nome do produto).','Média, melhor e mais fraco mês: só os meses já fechados'+(andamento?' ('+PANO_M[hm]+' ainda em andamento).':'.')].forEach(t=>{ rs.mergeCells(y,1,y,NC); const c=rs.getCell(y,1); c.value='•  '+t; c.alignment={wrapText:true,vertical:'middle',indent:1}; c.font=fnt({size:9,color:{argb:MUT}}); rs.getRow(y).height=t.length>140?28:16; y++; });
+  /* ===================== Detalhe ===================== */
   const verL=A.ver==='linha', colLin=A.ver==='produto'&&A.ls.length!==1;
-  const head=[verL?'Linha':'Produto'].concat(A.ver==='linprod'?['Linha']:[]).concat(colLin?['Linhas']:[]).concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% do total']).concat(ant?[String(A.ano-1)+' (sacos)','Variação']:[]);
+  const head=[verL?'Linha':'Produto'].concat(A.ver==='linprod'?['Linha']:[]).concat(colLin?['Linhas']:[]).concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% do total']).concat(ant?[String(A.ano-1),'Variação']:[]);
   const nF=head.length-nM-3-(ant?2:0), cM=nF+1, cT=nF+nM+1, cTt=cT+1, cP=cT+2, cA=cT+3, cV=cT+4;
-  const ws=wb.addWorksheet('Detalhe',{views:[{state:'frozen',xSplit:nF,ySplit:4,showGridLines:false}]});
-  ws.columns=head.map((h,i)=>({width:i===0?(verL?16:46):i<nF?16:i>=cT-1?13:10}));
-  faixa(ws,1,head.length,titulo+' · DETALHE '+(verL?'POR LINHA':A.ver==='linprod'?'POR LINHA E PRODUTO':'POR PRODUTO'),emit);
-  cab(ws,4,head,nF); ws.autoFilter={from:{row:4,column:1},to:{row:4,column:head.length}};
+  const ws=wb.addWorksheet('Detalhe',{views:[{state:'frozen',xSplit:nF,ySplit:4,showGridLines:false}],properties:{tabColor:{argb:PET2}}});
+  ws.columns=head.map((h,i)=>({width:i===0?(verL?18:44):i<nF?16:i>=cT-1?13:9.5}));
+  faixa(ws,head.length,'DETALHE '+(verL?'POR LINHA':A.ver==='linprod'?'POR LINHA E PRODUTO':'POR PRODUTO')+' · '+A.ano+' · '+escopo.toUpperCase(),per+' · '+emit);
+  cab(ws,4,head,nF); ws.getRow(4).height=26; ws.autoFilter={from:{row:4,column:1},to:{row:4,column:head.length}};
   let ri=5; const first=5;
-  (Sc.rows||[]).forEach((o,j)=>{ const r=ws.getRow(ri); const nm=A.ver==='linprod'?o.p:o.k; const vals=[nm].concat(A.ver==='linprod'?[o.l]:[]).concat(colLin?[(o.ls||[]).join(', ')]:[]);
-    vals.forEach((v,i)=>r.getCell(i+1).value=v); for(let i=0;i<nM;i++){ const c=r.getCell(cM+i); c.value=o.m[i]?r1(o.m[i]):null; c.numFmt='#,##0'; }
-    r.getCell(cT).value={formula:'SUM('+col(cM)+ri+':'+col(cM+nM-1)+ri+')',result:r1(o.tot)}; r.getCell(cT).numFmt='#,##0'; r.getCell(cT).font={bold:true,color:{argb:PET}};
-    r.getCell(cTt).value=tK[o.k]||0; r.getCell(cTt).numFmt='#,##0.0';
-    r.getCell(cP).numFmt='0.0%';
-    if(ant){ const a=X.antK?X.antK[o.k]||0:0; r.getCell(cA).value=a?r1(a):null; r.getCell(cA).numFmt='#,##0'; r.getCell(cV).value=a?{formula:'IF('+col(cA)+ri+'>0,'+col(cT)+ri+'/'+col(cA)+ri+'-1,"")'}:null; r.getCell(cV).numFmt='+0%;-0%;0%'; }
-    for(let c=1;c<=head.length;c++){ const k=r.getCell(c); k.border=linhaB; if(j%2) k.fill=fill(SOFT); } ri++; });
-  const last=ri-1, tr=ws.getRow(ri);
+  (Sc.rows||[]).forEach((o,j)=>{ const r=ws.getRow(ri); r.height=18; const nm=A.ver==='linprod'?o.p:o.k; const vals=[nm].concat(A.ver==='linprod'?[o.l]:[]).concat(colLin?[(o.ls||[]).join(', ')]:[]);
+    vals.forEach((v,i)=>{ const c=r.getCell(i+1); c.value=v; c.font=fnt(i===0?{color:{argb:PET}}:{color:{argb:MUT}}); c.alignment={vertical:'middle',indent:i===0?1:0}; });
+    for(let i=0;i<nM;i++){ const c=r.getCell(cM+i); c.value=o.m[i]?r1(o.m[i]):null; c.numFmt='#,##0;-#,##0;"–"'; c.font=fnt(); c.alignment={vertical:'middle'}; }
+    const t=r.getCell(cT); t.value={formula:'SUM('+col(cM)+ri+':'+col(cM+nM-1)+ri+')',result:r1(o.tot)}; t.numFmt='#,##0'; t.font=fnt({bold:true,color:{argb:PET}}); t.fill=fill(TINT);
+    const tt=r.getCell(cTt); tt.value=tK[o.k]||0; tt.numFmt='#,##0.0'; tt.font=fnt();
+    r.getCell(cP).numFmt='0.0%'; r.getCell(cP).font=fnt();
+    if(ant){ const a=X.antK?X.antK[o.k]||0:0; r.getCell(cA).value=a?r1(a):null; r.getCell(cA).numFmt='#,##0'; r.getCell(cA).font=fnt({color:{argb:MUT}}); r.getCell(cV).value=a?{formula:'IF('+col(cA)+ri+'>0,'+col(cT)+ri+'/'+col(cA)+ri+'-1,"")'}:null; r.getCell(cV).numFmt='+0%;-0%;0%'; r.getCell(cV).font=fnt({bold:true}); }
+    for(let c=1;c<=head.length;c++){ const k=r.getCell(c); k.border=linhaB; } ri++; });
+  const last=Math.max(first,ri-1), tr=ws.getRow(ri); tr.height=22;
   tr.getCell(1).value='Total'; for(let i=0;i<nM+2;i++){ const cc=cM+i, c=tr.getCell(cc); c.value={formula:'SUBTOTAL(9,'+col(cc)+first+':'+col(cc)+last+')'}; c.numFmt=cc===cTt?'#,##0.0':'#,##0'; }
   tr.getCell(cP).value=1; tr.getCell(cP).numFmt='0.0%'; if(ant){ tr.getCell(cA).value={formula:'SUBTOTAL(9,'+col(cA)+first+':'+col(cA)+last+')'}; tr.getCell(cA).numFmt='#,##0'; tr.getCell(cV).value={formula:'IF('+col(cA)+ri+'>0,'+col(cT)+ri+'/'+col(cA)+ri+'-1,"")'}; tr.getCell(cV).numFmt='+0%;-0%;0%'; }
-  for(let c=1;c<=head.length;c++){ const k=tr.getCell(c); k.font={bold:true,color:{argb:PET}}; k.fill=fill(TINT); k.border={top:{style:'medium',color:{argb:PET}}}; }
-  for(let r=first;r<=last;r++){ const c=ws.getRow(r).getCell(cP); c.value={formula:col(cT)+r+'/'+col(cT)+'$'+ri}; }
-  ws.getCell(ri+2,1).value=fonteTxt; ws.getCell(ri+2,1).font={italic:true,size:9,color:{argb:MUT}};
-  /* ---------- Por linha (fábrica) ---------- */
-  const wl=wb.addWorksheet('Por linha',{views:[{state:'frozen',xSplit:1,ySplit:4,showGridLines:false}]});
-  const hL=['Linha'].concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% da fábrica']); wl.columns=hL.map((h,i)=>({width:i===0?32:i>nM?13:10}));
-  faixa(wl,1,hL.length,'PRODUÇÃO '+A.ano+' · TODAS AS LINHAS DA FÁBRICA, MÊS A MÊS',emit); cab(wl,4,hL,1);
+  for(let c=1;c<=head.length;c++){ const k=tr.getCell(c); k.font=fnt({bold:true,color:{argb:'FFFFFFFF'}}); k.fill=fill(PET); k.alignment={vertical:'middle',indent:c===1?1:0}; }
+  for(let r=first;r<=last;r++){ ws.getRow(r).getCell(cP).value={formula:col(cT)+r+'/'+col(cT)+'$'+ri}; }
+  if(last>=first&&(Sc.rows||[]).length){ ws.addConditionalFormatting({ref:col(cM)+first+':'+col(cM+nM-1)+last,rules:[{type:'colorScale',cfvo:[{type:'min'},{type:'max'}],color:[{argb:'FFFFFFFF'},{argb:'FF9CC2D1'}]}]});
+    ws.addConditionalFormatting({ref:col(cP)+first+':'+col(cP)+last,rules:[{type:'dataBar',minLength:0,maxLength:100,cfvo:[{type:'num',value:0},{type:'max'}],color:{argb:'FF7FA9BA'}}]});
+    if(ant) ws.addConditionalFormatting({ref:col(cV)+first+':'+col(cV)+last,rules:[{type:'cellIs',operator:'lessThan',formulae:['0'],style:{font:{color:{argb:'FFB5473F'},bold:true}}},{type:'cellIs',operator:'greaterThan',formulae:['0'],style:{font:{color:{argb:'FF2F6E4F'},bold:true}}}]}); }
+  ws.getCell(ri+2,1).value='Cor dos meses: quanto mais escuro, mais produziu. '+fonteTxt; ws.getCell(ri+2,1).font=fnt({italic:true,size:8,color:{argb:MUT}});
+  /* ===================== Por linha ===================== */
+  const wl=wb.addWorksheet('Por linha',{views:[{state:'frozen',xSplit:1,ySplit:4,showGridLines:false}],properties:{tabColor:{argb:RED}}});
+  const hL=['Linha'].concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% da fábrica']); wl.columns=hL.map((h,i)=>({width:i===0?32:i>nM?13:9.5}));
+  faixa(wl,hL.length,'TODAS AS LINHAS DA FÁBRICA · '+A.ano+' · MÊS A MÊS',per+' · '+emit); cab(wl,4,hL,1); wl.getRow(4).height=26;
   let rl=5; const lf=rl;
-  bars.forEach((o,j)=>{ const r=wl.getRow(rl); r.getCell(1).value=o.k; for(let i=0;i<nM;i++){ const c=r.getCell(2+i); c.value=o.m[i]?r1(o.m[i]):null; c.numFmt='#,##0'; }
-    r.getCell(nM+2).value={formula:'SUM(B'+rl+':'+col(nM+1)+rl+')'}; r.getCell(nM+2).numFmt='#,##0'; r.getCell(nM+2).font={bold:true,color:{argb:PET}};
-    r.getCell(nM+3).value=tF[o.k]||0; r.getCell(nM+3).numFmt='#,##0.0'; r.getCell(nM+4).value=Fb.tot?o.tot/Fb.tot:0; r.getCell(nM+4).numFmt='0.0%';
-    const sel=A.ls.includes(o.k); for(let c=1;c<=hL.length;c++){ const k=r.getCell(c); k.border=linhaB; if(j%2) k.fill=fill(SOFT); if(sel) k.font={bold:true,color:{argb:RED}}; } rl++; });
-  const outros=Fb.mes.map((v,i)=>v-bars.reduce((a,o)=>a+(o.m[i]||0),0)); if(outros.some(v=>v>0.5)){ const r=wl.getRow(rl); r.getCell(1).value='Mais de uma linha (sem separar)'; r.getCell(1).font={italic:true,color:{argb:MUT}};
-    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); c.value=outros[i]>0.5?r1(outros[i]):null; c.numFmt='#,##0'; c.font={italic:true,color:{argb:MUT}}; } r.getCell(nM+2).value={formula:'SUM(B'+rl+':'+col(nM+1)+rl+')'}; r.getCell(nM+2).numFmt='#,##0'; rl++; }
-  { const r=wl.getRow(rl); r.getCell(1).value='Fábrica (total)'; for(let i=0;i<nM+1;i++){ const cc=2+i, c=r.getCell(cc); c.value={formula:'SUM('+col(cc)+lf+':'+col(cc)+(rl-1)+')'}; c.numFmt='#,##0'; } r.getCell(nM+3).value=r10(FbT.tot); r.getCell(nM+3).numFmt='#,##0.0'; r.getCell(nM+4).value=1; r.getCell(nM+4).numFmt='0.0%';
-    for(let c=1;c<=hL.length;c++){ const k=r.getCell(c); k.font={bold:true,color:{argb:PET}}; k.fill=fill(TINT); k.border={top:{style:'medium',color:{argb:PET}}}; } }
-  /* impressão: A4 deitada, cabe na largura */
-  [rs,ws,wl].forEach(s=>{ s.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.2,footer:.2}}; s.headerFooter={oddFooter:'&LPainel Colafix&RPágina &P de &N'}; });
-  ws.pageSetup.printTitlesRow='4:4';
+  bars.forEach(o=>{ const r=wl.getRow(rl); r.height=19; const sel=A.ls.includes(o.k); r.getCell(1).value=o.k; r.getCell(1).alignment={indent:1,vertical:'middle'};
+    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); c.value=o.m[i]?r1(o.m[i]):null; c.numFmt='#,##0;-#,##0;"–"'; }
+    r.getCell(nM+2).value={formula:'SUM(B'+rl+':'+col(nM+1)+rl+')'}; r.getCell(nM+2).numFmt='#,##0'; r.getCell(nM+2).fill=fill(TINT);
+    r.getCell(nM+3).value=tF[o.k]||0; r.getCell(nM+3).numFmt='#,##0.0'; r.getCell(nM+4).value=Fb.tot?o.v/Fb.tot:0; r.getCell(nM+4).numFmt='0.0%';
+    for(let c=1;c<=hL.length;c++){ const k=r.getCell(c); k.border=linhaB; k.font=fnt(sel?{bold:true,color:{argb:RED}}:(c===1||c===nM+2?{bold:c===nM+2,color:{argb:PET}}:{})); if(c>1) k.alignment={vertical:'middle'}; } rl++; });
+  const ll=rl-1;
+  const outros=Fb.mes.map((v,i)=>v-bars.reduce((a,o)=>a+(o.m[i]||0),0)); if(outros.some(v=>v>0.5)){ const r=wl.getRow(rl); r.height=19; r.getCell(1).value='Mais de uma linha (sem separar)'; r.getCell(1).font=fnt({italic:true,color:{argb:MUT}}); r.getCell(1).alignment={indent:1};
+    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); c.value=outros[i]>0.5?r1(outros[i]):null; c.numFmt='#,##0;-#,##0;"–"'; c.font=fnt({italic:true,color:{argb:MUT}}); } r.getCell(nM+2).value={formula:'SUM(B'+rl+':'+col(nM+1)+rl+')'}; r.getCell(nM+2).numFmt='#,##0'; r.getCell(nM+2).font=fnt({italic:true,color:{argb:MUT}}); rl++; }
+  { const r=wl.getRow(rl); r.height=22; r.getCell(1).value='Fábrica (total)'; r.getCell(1).alignment={indent:1,vertical:'middle'}; for(let i=0;i<nM+1;i++){ const cc=2+i, c=r.getCell(cc); c.value={formula:'SUM('+col(cc)+lf+':'+col(cc)+(rl-1)+')'}; c.numFmt='#,##0'; } r.getCell(nM+3).value=FbT.tot; r.getCell(nM+3).numFmt='#,##0.0'; r.getCell(nM+4).value=1; r.getCell(nM+4).numFmt='0.0%';
+    for(let c=1;c<=hL.length;c++){ const k=r.getCell(c); k.font=fnt({bold:true,color:{argb:'FFFFFFFF'}}); k.fill=fill(PET); if(c>1) k.alignment={vertical:'middle'}; } }
+  if(ll>=lf){ wl.addConditionalFormatting({ref:'B'+lf+':'+col(nM+1)+ll,rules:[{type:'colorScale',cfvo:[{type:'min'},{type:'max'}],color:[{argb:'FFFFFFFF'},{argb:'FF9CC2D1'}]}]});
+    wl.addConditionalFormatting({ref:col(nM+4)+lf+':'+col(nM+4)+ll,rules:[{type:'dataBar',minLength:0,maxLength:100,cfvo:[{type:'num',value:0},{type:'max'}],color:{argb:'FF7FA9BA'}}]}); }
+  /* impressão */
+  [rs,ws,wl].forEach(s=>{ s.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:.35,right:.35,top:.45,bottom:.5,header:.2,footer:.2}}; s.headerFooter={oddFooter:'&L&8Painel Colafix · '+escopo+'&R&8Página &P de &N'}; });
+  ws.pageSetup.printTitlesRow='4:4'; wl.pageSetup.printTitlesRow='4:4';
   const nome='Producao-'+A.ano+(A.ls.length?'-'+A.ls.join('-').replace(/\s+/g,''):'')+'.xlsx';
   const buf=await wb.xlsx.writeBuffer(); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=nome; document.body.appendChild(a); a.click(); a.remove(); toast('Excel baixado: '+nome); }
 /* PDF para a diretoria (27/10, "preciso enviar para os chefes"): página 1 = resumo (sacos, toneladas, média, melhor e pior
