@@ -122,11 +122,15 @@ async function panoXls(){ toast('Montando o Excel…'); const D=await panoPdfDad
   const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}}), linhaB={bottom:{style:'thin',color:{argb:LIN}}};
   const fnt=(o)=>Object.assign({name:FNT,size:10,color:{argb:'FF2B3A42'}},o||{});
   const logoId=img&&img.escuro?wb.addImage({base64:img.escuro.d,extension:'png'}):null;
+  /* logo da Lys em branco, para aparecer sobre a faixa azul */
+  let lysB=null; if(img&&img.lys){ try{ lysB=await new Promise(res=>{ const im=new Image(); im.onload=()=>{ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; const g=c.getContext('2d'); g.drawImage(im,0,0); g.globalCompositeOperation='source-in'; g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); res(c.toDataURL('image/png')); }; im.onerror=()=>res(null); im.src=img.lys.d; }); }catch(e){} }
+  const lysId=lysB?wb.addImage({base64:lysB,extension:'png'}):null;
   const col=n=>{ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
   const faixa=(ws,n,titulo,sub)=>{ ws.mergeCells(1,1,1,n); ws.mergeCells(2,1,2,n); ws.getRow(1).height=40; ws.getRow(2).height=18; ws.getRow(3).height=8;
     const c=ws.getCell(1,1); c.value=titulo; c.font=fnt({bold:true,size:16,color:{argb:'FFFFFFFF'}}); c.fill=fill(PET); c.alignment={vertical:'middle',indent:logoId?16:1};
     const s2=ws.getCell(2,1); s2.value=sub; s2.font=fnt({size:9,color:{argb:'FFC7D7E0'}}); s2.fill=fill(PET); s2.alignment={vertical:'top',indent:logoId?16:1};
-    if(logoId){ const lw=118, lh=img.escuro.h/img.escuro.w*lw; ws.addImage(logoId,{tl:{col:0.15,row:0.18},ext:{width:lw,height:Math.min(lh,44)}}); } };
+    if(logoId){ const lw=118, lh=img.escuro.h/img.escuro.w*lw; ws.addImage(logoId,{tl:{col:0.15,row:0.18},ext:{width:lw,height:Math.min(lh,44)}}); }
+    if(lysId){ const lh=40, lw=Math.min(90,img.lys.w/img.lys.h*lh), wd=ws.columns.map(c=>(c.width||9)*7.3), alvo=Math.max(0,wd.reduce((a,b)=>a+b,0)-lw-14); let px=0, ci=0; while(ci<wd.length-1&&px+wd[ci]<=alvo){ px+=wd[ci]; ci++; } ws.addImage(lysId,{tl:{col:ci+(alvo-px)/wd[ci],row:0.2},ext:{width:lw,height:lh}}); } };
   const secao=(ws,row,n,txt,a)=>{ ws.mergeCells(row,a||1,row,n); const c=ws.getCell(row,a||1); c.value=txt.toUpperCase(); c.font=fnt({bold:true,size:11,color:{argb:PET}}); c.border={bottom:{style:'medium',color:{argb:RED}}}; c.alignment={vertical:'bottom'}; ws.getRow(row).height=24; };
   const cab=(ws,row,vals,dir,c0)=>{ const r=ws.getRow(row); vals.forEach((v,i)=>{ const c=r.getCell((c0||1)+i); c.value=v; c.font=fnt({bold:true,size:9,color:{argb:'FFFFFFFF'}}); c.fill=fill(PET2); c.alignment={vertical:'middle',horizontal:i>=dir?'right':'left',wrapText:true,indent:i<dir?1:0}; }); r.height=22; };
   /* ===================== Resumo ===================== */
