@@ -37,7 +37,7 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
    let r=await baixa('[data-act="pano-pdf"]'); ok('PDF baixa', /^Producao-\d{4}.*\.pdf$/.test(r.n)&&r.tam>2000, JSON.stringify(r));
    r=await baixa('[data-act="pano-xls"]'); ok('Excel baixa', /^Producao-\d{4}.*\.xlsx$/.test(r.n)&&r.tam>1000, JSON.stringify(r));
    try{ const EJ=require('exceljs'); const wb=new EJ.Workbook(); await wb.xlsx.readFile(SP+'/'+r.n); const nomes=wb.worksheets.map(w=>w.name);
-     const res=wb.getWorksheet('Resumo'), det=wb.getWorksheet('Detalhe'), pl=wb.getWorksheet('Por linha'); const txt=w=>{ const t=[]; w.eachRow(rw=>rw.eachCell(c=>{ const v=c.value; t.push(v&&v.formula?'='+v.formula:String(v)); })); return t.join(' | '); };
+     const res=wb.getWorksheet('Resumo'), det=wb.getWorksheet('Detalhe'), pl=wb.getWorksheet('Por linha'); const txt=w=>{ const t=[]; w.eachRow(rw=>rw.eachCell(c=>{ const v=c.value; t.push(v&&v.formula?'='+v.formula:v&&v.richText?v.richText.map(x=>x.text).join(''):String(v)); })); return t.join(' | '); };
      ok('Excel com 3 abas: Resumo, Detalhe, Por linha', nomes.join()==='Resumo,Detalhe,Por linha', nomes.join());
      ok('Resumo: título, produzido 5.200 sc, toneladas, mês a mês e participação na fábrica', /PRODUÇÃO \d{4} · TODAS AS LINHAS/.test(txt(res))&&/Produzido no ano/i.test(txt(res))&&res.getRow(5).getCell(1).value===5200&&/Em toneladas/i.test(txt(res))&&/Mês a mês/i.test(txt(res))&&/Participação na fábrica/i.test(txt(res))&&/Como foi contado/i.test(txt(res))&&res.getImages().length>=2, txt(res).slice(0,700));
      ok('Detalhe: total com fórmula (SUBTOTAL), filtro e painéis congelados', /SUBTOTAL\(9,/.test(txt(det))&&det.autoFilter&&det.views[0].state==='frozen', txt(det).slice(0,500));
