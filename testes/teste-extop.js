@@ -28,6 +28,11 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  let x=await X(['Linha 3']); ok('Linha 3 = 850 (ordem 900001 nos dias 05 e 10); os 100 da ordem que não está no painel ficam de fora', x&&x.tot===850&&x.fora.join()==='AC0904:100', JSON.stringify(x));
  x=await X(['Linha 1']); ok('Linha 1 = 300 (ordem 900002)', x&&x.tot===300, JSON.stringify(x));
  x=await X(['Linha 2']); ok('Linha 2 = 0', x&&x.tot===0, JSON.stringify(x));
+ await p.evaluate(()=>{ const A=Painel.producaoAno.estado(); Object.assign(A,{ver:'ordem',ls:[]}); __T.go('prodano'); }); await H.dorme(1500);
+ let t=await p.evaluate(()=>[...document.querySelectorAll('.pano-ord tbody tr:not(.pano-gh)')].map(r=>[...r.cells].map(c=>c.innerText.trim()).slice(1,5).join('|')));
+ ok('Ver por Ordem: uma linha por ordem com o nº, produto, linha e sacos', t.some(r=>/^900001\|.*\|Linha 3\|850$/.test(r))&&t.some(r=>/^900002\|.*\|Linha 1\|300$/.test(r))&&t.some(r=>/^777777\|/.test(r)), JSON.stringify(t));
+ t=await p.evaluate(()=>document.querySelector('.pano-ord tbody tr.pano-gh')&&document.querySelector('.pano-ord tbody tr.pano-gh').innerText);
+ ok('Separado por mês com o total do mês', /ordens|ordem/.test(t||''), t);
  const cache=await p.evaluate(()=>JSON.parse(localStorage.getItem('colafix.opLn')||'{}'));
  ok('Guarda no aparelho a linha das ordens (900001 → Linha 3) e a que não achou (777777)', cache['900001']&&cache['900001'].n==='Linha 3'&&cache['777777']&&cache['777777'].n==='', JSON.stringify(cache));
  ok('Sem erros no console', !erros.length, erros.join(' | '));

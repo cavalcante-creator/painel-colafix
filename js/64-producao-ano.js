@@ -8,7 +8,17 @@
 "use strict";
 S.pano=S.pano||{ano:+hojeStr().slice(0,4),fonte:'focco',med:'sc',ver:'produto',ls:[],q:'',comp:false,tudo:false};
 const PANO_M=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-const PANO_VER=[['produto','Produto'],['linha','Linha'],['linprod','Linha › produto']];
+const PANO_VER=[['produto','Produto'],['linha','Linha'],['linprod','Linha › produto'],['ordem','Ordem']];
+/* 27/10 ("relatório detalhado com o número da ordem"): cada ordem de produção numa linha — data, nº, produto, linha,
+   sacos e toneladas, separado por mês. O Extrato do Focco traz o nº (NRO DOC da EPP); sem o nº, junta por produto/linha/mês. */
+function panoKg(c){ try{ return (ritKg(c)||20)/1000; }catch(e){ return .02; } }
+function panoOrdens(it){ const g=new Map();
+  (it||[]).forEach(x=>{ if(!x.v) return; const mes=x.d.slice(0,7), k=x.o?('o|'+x.o+'|'+x.l+'|'+(x.c||x.p)):('s|'+x.l+'|'+(x.c||x.p)+'|'+mes);
+    let r=g.get(k); if(!r){ r={o:x.o||'',l:x.l,p:x.p||'—',c:x.c||'',d1:x.d,d2:x.d,v:0,mes:x.o?'':mes}; g.set(k,r); }
+    r.v+=x.v; if(x.d<r.d1) r.d1=x.d; if(x.d>r.d2) r.d2=x.d; });
+  const rs=[...g.values()]; rs.forEach(r=>{ if(!r.mes) r.mes=r.d1.slice(0,7); });
+  return rs.sort((a,b)=>a.mes.localeCompare(b.mes)||(a.o?0:1)-(b.o?0:1)||a.d1.localeCompare(b.d1)||(+a.o||0)-(+b.o||0)||a.p.localeCompare(b.p)); }
+function panoDataTxt(r){ const f=d=>d.slice(8,10)+'/'+d.slice(5,7); return r.o?(r.d1===r.d2?f(r.d1):f(r.d1)+' a '+f(r.d2)):'no mês'; }
 function panoPer(ano){ const h=hojeStr(), de=ano+'-01-01', fim=ano+'-12-31'; return {de,ate:fim>h?h:fim,fim}; }
 function panoF(A){ return {per:'datas',med:A.med,por:'produto',ls:A.ls.slice(),prod:A.q,semSetup:true,comp:false,fonte:A.fonte==='focco'?'focco':''}; }
 /* lançamentos do ano → matriz chave × mês */
@@ -59,6 +69,7 @@ function vProdAno(){ const A=S.pano, X=panoDados(), LO=linhasOrd(), anoH=+hojeSt
   const k=(v,t,s,c)=>`<div class="${c||''}"><b class="num">${v}</b><span>${t}</span>${s?`<small>${s}</small>`:''}</div>`;
   const kp=`<div class="pra-tot pano-k">${k(panoN(A,X.tot)+' '+U,'Total em '+A.ano,X.ant?(totAnt?`${vr(X.tot,totAnt)} × ${A.ano-1} (${panoN(A,totAnt)} ${U})`:'sem dados em '+(A.ano-1)):'')}${k(panoN(A,media)+' '+U,'Média por mês',mesesCom+' '+(mesesCom===1?'mês':'meses')+' com produção')}${k(X.tot?PANO_M[melhor]:'—','Melhor mês',X.tot?panoN(A,X.mes[melhor])+' '+U:'')}${k(String(X.rows.length),A.ver==='linha'?'linhas':A.ver==='linprod'?'linha × produto':'produtos','')}</div>`;
   const avisos=A.fonte==='focco'?praFocAvisos(X.R,{P:{ate:X.P.ate}},{med:A.med}):'';
+  if(A.ver==='ordem') return cab+filtros+kp.replace(/<span>(produtos|linhas)<\/span>/,'<span>produtos</span>')+avisos+`<section class="card"><div class="pano-gh2"><h2>Mês a mês · ${A.ano}</h2>${X.ant?`<span class="pano-lg"><i class="a"></i>${A.ano} <i class="b"></i>${A.ano-1}</span>`:''}</div>${panoGraf(A,X)}</section>`+panoOrdTab(A,X);
   const lim=A.tudo?X.rows.length:Math.min(X.rows.length,80), mostra=X.rows.slice(0,lim), cols=A.ver==='produto'&&!A.ls.length;
   const nc=v=>v?panoN(A,v):'<span class="t-mut">—</span>';
   let corpo='', lAnt=null;
@@ -71,6 +82,16 @@ function vProdAno(){ const A=S.pano, X=panoDados(), LO=linhasOrd(), anoH=+hojeSt
     <tfoot><tr><th scope="row">Total</th>${X.mes.map(v=>`<td class="nr num">${nc(v)}</td>`).join('')}<td class="nr num"><b>${panoN(A,X.tot)}</b></td><td class="nr num">100%</td>${X.ant?`<td class="nr num">${panoN(A,totAnt)}</td><td class="nr num">${vr(X.tot,totAnt)}</td>`:''}</tr></tfoot></table></div>
     ${X.rows.length>lim?`<button class="lnk" data-act="pano-tudo" style="margin-top:8px">Mostrar todos (${X.rows.length})</button>`:''}</section>`;
   return cab+filtros+kp+avisos+`<section class="card"><div class="pano-gh2"><h2>Mês a mês · ${A.ano}</h2>${X.ant?`<span class="pano-lg"><i class="a"></i>${A.ano} <i class="b"></i>${A.ano-1}</span>`:''}</div>${panoGraf(A,X)}</section>`+tab; }
+function panoOrdTab(A,X){ const e=esc, rs=panoOrdens(X.R&&X.R.it), U=panoU(A), lim=A.tudo?rs.length:Math.min(rs.length,150), com=rs.filter(r=>r.o).length;
+  const tm={}; rs.forEach(r=>{ const t=tm[r.mes]||(tm[r.mes]={v:0,n:0}); t.v+=r.v; if(r.o) t.n++; });
+  let corpo='', mAnt=null; rs.slice(0,lim).forEach(r=>{ if(r.mes!==mAnt){ mAnt=r.mes; const t=tm[r.mes]; corpo+=`<tr class="pano-gh"><th colspan="4" scope="rowgroup">${e(pdMes(r.mes).replace(/^./,c=>c.toUpperCase()))} <small>${t.n} ${t.n===1?'ordem':'ordens'}</small></th><td class="nr num"><b>${panoN(A,t.v)}</b></td><td class="nr num">${X.tot?Math.round(t.v/X.tot*1000)/10+'%':''}</td></tr>`; }
+    const cod=String(r.p||'').split(' · ')[0];
+    corpo+=`<tr><td class="num">${e(panoDataTxt(r))}</td><td class="num">${r.o?'<b>'+e(r.o)+'</b>':'<span class="t-mut">sem nº</span>'}</td><td>${cod&&cod!=='—'?`<button class="lnk pano-nm" data-act="pano-prod" data-v="${e(cod)}" title="Ver só este produto">${e(r.p)}</button>`:e(r.p)}</td><td>${e(r.l)}</td><td class="nr num">${panoN(A,r.v)}</td><td class="nr num">${X.tot?Math.round(r.v/X.tot*1000)/10+'%':''}</td></tr>`; });
+  return `<section class="card pano-t"><div class="pano-gh2"><h2>Por ordem de produção</h2><span class="sub" style="margin:0">${com} ${com===1?'ordem':'ordens'}${rs.length>com?' · "sem nº" = produção do Extrato sem o número da ordem, junta por produto e mês':''}</span></div>
+    <div class="pano-tw"><table class="anl-t pano-tb pano-ord"><thead><tr><th>Data</th><th>Ordem</th><th>Produto</th><th>Linha</th><th class="nr">${A.med==='t'?'Toneladas':'Sacos'}</th><th class="nr">%</th></tr></thead>
+    <tbody>${corpo||'<tr><td colspan="6"><div class="empty">Nada produzido com esses filtros.</div></td></tr>'}</tbody>
+    <tfoot><tr><th colspan="4" scope="row">Total</th><td class="nr num"><b>${panoN(A,X.tot)} ${U}</b></td><td class="nr num">100%</td></tr></tfoot></table></div>
+    ${rs.length>lim?`<button class="lnk" data-act="pano-tudo" style="margin-top:8px">Mostrar todas (${rs.length})</button>`:''}</section>`; }
 /* ---------- Excel e PDF ---------- */
 function panoLinhas(){ const A=S.pano, X=panoDados(); if(!X.rows) return null; const head=[A.ver==='linha'?'Linha':A.ver==='linprod'?'Linha':'Produto'].concat(A.ver==='linprod'?['Produto']:[]).concat(A.ver==='produto'?['Linhas']:[]).concat(PANO_M,['Total','%']).concat(X.ant?[String(A.ano-1),'Variação %']:[]);
   const num=v=>A.med==='t'?Math.round(v*10)/10:Math.round(v);
@@ -205,6 +226,24 @@ async function panoXls(){ toast('Montando o Excel…'); const D=await panoPdfDad
     ws.addConditionalFormatting({ref:col(cP)+first+':'+col(cP)+last,rules:[{type:'dataBar',minLength:0,maxLength:100,cfvo:[{type:'num',value:0},{type:'max'}],color:{argb:'FF7FA9BA'}}]});
     if(ant) ws.addConditionalFormatting({ref:col(cV)+first+':'+col(cV)+last,rules:[{type:'cellIs',operator:'lessThan',formulae:['0'],style:{font:{color:{argb:'FFB5473F'},bold:true}}},{type:'cellIs',operator:'greaterThan',formulae:['0'],style:{font:{color:{argb:'FF2F6E4F'},bold:true}}}]}); }
   ws.getCell(ri+2,1).value='Cor dos meses: quanto mais escuro, mais produziu. '+fonteTxt; ws.getCell(ri+2,1).font=fnt({italic:true,size:8,color:{argb:MUT}});
+  /* ===================== Por ordem (27/10) ===================== */
+  { const rs=panoOrdens(Sc.R&&Sc.R.it); if(rs.length){
+    const wo=wb.addWorksheet('Por ordem',{views:[{state:'frozen',ySplit:4,showGridLines:false}],properties:{tabColor:{argb:OK}}});
+    const hO=['Mês','Data','Ordem','Produto','Linha','Sacos','Toneladas','% do total']; wo.columns=[{width:12},{width:14},{width:11},{width:46},{width:16},{width:12},{width:12},{width:11}];
+    faixa(wo,hO.length,'PRODUÇÃO POR ORDEM · '+A.ano+' · '+escopo.toUpperCase(),per+' · '+emit); cab(wo,4,hO,5); wo.getRow(4).height=24; wo.autoFilter={from:{row:4,column:1},to:{row:4,column:hO.length}};
+    let r0=5; const f0=r0;
+    rs.forEach((r,j)=>{ const row=wo.getRow(r0); row.height=17; const t=Math.round(r.v*panoKg(r.c)*100)/100;
+      [MC(+r.mes.slice(5,7)-1)+'/'+r.mes.slice(0,4),panoDataTxt(r),r.o?(+r.o||r.o):'sem nº',r.p,r.l,r1(r.v),t].forEach((v,i)=>{ const c=row.getCell(i+1); c.value=v; c.font=fnt(i===2&&r.o?{bold:true,color:{argb:PET}}:i===2?{italic:true,color:{argb:MUT}}:{}); c.alignment={vertical:'middle',horizontal:i>=5||i===2?'right':'left',indent:i===0?1:0}; });
+      row.getCell(6).numFmt='#,##0'; row.getCell(7).numFmt='#,##0.00'; row.getCell(8).numFmt='0.0%';
+      for(let c=1;c<=hO.length;c++){ const k=row.getCell(c); k.border=linhaB; if(j%2) k.fill=fill(SOFT); } r0++; });
+    const lo=r0-1, tr=wo.getRow(r0); tr.height=22; tr.getCell(1).value='Total';
+    tr.getCell(6).value={formula:'SUBTOTAL(9,F'+f0+':F'+lo+')'}; tr.getCell(6).numFmt='#,##0'; tr.getCell(7).value={formula:'SUBTOTAL(9,G'+f0+':G'+lo+')'}; tr.getCell(7).numFmt='#,##0.0'; tr.getCell(8).value=1; tr.getCell(8).numFmt='0.0%';
+    for(let c=1;c<=hO.length;c++){ const k=tr.getCell(c); k.font=fnt({bold:true,color:{argb:'FFFFFFFF'}}); k.fill=fill(PET); k.alignment={vertical:'middle',horizontal:c>=6?'right':'left',indent:c===1?1:0}; }
+    for(let r=f0;r<=lo;r++) wo.getRow(r).getCell(8).value={formula:'F'+r+'/F$'+r0};
+    wo.addConditionalFormatting({ref:'H'+f0+':H'+lo,rules:[{type:'dataBar',minLength:0,maxLength:100,cfvo:[{type:'num',value:0},{type:'max'}],color:{argb:'FF7FA9BA'}}]});
+    if(rs.some(r=>!r.o)){ const c=wo.getCell(r0+2,1); c.value='"sem nº" = produção do Extrato do Focco sem o número da ordem (junta por produto, linha e mês).'; c.font=fnt({italic:true,size:8,color:{argb:MUT}}); }
+    wo.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:.35,right:.35,top:.45,bottom:.5,header:.2,footer:.2},printTitlesRow:'4:4'}; wo.headerFooter={oddFooter:'&L&8Painel Colafix · '+escopo+'&R&8Página &P de &N'};
+  } }
   /* ===================== Por linha ===================== */
   const wl=wb.addWorksheet('Por linha',{views:[{state:'frozen',xSplit:1,ySplit:4,showGridLines:false}],properties:{tabColor:{argb:RED}}});
   const hL=['Linha'].concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% da fábrica']); wl.columns=hL.map((h,i)=>({width:i===0?32:i>nM?13:9.5}));
@@ -305,6 +344,20 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
     doc.setFont('helvetica','bold'); doc.setFontSize(8); tc(Co.ink); doc.text(fit('Fora do total: '+sd.length+(sd.length===1?' item que pode':' itens que podem')+' ter sido feito'+(sd.length===1?'':'s')+' na '+nomeLs+' somam '+nS(sdTot)+' sc ('+nT(sdTt)+' t) no ano.',PW-2*M-8),M+4,by+5.2);
     doc.setFont('helvetica','normal'); doc.setFontSize(7); tc(Co.mut); doc.text(fit('O Focco registra quanto foi produzido do item, mas não em qual linha. Esses itens podem ser feitos em mais de uma linha, por isso ficam à parte (detalhe na última página).',PW-2*M-8),M+4,by+9.8); }
   /* tabela detalhada */
+  if(A.ver==='ordem'){ /* 27/10: detalhe por ordem de produção (sacos e toneladas), separado por mês */
+    doc.addPage(); topo(titulo,'Detalhe por ordem de produção · sacos e toneladas');
+    const rs=panoOrdens(Sc.R&&Sc.R.it), head=['Data','Ordem','Produto','Linha','Sacos','Toneladas','% do total'], ws=[24,22,PW-2*M-24-22-34-26-26-20,34,26,26,20], xs=[]; let ax=M; ws.forEach(w=>{ xs.push(ax); ax+=w; });
+    const dir=i=>i>=4; let y=26; const cab=()=>{ fc(Co.pet); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.8); tc([255,255,255]); head.forEach((h,i)=>doc.text(h,dir(i)?xs[i]+ws[i]-1:xs[i]+1,y+4,{align:dir(i)?'right':'left'})); y+=6; };
+    const meses=[...new Set(rs.map(r=>r.mes))]; let rest=rs.length+meses.length+1; const LIM=PH-14, cabe=()=>LIM>=y?Math.floor((LIM-y)/5)+1:0;
+    const lin=(r,tipo,zeb)=>{ const c=cabe(), sobra=rest-c; if(y>LIM||(sobra>0&&sobra<5&&rest<=6)||(tipo==='g'&&c<4&&rest>c)){ doc.addPage(); y=12; cab(); } rest--; const h=tipo?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='t'){ fc([226,236,241]); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='g'){ fc(Co.soft); doc.rect(M,y,PW-2*M,h,'F'); }
+      doc.setFont('helvetica',tipo?'bold':'normal'); doc.setFontSize(7); tc(tipo==='g'?Co.teal:Co.ink); r.forEach((v,i)=>{ const t=fit(v,(tipo&&i===0?ws[0]+ws[1]+ws[2]+ws[3]:ws[i])-2); if(t) doc.text(t,dir(i)?xs[i]+ws[i]-1:xs[i]+1,y+3.6,{align:dir(i)?'right':'left'}); }); y+=h; };
+    cab(); let mAnt=null, z=0, tt=0;
+    rs.forEach(r=>{ if(r.mes!==mAnt){ mAnt=r.mes; const xs2=rs.filter(q=>q.mes===r.mes), sv=xs2.reduce((a,q)=>a+q.v,0), st=xs2.reduce((a,q)=>a+q.v*panoKg(q.c),0), no=xs2.filter(q=>q.o).length;
+        lin([pdMes(r.mes).replace(/^./,c=>c.toUpperCase())+' · '+no+(no===1?' ordem':' ordens'),'','','',nS(sv),nT(st),pc(sv,Sc.tot)],'g'); z=0; }
+      const t=r.v*panoKg(r.c); tt+=t; lin([panoDataTxt(r),r.o||'sem nº',r.p,r.l,nS(r.v),nT(t),pc(r.v,Sc.tot)],'',z++%2); });
+    lin(['Total','','','',nS(Sc.tot),nT(Tn.tot),'100%'],'t');
+    if(rs.some(r=>!r.o)){ y+=3; doc.setFont('helvetica','italic'); doc.setFontSize(6.8); tc(Co.mut); doc.text('"sem nº" = produção do Extrato do Focco sem o número da ordem (junta por produto, linha e mês).',M,y+3); }
+  } else {
   doc.addPage(); topo(titulo,'Detalhe '+(A.ver==='linha'?'por linha':A.ver==='linprod'?'por linha e produto':'por produto')+' · sacos e toneladas');
   const verL=A.ver==='linha', colLin=A.ver==='produto'&&A.ls.length!==1, tK={}; (Tn.rows||[]).forEach(o=>tK[o.k]=o.tot);
   const head=[verL?'Linha':'Produto'].concat(colLin?['Linhas']:[]).concat(MS,['Total sc','Total t','%']).concat(X.ant&&A.med==='sc'?[String(A.ano-1),'Var.']:[]);
@@ -324,6 +377,7 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
       lin([o.l+' · '+rs.length+(rs.length===1?' produto':' produtos')].concat(sm.slice(0,nM).map(nS),[nS(st),nT(stt),pc(st,Sc.tot)]).concat(antK?['','']:[]),'g'); z=0; }
     const r=linhaDe(A.ver==='linprod'?o.p:o.k,(o.ls||[]).join(', '),o.m,o.tot,tK[o.k]||0,antK?antK[o.k]||0:0); lin(r,'',z++%2); });
   lin(['Total'].concat(colLin?['']:[]).concat(Sc.mes.slice(0,nM).map(nS),[nS(Sc.tot),nT(Tn.tot),'100%']).concat(antK?[nS(X.ant.tot),X.ant.tot?((Sc.tot>=X.ant.tot?'+':'')+Math.round((Sc.tot-X.ant.tot)/X.ant.tot*100)+'%'):'']:[]),'t');
+  }
   if(sd.length){ doc.addPage(); topo(titulo,'Itens que podem ter passado pela '+nomeLs+' · fora do total'); let y2=28; secao('Itens que podem ter sido feitos na '+nomeLs,M,y2); y2+=5;
     doc.setFont('helvetica','normal'); doc.setFontSize(8); tc(Co.ink);
     doc.splitTextToSize('O Extrato do Focco mostra quanto foi produzido de cada item por dia, mas não em qual linha. Os itens abaixo estão cadastrados para mais de uma linha e não há apontamento no painel que permita separar. Por isso NÃO estão somados no total da '+nomeLs+' das páginas anteriores. Os números abaixo são a produção inteira do item, em todas as linhas onde ele pode ser feito.',PW-2*M).forEach(t=>{ doc.text(t,M,y2+3); y2+=4; }); y2+=3;

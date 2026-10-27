@@ -38,10 +38,15 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
    r=await baixa('[data-act="pano-xls"]'); ok('Excel baixa', /^Producao-\d{4}.*\.xlsx$/.test(r.n)&&r.tam>1000, JSON.stringify(r));
    try{ const EJ=require('exceljs'); const wb=new EJ.Workbook(); await wb.xlsx.readFile(SP+'/'+r.n); const nomes=wb.worksheets.map(w=>w.name);
      const res=wb.getWorksheet('Resumo'), det=wb.getWorksheet('Detalhe'), pl=wb.getWorksheet('Por linha'); const txt=w=>{ const t=[]; w.eachRow(rw=>rw.eachCell(c=>{ const v=c.value; t.push(v&&v.formula?'='+v.formula:v&&v.richText?v.richText.map(x=>x.text).join(''):String(v)); })); return t.join(' | '); };
-     ok('Excel com 3 abas: Resumo, Detalhe, Por linha', nomes.join()==='Resumo,Detalhe,Por linha', nomes.join());
+     ok('Excel com 4 abas: Resumo, Detalhe, Por ordem, Por linha', nomes.join()==='Resumo,Detalhe,Por ordem,Por linha', nomes.join());
      ok('Resumo: título, produzido 5.200 sc, toneladas, mês a mês e participação na fábrica', /PRODUÇÃO \d{4} · TODAS AS LINHAS/.test(txt(res))&&/Produzido no ano/i.test(txt(res))&&res.getRow(5).getCell(1).value===5200&&/Em toneladas/i.test(txt(res))&&/Mês a mês/i.test(txt(res))&&/Participação na fábrica/i.test(txt(res))&&/Como foi contado/i.test(txt(res))&&res.getImages().length>=2, txt(res).slice(0,700));
      ok('Detalhe: total com fórmula (SUBTOTAL), filtro e painéis congelados', /SUBTOTAL\(9,/.test(txt(det))&&det.autoFilter&&det.views[0].state==='frozen', txt(det).slice(0,500));
-     ok('Por linha: Fixcol 300 e total da fábrica', /Fixcol/.test(txt(pl))&&/Fábrica \(total\)/.test(txt(pl)), txt(pl).slice(0,500)); }catch(e){ ok('Ler o Excel', false, e.message); } }
+     ok('Por linha: Fixcol 300 e total da fábrica', /Fixcol/.test(txt(pl))&&/Fábrica \(total\)/.test(txt(pl)), txt(pl).slice(0,500));
+     const po=wb.getWorksheet('Por ordem'); ok('Excel: aba Por ordem com as ordens e total', !!po&&/sem nº|\d/.test(txt(po))&&/SUBTOTAL/.test(txt(po)), po?txt(po).slice(0,300):'sem aba'); }catch(e){ ok('Ler o Excel', false, e.message); }
+   await p.click('[data-act="pano-set"][data-k="ver"][data-v="ordem"]'); await H.dorme(1200);
+   ok('Ver por Ordem mostra a tabela por ordem', await p.evaluate(()=>document.querySelectorAll('.pano-ord tbody tr').length>1));
+   await p.screenshot({path:SP+'/prodano-ordem.png',fullPage:true});
+   r=await baixa('[data-act="pano-pdf"]'); ok('PDF por ordem baixa', /\.pdf$/.test(r.n)&&r.tam>2000, JSON.stringify(r)); require('fs').copyFileSync(SP+'/'+r.n,SP+'/Producao-ordem.pdf'); }
  await p.setViewportSize({width:390,height:840}); await H.dorme(800); ok('Celular: só a tabela rola de lado', await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

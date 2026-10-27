@@ -122,22 +122,24 @@ function praSemana(d){ const x=new Date(d+'T12:00:00'), w=(x.getDay()+6)%7; retu
 function praProd(o){ const c=codigoDe(o); let n=''; try{ n=ritNome(c); }catch(e){} if(!n||n===c) n=String(o.produto||'').replace(/^\S+\s*[-—]\s*/,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b.*$/i,''); return {c,n:(c+' · '+n).trim()}; }
 function praFam(nome){ const w=String(nome||'').replace(/^\S+\s·\s/,'').replace(/^ARGAMASSA\s+/i,'').split(/\s+/).filter(x=>x&&!/^\d/.test(x)); return w.slice(0,2).join(' ')||'Outros'; }
 function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.ls.length||f.ls.includes(l), pq=praN(f.prod).trim(); let faltam=0;
-  const add=(d,l,p,mot,v,semLs)=>{ if(d<de||d>ate||(!semLs&&!lsOk(l||'—'))) return; if(pq&&p&&!praN(p.n).includes(pq)) return; it.push({d,l:l||'—',p:p?p.n:'',fam:p?praFam(p.n):'',mot:mot||'',v}); };
+  const add=(d,l,p,mot,v,semLs,o)=>{ if(d<de||d>ate||(!semLs&&!lsOk(l||'—'))) return; if(pq&&p&&!praN(p.n).includes(pq)) return; it.push({d,l:l||'—',p:p?p.n:'',c:p?p.c||'':'',fam:p?praFam(p.n):'',mot:mot||'',v,o:o?String(o):''}); };
   var semDiv={}, dvF={};
   if(dados.foc&&praFocoOk(f)){ const DV={}; dados.foc.forEach(x0=>{ const I=praFocItem(x0.c), D=DV[x0.c]||(DV[x0.c]=praDiv(x0.c)), kf=f.med==='t'?(()=>{ try{ return ritKg(x0.c); }catch(e){ return 20; } })()/1000:1;
       /* 27/10: o que tem ordem de produção com linha no painel vai para essa linha; só o resto segue a regra do item */
-      let x=x0; if(x0.op){ let ja=0; for(const n in x0.op){ const l=praOpLinha(n), q=+x0.op[n]||0; if(l&&q>0){ const qq=Math.min(q,x0.q-ja); if(qq<=0) continue; ja+=qq; dvF.op=(dvF.op||0)+1; add(x0.d,l,I.p,'',qq*kf); } } if(ja>=x0.q-0.001) return; if(ja) x=Object.assign({},x0,{q:x0.q-ja}); }
-      const v=x.q*kf;
-      if(D.d){ dvF[D.f]=(dvF[D.f]||0)+1; for(const l in D.d) add(x.d,l,I.p,'',v*D.d[l]); return; }
+      /* 27/10 (relatório por ordem): as ordens sem linha no painel guardam o nº e seguem a regra do item */
+      let x=x0; const parts=[]; if(x0.op){ let ja=0; for(const n in x0.op){ const l=praOpLinha(n), q=+x0.op[n]||0; if(q<=0) continue; const qq=Math.min(q,x0.q-ja); if(qq<=0) continue; ja+=qq; if(l){ dvF.op=(dvF.op||0)+1; add(x0.d,l,I.p,'',qq*kf,false,n); } else parts.push({q:qq,o:n}); } if(ja<x0.q-0.001) parts.push({q:x0.q-ja,o:''}); }
+      else parts.push({q:x0.q,o:''});
+      parts.forEach(pt=>{ const v=pt.q*kf;
+      if(D.d){ dvF[D.f]=(dvF[D.f]||0)+1; for(const l in D.d) add(x.d,l,I.p,'',v*D.d[l],false,pt.o); return; }
       /* sem divisão: fora do filtro de linha; sem filtro, aparece com as linhas juntas */
       if(f.ls&&f.ls.length){ if(D.ls.some(l=>f.ls.includes(l))){ if(x.d>=de&&x.d<=ate&&(!pq||praN(x.c+' '+I.p.n).includes(pq))){ const k=x.c; semDiv[k]=semDiv[k]||{c:k,p:I.p.n,ls:D.ls,v:0,m:Array(12).fill(0)}; semDiv[k].v+=v; semDiv[k].m[+x.d.slice(5,7)-1]+=v; } } return; }
-      add(x.d,D.ls.length?D.ls.join(' / '):'Sem linha',I.p,'',v,true); }); }
+      add(x.d,D.ls.length?D.ls.join(' / '):'Sem linha',I.p,'',v,true,pt.o); }); }); }
   else if(praPar(f.med)) dados.par.forEach(p=>{ if(!p.inicio||(f.semSetup&&praSetup(p))) return; if(pq) return; add(hojeStr(new Date(p.inicio)),p.linha,null,p.motivo||'Sem motivo',f.med==='par'?pdMin(p.inicio,p.fim):1); });
-  else if(f.med==='perda') dados.per.forEach(x=>{ if(!x.em) return; const o=ordById(x.ordem)||(S.ritOrdX||{})[x.ordem]; const p=o?praProd(o):{c:'',n:String(x.produto||'—')}; add(hojeStr(new Date(x.em)),x.linha||(o&&o.linha),p,'',+x.qtd||0); });
+  else if(f.med==='perda') dados.per.forEach(x=>{ if(!x.em) return; const o=ordById(x.ordem)||(S.ritOrdX||{})[x.ordem]; const p=o?praProd(o):{c:'',n:String(x.produto||'—')}; add(hojeStr(new Date(x.em)),x.linha||(o&&o.linha),p,'',+x.qtd||0,false,x.num||(o&&o.num)); });
   else { dados.ent.forEach(e=>{ if(e.anula) an.add(e.anula); });
     dados.ent.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const o=ordById(e.ordem)||(S.ritOrdX||{})[e.ordem]; if(!o){ faltam++; try{ ritFaltaOrdem(e.ordem); }catch(x){} }
       const p=o?praProd(o):{c:'',n:'Ordem '+(e.num||'?')+' (carregando)'}, q=+e.qtd||0, kg=o&&p.c?(()=>{ try{ return ritKg(p.c); }catch(x){ return 20; } })():20;
-      add(hojeStr(new Date(e.em)),e.linha||(o&&o.linha),p,'',f.med==='t'?q*kg/1000:q); }); }
+      add(hojeStr(new Date(e.em)),e.linha||(o&&o.linha),p,'',f.med==='t'?q*kg/1000:q,false,e.num||(o&&o.num)); }); }
   const por=f.por==='motivo'&&!praPar(f.med)?'linha':praPar(f.med)&&praSemProd(f.por)?'motivo':f.por;
   const chave=x=>por==='dia'?x.d:por==='semana'?praSemana(x.d):por==='mes'?x.d.slice(0,7):por==='linha'?x.l:por==='produto'?(x.p||'—'):por==='linprod'?x.l+PRA_SEP+(x.p||'—'):por==='familia'?(x.fam||'—'):(x.mot||'—');
   const g={}; it.forEach(x=>{ const k=chave(x); g[k]=(g[k]||0)+x.v; });
