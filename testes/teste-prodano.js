@@ -1,13 +1,14 @@
 /* Produção do ano (js/64, 27/10): meses × produto/linha, filtros de linha e produto, comparação com o ano anterior, Excel e PDF. */
 const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,400):'')); };
 (async()=>{ const {d}=H.seed(); const D=d.docs; const now=new Date(), ano=now.getFullYear(), pa=ano-1;
- D['pcpvendas/'+ano+'-01']={d:{RJ300:{'10':[1000,0]},AC100:{'10':[2000,0],'11':[500,0]}}};
+ D['pcpvendas/'+ano+'-01']={d:{RJ300:{'10':[1000,0]},AC100:{'10':[2000,0],'11':[500,0]},CH11:{'12':[300,0]}}};
+ D['itens/CH11']={codigo:'CH11',descricao:'CHAPISCO ROLADO',linhas:['Fixcol']}; D['pcpbase/itens']={l:{CH11:{d:'CHAPISCO ROLADO',ln:['Linha 3'],a3:0,a30:0,sal:1}},atual:{}}; /* o Focco diz L3, mas a usuária acertou Fixcol nos Ajustes */
  D['pcpvendas/'+ano+'-03']={d:{RJ300:{'05':[400,0]},AC500:{'06':[1000,0]}}};
  D['pcpvendas/'+pa+'-01']={d:{RJ300:{'10':[700,0]}}};
  D['itens/RJ300']={codigo:'RJ300',descricao:'REJUNTE FLEX CINZA 5KG',linhas:['Linha 3']};
  D['itens/AC100']={codigo:'AC100',descricao:'ARGAMASSA AC1 20KG',linhas:['Linha 1']};
  D['itens/AC500']={codigo:'AC500',descricao:'ARGAMASSA AC3 20KG',linhas:['Linha 1','Linha 2']};
- D['config/geral'].linhasOrdem=['Linha 1','Linha 2','Linha 3'];
+ D['config/geral'].linhasOrdem=['Linha 1','Linha 2','Linha 3','Fixcol'];
  D['config/geral'].ritmo={linhas:['Linha 1','Linha 2','Linha 3'],itens:{AC500:{d:{'Linha 1':50,'Linha 2':50}}},aj1410:{em:'x'}};
  D['pcpbase/vendas']={ate:ano+'-03-31',ini:ano+'-01-02',mensal:{}};
  const erros=[]; const B=await H.abrir({viewport:{width:1440,height:1000},acceptDownloads:true}); const p=B.page; p.on('pageerror',e=>erros.push(e.message));
@@ -19,10 +20,10 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  await p.evaluate(()=>__T.go('prodano')); await H.dorme(2500);
  const X=()=>p.evaluate(()=>{ const X=Painel.producaoAno.dados(); return X.rows?{rows:X.rows.map(o=>({k:o.k,m:o.m,t:o.tot})),mes:X.mes,tot:X.tot,ant:X.ant?X.ant.tot:null}:X; });
  let x=await X();
- ok('Por produto: AC100 2.500 em jan, RJ300 1.000 jan + 400 mar, AC500 1.000 em mar; total 4.900', x.tot===4900&&x.mes[0]===3500&&x.mes[2]===1400&&x.rows[0].k.startsWith('AC100'), JSON.stringify(x));
+ ok('Por produto: AC100 2.500 em jan, RJ300 1.000 jan + 400 mar, AC500 1.000 em mar, CH11 300; total 5.200', x.tot===5200&&x.mes[0]===3800&&x.mes[2]===1400&&x.rows[0].k.startsWith('AC100'), JSON.stringify(x));
  await p.click('[data-act="pano-set"][data-k="ver"][data-v="linha"]'); await H.dorme(1200); x=await X();
  const L=k=>(x.rows.find(r=>r.k===k)||{}).t;
- ok('Por linha: L1 3.000 (AC100 + metade do AC500), L2 500, L3 1.400', L('Linha 1')===3000&&L('Linha 2')===500&&L('Linha 3')===1400, JSON.stringify(x.rows));
+ ok('Por linha: L1 3.000 (AC100 + metade do AC500), L2 500, L3 1.400, Fixcol 300 (linha dos Ajustes vale antes do Focco)', L('Linha 1')===3000&&L('Linha 2')===500&&L('Linha 3')===1400&&L('Fixcol')===300, JSON.stringify(x.rows));
  await p.click('[data-act="pano-ln"][data-v="Linha 3"]'); await H.dorme(1000); await p.click('[data-act="pano-set"][data-k="ver"][data-v="produto"]'); await H.dorme(1000); x=await X();
  ok('Escolhendo a Linha 3: só o RJ300 (1.400)', x.tot===1400&&x.rows.length===1&&x.rows[0].k.startsWith('RJ300'), JSON.stringify(x.rows));
  await p.check('[data-pano="comp"]'); await H.dorme(2000); x=await X(); const t=await p.evaluate(()=>document.getElementById('view').innerText);

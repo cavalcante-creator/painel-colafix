@@ -78,10 +78,12 @@ function praFocTem(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,at
   if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[], cov={}; ms.forEach(cp=>{ const M=C[cp].d, ds=new Set(); for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q){ foc.push({d:cp+'-'+dd,c,q}); ds.add(dd); } } cov[cp]=ds.size; }); return {foc,cov,ent:[],par:[],per:[]}; }
   praFocBusca(de,ate).then(()=>{ try{ if(S.view==='prodind'||S.view==='prodano') render(); }catch(e){} }); return null; }
 /* 27/10 (2º pedido "não está puxando só da linha"): a linha onde o item É FEITO, nesta ordem:
-   1) a linha do Focco (base: itens.l[c].ln), quando é uma só; 2) o que as linhas apontaram no painel nos últimos 60 dias (ritReal);
+   0) a linha do item em Ajustes › Itens, quando é uma só (a usuária acertou ali); 1) a linha do Focco (base: itens.l[c].ln), quando é uma só; 2) o que as linhas apontaram no painel nos últimos 60 dias (ritReal);
    3) a divisão em % da Curva S (Previsto × Realizado › Configurar; só tem L1/L2); 4) o cadastro de Itens, quando é uma linha só.
    Sem nada disso (item que pode ir em várias linhas e sem divisão), a produção NÃO é posta numa linha: fica à parte e a tela avisa. */
 function praDiv(c){ const LO=linhasOrd(), B=(S.anl&&S.anl.base)||{}, it=((B.itens||{}).l||{})[c]||{}, um=l=>({d:{[l]:1},f:'focco'});
+  /* 27/10: o que a usuária acertou em Ajustes › Itens (uma linha só) vale antes do Focco (ex.: chapisco = Fixcol) */
+  try{ const pi=typeof itemDe==='function'?itemDe(c):null, cl=((pi&&pi.linhas)||[]).filter(l=>LO.includes(l)); if(cl.length===1) return {d:{[cl[0]]:1},f:'cad'}; }catch(e){}
   const fl=(it.ln||[]).filter(l=>LO.includes(l)); if(fl.length===1) return um(fl[0]);
   try{ const r=ritReal(c,LO); if(r&&r.d&&Object.keys(r.d).length) return {d:r.d,f:'real'}; }catch(e){}
   try{ const ci=(ritCfg().itens||{})[c]; if(ci&&ci.d){ const d={}; let t=0; for(const l in ci.d){ const v=+ci.d[l]||0; if(v>0&&LO.includes(l)){ d[l]=v; t+=v; } } if(t>0){ for(const l in d) d[l]/=t; return {d,f:'cfg'}; } } }catch(e){}
@@ -148,7 +150,7 @@ function praFocAvisos(R,X,F){ const V=((S.anl&&S.anl.base)||{}).vendas||{}, h=ho
   if(vaz.length) out.push(`<div class="pra-av">Sem Extrato importado em ${vaz.map(k=>MS[+k.slice(5)-1]+'/'+k.slice(0,4)).join(', ')}: esses meses não entram no total. Importe o Extrato desses meses em Análise PCP › Sistema › Base de dados.</div>`);
   if((R.semDiv||[]).length){ const t=R.semDiv.reduce((a,x)=>a+x.v,0);
     out.push(`<details class="pra-av"><summary>${praFmt(F.med,t)} de ${R.semDiv.length} ${R.semDiv.length===1?'item':'itens'} ficaram de fora: o item pode ser feito em mais de uma linha e não há como saber quanto foi nesta linha</summary><div style="margin-top:6px">${R.semDiv.slice(0,15).map(x=>esc(x.p)+' ('+esc(x.ls.join(' / ')||'sem linha')+'): '+praFmt(F.med,x.v)).join('<br>')}</div><div style="margin-top:6px">Para entrarem, diga a linha do item no Focco ou a divisão em Análise PCP › Mês › Previsto × Realizado › Configurar.</div></details>`); }
-  out.push('<div class="sub" style="margin:0;font-size:12.5px">No Extrato não vem a linha. A linha é a do item no Focco; item de mais de uma linha é dividido pelo que as linhas apontaram no painel nos últimos 60 dias ou, sem isso, pela % da Curva S.</div>');
+  out.push('<div class="sub" style="margin:0;font-size:12.5px">No Extrato não vem a linha. A linha é a do item em Ajustes › Itens (ou a do Focco); item de mais de uma linha é dividido pelo que as linhas apontaram no painel nos últimos 60 dias ou, sem isso, pela % da Curva S.</div>');
   return out.join(''); }
 /* ---------- tela ---------- */
 function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=linhasOrd(), sv=S.pra.salvas||[];
