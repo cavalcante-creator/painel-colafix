@@ -85,9 +85,8 @@ async function panoXlsSimples(){ const L=panoLinhas(); if(!L) return; try{ await
   const XL=window.XLSX, ws=XL.utils.aoa_to_sheet([[panoDesc(L.A)],[],L.head].concat(L.rows,[L.tot])); ws['!cols']=L.head.map((h,i)=>({wch:i===0?(L.A.ver==='linha'?14:44):i===1&&L.A.ver!=='linha'?24:10}));
   const wb=XL.utils.book_new(); XL.utils.book_append_sheet(wb,ws,'Produção '+L.A.ano); XL.writeFile(wb,'Producao-'+L.A.ano+(L.A.ls.length?'-'+L.A.ls.join('-').replace(/\s+/g,''):'')+'.xlsx'); toast('Excel baixado.'); }
 /* 27/10 (2º pedido "ainda dá para melhorar o layout"): gráficos desenhados em canvas e colados como imagem no Excel */
-/* logo da Lys com as cores originais sobre um selo branco arredondado (o azul dela some direto na faixa azul) — Excel e PDF */
-async function panoLysBranca(img){ if(!img||!img.lys) return null; if(img._lysB!==undefined) return img._lysB; try{ img._lysB=await new Promise(res=>{ const im=new Image(); im.onload=()=>{ const w=im.naturalWidth, h=im.naturalHeight, pad=Math.round(h*.16), W=w+pad*2, H=h+pad*2, r=Math.round(H*.18), c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
-    g.fillStyle='#fff'; g.beginPath(); g.moveTo(r,0); g.arcTo(W,0,W,H,r); g.arcTo(W,H,0,H,r); g.arcTo(0,H,0,0,r); g.arcTo(0,0,W,0,r); g.closePath(); g.fill(); g.drawImage(im,pad,pad); res({d:c.toDataURL('image/png'),w:W,h:H}); }; im.onerror=()=>res(null); im.src=img.lys.d; }); }catch(e){ img._lysB=null; } return img._lysB; }
+/* 27/10 ("sem quadrado branco"): cabeçalho claro — as duas logos com as cores originais direto no fundo branco */
+function panoLogos(img){ const cf=img&&(img.claro||null), ly=img&&img.lys||null; return {cf,ly}; }
 function panoCanvas(w,h,fn){ const k=2, c=document.createElement('canvas'); c.width=w*k; c.height=h*k; const g=c.getContext('2d'); g.scale(k,k); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.font='12px Arial'; fn(g); return c.toDataURL('image/png'); }
 function panoPngMes(o){ /* o: {meses, v, ant, melhor, andamento, n} */ const W=1100,H=300; return panoCanvas(W,H,g=>{
   const x0=60,x1=W-20,y0=H-40,yt=24, mx=Math.max(1,...o.v.slice(0,o.n),...(o.ant?o.ant.slice(0,o.n):[0])), passo=Math.pow(10,Math.floor(Math.log10(mx))), top=Math.ceil(mx/passo*1.12)*passo, Y=v=>y0-(y0-yt)*v/top, bw=(x1-x0)/12;
@@ -124,17 +123,16 @@ async function panoXls(){ toast('Montando o Excel…'); const D=await panoPdfDad
   const PET='FF143F54', PET2='FF1B5168', TINT='FFE2ECF1', SOFT='FFF4F6F8', MUT='FF5E6E77', RED='FFE3312D', OK='FF3C8A63', LIN='FFE3E8EC', FNT='Calibri';
   const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}}), linhaB={bottom:{style:'thin',color:{argb:LIN}}};
   const fnt=(o)=>Object.assign({name:FNT,size:10,color:{argb:'FF2B3A42'}},o||{});
-  const logoId=img&&img.escuro?wb.addImage({base64:img.escuro.d,extension:'png'}):null;
+  const LG=panoLogos(img), logoId=LG.cf?wb.addImage({base64:LG.cf.d,extension:'png'}):null;
   /* logo da Lys em branco, para aparecer sobre a faixa azul */
-  const lysB=await panoLysBranca(img);
-  const lysId=lysB?wb.addImage({base64:lysB.d,extension:'png'}):null;
+  const lysB=LG.ly, lysId=lysB?wb.addImage({base64:lysB.d,extension:'png'}):null;
   const col=n=>{ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
   /* faixa: linha 1 = as duas logos (Colafix à esquerda, Lys à direita), linha 2 = título e subtítulo — sem texto por baixo das logos */
   const faixa=(ws,n,titulo,sub)=>{ ws.mergeCells(1,1,1,n); ws.mergeCells(2,1,2,n); ws.getRow(1).height=logoId!=null||lysId!=null?40:6; ws.getRow(2).height=40; ws.getRow(3).height=8;
-    ws.getCell(1,1).fill=fill(PET); const c=ws.getCell(2,1); c.fill=fill(PET); c.alignment={vertical:'middle',indent:1,wrapText:true};
-    c.value={richText:[{text:titulo+'\n',font:fnt({bold:true,size:15,color:{argb:'FFFFFFFF'}})},{text:sub,font:fnt({size:9,color:{argb:'FFC7D7E0'}})}]};
-    if(logoId!=null){ const lw=118, lh=img.escuro.h/img.escuro.w*lw; ws.addImage(logoId,{tl:{col:0.15,row:0.18},ext:{width:lw*Math.min(1,38/lh),height:Math.min(lh,38)}}); }
-    if(lysId!=null){ const lh=40, lw=lysB.w/lysB.h*lh, wd=ws.columns.map(c=>(c.width||9)*7.3), alvo=Math.max(0,wd.reduce((a,b)=>a+b,0)-lw-14); let px=0, ci=0; while(ci<wd.length-1&&px+wd[ci]<=alvo){ px+=wd[ci]; ci++; } ws.addImage(lysId,{tl:{col:ci+(alvo-px)/wd[ci],row:0.07},ext:{width:lw,height:lh}}); } };
+    const c=ws.getCell(2,1); c.alignment={vertical:'middle',indent:0,wrapText:true}; c.border={bottom:{style:'medium',color:{argb:PET}}};
+    c.value={richText:[{text:titulo+'\n',font:fnt({bold:true,size:15,color:{argb:PET}})},{text:sub,font:fnt({size:9,color:{argb:MUT}})}]};
+    if(logoId!=null){ const lw=118, lh=LG.cf.h/LG.cf.w*lw; ws.addImage(logoId,{tl:{col:0.02,row:0.18},ext:{width:lw*Math.min(1,38/lh),height:Math.min(lh,38)}}); }
+    if(lysId!=null){ const lh=40, lw=lysB.w/lysB.h*lh, wd=ws.columns.map(c=>(c.width||9)*7.3), alvo=Math.max(0,wd.reduce((a,b)=>a+b,0)-lw-4); let px=0, ci=0; while(ci<wd.length-1&&px+wd[ci]<=alvo){ px+=wd[ci]; ci++; } ws.addImage(lysId,{tl:{col:ci+(alvo-px)/wd[ci],row:0.07},ext:{width:lw,height:lh}}); } };
   const secao=(ws,row,n,txt,a)=>{ ws.mergeCells(row,a||1,row,n); const c=ws.getCell(row,a||1); c.value=txt.toUpperCase(); c.font=fnt({bold:true,size:11,color:{argb:PET}}); c.border={bottom:{style:'medium',color:{argb:RED}}}; c.alignment={vertical:'bottom'}; ws.getRow(row).height=24; };
   const cab=(ws,row,vals,dir,c0)=>{ const r=ws.getRow(row); vals.forEach((v,i)=>{ const c=r.getCell((c0||1)+i); c.value=v; c.font=fnt({bold:true,size:9,color:{argb:'FFFFFFFF'}}); c.fill=fill(PET2); c.alignment={vertical:'middle',horizontal:i>=dir?'right':'left',wrapText:true,indent:i<dir?1:0}; }); r.height=22; };
   /* ===================== Resumo ===================== */
@@ -253,10 +251,10 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
   const filtrado=!!(A.ls.length||A.q), nomeSel=A.ls.length?A.ls.join(' + '):A.q?'Produto "'+A.q+'"':'Fábrica', MC=n=>PANO_M[n].replace(/^./,c=>c.toUpperCase());
   const titulo='Produção '+A.ano+' · '+(A.ls.length?A.ls.join(', '):'todas as linhas')+(A.q?' · produto "'+A.q+'"':'');
   /* cabeçalho */
-  const lysPdf=await panoLysBranca(img), lyW=lysPdf?14*lysPdf.w/lysPdf.h:0, xR=PW-M-(lysPdf?lyW+4:0);
-  const topo=(t,sub)=>{ fc(Co.pet); doc.rect(0,0,PW,20,'F'); if(img&&img.escuro) doc.addImage(img.escuro.d,'PNG',M,5,30,30*img.escuro.h/img.escuro.w);
-    if(lysPdf) doc.addImage(lysPdf.d,'PNG',PW-M-lyW,3,lyW,14);
-    doc.setFont('helvetica','bold'); doc.setFontSize(14); tc([255,255,255]); doc.text(fit(t,PW-2*M-90),M+38,10); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); tc([199,215,224]); doc.text(fit(sub,PW-2*M-90),M+38,15.5);
+  const LGp=panoLogos(img), lysPdf=LGp.ly, lyW=lysPdf?13*lysPdf.w/lysPdf.h:0, xR=PW-M-(lysPdf?lyW+4:0);
+  const topo=(t,sub)=>{ fc(Co.pet); doc.rect(0,20,PW,0.9,'F'); if(LGp.cf) doc.addImage(LGp.cf.d,'PNG',M,5,30,Math.min(11,30*LGp.cf.h/LGp.cf.w));
+    if(lysPdf) doc.addImage(lysPdf.d,'PNG',PW-M-lyW,3.5,lyW,13);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); tc(Co.pet); doc.text(fit(t,PW-2*M-90),M+38,10); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); tc(Co.mut); doc.text(fit(sub,PW-2*M-90),M+38,15.5);
     doc.setFontSize(7.5); doc.text('Emitido em '+new Date().toLocaleDateString('pt-BR')+' às '+hora(new Date().toISOString()),xR,10,{align:'right'}); doc.text('Jan a '+PANO_M[hm]+' de '+A.ano+(andamento?' ('+PANO_M[hm]+' até '+hojeStr().slice(8,10)+'/'+hojeStr().slice(5,7)+')':''),xR,15.5,{align:'right'}); };
   const secao=(t,x,y)=>{ fc(Co.red); doc.rect(x,y-3.2,1.2,4.2,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); tc(Co.ink); doc.text(t,x+3,y); };
   topo(titulo,'Resumo para a diretoria · '+(A.fonte==='focco'?'Extrato do Focco (EPP)':'apontamentos do painel'));
