@@ -31,12 +31,12 @@ service cloud.firestore {
 
     // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
     match /{col}/{id} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
     }
     match /{col}/{id}/{resto=**} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
     }
 
     // Silos: histórico do saldo (consumo, estorno, medição). Só inclusão: ninguém altera nem apaga uma movimentação.
@@ -121,6 +121,10 @@ service cloud.firestore {
     match /presenca/{dia} {
       allow read: if rhOk() || (liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])));
       allow write: if rhOk();
+    }
+    // Quadro de pessoas do gestor (27/10: quem fica e quem sai, por linha/setor): só a dona e quem tem a Visão do gestor.
+    match /gxquadro/{id} {
+      allow read, write: if dono() || (liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])));
     }
     match /config/feriados {
       allow write: if rhOk();
