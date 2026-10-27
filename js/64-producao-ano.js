@@ -78,9 +78,105 @@ function panoLinhas(){ const A=S.pano, X=panoDados(); if(!X.rows) return null; c
   const tot=['Total'].concat(A.ver!=='linha'&&A.ver!=='produto'?['']:[]).concat(A.ver==='produto'?['']:[]).concat(X.mes.map(num),[num(X.tot),100]).concat(X.ant?[num(X.ant.tot),X.ant.tot?Math.round((X.tot-X.ant.tot)/X.ant.tot*1000)/10:'']:[]);
   return {A,X,head,rows,tot}; }
 function panoDesc(A){ return 'Produção '+(A.med==='t'?'em toneladas':'em sacos')+' · '+A.ano+' · '+(A.fonte==='focco'?'Extrato do Focco':'apontamentos do painel')+(A.ls.length?' · '+A.ls.join(', '):' · todas as linhas')+(A.q?' · produto com "'+A.q+'"':''); }
-async function panoXls(){ const L=panoLinhas(); if(!L) return; try{ await carregarScript(ANL_XLSX); }catch(e){} if(!window.XLSX){ toast('Não foi possível carregar o gerador de Excel.'); return; }
+/* 27/10 ("o excel está muito básico"): Excel com cores (ExcelJS, como o "O que precisa produzir"): Resumo (os números do PDF,
+   mês a mês, participação na fábrica, como foi contado) · Detalhe (produto/linha × mês, sacos e toneladas, totais com fórmula,
+   filtro e painéis congelados) · Por linha (todas as linhas da fábrica, mês a mês). Sem ExcelJS cai na planilha simples. */
+async function panoXlsSimples(){ const L=panoLinhas(); if(!L) return; try{ await carregarScript(ANL_XLSX); }catch(e){} if(!window.XLSX){ toast('Não foi possível carregar o gerador de Excel.'); return; }
   const XL=window.XLSX, ws=XL.utils.aoa_to_sheet([[panoDesc(L.A)],[],L.head].concat(L.rows,[L.tot])); ws['!cols']=L.head.map((h,i)=>({wch:i===0?(L.A.ver==='linha'?14:44):i===1&&L.A.ver!=='linha'?24:10}));
   const wb=XL.utils.book_new(); XL.utils.book_append_sheet(wb,ws,'Produção '+L.A.ano); XL.writeFile(wb,'Producao-'+L.A.ano+(L.A.ls.length?'-'+L.A.ls.join('-').replace(/\s+/g,''):'')+'.xlsx'); toast('Excel baixado.'); }
+async function panoXls(){ toast('Montando o Excel…'); const D=await panoPdfDados(); if(!D){ toast('Os dados ainda estão carregando. Tente de novo em alguns segundos.'); return; }
+  try{ await carregarScript(typeof ESW_EXCELJS!=='undefined'?ESW_EXCELJS:'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'); }catch(e){}
+  const XJ=window.ExcelJS; if(!XJ){ return panoXlsSimples(); }
+  const {A,X,Sc,Tn,Fb,FbT}=D, anoH=+hojeStr().slice(0,4), hm=A.ano===anoH?+hojeStr().slice(5,7)-1:11, nM=hm+1, MC=i=>PANO_M[i].replace(/^./,c=>c.toUpperCase());
+  const andamento=A.ano===anoH&&hojeStr()<A.ano+'-'+String(hm+1).padStart(2,'0')+'-'+String(new Date(A.ano,hm+1,0).getDate()).padStart(2,'0');
+  const fech=Sc.mes.slice(0,andamento?hm:nM).map((v,i)=>({i,v})).filter(o=>o.v>0), media=fech.length?fech.reduce((a,o)=>a+o.v,0)/fech.length:0;
+  const melhor=fech.length?fech.reduce((b,o)=>o.v>b.v?o:b):null, pior=fech.length?fech.reduce((b,o)=>o.v<b.v?o:b):null, filtrado=!!(A.ls.length||A.q);
+  const ant=X.ant&&A.med==='sc'?X.ant:null, tK={}; (Tn.rows||[]).forEach(o=>tK[o.k]=o.tot); const tF={}; (FbT.rows||[]).forEach(o=>tF[o.k]=o.tot);
+  const r1=v=>Math.round(v), r10=v=>Math.round(v*10)/10;
+  const titulo=('Produção '+A.ano+' · '+(A.ls.length?A.ls.join(', '):'todas as linhas')+(A.q?' · produto "'+A.q+'"':'')).toUpperCase();
+  const fonteTxt=A.fonte==='focco'?'Extrato do Focco (EPP). Linha = a da ordem de produção no painel; sem a ordem, a do item (Ajustes › Itens ou Focco). Só entra o que tem linha certa.':'Apontamentos lançados no painel.';
+  const emit='Emitido em '+new Date().toLocaleDateString('pt-BR')+' às '+hora(new Date().toISOString())+' · janeiro a '+PANO_M[hm]+' de '+A.ano+(andamento?' ('+PANO_M[hm]+' até '+hojeStr().slice(8,10)+'/'+hojeStr().slice(5,7)+')':'')+' · Painel Colafix';
+  const wb=new XJ.Workbook(); wb.creator='Painel Colafix'; try{ wb.calcProperties.fullCalcOnLoad=true; }catch(e){} const PET='FF143F54', TINT='FFE2ECF1', SOFT='FFF4F6F8', MUT='FF5E6E77', RED='FFB5473F', OK='FF2F6E4F';
+  const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}}), linhaB={bottom:{style:'thin',color:{argb:'FFE3E3E3'}}};
+  const faixa=(ws,row,n,txt,sub)=>{ ws.mergeCells(row,1,row,n); const c=ws.getCell(row,1); c.value=txt; c.font={bold:true,size:14,color:{argb:'FFFFFFFF'}}; c.fill=fill(PET); c.alignment={vertical:'middle',indent:1}; ws.getRow(row).height=30;
+    if(sub){ ws.mergeCells(row+1,1,row+1,n); const s2=ws.getCell(row+1,1); s2.value=sub; s2.font={italic:true,color:{argb:MUT}}; s2.alignment={indent:1}; } };
+  const secao=(ws,row,n,txt)=>{ ws.mergeCells(row,1,row,n); const c=ws.getCell(row,1); c.value=txt; c.font={bold:true,size:12,color:{argb:PET}}; c.border={bottom:{style:'medium',color:{argb:'FFE3312D'}}}; ws.getRow(row).height=20; };
+  const cab=(ws,row,vals,dir)=>{ const r=ws.getRow(row); r.values=vals; r.height=22; r.eachCell((c,i)=>{ c.font={bold:true,size:10,color:{argb:PET}}; c.fill=fill(TINT); c.alignment={vertical:'middle',horizontal:i>dir?'right':'left',wrapText:true}; c.border={bottom:{style:'medium',color:{argb:PET}}}; }); };
+  const col=n=>{ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
+  /* ---------- Resumo ---------- */
+  const rs=wb.addWorksheet('Resumo',{views:[{showGridLines:false}]}); const NR=Math.max(7,nM+2);
+  rs.columns=[{width:26}].concat(Array(NR-1).fill({width:12}));
+  faixa(rs,1,NR,titulo,emit);
+  secao(rs,4,NR,'Números do ano');
+  const K=[['Produzido no ano',r1(Sc.tot),'sacos','#,##0'],['Em toneladas',r10(Tn.tot),'t (sacos × peso do saco)','#,##0.0'],['Média por mês',r1(media),'sacos · '+fech.length+(fech.length===1?' mês fechado':' meses fechados'),'#,##0'],
+    ['Melhor mês',melhor?MC(melhor.i):'—',melhor?r1(melhor.v)+' sacos':'',null],['Mês mais fraco',pior?MC(pior.i):'—',pior?r1(pior.v)+' sacos':'',null]];
+  if(filtrado&&Fb.tot) K.push(['Da produção da fábrica',Sc.tot/Fb.tot,'de '+r1(Fb.tot).toLocaleString('pt-BR')+' sacos no total','0.0%']);
+  if(ant&&ant.tot) K.push(['Comparado a '+(A.ano-1),(Sc.tot-ant.tot)/ant.tot,r1(ant.tot).toLocaleString('pt-BR')+' sacos em '+(A.ano-1)+' (ano inteiro)','+0%;-0%;0%']);
+  K.forEach((k,i)=>{ const r=rs.getRow(5+i); r.getCell(1).value=k[0]; r.getCell(1).font={bold:true,color:{argb:PET}}; const v=r.getCell(2); v.value=k[1]; v.font={bold:true,size:13,color:{argb:PET}}; if(k[3]) v.numFmt=k[3]; v.alignment={horizontal:'right'};
+    rs.mergeCells(5+i,3,5+i,NR); r.getCell(3).value=k[2]; r.getCell(3).font={color:{argb:MUT}}; r.getCell(3).alignment={indent:1}; r.height=19; for(let c=1;c<=NR;c++) r.getCell(c).border=linhaB; });
+  /* mês a mês */
+  let y=5+K.length+1; secao(rs,y,NR,'Mês a mês'); y++;
+  cab(rs,y,['']. concat(Array.from({length:nM},(_,i)=>MC(i)),['Total']),1); const yC=y; y++;
+  const linhasMes=[['Sacos',Sc.mes,'#,##0',true],['Toneladas',Tn.mes,'#,##0.0',true]];
+  if(filtrado) linhasMes.push(['% da fábrica',Sc.mes.map((v,i)=>Fb.mes[i]?v/Fb.mes[i]:null),'0.0%',false]);
+  if(ant) linhasMes.push([String(A.ano-1)+' (sacos)',ant.mes,'#,##0',true]);
+  const yS=y; linhasMes.forEach((L,j)=>{ const r=rs.getRow(y); r.getCell(1).value=L[0]; r.getCell(1).font={bold:true,color:{argb:PET}};
+    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); const v=L[1][i]; c.value=v==null?null:(L[2]==='0.0%'?v:(L[2]==='#,##0'?r1(v):r10(v))); c.numFmt=L[2]; }
+    const t=r.getCell(2+nM); if(L[3]) t.value={formula:'SUM('+col(2)+y+':'+col(1+nM)+y+')'}; else t.value=Fb.tot?Sc.tot/Fb.tot:null; t.numFmt=L[2]; t.font={bold:true};
+    if(j%2) for(let c=1;c<=nM+2;c++) r.getCell(c).fill=fill(SOFT); for(let c=1;c<=nM+2;c++) r.getCell(c).border=linhaB;
+    if(melhor) r.getCell(2+melhor.i).font={bold:true,color:{argb:OK}}; y++; });
+  rs.getRow(yC).getCell(1).value='';
+  /* participação */
+  y++; secao(rs,y,NR,'Participação na fábrica (todas as linhas)'); y++;
+  cab(rs,y,['Linha','Sacos','Toneladas','% da fábrica'],1); y++;
+  const LO=linhasOrd(), ix=l=>{ const i=LO.indexOf(l); return i<0?999:i; };
+  const bars=(Fb.rows||[]).filter(o=>o.k&&o.k!=='—'&&!/\s\/\s/.test(o.k)).sort((a,b)=>ix(a.k)-ix(b.k)); const yP=y;
+  bars.forEach(o=>{ const r=rs.getRow(y); r.values=[o.k,r1(o.tot),r10(tF[o.k]||0),Fb.tot?o.tot/Fb.tot:0]; r.getCell(2).numFmt='#,##0'; r.getCell(3).numFmt='#,##0.0'; r.getCell(4).numFmt='0.0%';
+    const sel=A.ls.includes(o.k); for(let c=1;c<=4;c++){ r.getCell(c).border=linhaB; if(sel){ r.getCell(c).font={bold:true,color:{argb:RED}}; } } y++; });
+  { const r=rs.getRow(y); r.values=['Fábrica (total)',r1(Fb.tot),r10(FbT.tot),1]; r.getCell(2).numFmt='#,##0'; r.getCell(3).numFmt='#,##0.0'; r.getCell(4).numFmt='0.0%'; for(let c=1;c<=4;c++){ r.getCell(c).font={bold:true,color:{argb:PET}}; r.getCell(c).fill=fill(TINT); } y++; }
+  rs.getCell(y,1).value='O total da fábrica inclui os itens feitos em mais de uma linha sem como separar; por isso as linhas podem não somar 100%.'; rs.getCell(y,1).font={italic:true,size:9,color:{argb:MUT}}; y+=2;
+  secao(rs,y,NR,'Como foi contado'); y++;
+  [fonteTxt,'Toneladas = sacos × peso do saco (do nome do produto).','Média, melhor e mais fraco mês: só os meses já fechados'+(andamento?' ('+PANO_M[hm]+' ainda em andamento).':'.')].forEach(t=>{ rs.mergeCells(y,1,y,NR); const c=rs.getCell(y,1); c.value='• '+t; c.alignment={wrapText:true,vertical:'top'}; c.font={color:{argb:MUT}}; rs.getRow(y).height=t.length>110?30:16; y++; });
+  /* ---------- Detalhe ---------- */
+  const verL=A.ver==='linha', colLin=A.ver==='produto'&&A.ls.length!==1;
+  const head=[verL?'Linha':'Produto'].concat(A.ver==='linprod'?['Linha']:[]).concat(colLin?['Linhas']:[]).concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% do total']).concat(ant?[String(A.ano-1)+' (sacos)','Variação']:[]);
+  const nF=head.length-nM-3-(ant?2:0), cM=nF+1, cT=nF+nM+1, cTt=cT+1, cP=cT+2, cA=cT+3, cV=cT+4;
+  const ws=wb.addWorksheet('Detalhe',{views:[{state:'frozen',xSplit:nF,ySplit:4,showGridLines:false}]});
+  ws.columns=head.map((h,i)=>({width:i===0?(verL?16:46):i<nF?16:i>=cT-1?13:10}));
+  faixa(ws,1,head.length,titulo+' · DETALHE '+(verL?'POR LINHA':A.ver==='linprod'?'POR LINHA E PRODUTO':'POR PRODUTO'),emit);
+  cab(ws,4,head,nF); ws.autoFilter={from:{row:4,column:1},to:{row:4,column:head.length}};
+  let ri=5; const first=5;
+  (Sc.rows||[]).forEach((o,j)=>{ const r=ws.getRow(ri); const nm=A.ver==='linprod'?o.p:o.k; const vals=[nm].concat(A.ver==='linprod'?[o.l]:[]).concat(colLin?[(o.ls||[]).join(', ')]:[]);
+    vals.forEach((v,i)=>r.getCell(i+1).value=v); for(let i=0;i<nM;i++){ const c=r.getCell(cM+i); c.value=o.m[i]?r1(o.m[i]):null; c.numFmt='#,##0'; }
+    r.getCell(cT).value={formula:'SUM('+col(cM)+ri+':'+col(cM+nM-1)+ri+')',result:r1(o.tot)}; r.getCell(cT).numFmt='#,##0'; r.getCell(cT).font={bold:true,color:{argb:PET}};
+    r.getCell(cTt).value=tK[o.k]||0; r.getCell(cTt).numFmt='#,##0.0';
+    r.getCell(cP).numFmt='0.0%';
+    if(ant){ const a=X.antK?X.antK[o.k]||0:0; r.getCell(cA).value=a?r1(a):null; r.getCell(cA).numFmt='#,##0'; r.getCell(cV).value=a?{formula:'IF('+col(cA)+ri+'>0,'+col(cT)+ri+'/'+col(cA)+ri+'-1,"")'}:null; r.getCell(cV).numFmt='+0%;-0%;0%'; }
+    for(let c=1;c<=head.length;c++){ const k=r.getCell(c); k.border=linhaB; if(j%2) k.fill=fill(SOFT); } ri++; });
+  const last=ri-1, tr=ws.getRow(ri);
+  tr.getCell(1).value='Total'; for(let i=0;i<nM+2;i++){ const cc=cM+i, c=tr.getCell(cc); c.value={formula:'SUBTOTAL(9,'+col(cc)+first+':'+col(cc)+last+')'}; c.numFmt=cc===cTt?'#,##0.0':'#,##0'; }
+  tr.getCell(cP).value=1; tr.getCell(cP).numFmt='0.0%'; if(ant){ tr.getCell(cA).value={formula:'SUBTOTAL(9,'+col(cA)+first+':'+col(cA)+last+')'}; tr.getCell(cA).numFmt='#,##0'; tr.getCell(cV).value={formula:'IF('+col(cA)+ri+'>0,'+col(cT)+ri+'/'+col(cA)+ri+'-1,"")'}; tr.getCell(cV).numFmt='+0%;-0%;0%'; }
+  for(let c=1;c<=head.length;c++){ const k=tr.getCell(c); k.font={bold:true,color:{argb:PET}}; k.fill=fill(TINT); k.border={top:{style:'medium',color:{argb:PET}}}; }
+  for(let r=first;r<=last;r++){ const c=ws.getRow(r).getCell(cP); c.value={formula:col(cT)+r+'/'+col(cT)+'$'+ri}; }
+  ws.getCell(ri+2,1).value=fonteTxt; ws.getCell(ri+2,1).font={italic:true,size:9,color:{argb:MUT}};
+  /* ---------- Por linha (fábrica) ---------- */
+  const wl=wb.addWorksheet('Por linha',{views:[{state:'frozen',xSplit:1,ySplit:4,showGridLines:false}]});
+  const hL=['Linha'].concat(Array.from({length:nM},(_,i)=>MC(i)),['Total sacos','Total t','% da fábrica']); wl.columns=hL.map((h,i)=>({width:i===0?32:i>nM?13:10}));
+  faixa(wl,1,hL.length,'PRODUÇÃO '+A.ano+' · TODAS AS LINHAS DA FÁBRICA, MÊS A MÊS',emit); cab(wl,4,hL,1);
+  let rl=5; const lf=rl;
+  bars.forEach((o,j)=>{ const r=wl.getRow(rl); r.getCell(1).value=o.k; for(let i=0;i<nM;i++){ const c=r.getCell(2+i); c.value=o.m[i]?r1(o.m[i]):null; c.numFmt='#,##0'; }
+    r.getCell(nM+2).value={formula:'SUM(B'+rl+':'+col(nM+1)+rl+')'}; r.getCell(nM+2).numFmt='#,##0'; r.getCell(nM+2).font={bold:true,color:{argb:PET}};
+    r.getCell(nM+3).value=tF[o.k]||0; r.getCell(nM+3).numFmt='#,##0.0'; r.getCell(nM+4).value=Fb.tot?o.tot/Fb.tot:0; r.getCell(nM+4).numFmt='0.0%';
+    const sel=A.ls.includes(o.k); for(let c=1;c<=hL.length;c++){ const k=r.getCell(c); k.border=linhaB; if(j%2) k.fill=fill(SOFT); if(sel) k.font={bold:true,color:{argb:RED}}; } rl++; });
+  const outros=Fb.mes.map((v,i)=>v-bars.reduce((a,o)=>a+(o.m[i]||0),0)); if(outros.some(v=>v>0.5)){ const r=wl.getRow(rl); r.getCell(1).value='Mais de uma linha (sem separar)'; r.getCell(1).font={italic:true,color:{argb:MUT}};
+    for(let i=0;i<nM;i++){ const c=r.getCell(2+i); c.value=outros[i]>0.5?r1(outros[i]):null; c.numFmt='#,##0'; c.font={italic:true,color:{argb:MUT}}; } r.getCell(nM+2).value={formula:'SUM(B'+rl+':'+col(nM+1)+rl+')'}; r.getCell(nM+2).numFmt='#,##0'; rl++; }
+  { const r=wl.getRow(rl); r.getCell(1).value='Fábrica (total)'; for(let i=0;i<nM+1;i++){ const cc=2+i, c=r.getCell(cc); c.value={formula:'SUM('+col(cc)+lf+':'+col(cc)+(rl-1)+')'}; c.numFmt='#,##0'; } r.getCell(nM+3).value=r10(FbT.tot); r.getCell(nM+3).numFmt='#,##0.0'; r.getCell(nM+4).value=1; r.getCell(nM+4).numFmt='0.0%';
+    for(let c=1;c<=hL.length;c++){ const k=r.getCell(c); k.font={bold:true,color:{argb:PET}}; k.fill=fill(TINT); k.border={top:{style:'medium',color:{argb:PET}}}; } }
+  /* impressão: A4 deitada, cabe na largura */
+  [rs,ws,wl].forEach(s=>{ s.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.2,footer:.2}}; s.headerFooter={oddFooter:'&LPainel Colafix&RPágina &P de &N'}; });
+  ws.pageSetup.printTitlesRow='4:4';
+  const nome='Producao-'+A.ano+(A.ls.length?'-'+A.ls.join('-').replace(/\s+/g,''):'')+'.xlsx';
+  const buf=await wb.xlsx.writeBuffer(); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=nome; document.body.appendChild(a); a.click(); a.remove(); toast('Excel baixado: '+nome); }
 /* PDF para a diretoria (27/10, "preciso enviar para os chefes"): página 1 = resumo (sacos, toneladas, média, melhor e pior
    mês, participação na fábrica), gráfico mês a mês e quadro mês a mês; depois a tabela por produto/linha com toneladas.
    Só os meses até o mês atual. Itens sem linha definida não aparecem por nome (só somam no total da fábrica). */

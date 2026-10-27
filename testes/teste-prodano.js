@@ -35,7 +35,13 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  const SP=process.env.SHOTS||'/tmp'; await p.screenshot({path:SP+'/prodano.png',fullPage:true});
  if(process.env.JSPDF_REAL){ const baixa=async sel=>{ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:20000}),p.click(sel)]); const f=SP+'/'+dl.suggestedFilename(); await dl.saveAs(f); return {n:dl.suggestedFilename(),tam:fs.statSync(f).size}; };
    let r=await baixa('[data-act="pano-pdf"]'); ok('PDF baixa', /^Producao-\d{4}.*\.pdf$/.test(r.n)&&r.tam>2000, JSON.stringify(r));
-   r=await baixa('[data-act="pano-xls"]'); ok('Excel baixa', /^Producao-\d{4}.*\.xlsx$/.test(r.n)&&r.tam>1000, JSON.stringify(r)); }
+   r=await baixa('[data-act="pano-xls"]'); ok('Excel baixa', /^Producao-\d{4}.*\.xlsx$/.test(r.n)&&r.tam>1000, JSON.stringify(r));
+   try{ const EJ=require('exceljs'); const wb=new EJ.Workbook(); await wb.xlsx.readFile(SP+'/'+r.n); const nomes=wb.worksheets.map(w=>w.name);
+     const res=wb.getWorksheet('Resumo'), det=wb.getWorksheet('Detalhe'), pl=wb.getWorksheet('Por linha'); const txt=w=>{ const t=[]; w.eachRow(rw=>rw.eachCell(c=>{ const v=c.value; t.push(v&&v.formula?'='+v.formula:String(v)); })); return t.join(' | '); };
+     ok('Excel com 3 abas: Resumo, Detalhe, Por linha', nomes.join()==='Resumo,Detalhe,Por linha', nomes.join());
+     ok('Resumo: título, produzido 5.200 sc, toneladas, mês a mês e participação na fábrica', /PRODUÇÃO \d{4} · TODAS AS LINHAS/.test(txt(res))&&/Produzido no ano \| 5200/.test(txt(res))&&/Em toneladas/.test(txt(res))&&/Mês a mês/.test(txt(res))&&/Participação na fábrica/.test(txt(res))&&/Como foi contado/.test(txt(res)), txt(res).slice(0,700));
+     ok('Detalhe: total com fórmula (SUBTOTAL), filtro e painéis congelados', /SUBTOTAL\(9,/.test(txt(det))&&det.autoFilter&&det.views[0].state==='frozen', txt(det).slice(0,500));
+     ok('Por linha: Fixcol 300 e total da fábrica', /Fixcol/.test(txt(pl))&&/Fábrica \(total\)/.test(txt(pl)), txt(pl).slice(0,500)); }catch(e){ ok('Ler o Excel', false, e.message); } }
  await p.setViewportSize({width:390,height:840}); await H.dorme(800); ok('Celular: só a tabela rola de lado', await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
