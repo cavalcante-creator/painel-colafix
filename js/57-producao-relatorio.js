@@ -104,7 +104,7 @@ function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.l
   if(dados.foc&&praFocoOk(f)){ const DV={}; dados.foc.forEach(x=>{ const I=praFocItem(x.c), D=DV[x.c]||(DV[x.c]=praDiv(x.c)), v=f.med==='t'?x.q*(()=>{ try{ return ritKg(x.c); }catch(e){ return 20; } })()/1000:x.q;
       if(D.d){ dvF[D.f]=(dvF[D.f]||0)+1; for(const l in D.d) add(x.d,l,I.p,'',v*D.d[l]); return; }
       /* sem divisão: fora do filtro de linha; sem filtro, aparece com as linhas juntas */
-      if(f.ls&&f.ls.length){ if(D.ls.some(l=>f.ls.includes(l))){ if(x.d>=de&&x.d<=ate){ const k=x.c; semDiv[k]=semDiv[k]||{p:I.p.n,ls:D.ls,v:0}; semDiv[k].v+=v; } } return; }
+      if(f.ls&&f.ls.length){ if(D.ls.some(l=>f.ls.includes(l))){ if(x.d>=de&&x.d<=ate&&(!pq||praN(x.c+' '+I.p.n).includes(pq))){ const k=x.c; semDiv[k]=semDiv[k]||{c:k,p:I.p.n,ls:D.ls,v:0,m:Array(12).fill(0)}; semDiv[k].v+=v; semDiv[k].m[+x.d.slice(5,7)-1]+=v; } } return; }
       add(x.d,D.ls.length?D.ls.join(' / '):'Sem linha',I.p,'',v,true); }); }
   else if(praPar(f.med)) dados.par.forEach(p=>{ if(!p.inicio||(f.semSetup&&praSetup(p))) return; if(pq) return; add(hojeStr(new Date(p.inicio)),p.linha,null,p.motivo||'Sem motivo',f.med==='par'?pdMin(p.inicio,p.fim):1); });
   else if(f.med==='perda') dados.per.forEach(x=>{ if(!x.em) return; const o=ordById(x.ordem)||(S.ritOrdX||{})[x.ordem]; const p=o?praProd(o):{c:'',n:String(x.produto||'—')}; add(hojeStr(new Date(x.em)),x.linha||(o&&o.linha),p,'',+x.qtd||0); });

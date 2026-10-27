@@ -149,6 +149,11 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
   let yy=ty+3; fc(Co.pet); doc.rect(M,yy,PW-2*M,5.5,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(7); tc([255,255,255]); cols.forEach((c,i)=>{ if(i) doc.text(c,cx(i)+cw-1.5,yy+3.8,{align:'right'}); }); yy+=5.5;
   linhasQ.forEach((r,j)=>{ if(j%2){ fc(Co.zeb); doc.rect(M,yy,PW-2*M,5.4,'F'); } doc.setFont('helvetica','bold'); doc.setFontSize(7.2); tc(Co.ink); doc.text(r[0],M+1.5,yy+3.8);
     doc.setFont('helvetica','normal'); r[1].forEach((v,i)=>doc.text(v,cx(i+1)+cw-1.5,yy+3.8,{align:'right'})); doc.setFont('helvetica','bold'); doc.text(r[2],cx(cols.length-1)+cw-1.5,yy+3.8,{align:'right'}); yy+=5.4; });
+  /* itens que podem ter passado pela linha escolhida, mas o Focco não separa (pedido de 27/10): fora do total */
+  const sd=(Sc.R&&Sc.R.semDiv)||[], sdT={}; ((Tn.R&&Tn.R.semDiv)||[]).forEach(o=>sdT[o.c]=o.v); const sdTot=sd.reduce((a,o)=>a+o.v,0), sdTt=sd.reduce((a,o)=>a+(sdT[o.c]||0),0), nomeLs=A.ls.join(' + ');
+  if(sd.length){ const by=yy+6; fc([253,246,232]); doc.roundedRect(M,by,PW-2*M,13,1.5,1.5,'F'); fc(Co.warn); doc.rect(M,by,1.3,13,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); tc(Co.ink); doc.text(fit('Fora do total: '+sd.length+(sd.length===1?' item que pode':' itens que podem')+' ter sido feito'+(sd.length===1?'':'s')+' na '+nomeLs+' somam '+nS(sdTot)+' sc ('+nT(sdTt)+' t) no ano.',PW-2*M-8),M+4,by+5.2);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); tc(Co.mut); doc.text(fit('O Focco registra quanto foi produzido do item, mas não em qual linha. Esses itens podem ser feitos em mais de uma linha, por isso ficam à parte (detalhe na última página).',PW-2*M-8),M+4,by+9.8); }
   /* tabela detalhada */
   doc.addPage(); topo(titulo,'Detalhe '+(A.ver==='linha'?'por linha':A.ver==='linprod'?'por linha e produto':'por produto')+' · sacos e toneladas');
   const verL=A.ver==='linha', colLin=A.ver==='produto'&&A.ls.length!==1, tK={}; (Tn.rows||[]).forEach(o=>tK[o.k]=o.tot);
@@ -166,6 +171,20 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
       lin([o.l+' · '+rs.length+(rs.length===1?' produto':' produtos')].concat(sm.slice(0,nM).map(nS),[nS(st),nT(stt),pc(st,Sc.tot)]).concat(antK?['','']:[]),'g'); z=0; }
     const r=linhaDe(A.ver==='linprod'?o.p:o.k,(o.ls||[]).join(', '),o.m,o.tot,tK[o.k]||0,antK?antK[o.k]||0:0); lin(r,'',z++%2); });
   lin(['Total'].concat(colLin?['']:[]).concat(Sc.mes.slice(0,nM).map(nS),[nS(Sc.tot),nT(Tn.tot),'100%']).concat(antK?[nS(X.ant.tot),X.ant.tot?((Sc.tot>=X.ant.tot?'+':'')+Math.round((Sc.tot-X.ant.tot)/X.ant.tot*100)+'%'):'']:[]),'t');
+  if(sd.length){ doc.addPage(); topo(titulo,'Itens que podem ter passado pela '+nomeLs+' · fora do total'); let y2=28; secao('Itens que podem ter sido feitos na '+nomeLs,M,y2); y2+=5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); tc(Co.ink);
+    doc.splitTextToSize('O Extrato do Focco mostra quanto foi produzido de cada item por dia, mas não em qual linha. Os itens abaixo estão cadastrados para mais de uma linha e não há apontamento no painel que permita separar. Por isso NÃO estão somados no total da '+nomeLs+' das páginas anteriores. Os números abaixo são a produção inteira do item, em todas as linhas onde ele pode ser feito.',PW-2*M).forEach(t=>{ doc.text(t,M,y2+3); y2+=4; }); y2+=3;
+    const hd=['Produto','Pode ser feito em'].concat(MS,['Total sc','Total t']), fx=[80,34], rs=(PW-2*M-114)/(hd.length-2), w2=fx.concat(Array(hd.length-2).fill(rs)), x2=[]; let bx=M; w2.forEach(w=>{ x2.push(bx); bx+=w; });
+    const cab2=()=>{ fc(Co.pet); doc.rect(M,y2,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.6); tc([255,255,255]); hd.forEach((h,i)=>{ const r=i>=2; doc.text(fit(h,w2[i]-2),r?x2[i]+w2[i]-1:x2[i]+1,y2+4,{align:r?'right':'left'}); }); y2+=6; };
+    const l2=(r,tot,zeb)=>{ if(y2>PH-14){ doc.addPage(); y2=12; cab2(); } const h=tot?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y2,PW-2*M,h,'F'); } if(tot){ fc([226,236,241]); doc.rect(M,y2,PW-2*M,h,'F'); }
+      doc.setFont('helvetica',tot?'bold':'normal'); doc.setFontSize(6.8); tc(Co.ink); r.forEach((v,i)=>{ const t=fit(v,w2[i]-2), rr=i>=2; if(t) doc.text(t,rr?x2[i]+w2[i]-1:x2[i]+1,y2+3.6,{align:rr?'right':'left'}); }); y2+=h; };
+    cab2(); const sm=Array(12).fill(0); sd.forEach((o,j)=>{ (o.m||[]).forEach((v,i)=>sm[i]+=v); const nm=String(o.p||'').toUpperCase().startsWith(String(o.c).toUpperCase())?o.p:o.c+' · '+o.p;
+      l2([nm,(o.ls||[]).join(' / ')].concat((o.m||Array(12).fill(0)).slice(0,nM).map(nv),[nS(o.v),nT(sdT[o.c]||0)]),false,j%2); });
+    l2(['Total desses itens',''].concat(sm.slice(0,nM).map(nv),[nS(sdTot),nT(sdTt)]),true); y2+=6;
+    if(y2>PH-30){ doc.addPage(); y2=14; }
+    const caixa=(t1,t2,cor)=>{ fc(Co.soft); doc.roundedRect(M,y2,PW-2*M,12,1.5,1.5,'F'); fc(cor); doc.rect(M,y2,1.3,12,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); tc(Co.ink); doc.text(t1,M+4,y2+5); doc.setFont('helvetica','normal'); doc.setFontSize(7); tc(Co.mut); doc.text(fit(t2,PW-2*M-8),M+4,y2+9.3); y2+=15; };
+    caixa(nomeLs+' (certo): '+nS(Sc.tot)+' sc · '+nT(Tn.tot)+' t','Só os itens feitos apenas na '+nomeLs+', ou com a divisão conhecida (é o total das páginas anteriores).',Co.teal);
+    caixa(nomeLs+' se todos esses itens tivessem sido feitos nela: até '+nS(Sc.tot+sdTot)+' sc · '+nT(Tn.tot+sdTt)+' t','É o máximo possível. O número real fica entre os dois; para saber, é preciso dizer a linha (ou a divisão) desses itens em Ajustes › Itens.',Co.warn); }
   /* rodapé */
   const np=doc.getNumberOfPages?doc.getNumberOfPages():1; for(let p=1;p<=np;p++){ if(doc.setPage) doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(6.5); tc(Co.mut);
     doc.text(fit(A.fonte==='focco'?'Fonte: Extrato do Focco (EPP), sacos produzidos por item e dia. A linha é a do item em Ajustes › Itens (ou a do Focco). Toneladas = sacos × peso do saco.':'Fonte: apontamentos lançados no painel. Toneladas = sacos × peso do saco.',PW-2*M-30),M,PH-5); doc.text('Página '+p+' de '+np,PW-M,PH-5,{align:'right'}); }
