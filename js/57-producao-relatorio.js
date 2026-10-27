@@ -75,8 +75,18 @@ function praFocBusca(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,
   return Promise.all(ms.map(cp=>{ if(C[cp]&&C[cp].pr) return C[cp].pr; const it={d:null}; C[cp]=it;
     it.pr=S.db.doc('pcpvendas/'+cp).get().then(g=>{ it.d=g.exists?(g.data().d||{}):{}; return it.d; }).catch(e=>{ console.warn('[análise] extrato '+cp,e); delete C[cp]; return {}; }); return it.pr; })); }
 function praFocTem(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,ate);
-  if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[]; ms.forEach(cp=>{ const M=C[cp].d; for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q) foc.push({d:cp+'-'+dd,c,q}); } }); return {foc,ent:[],par:[],per:[]}; }
+  if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[], cov={}; ms.forEach(cp=>{ const M=C[cp].d, ds=new Set(); for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q){ foc.push({d:cp+'-'+dd,c,q}); ds.add(dd); } } cov[cp]=ds.size; }); return {foc,cov,ent:[],par:[],per:[]}; }
   praFocBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
+/* 27/10 (2º pedido "não está puxando só da linha"): a linha onde o item É FEITO, nesta ordem:
+   1) a linha do Focco (base: itens.l[c].ln), quando é uma só; 2) a divisão em % da Curva S (Previsto × Realizado › Configurar);
+   3) o que as linhas apontaram no painel nos últimos 60 dias (ritReal); 4) o cadastro de Itens, quando é uma linha só.
+   Sem nada disso (item que pode ir em várias linhas e sem divisão), a produção NÃO é posta numa linha: fica à parte e a tela avisa. */
+function praDiv(c){ const LO=linhasOrd(), B=(S.anl&&S.anl.base)||{}, it=((B.itens||{}).l||{})[c]||{}, um=l=>({d:{[l]:1},f:'focco'});
+  const fl=(it.ln||[]).filter(l=>LO.includes(l)); if(fl.length===1) return um(fl[0]);
+  try{ const ci=(ritCfg().itens||{})[c]; if(ci&&ci.d){ const d={}; let t=0; for(const l in ci.d){ const v=+ci.d[l]||0; if(v>0&&LO.includes(l)){ d[l]=v; t+=v; } } if(t>0){ for(const l in d) d[l]/=t; return {d,f:'cfg'}; } } }catch(e){}
+  try{ const r=ritReal(c,LO); if(r&&r.d&&Object.keys(r.d).length) return {d:r.d,f:'real'}; }catch(e){}
+  let cad=[]; try{ cad=anlLinhasDe(c,it); }catch(e){} if(cad.length===1) return {d:{[cad[0]]:1},f:'cad'};
+  return {d:null,ls:fl.length?fl:cad}; }
 function praFocItem(c){ const B=(S.anl&&S.anl.base)||{}, it=((B.itens||{}).l||{})[c]||{}; let ls=[]; try{ ls=anlLinhasDe(c,it); }catch(e){}
   let n=''; try{ n=ritNome(c); }catch(e){} if(!n||n===c) n=String(it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||'').replace(/^ARGAMASSA\s+/i,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b.*$/i,'');
   return {ls,p:{c,n:(c+' · '+n).trim()}}; }
@@ -88,7 +98,12 @@ function praProd(o){ const c=codigoDe(o); let n=''; try{ n=ritNome(c); }catch(e)
 function praFam(nome){ const w=String(nome||'').replace(/^\S+\s·\s/,'').replace(/^ARGAMASSA\s+/i,'').split(/\s+/).filter(x=>x&&!/^\d/.test(x)); return w.slice(0,2).join(' ')||'Outros'; }
 function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.ls.length||f.ls.includes(l), pq=praN(f.prod).trim(); let faltam=0;
   const add=(d,l,p,mot,v,semLs)=>{ if(d<de||d>ate||(!semLs&&!lsOk(l||'—'))) return; if(pq&&p&&!praN(p.n).includes(pq)) return; it.push({d,l:l||'—',p:p?p.n:'',fam:p?praFam(p.n):'',mot:mot||'',v}); };
-  if(dados.foc&&praFocoOk(f)){ dados.foc.forEach(x=>{ const I=praFocItem(x.c); if(f.ls&&f.ls.length&&!I.ls.some(l=>f.ls.includes(l))) return; const l=I.ls.length?I.ls.join(' / '):'Sem linha'; add(x.d,l,I.p,'',f.med==='t'?x.q*(()=>{ try{ return ritKg(x.c); }catch(e){ return 20; } })()/1000:x.q,true); }); }
+  var semDiv={}, dvF={};
+  if(dados.foc&&praFocoOk(f)){ const DV={}; dados.foc.forEach(x=>{ const I=praFocItem(x.c), D=DV[x.c]||(DV[x.c]=praDiv(x.c)), v=f.med==='t'?x.q*(()=>{ try{ return ritKg(x.c); }catch(e){ return 20; } })()/1000:x.q;
+      if(D.d){ dvF[D.f]=(dvF[D.f]||0)+1; for(const l in D.d) add(x.d,l,I.p,'',v*D.d[l]); return; }
+      /* sem divisão: fora do filtro de linha; sem filtro, aparece com as linhas juntas */
+      if(f.ls&&f.ls.length){ if(!D.ls.length||D.ls.some(l=>f.ls.includes(l))){ if(x.d>=de&&x.d<=ate){ const k=x.c; semDiv[k]=semDiv[k]||{p:I.p.n,ls:D.ls,v:0}; semDiv[k].v+=v; } } return; }
+      add(x.d,D.ls.length?D.ls.join(' / '):'Sem linha',I.p,'',v,true); }); }
   else if(praPar(f.med)) dados.par.forEach(p=>{ if(!p.inicio||(f.semSetup&&praSetup(p))) return; if(pq) return; add(hojeStr(new Date(p.inicio)),p.linha,null,p.motivo||'Sem motivo',f.med==='par'?pdMin(p.inicio,p.fim):1); });
   else if(f.med==='perda') dados.per.forEach(x=>{ if(!x.em) return; const o=ordById(x.ordem)||(S.ritOrdX||{})[x.ordem]; const p=o?praProd(o):{c:'',n:String(x.produto||'—')}; add(hojeStr(new Date(x.em)),x.linha||(o&&o.linha),p,'',+x.qtd||0); });
   else { dados.ent.forEach(e=>{ if(e.anula) an.add(e.anula); });
@@ -104,7 +119,7 @@ function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.l
     var rows=Object.entries(g).map(([k,v])=>({k,v,l:k.split(PRA_SEP)[0]})).sort((a,b)=>ix(a.l)-ix(b.l)||a.l.localeCompare(b.l)||b.v-a.v); rows.tl=tl; }
   else var rows=Object.entries(g).map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);
   const tot=it.reduce((a,x)=>a+x.v,0), dias=new Set(it.filter(x=>x.v>0).map(x=>x.d)).size;
-  return {rows,tot,dias,n:it.length,por,faltam}; }
+  return {rows,tot,dias,n:it.length,por,faltam,semDiv:Object.values(semDiv).sort((a,b)=>b.v-a.v)}; }
 const PRA_SEP=' › ';
 function praRot(por,k){ if(por==='dia'){ const w=['dom','seg','ter','qua','qui','sex','sáb'][new Date(k+'T12:00:00').getDay()]; return praDm(k)+' '+w; } if(por==='semana') return 'semana de '+praDm(k); if(por==='mes') return pdMes(k); return k; }
 function praFmt(med,v){ if(med==='t') return (Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' t'; if(med==='par') return pdHrs(v); if(med==='npar') return Math.round(v)+(Math.round(v)===1?' parada':' paradas'); return Math.round(v).toLocaleString('pt-BR')+' sc'; }
@@ -112,7 +127,7 @@ function praVar(a,b){ if(!b) return ''; const p=Math.round((a-b)/b*100); return 
 function praDesc(f,P){ const xs=[PRA_MED[f.med]+' por '+PRA_POR[f.por==='motivo'&&!praPar(f.med)?'linha':f.por].toLowerCase(),P?P.txt:PRA_PER[f.per].toLowerCase()];
   if(f.ls&&f.ls.length) xs.push(f.ls.join(', ')); if(f.prod&&!praPar(f.med)) xs.push('produto com "'+f.prod+'"'); if(praPar(f.med)&&f.semSetup) xs.push('sem setup'); if(praFocoOk(f)){ const V=((S.anl&&S.anl.base)||{}).vendas||{}; xs.push('pelo Extrato do Focco'+(V.ate?' (importado até '+praDm(V.ate)+')':'')); } if(f.comp) xs.push('comparando com '+(f.compCp?pdMes(f.compCp):'o período anterior')); return xs.join(' · '); }
 function praResultado(f,cpRel){ const P=praPeriodo(f,cpRel), d=praDad(f,P.de,P.ate); if(!d) return {P,carregando:true};
-  const R=praCalc(f,d,P.de,P.ate); let A=null, RA=null; if(f.comp){ A=praAnterior(f,P); const da=praDad(f,A.de,A.ate); if(da) RA=praCalc(f,da,A.de,A.ate); else return {P,carregando:true}; }
+  const R=praCalc(f,d,P.de,P.ate); if(d.cov) R.cov=d.cov; let A=null, RA=null; if(f.comp){ A=praAnterior(f,P); const da=praDad(f,A.de,A.ate); if(da) RA=praCalc(f,da,A.de,A.ate); else return {P,carregando:true}; }
   const ant={}; if(RA&&!praTempo(R.por)) RA.rows.forEach(r=>ant[r.k]=r.v);
   return {P,A,R,RA,ant,err:(S.pra.cache[P.de+'|'+P.ate]||{}).err}; }
 
@@ -125,6 +140,16 @@ async function praSalvasGrava(){ try{ await S.db.doc('perfis/'+S.uid).set({prodA
 function praMesesOpc(){ const d=new Date(); d.setDate(1); return [...Array(24)].map((_,i)=>{ const x=new Date(d.getFullYear(),d.getMonth()-i,1); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }); }
 function praGrupo(R,l,med){ const rs=R.rows.filter(x=>x.l===l), t=(R.rows.tl||{})[l]||0;
   return `<div class="pra-gh"><b>${esc(l)}</b><span>${rs.length} ${rs.length===1?'material':'materiais'} · ${praFmt(med,t)}${R.tot?' · '+Math.round(t/R.tot*100)+'% do total':''}</span></div>`; }
+/* avisos do Extrato do Focco: até quando foi importado, meses sem dado e itens sem linha definida (27/10) */
+function praFocAvisos(R,X,F){ const V=((S.anl&&S.anl.base)||{}).vendas||{}, h=hojeStr(), fim=X.P.ate<h?X.P.ate:h, out=[];
+  if(V.ate&&V.ate<addDias(fim,-1)) out.push(`<div class="pra-av">O Extrato do Focco importado vai até ${praDmy(V.ate)}. Para ter os dias depois disso, importe o Extrato em Análise PCP › Sistema › Base de dados.</div>`);
+  const MS=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'], cov=R.cov||{}, ks=Object.keys(cov).sort(), vaz=ks.filter(k=>!cov[k]&&k+'-01'<=fim);
+  if(ks.length>1) out.push(`<div class="pra-cov">Dias com produção no Extrato, por mês: ${ks.map(k=>`<span class="${!cov[k]&&k+'-01'<=fim?'v':''}">${MS[+k.slice(5)-1]} ${cov[k]}</span>`).join('')}</div>`);
+  if(vaz.length) out.push(`<div class="pra-av">Sem Extrato importado em ${vaz.map(k=>MS[+k.slice(5)-1]+'/'+k.slice(0,4)).join(', ')}: esses meses não entram no total. Importe o Extrato desses meses em Análise PCP › Sistema › Base de dados.</div>`);
+  if((R.semDiv||[]).length){ const t=R.semDiv.reduce((a,x)=>a+x.v,0);
+    out.push(`<details class="pra-av"><summary>${praFmt(F.med,t)} de ${R.semDiv.length} ${R.semDiv.length===1?'item':'itens'} ficaram de fora: o item pode ser feito em mais de uma linha e não há como saber quanto foi nesta linha</summary><div style="margin-top:6px">${R.semDiv.slice(0,15).map(x=>esc(x.p)+' ('+esc(x.ls.join(' / ')||'sem linha')+'): '+praFmt(F.med,x.v)).join('<br>')}</div><div style="margin-top:6px">Para entrarem, diga a linha do item no Focco ou a divisão em Análise PCP › Mês › Previsto × Realizado › Configurar.</div></details>`); }
+  out.push('<div class="sub" style="margin:0;font-size:12.5px">No Extrato não vem a linha. A linha é a do item no Focco; item de mais de uma linha é dividido pela % da Curva S ou pelo que as linhas apontaram no painel nos últimos 60 dias.</div>');
+  return out.join(''); }
 /* ---------- tela ---------- */
 function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=linhasOrd(), sv=S.pra.salvas||[];
   const opt=(o,v)=>Object.entries(o).map(([k,t])=>`<option value="${k}" ${k===v?'selected':''}>${t}</option>`).join('');
@@ -138,7 +163,7 @@ function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=l
       ${comp?`<div><b class="${!totA?'':R.tot>=totA?(praPar(F.med)||F.med==='perda'?'crit':'ok'):(praPar(F.med)||F.med==='perda'?'ok':'crit')}">${praVar(R.tot,totA)||'—'}</b><span>${totA?'Antes: '+praFmt(F.med,totA)+' · '+esc(X.A.txt):'Sem dados antes ('+esc(X.A.txt)+')'}</span></div>`:''}
       <div><b>${R.rows.filter(r=>r.v>0).length}</b><span>${lp?'materiais (linha × produto) no resultado':PRA_POR[R.por]==='Dia'?'dias com registro':(PRA_POR[R.por]||'').toLowerCase()+(cat?'s':'')+' no resultado'}</span></div></div>
       ${X.err?'<div class="pra-av">Não foi possível buscar todos os dados do período. Confira a internet e toque em Analisar de novo.</div>':''}
-      ${praFocoOk(F)?(()=>{ const V=((S.anl&&S.anl.base)||{}).vendas||{}, h=hojeStr(); return V.ate&&V.ate<X.P.ate&&V.ate<h?`<div class="pra-av">O Extrato do Focco importado vai até ${praDmy(V.ate)}. Para ter os dias depois disso, importe o Extrato em Análise PCP › Sistema › Base de dados.</div>`:''; })()+(R.rows.some(r=>/ \/ /.test(String(r.k)))?'<div class="sub" style="margin:0;font-size:12.5px">No Extrato não vem a linha: ela vem do cadastro do item. Item feito em mais de uma linha aparece com as linhas juntas (ex.: "Linha 1 / Linha 3").</div>':''):''}
+      ${praFocoOk(F)?praFocAvisos(R,X,F):''}
       ${R.faltam?`<div class="pra-av">Buscando ${R.faltam} ordem(ns) antiga(s) para saber o produto… o resultado se completa sozinho.</div>`:''}
       ${R.n?`<div class="pra-bs">${mostra.map((r,i)=>{ const a=X.ant[r.k], gh=lp&&(!i||mostra[i-1].l!==r.l)?praGrupo(R,r.l,F.med):'', rot=lp?r.k.slice(r.l.length+PRA_SEP.length):praRot(R.por,r.k); return gh+`<div class="pra-b"><span title="${esc(praRot(R.por,r.k))}">${esc(rot)}</span><div><i style="width:${(r.v/mx*100).toFixed(1)}%"></i></div><b>${praFmt(F.med,r.v)}</b><small>${lp?((R.rows.tl||{})[r.l]?Math.round(r.v/R.rows.tl[r.l]*100)+'% da linha':''):R.tot?Math.round(r.v/R.tot*100)+'%':''}${comp&&cat?' · antes '+praFmt(F.med,a||0)+(praVar(r.v,a||0)?' ('+praVar(r.v,a||0)+')':''):''}</small></div>`; }).join('')}</div>${R.rows.length>mostra.length?`<div class="sub">Mostrando ${mostra.length} de ${R.rows.length}. O PDF e o Excel têm tudo.</div>`:''}`
       :'<div class="empty">Nada encontrado com essas escolhas.</div>'}`; }
@@ -282,6 +307,8 @@ document.head.insertAdjacentHTML('beforeend',`<style id="pra-css">
 .pra-sp{flex:1}.pra-ck{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:inherit}
 .pra-r{border-top:1px solid var(--line,#DDE4E9);padding-top:12px;display:flex;flex-direction:column;gap:12px}
 .pra-dsc{font-size:13px;color:var(--muted)}
+.pra-cov{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}.pra-cov span{background:var(--ground);border-radius:6px;padding:2px 7px;color:inherit}.pra-cov span.v{background:var(--crit-tint,#F6E8E6);color:var(--crit-ink,#9C3B34);font-weight:600}
+details.pra-av summary{cursor:pointer}
 .pra-gh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:8px;padding:6px 0 4px;border-bottom:2px solid var(--teal-strong,#143F54)}.pra-gh:first-child{margin-top:0}.pra-gh b{font-size:14.5px;color:var(--teal-strong,#143F54)}.pra-gh span{font-size:12.5px;color:var(--muted)}
 .pra-cmp{height:34px;width:auto;min-width:150px;font-size:13px;padding:0 8px}.pra-cmp:disabled{opacity:.5}
 .pra-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.pra-tot>div{background:var(--ground);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
