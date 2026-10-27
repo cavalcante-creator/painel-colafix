@@ -83,8 +83,13 @@ function praFocTem(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,at
    Sem nada disso (item que pode ir em várias linhas e sem divisão), a produção NÃO é posta numa linha: fica à parte e a tela avisa. */
 function praDiv(c){ const LO=linhasOrd(), B=(S.anl&&S.anl.base)||{}, it=((B.itens||{}).l||{})[c]||{}, um=l=>({d:{[l]:1},f:'focco'});
   /* 27/10: o que a usuária acertou em Ajustes › Itens (uma linha só) vale antes do Focco (ex.: chapisco = Fixcol) */
-  try{ const pi=typeof itemDe==='function'?itemDe(c):null, cl=((pi&&pi.linhas)||[]).filter(l=>LO.includes(l)); if(cl.length===1) return {d:{[cl[0]]:1},f:'cad'}; }catch(e){}
-  const fl=(it.ln||[]).filter(l=>LO.includes(l)); if(fl.length===1) return um(fl[0]);
+  let cl=[]; try{ const pi=typeof itemDe==='function'?itemDe(c):null; cl=((pi&&pi.linhas)||[]).filter(l=>LO.includes(l)); }catch(e){}
+  if(cl.length===1) return {d:{[cl[0]]:1},f:'cad'};
+  /* 27/10 ("AB0003 está na linha 2 e 3"): cadastro com algumas linhas, mas não todas as "Linha N" (a usuária escolheu),
+     vale antes do Focco: são essas as linhas onde o item pode ser feito */
+  const LN=LO.filter(l=>/^linha\s*\d/i.test(l)), cadEsc=cl.length>1&&cl.every(l=>LN.includes(l))&&LN.some(l=>!cl.includes(l)); /* só "Linha N" (rejunte M1/M2 segue o Focco) */
+  let fl=(it.ln||[]).filter(l=>LO.includes(l)); if(cadEsc) fl=cl;
+  if(fl.length===1) return um(fl[0]);
   let cad=[]; try{ cad=anlLinhasDe(c,it); }catch(e){}
   /* 27/10 ("por que só apareceu essa?"): o apontado recente e a % da Curva S (que só tem L1/L2) só dividem o item se
      cobrem todas as linhas onde o Focco diz que ele pode ser feito; senão não dá para saber (ex.: AC0002 Focco L1/L3, Curva S L1) */
