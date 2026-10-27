@@ -26,10 +26,18 @@ let _qdT=null;
 function qdGrava(){ const D=qdD(); S.qd.dados=D; S.qd.salv=Date.now(); clearTimeout(_qdT);
   _qdT=setTimeout(async()=>{ try{ await S.db.collection('gxquadro').doc('atual').set({cols:D.cols,em:new Date().toISOString(),por:(S.user&&S.user.uid)||'',porNome:(typeof gxEu==='function'?gxEu():'')||''}); S.qd.salv=Date.now(); D.em=new Date().toISOString(); D.porNome=(typeof gxEu==='function'?gxEu():'')||''; const el=document.getElementById('qd-salvo'); if(el) el.textContent='Salvo agora'; }
     catch(e){ toast('Não deu para salvar o quadro: '+(e&&e.message||e)); } },500); }
-function qdPessoasRH(){ const ds=((S.gxPres&&S.gxPres.docs)||[]).slice().sort((a,b)=>String(b.dia).localeCompare(String(a.dia))); const m=new Map();
-  for(const d of ds){ (d.p||[]).concat(d.f||[]).forEach(p=>{ if(p&&p.n&&!m.has(qdK(p.n))) m.set(qdK(p.n),{n:p.n,s:p.s||'',e:p.e||''}); }); if(m.size>20) break; }
-  return [...m.values()].sort((a,b)=>a.n.localeCompare(b.n,'pt-BR')); }
-function qdOnde(n){ const k=qdK(n); for(const c of qdD().cols){ if(c.ps.some(p=>qdK(p.n)===k)) return c.nome; } return null; }
+function qdLev(a,b){ if(Math.abs(a.length-b.length)>2) return 9; let v=[...Array(b.length+1).keys()]; for(let i=1;i<=a.length;i++){ const w=[i]; for(let j=1;j<=b.length;j++) w[j]=Math.min(v[j]+1,w[j-1]+1,v[j-1]+(a[i-1]===b[j-1]?0:1)); v=w; } return v[b.length]; }
+/* mesma pessoa com grafia diferente (NARCISO/NARCIZO, nome do Face ID × cadastro) */
+function qdMesma(x,y){ const a=qdK(x), b=qdK(y); if(!a||!b) return false; if(a===b) return true;
+  const pa=a.split(' '), pb=b.split(' '); if(pa[0]!==pb[0]) return false;
+  if(pa.length>1&&pb.length>1&&pa[pa.length-1]===pb[pb.length-1]) return true;
+  return a.length>=10&&qdLev(a,b)<=2; }
+function qdPessoasRH(){ const ds=((S.gxPres&&S.gxPres.docs)||[]).slice().sort((a,b)=>String(b.dia).localeCompare(String(a.dia))); const L=[];
+  for(const d of ds){ (d.p||[]).concat(d.f||[]).forEach(p=>{ if(!p||!p.n) return; const x=L.find(o=>qdMesma(o.n,p.n));
+      if(!x){ L.push({n:p.n,s:p.s||'',e:p.e||''}); return; }
+      if(!x.s&&p.s) x.s=p.s; if(!x.e&&p.e) x.e=p.e; if(p.n.split(/\s+/).length>x.n.split(/\s+/).length) x.n=p.n; }); }
+  return L.sort((a,b)=>a.n.localeCompare(b.n,'pt-BR')); }
+function qdOnde(n){ for(const c of qdD().cols){ if(c.ps.some(p=>qdMesma(p.n,n))) return c.nome; } return null; }
 function qdTot(){ const t={n:0,fica:0,duv:0,sai:0,sem:0}; qdD().cols.forEach(c=>c.ps.forEach(p=>{ t.n++; if(p.st&&t[p.st]!=null) t[p.st]++; else t.sem++; })); return t; }
 function qdCard(c,p,i){ const st=QD_ST[p.st];
   return `<div class="qd-p ${p.st?'st-'+p.st:''} ${S.qd.sel===p.id?'sel':''}" draggable="true" data-qdp="${esc(p.id)}" data-qdc="${esc(c.id)}">

@@ -2,7 +2,7 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs; const hoje=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
  d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
- D['presenca/'+hoje]={dia:hoje,exp:true,p:[{n:'ANA TESTE PRIMEIRA',s:'Linha 1',e:'COLAFIX',c:'07:20'},{n:'BETO TESTE SEGUNDO',s:'Expedição',e:'COLAFIX',c:'07:25'}],f:[{n:'CAIO TESTE TERCEIRO',s:'Rejunte',e:'ZENITH',m:'Sem registro'}],em:new Date().toISOString()};
+ D['presenca/'+hoje]={dia:hoje,exp:true,p:[{n:'ANA TESTE PRIMEIRA',s:'Linha 1',e:'COLAFIX',c:'07:20'},{n:'BETO TESTE SEGUNDO',s:'Expedição',e:'COLAFIX',c:'07:25'},{n:'Lucas De Teste Narciso',s:'',e:'Zenith',c:'07:30'}],f:[{n:'CAIO TESTE TERCEIRO',s:'Rejunte',e:'ZENITH',m:'Sem registro'},{n:'Lucas De Teste Narcizo',s:'EXPEDIÇÃO',e:'Zenith',m:'Sem registro'}],em:new Date().toISOString()};
  const erros=[]; const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(4000);
  await p.click('#navlist [data-go="gxpres"]'); await H.dorme(900);
  let s=await p.evaluate(()=>[...document.querySelectorAll('.gxg-tabs .gxg-tb')].map(b=>b.innerText.replace(/\d+$/,'').trim()).join('|'));
@@ -14,7 +14,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const c0=await col(0), c1=await col(1);
  await p.click(`[data-act="qd-add"][data-v="${c0}"]`); await H.dorme(500);
  s=await p.evaluate(()=>[...document.querySelectorAll('.qd-rp')].map(b=>b.dataset.v));
- ok('Lista do RH vem da presença (inclusive quem não veio)', s.length===3&&s.includes('CAIO TESTE TERCEIRO'), JSON.stringify(s));
+ ok('Lista do RH vem da presença (inclusive quem não veio)', s.length===4&&s.includes('CAIO TESTE TERCEIRO'), JSON.stringify(s));
+ const lu=await p.evaluate(()=>[...document.querySelectorAll('.qd-rp')].filter(b=>/Narci/i.test(b.dataset.v)).map(b=>b.innerText.replace(/\n/g,' ')));
+ ok('Mesma pessoa com grafia diferente aparece uma vez só (com o setor)', lu.length===1&&/EXPEDI/i.test(lu[0]), JSON.stringify(lu));
  await p.fill('#qd-q','ana'); await H.dorme(200); await p.press('#qd-q','Enter'); await H.dorme(500);
  await p.fill('#qd-q','Zeca digitado'); await p.click('[data-act="qd-addtxt"]'); await H.dorme(500);
  await p.click('[data-act="qd-fecha"]'); await H.dorme(400);

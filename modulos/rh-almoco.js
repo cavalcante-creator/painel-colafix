@@ -719,11 +719,16 @@
   const prMenos=(d,n)=>{ const x=new Date(d+'T12:00'); x.setDate(x.getDate()-n); return x.toISOString().slice(0,10); };
   /* último dia em que cada CPF passou no Face ID (meses já carregados), antes do dia d */
   function prVisto(d){ const ult={}; let dias=0; Object.keys(A.dados).forEach(m=>{ const ds=(A.dados[m]||{}).dias||{}; Object.keys(ds).forEach(x=>{ if(x>=d) return; const ks=Object.keys(ds[x]||{}); if(ks.length>=5) dias++; ks.forEach(k=>{ if(!ult[k]||x>ult[k]) ult[k]=x; }); }); }); return {ult,dias}; }
+  /* nome do Face ID × nome do cadastro com grafia um pouco diferente (NARCISO/NARCIZO): mesma pessoa */
+  function prLev(a,b){ if(Math.abs(a.length-b.length)>1) return 9; let v=[...Array(b.length+1).keys()]; for(let i=1;i<=a.length;i++){ const w=[i]; for(let j=1;j<=b.length;j++) w[j]=Math.min(v[j]+1,w[j-1]+1,v[j-1]+(a[i-1]===b[j-1]?0:1)); v=w; } return v[b.length]; }
+  function prMesma(a,b){ if(fMesma(a,b)) return true; const A1=fNorm(a).split(' ').filter(t=>t.length>2), B1=fNorm(b).split(' ').filter(t=>t.length>2); if(A1.length<2||B1.length<2) return false;
+    const tk=(x,y)=>x===y||(x.length>=5&&y.length>=5&&x[0]===y[0]&&prLev(x,y)<=1); if(!tk(A1[0],B1[0])) return false;
+    const [cu,lo]=A1.length<=B1.length?[A1,B1]:[B1,A1]; return cu.every(t=>lo.some(u=>tk(t,u))); }
   function prDia(c,d,maxP){ const m=d.slice(0,7), Dm=A.dados[m]||{}, dia=(Dm.dias||{})[d]||{}, P0=Dm.pessoas||{}, P=c.P, R=c.R;
     const fx={}; (R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const tur=((P.S&&P.S.cfg&&P.S.cfg.turnos)||[])[0], ini=hm((tur&&tur.ini)||'07:30'), lim=Math.min(23*60,ini+30), limT=pad(Math.floor(lim/60))+':'+pad(lim%60);
     const ps=[], vistos=new Set();
-    Object.keys(dia).forEach(k=>{ const x=dia[k]||{}, f=fx[k]||null, pp=P0[k]||{}; const t=(x.t||[]).map(z=>{ const mm=String(z).match(/^(\d{2}:\d{2})(:\d{2})?\s*(.*)$/); return mm?{h:mm[1],d:mm[3]}:null; }).filter(Boolean).sort((a,b)=>a.h.localeCompare(b.h));
+    Object.keys(dia).forEach(k=>{ const x=dia[k]||{}, pp=P0[k]||{}; let f=fx[k]||null; if(!f&&pp.n){ const cs=(R.func||[]).filter(y=>prMesma(pp.n,y.nome)); if(cs.length===1) f=cs[0]; } const t=(x.t||[]).map(z=>{ const mm=String(z).match(/^(\d{2}:\d{2})(:\d{2})?\s*(.*)$/); return mm?{h:mm[1],d:mm[3]}:null; }).filter(Boolean).sort((a,b)=>a.h.localeCompare(b.h));
       if(!t.length) return; const g=[]; let ab=null; t.forEach(z=>{ if(ehSaida(z.d)){ if(ab!=null){ g.push(ab+'-'+z.h); ab=null; } } else if(ab==null) ab=z.h; }); if(ab!=null) g.push(ab+'-');
       const u=t[t.length-1]; vistos.add(k); if(f) vistos.add('f:'+f._id);
       ps.push({n:titulo(f?f.nome:(pp.n||'Sem nome')),s:(f&&f.setor)||'',e:prEmp(f,pp),c:t[0].h,a:x.a||'',u:u.h,sa:ehSaida(u.d)?1:0,g}); });
@@ -733,7 +738,7 @@
     const fs=[]; let VI=null; if(exp){ const ferias=(R.fer||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
       const sFil=((R.cfg&&R.cfg.setoresFilial)||[]).map(nrm), fora=f=>f.filial==='FIXCOL'||(f.setor&&sFil.includes(nrm(f.setor)));
       (R.func||[]).filter(f=>!/deslig|inativ|encerr|demit|rescis|afast/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d&&!/afast/i.test(f.status||''))).filter(f=>(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)&&!fora(f)).forEach(f=>{
-        const k=String(f.cpf||'').replace(/\D/g,'').padStart(11,'0'); if(vistos.has(k)||vistos.has('f:'+f._id)||ps.some(p=>fMesma(p.n,f.nome))) return;
+        const k=String(f.cpf||'').replace(/\D/g,'').padStart(11,'0'); if(vistos.has(k)||vistos.has('f:'+f._id)||ps.some(p=>prMesma(p.n,f.nome))) return;
         const fer=ferias.some(y=>y.funcId===f._id), vi=fer?null:(VI||(VI=prVisto(d))), u=vi&&vi.ult[k]||'', lim2=prMenos(d,14);
         /* sem passar no Face ID há mais de 2 semanas (ou nunca, com 2 semanas de dados): provavelmente saiu e o cadastro não foi atualizado */
         if(vi&&vi.dias>=8&&(!f.admissao||f.admissao<lim2)&&(!u||u<lim2)){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Sumiu',u}); return; }

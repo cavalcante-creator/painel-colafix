@@ -10,10 +10,12 @@ const n=new Date(), hj=iso(n);
   D['rh/dados/funcionarios/fz']={nome:'HELENA FILIAL',cpf:'88888888888',setor:'SECAGEM FIXCOL',empresa:'ZENITH',tipo:'PJ',status:'Ativo',admissao:'2020-01-01'};
   D['rh/dados/funcionarios/fd']={nome:'IVO DESLIGADO',cpf:'99999999999',setor:'Expedição',empresa:'COLAFIX',tipo:'CLT',status:'Desligado',admissao:'2020-01-01'};
   D['rh/dados/funcionarios/fa']={nome:'JOAO AFASTADO',cpf:'10101010101',setor:'Expedição',empresa:'COLAFIX',tipo:'CLT',status:'Afastado',admissao:'2020-01-01'};
+  D['rh/dados/funcionarios/fl']={nome:'LUCAS DE OLIVEIRA NARCIZO',cpf:'12121212121',setor:'Expedição',empresa:'ZENITH',tipo:'PJ',status:'Ativo',admissao:'2020-01-01'};
   /* 20 dias para trás: todos passam (Gilson só até 18 dias atrás); hoje Fabio não veio */
   const docs={};
   for(let k=20;k>=0;k--){ const x=new Date(n); x.setDate(x.getDate()-k); const ds=iso(x), m=ds.slice(0,7); docs[m]=docs[m]||{mes:m,dias:{},pessoas:{},imp:[{em:new Date().toISOString(),por:'Teste'}]};
     const dia={}; P.forEach((p,i)=>{ if(k===0&&i===5) return; dia[p[1]]={p:1,a:'11:4'+i,t:['07:1'+i+':00 Portaria Entrada','11:4'+i+':00 REFEITÓRIO','17:3'+i+':00 Portaria Saída']}; docs[m].pessoas[p[1]]={n:p[0],e:'COLAFIX'}; });
+    dia['nome:LUCAS DE OLIVEIRA NARCISO']={p:1,t:['07:25:00 Portaria Entrada']}; docs[m].pessoas['nome:LUCAS DE OLIVEIRA NARCISO']={n:'LUCAS DE OLIVEIRA NARCISO',e:'ZENITH'};
     if(k>=18){ dia['77777777777']={p:1,t:['07:20:00 Portaria Entrada']}; docs[m].pessoas['77777777777']={n:'GILSON SAIU',e:'COLAFIX'}; }
     docs[m].dias[ds]=dia; }
   Object.values(docs).forEach(x=>D['rh/dados/almoco/'+x.mes]=x);
@@ -21,6 +23,8 @@ const n=new Date(), hj=iso(n);
   let doc=null; for(let i=0;i<60;i++){ await H.dorme(500); doc=await p.evaluate(x=>__T.S().db.doc('presenca/'+x).get().then(g=>g.exists?g.data():null),hj); if(doc&&doc.f&&doc.f.length>=2) break; }
   const fg=doc&&doc.f.find(x=>/Gilson/.test(x.n)), ff=doc&&doc.f.find(x=>/Fabio/.test(x.n));
   ok('Quem não passa no Face ID há mais de 2 semanas vira "Sumiu" (com a última passagem); quem faltou hoje continua "Sem registro"', fg&&fg.m==='Sumiu'&&/^\d{4}-\d{2}-\d{2}$/.test(fg.u)&&ff&&ff.m==='Sem registro', JSON.stringify(doc&&doc.f));
+  const lu=doc?doc.p.concat(doc.f).filter(x=>/Lucas/.test(x.n)):[];
+  ok('Nome do Face ID com grafia diferente do cadastro (Narciso × Narcizo) é a mesma pessoa: uma vez só, presente, com o setor', lu.length===1&&!lu[0].m&&/Expedi/.test(lu[0].s), JSON.stringify(lu));
   await p.evaluate(()=>__T.go('gxpres')); await H.dorme(1500);
   ok('Desligado e afastado não aparecem em "não vieram"', doc&&!doc.f.some(x=>/Ivo|Joao/.test(x.n)), JSON.stringify(doc&&doc.f.map(x=>x.n)));
   const tabs=await p.evaluate(()=>[...document.querySelectorAll('.gxp-tab')].map(b=>b.innerText.replace(/\s+/g,' ')).join(' | '));
