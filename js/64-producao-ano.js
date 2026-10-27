@@ -12,13 +12,22 @@ const PANO_VER=[['produto','Produto'],['linha','Linha'],['linprod','Linha › pr
 /* 27/10 ("relatório detalhado com o número da ordem"): cada ordem de produção numa linha — data, nº, produto, linha,
    sacos e toneladas, separado por mês. O Extrato do Focco traz o nº (NRO DOC da EPP); sem o nº, junta por produto/linha/mês. */
 function panoKg(c){ try{ return (ritKg(c)||20)/1000; }catch(e){ return .02; } }
-function panoOrdens(it){ const g=new Map();
-  (it||[]).forEach(x=>{ if(!x.v) return; const mes=x.d.slice(0,7), k=x.o?('o|'+x.o+'|'+x.l+'|'+(x.c||x.p)):('s|'+x.l+'|'+(x.c||x.p)+'|'+mes);
-    let r=g.get(k); if(!r){ r={o:x.o||'',l:x.l,p:x.p||'—',c:x.c||'',d1:x.d,d2:x.d,v:0,mes:x.o?'':mes}; g.set(k,r); }
+/* 27/10 (2º pedido "separar por dia e linha e mês"): A.osep = {dia, linha}; o mês sempre separa */
+function panoSep(A){ const o=A.osep||(A.osep={dia:true,linha:true}); return o; }
+function panoOrdens(it,sep){ sep=sep||{dia:true,linha:true}; const g=new Map(), LO=linhasOrd(), ix=l=>{ const i=LO.indexOf(l); return i<0?999:i; };
+  (it||[]).forEach(x=>{ if(!x.v) return; const mes=x.d.slice(0,7), per=sep.dia?x.d:mes, k=(x.o?'o|'+x.o:'s')+'|'+x.l+'|'+(x.c||x.p)+'|'+per;
+    let r=g.get(k); if(!r){ r={o:x.o||'',l:x.l,p:x.p||'—',c:x.c||'',d1:x.d,d2:x.d,v:0,mes,dia:sep.dia?x.d:''}; g.set(k,r); }
     r.v+=x.v; if(x.d<r.d1) r.d1=x.d; if(x.d>r.d2) r.d2=x.d; });
-  const rs=[...g.values()]; rs.forEach(r=>{ if(!r.mes) r.mes=r.d1.slice(0,7); });
-  return rs.sort((a,b)=>a.mes.localeCompare(b.mes)||(a.o?0:1)-(b.o?0:1)||a.d1.localeCompare(b.d1)||(+a.o||0)-(+b.o||0)||a.p.localeCompare(b.p)); }
-function panoDataTxt(r){ const f=d=>d.slice(8,10)+'/'+d.slice(5,7); return r.o?(r.d1===r.d2?f(r.d1):f(r.d1)+' a '+f(r.d2)):'no mês'; }
+  const rs=[...g.values()]; rs.forEach(r=>{ if(!sep.dia) r.mes=r.d1.slice(0,7); });
+  return rs.sort((a,b)=>a.mes.localeCompare(b.mes)||(sep.dia?a.dia.localeCompare(b.dia):0)||(sep.linha?ix(a.l)-ix(b.l)||a.l.localeCompare(b.l):0)||(a.o?0:1)-(b.o?0:1)||a.d1.localeCompare(b.d1)||(+a.o||0)-(+b.o||0)||a.p.localeCompare(b.p)); }
+/* lista com os títulos de mês › dia › linha (com total e nº de ordens) e as linhas das ordens */
+function panoOrdGrupos(rs,sep){ const lv=['mes'].concat(sep.dia?['dia']:[]).concat(sep.linha?['l']:[]), out=[], tot=new Map();
+  const kOf=(r,i)=>lv.slice(0,i+1).map(k=>r[k]).join('|');
+  rs.forEach(r=>lv.forEach((k,i)=>{ const kk=kOf(r,i); let t=tot.get(kk); if(!t){ t={v:0,t:0,os:new Set()}; tot.set(kk,t); } t.v+=r.v; t.t+=r.v*panoKg(r.c); if(r.o) t.os.add(r.o); }));
+  const W=['dom','seg','ter','qua','qui','sex','sáb'], rot=(k,r)=>k==='mes'?pdMes(r.mes).replace(/^./,c=>c.toUpperCase()):k==='dia'?W[new Date(r.dia+'T12:00:00').getDay()]+' '+r.dia.slice(8,10)+'/'+r.dia.slice(5,7):r.l;
+  let ant=lv.map(()=>null); rs.forEach(r=>{ let mud=false; lv.forEach((k,i)=>{ const kk=kOf(r,i); if(mud||kk!==ant[i]){ mud=true; ant[i]=kk; const t=tot.get(kk); out.push({g:true,lv:i,k,txt:rot(k,r),v:t.v,t:t.t,n:t.os.size}); } }); out.push({g:false,r}); });
+  return out; }
+function panoDataTxt(r){ const f=d=>d.slice(8,10)+'/'+d.slice(5,7); return r.d1===r.d2?f(r.d1):r.o?f(r.d1)+' a '+f(r.d2):'no mês'; }
 function panoPer(ano){ const h=hojeStr(), de=ano+'-01-01', fim=ano+'-12-31'; return {de,ate:fim>h?h:fim,fim}; }
 function panoF(A){ return {per:'datas',med:A.med,por:'produto',ls:A.ls.slice(),prod:A.q,semSetup:true,comp:false,fonte:A.fonte==='focco'?'focco':''}; }
 /* lançamentos do ano → matriz chave × mês */
@@ -82,16 +91,19 @@ function vProdAno(){ const A=S.pano, X=panoDados(), LO=linhasOrd(), anoH=+hojeSt
     <tfoot><tr><th scope="row">Total</th>${X.mes.map(v=>`<td class="nr num">${nc(v)}</td>`).join('')}<td class="nr num"><b>${panoN(A,X.tot)}</b></td><td class="nr num">100%</td>${X.ant?`<td class="nr num">${panoN(A,totAnt)}</td><td class="nr num">${vr(X.tot,totAnt)}</td>`:''}</tr></tfoot></table></div>
     ${X.rows.length>lim?`<button class="lnk" data-act="pano-tudo" style="margin-top:8px">Mostrar todos (${X.rows.length})</button>`:''}</section>`;
   return cab+filtros+kp+avisos+`<section class="card"><div class="pano-gh2"><h2>Mês a mês · ${A.ano}</h2>${X.ant?`<span class="pano-lg"><i class="a"></i>${A.ano} <i class="b"></i>${A.ano-1}</span>`:''}</div>${panoGraf(A,X)}</section>`+tab; }
-function panoOrdTab(A,X){ const e=esc, rs=panoOrdens(X.R&&X.R.it), U=panoU(A), lim=A.tudo?rs.length:Math.min(rs.length,150), com=rs.filter(r=>r.o).length;
-  const tm={}; rs.forEach(r=>{ const t=tm[r.mes]||(tm[r.mes]={v:0,n:0}); t.v+=r.v; if(r.o) t.n++; });
-  let corpo='', mAnt=null; rs.slice(0,lim).forEach(r=>{ if(r.mes!==mAnt){ mAnt=r.mes; const t=tm[r.mes]; corpo+=`<tr class="pano-gh"><th colspan="4" scope="rowgroup">${e(pdMes(r.mes).replace(/^./,c=>c.toUpperCase()))} <small>${t.n} ${t.n===1?'ordem':'ordens'}</small></th><td class="nr num"><b>${panoN(A,t.v)}</b></td><td class="nr num">${X.tot?Math.round(t.v/X.tot*1000)/10+'%':''}</td></tr>`; }
-    const cod=String(r.p||'').split(' · ')[0];
-    corpo+=`<tr><td class="num">${e(panoDataTxt(r))}</td><td class="num">${r.o?'<b>'+e(r.o)+'</b>':'<span class="t-mut">sem nº</span>'}</td><td>${cod&&cod!=='—'?`<button class="lnk pano-nm" data-act="pano-prod" data-v="${e(cod)}" title="Ver só este produto">${e(r.p)}</button>`:e(r.p)}</td><td>${e(r.l)}</td><td class="nr num">${panoN(A,r.v)}</td><td class="nr num">${X.tot?Math.round(r.v/X.tot*1000)/10+'%':''}</td></tr>`; });
-  return `<section class="card pano-t"><div class="pano-gh2"><h2>Por ordem de produção</h2><span class="sub" style="margin:0">${com} ${com===1?'ordem':'ordens'}${rs.length>com?' · "sem nº" = produção do Extrato sem o número da ordem, junta por produto e mês':''}</span></div>
+function panoOrdTab(A,X){ const e=esc, sep=panoSep(A), rs=panoOrdens(X.R&&X.R.it,sep), U=panoU(A), com=new Set(rs.filter(r=>r.o).map(r=>r.o)).size, G=panoOrdGrupos(rs,sep);
+  let nr=0, corpo=''; const lim=A.tudo?Infinity:220;
+  for(const x of G){ if(nr>=lim) break; nr++;
+    if(x.g){ corpo+=`<tr class="pano-gh pano-lv${x.lv}"><th colspan="4" scope="rowgroup">${e(x.txt)} <small>${x.n} ${x.n===1?'ordem':'ordens'}</small></th><td class="nr num"><b>${panoN(A,x.v)}</b></td><td class="nr num">${X.tot?Math.round(x.v/X.tot*1000)/10+'%':''}</td></tr>`; continue; }
+    const r=x.r, cod=String(r.p||'').split(' · ')[0];
+    corpo+=`<tr><td class="num">${e(panoDataTxt(r))}</td><td class="num">${r.o?'<b>'+e(r.o)+'</b>':'<span class="t-mut">sem nº</span>'}</td><td>${cod&&cod!=='—'?`<button class="lnk pano-nm" data-act="pano-prod" data-v="${e(cod)}" title="Ver só este produto">${e(r.p)}</button>`:e(r.p)}</td><td>${e(r.l)}</td><td class="nr num">${panoN(A,r.v)}</td><td class="nr num">${X.tot?Math.round(r.v/X.tot*1000)/10+'%':''}</td></tr>`; }
+  const ck=(k,t)=>`<button class="pra-chip ${sep[k]?'on':''}" data-act="pano-osep" data-v="${k}" aria-pressed="${!!sep[k]}">${t}</button>`;
+  return `<section class="card pano-t"><div class="pano-gh2"><h2>Por ordem de produção</h2><div class="pano-osep"><span>Separar por</span><button class="pra-chip on" disabled aria-pressed="true">Mês</button>${ck('dia','Dia')}${ck('linha','Linha')}</div></div>
+    <div class="sub" style="margin:0 0 8px">${com} ${com===1?'ordem':'ordens'}${rs.some(r=>!r.o)?' · "sem nº" = produção do Extrato sem o número da ordem, junta por produto'+(sep.dia?' e dia':' e mês'):''}</div>
     <div class="pano-tw"><table class="anl-t pano-tb pano-ord"><thead><tr><th>Data</th><th>Ordem</th><th>Produto</th><th>Linha</th><th class="nr">${A.med==='t'?'Toneladas':'Sacos'}</th><th class="nr">%</th></tr></thead>
     <tbody>${corpo||'<tr><td colspan="6"><div class="empty">Nada produzido com esses filtros.</div></td></tr>'}</tbody>
     <tfoot><tr><th colspan="4" scope="row">Total</th><td class="nr num"><b>${panoN(A,X.tot)} ${U}</b></td><td class="nr num">100%</td></tr></tfoot></table></div>
-    ${rs.length>lim?`<button class="lnk" data-act="pano-tudo" style="margin-top:8px">Mostrar todas (${rs.length})</button>`:''}</section>`; }
+    ${G.length>nr?`<button class="lnk" data-act="pano-tudo" style="margin-top:8px">Mostrar tudo (${rs.length} linhas)</button>`:''}</section>`; }
 /* ---------- Excel e PDF ---------- */
 function panoLinhas(){ const A=S.pano, X=panoDados(); if(!X.rows) return null; const head=[A.ver==='linha'?'Linha':A.ver==='linprod'?'Linha':'Produto'].concat(A.ver==='linprod'?['Produto']:[]).concat(A.ver==='produto'?['Linhas']:[]).concat(PANO_M,['Total','%']).concat(X.ant?[String(A.ano-1),'Variação %']:[]);
   const num=v=>A.med==='t'?Math.round(v*10)/10:Math.round(v);
@@ -227,7 +239,7 @@ async function panoXls(){ toast('Montando o Excel…'); const D=await panoPdfDad
     if(ant) ws.addConditionalFormatting({ref:col(cV)+first+':'+col(cV)+last,rules:[{type:'cellIs',operator:'lessThan',formulae:['0'],style:{font:{color:{argb:'FFB5473F'},bold:true}}},{type:'cellIs',operator:'greaterThan',formulae:['0'],style:{font:{color:{argb:'FF2F6E4F'},bold:true}}}]}); }
   ws.getCell(ri+2,1).value='Cor dos meses: quanto mais escuro, mais produziu. '+fonteTxt; ws.getCell(ri+2,1).font=fnt({italic:true,size:8,color:{argb:MUT}});
   /* ===================== Por ordem (27/10) ===================== */
-  { const rs=panoOrdens(Sc.R&&Sc.R.it); if(rs.length){
+  { const rs=panoOrdens(Sc.R&&Sc.R.it,{dia:true,linha:true}); if(rs.length){
     const wo=wb.addWorksheet('Por ordem',{views:[{state:'frozen',ySplit:4,showGridLines:false}],properties:{tabColor:{argb:OK}}});
     const hO=['Mês','Data','Ordem','Produto','Linha','Sacos','Toneladas','% do total']; wo.columns=[{width:12},{width:14},{width:11},{width:46},{width:16},{width:12},{width:12},{width:11}];
     faixa(wo,hO.length,'PRODUÇÃO POR ORDEM · '+A.ano+' · '+escopo.toUpperCase(),per+' · '+emit); cab(wo,4,hO,5); wo.getRow(4).height=24; wo.autoFilter={from:{row:4,column:1},to:{row:4,column:hO.length}};
@@ -346,15 +358,14 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
   /* tabela detalhada */
   if(A.ver==='ordem'){ /* 27/10: detalhe por ordem de produção (sacos e toneladas), separado por mês */
     doc.addPage(); topo(titulo,'Detalhe por ordem de produção · sacos e toneladas');
-    const rs=panoOrdens(Sc.R&&Sc.R.it), head=['Data','Ordem','Produto','Linha','Sacos','Toneladas','% do total'], ws=[24,22,PW-2*M-24-22-34-26-26-20,34,26,26,20], xs=[]; let ax=M; ws.forEach(w=>{ xs.push(ax); ax+=w; });
+    const sep=panoSep(A), rs=panoOrdens(Sc.R&&Sc.R.it,sep), G=panoOrdGrupos(rs,sep), head=['Data','Ordem','Produto','Linha','Sacos','Toneladas','% do total'], ws=[24,22,PW-2*M-24-22-34-26-26-20,34,26,26,20], xs=[]; let ax=M; ws.forEach(w=>{ xs.push(ax); ax+=w; });
     const dir=i=>i>=4; let y=26; const cab=()=>{ fc(Co.pet); doc.rect(M,y,PW-2*M,6,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(6.8); tc([255,255,255]); head.forEach((h,i)=>doc.text(h,dir(i)?xs[i]+ws[i]-1:xs[i]+1,y+4,{align:dir(i)?'right':'left'})); y+=6; };
-    const meses=[...new Set(rs.map(r=>r.mes))]; let rest=rs.length+meses.length+1; const LIM=PH-14, cabe=()=>LIM>=y?Math.floor((LIM-y)/5)+1:0;
-    const lin=(r,tipo,zeb)=>{ const c=cabe(), sobra=rest-c; if(y>LIM||(sobra>0&&sobra<5&&rest<=6)||(tipo==='g'&&c<4&&rest>c)){ doc.addPage(); y=12; cab(); } rest--; const h=tipo?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='t'){ fc([226,236,241]); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='g'){ fc(Co.soft); doc.rect(M,y,PW-2*M,h,'F'); }
-      doc.setFont('helvetica',tipo?'bold':'normal'); doc.setFontSize(7); tc(tipo==='g'?Co.teal:Co.ink); r.forEach((v,i)=>{ const t=fit(v,(tipo&&i===0?ws[0]+ws[1]+ws[2]+ws[3]:ws[i])-2); if(t) doc.text(t,dir(i)?xs[i]+ws[i]-1:xs[i]+1,y+3.6,{align:dir(i)?'right':'left'}); }); y+=h; };
-    cab(); let mAnt=null, z=0, tt=0;
-    rs.forEach(r=>{ if(r.mes!==mAnt){ mAnt=r.mes; const xs2=rs.filter(q=>q.mes===r.mes), sv=xs2.reduce((a,q)=>a+q.v,0), st=xs2.reduce((a,q)=>a+q.v*panoKg(q.c),0), no=xs2.filter(q=>q.o).length;
-        lin([pdMes(r.mes).replace(/^./,c=>c.toUpperCase())+' · '+no+(no===1?' ordem':' ordens'),'','','',nS(sv),nT(st),pc(sv,Sc.tot)],'g'); z=0; }
-      const t=r.v*panoKg(r.c); tt+=t; lin([panoDataTxt(r),r.o||'sem nº',r.p,r.l,nS(r.v),nT(t),pc(r.v,Sc.tot)],'',z++%2); });
+    let rest=G.length+1; const LIM=PH-14, cabe=()=>LIM>=y?Math.floor((LIM-y)/5)+1:0;
+    const lin=(r,tipo,zeb)=>{ const c=cabe(), sobra=rest-c, gr=/^g/.test(tipo||''); if(y>LIM||(sobra>0&&sobra<5&&rest<=6)||(gr&&c<4&&rest>c)){ doc.addPage(); y=12; cab(); } rest--; const h=tipo?5.4:5; if(zeb){ fc(Co.zeb); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='t'){ fc([226,236,241]); doc.rect(M,y,PW-2*M,h,'F'); } if(tipo==='g0'){ fc([214,228,235]); doc.rect(M,y,PW-2*M,h,'F'); } else if(gr){ fc(Co.soft); doc.rect(M,y,PW-2*M,h,'F'); }
+      doc.setFont('helvetica',tipo?'bold':'normal'); doc.setFontSize(tipo==='g0'?7.6:7); tc(gr?Co.teal:Co.ink); r.forEach((v,i)=>{ const t=fit(v,(tipo&&i===0?ws[0]+ws[1]+ws[2]+ws[3]:ws[i])-2); if(t) doc.text(t,dir(i)?xs[i]+ws[i]-1:xs[i]+1,y+3.6,{align:dir(i)?'right':'left'}); }); y+=h; };
+    cab(); let z=0;
+    G.forEach(x=>{ if(x.g){ lin(['  '.repeat(x.lv)+x.txt+' · '+x.n+(x.n===1?' ordem':' ordens'),'','','',nS(x.v),nT(x.t),pc(x.v,Sc.tot)],'g'+x.lv); z=0; return; }
+      const r=x.r; lin([panoDataTxt(r),r.o||'sem nº',r.p,r.l,nS(r.v),nT(r.v*panoKg(r.c)),pc(r.v,Sc.tot)],'',z++%2); });
     lin(['Total','','','',nS(Sc.tot),nT(Tn.tot),'100%'],'t');
     if(rs.some(r=>!r.o)){ y+=3; doc.setFont('helvetica','italic'); doc.setFontSize(6.8); tc(Co.mut); doc.text('"sem nº" = produção do Extrato do Focco sem o número da ordem (junta por produto, linha e mês).',M,y+3); }
   } else {
@@ -399,6 +410,7 @@ async function panoPdf(){ toast('Montando o PDF…'); const D=await panoPdfDados
 /* ---------- ações ---------- */
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="pano-"]'); if(!b) return; const a=b.dataset.act, A=S.pano;
   if(a==='pano-set'){ const k=b.dataset.k; A[k]=b.dataset.v; A.tudo=false; render(); return; }
+  if(a==='pano-osep'){ const o=panoSep(A); o[b.dataset.v]=!o[b.dataset.v]; A.tudo=false; render(); return; }
   if(a==='pano-ln'){ const v=b.dataset.v; A.ls=!v?[]:A.ls.includes(v)?A.ls.filter(x=>x!==v):A.ls.concat([v]); render(); return; }
   if(a==='pano-prod'){ A.q=b.dataset.v; if(A.ver==='linha') A.ver='produto'; render(); return; }
   if(a==='pano-limpar'){ A.q=''; A.ls=[]; render(); return; }
@@ -419,6 +431,8 @@ try{ const g=GXG.find(x=>x.id==='g-prod'); if(g&&!g.tabs.some(t=>t[0]==='prodano
   const f=S.extViews.prodano; S.extViews.prodano=function(){ const h=f.apply(this,arguments); try{ if(!gxSolo()) return h; return gxgAbas('prodano')+h; }catch(e){ return h; } }; } }catch(e){}
 window.Painel=window.Painel||{}; window.Painel.producaoAno={dados:()=>panoDados(),estado:()=>S.pano};
 document.head.insertAdjacentHTML('beforeend',`<style id="pano-css">
+.pano-osep{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.pano-osep>span{font-size:12px;color:var(--muted);margin-right:2px}.pano-osep .pra-chip[disabled]{opacity:1;cursor:default}
+.pano-ord .pano-lv1 th{padding-left:22px;font-weight:600}.pano-ord .pano-lv2 th{padding-left:40px;font-weight:500}.pano-ord .pano-lv1,.pano-ord .pano-lv2{background:transparent}.pano-ord .pano-lv0{background:color-mix(in srgb,var(--teal) 9%,var(--surface))}
 .pano-f{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:14px 16px}
 .pano-f label.pra-ck{flex-direction:row;align-items:center;align-self:center}
 .pano-f label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}.pano-f select,.pano-f .txt{min-width:150px}

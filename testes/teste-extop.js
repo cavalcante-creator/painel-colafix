@@ -30,9 +30,14 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  x=await X(['Linha 2']); ok('Linha 2 = 0', x&&x.tot===0, JSON.stringify(x));
  await p.evaluate(()=>{ const A=Painel.producaoAno.estado(); Object.assign(A,{ver:'ordem',ls:[]}); __T.go('prodano'); }); await H.dorme(1500);
  let t=await p.evaluate(()=>[...document.querySelectorAll('.pano-ord tbody tr:not(.pano-gh)')].map(r=>[...r.cells].map(c=>c.innerText.trim()).slice(1,5).join('|')));
- ok('Ver por Ordem: uma linha por ordem com o nº, produto, linha e sacos', t.some(r=>/^900001\|.*\|Linha 3\|850$/.test(r))&&t.some(r=>/^900002\|.*\|Linha 1\|300$/.test(r))&&t.some(r=>/^777777\|/.test(r)), JSON.stringify(t));
+ ok('Ver por Ordem: uma linha por ordem com o nº, produto, linha e sacos', t.some(r=>/^900001\|.*\|Linha 3\|600$/.test(r))&&t.some(r=>/^900001\|.*\|Linha 3\|250$/.test(r))&&t.some(r=>/^900002\|.*\|Linha 1\|300$/.test(r))&&t.some(r=>/^777777\|/.test(r)), JSON.stringify(t));
  t=await p.evaluate(()=>document.querySelector('.pano-ord tbody tr.pano-gh')&&document.querySelector('.pano-ord tbody tr.pano-gh').innerText);
  ok('Separado por mês com o total do mês', /ordens|ordem/.test(t||''), t);
+ t=await p.evaluate(()=>[...document.querySelectorAll('.pano-ord tbody tr.pano-gh')].map(r=>r.className.match(/pano-lv\d/)[0]+':'+r.cells[0].innerText.split('\n')[0].trim()));
+ ok('Separa por mês › dia › linha (dia 05 e dia 10, cada um com as suas linhas)', t.filter(x=>x.startsWith('pano-lv1')).length===2&&t.some(x=>x.startsWith('pano-lv2:Linha 3'))&&t.some(x=>x.startsWith('pano-lv2:Linha 1 ')), JSON.stringify(t));
+ await p.click('[data-act="pano-osep"][data-v="dia"]'); await H.dorme(800);
+ t=await p.evaluate(()=>[...document.querySelectorAll('.pano-ord tbody tr:not(.pano-gh)')].map(r=>r.cells[0].innerText.trim()+'|'+r.cells[1].innerText.trim()+'|'+r.cells[4].innerText.trim()));
+ ok('Sem o dia: a ordem 900001 vira uma linha só (05/03 a 10/03, 850)', t.some(x=>/a .*\|900001\|850/.test(x)), JSON.stringify(t));
  const cache=await p.evaluate(()=>JSON.parse(localStorage.getItem('colafix.opLn')||'{}'));
  ok('Guarda no aparelho a linha das ordens (900001 → Linha 3) e a que não achou (777777)', cache['900001']&&cache['900001'].n==='Linha 3'&&cache['777777']&&cache['777777'].n==='', JSON.stringify(cache));
  ok('Sem erros no console', !erros.length, erros.join(' | '));
