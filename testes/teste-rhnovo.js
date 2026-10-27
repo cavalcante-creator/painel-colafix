@@ -117,6 +117,6 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   const C=await H.abrir({viewport:{width:1440,height:900}}); await H.preparar(C.page,d); await C.page.goto(H.BASE); await H.entrar(C.page,'iasmyn','senha123'); await H.dorme(2500);
   await C.page.evaluate(()=>__T.go('rhinicio')); await H.dorme(500);
   const dn=await C.page.evaluate(()=>({solo:document.body.classList.contains('rh-solo'),abas:[...document.querySelectorAll('#view nav.tabs .tab')].map(t=>t.innerText.trim()).join('|'),mods:document.querySelectorAll('#navlist [data-mod]').length}));
-  ok('A dona continua com a lista de módulos e as abas do RH em cima', !dn.solo&&dn.mods>2&&dn.abas==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Documentos e contratos|Férias e prazos|Almoço|Vagas|Cadastros', JSON.stringify(dn));
+  ok('A dona continua com a lista de módulos e as abas do RH em cima', !dn.solo&&dn.mods>2&&dn.abas==='Início|Agenda|Funcionários|Pessoas na empresa|Fichas do mês|Uniformes|Documentos e contratos|Férias e prazos|Almoço|Vagas|Cadastros', JSON.stringify(dn));
   await C.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?f+' FALHOU':'TODOS PASSARAM'); process.exit(f?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

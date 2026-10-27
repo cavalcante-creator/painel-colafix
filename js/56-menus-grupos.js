@@ -11,7 +11,7 @@
 const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios','tabprod']},{g:'Almoxarifado',ms:['premix','almox','monitor']},{g:'Silos',ms:['silos','silosver','silocel']},
   {id:'manut'},{id:'rh'},{id:'gestor'},{id:'telas'},{g:'Sistema',ic:'ajuste',ms:['meumenu','backup']}];
 const RHG=[{v:'rhinicio'},{g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhpres','Pessoas na empresa'],['rhvagas','Vagas']]},
-  {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhferias','Férias e prazos']]},{g:'Documentos',ic:'folha',vs:[['rhfichas','Fichas do mês'],['rhdocs','Documentos e contratos']]},
+  {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhferias','Férias e prazos']]},{g:'Documentos',ic:'folha',vs:[['rhfichas','Fichas do mês'],['rhunif','Uniformes'],['rhdocs','Documentos e contratos']]},
   {v:'rhalmoco'},{v:'rhfuncoes'}];
 const RH_SUB={rhterc:'rhfunc'};
 function sbRhSolo(){ try{ const ms=modsVis(); return ms.length===1&&ms[0].id==='rh'; }catch(e){ return false; } }
@@ -64,6 +64,7 @@ function sbRhAcoes(){ const xs=[];
   if(sbOk('rhferias')) xs.push(['Marcar férias','férias marcar programar',()=>go('rhferias')]);
   if(sbOk('rhdocs')) xs.push(['Gerar documento ou contrato','contrato documento advertência aviso termo',()=>go('rhdocs')]);
   if(sbOk('rhalmoco')){ xs.push(['Ausência no almoço','almoço ausência não almoça',()=>{ try{ RHAlmoco.ausencia(Painel); }catch(e){ go('rhalmoco'); } }]); xs.push(['Importar o Face ID / folha do almoço','csv face id almoço folha assinatura',()=>go('rhalmoco')]); }
+  if(sbOk('rhunif')) xs.push(['Entregar uniforme','uniforme camiseta calça entrega solicitação e-mail rh',()=>{ window.RHUnifNovo&&window.RHUnifNovo(); }]);
   if(sbOk('rhvagas')) xs.push(['Nova vaga','vaga candidato contratar',()=>{ go('rhvagas'); sbClica({act:'rhv-vnova'},150); }]);
   if(sbOk('rhfichas')) xs.push(['Imprimir as fichas do mês','fichas epi uniforme imprimir',()=>go('rhfichas')]);
   return xs; }
@@ -98,3 +99,7 @@ body.sbg-adm #navlist .navbtn>span{flex:1;min-width:0}
 .side .navlist{overflow-y:auto;min-height:0;flex:0 1 auto;margin-right:-6px;padding-right:6px;scrollbar-width:thin}
 .side .navlist::-webkit-scrollbar{width:6px}.side .navlist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:3px}
 </style>`);
+
+/* 27/10: "Entregar uniforme" nas ações rápidas (+) de quem vê a tela Uniformes do RH */
+{ const _tm=tpMais; tpMais=function(){ const xs=_tm.apply(this,arguments); try{ if(viewOk('rhunif')&&window.RHUnifNovo) xs.push(['unif','Entregar uniforme (avisar o RH)','']); }catch(e){} return xs; };
+  const _ta=tpAcao; tpAcao=function(a){ if(a==='unif'){ S.tp.pop=null; tpFechaPop(); window.RHUnifNovo&&window.RHUnifNovo(); return; } return _ta.apply(this,arguments); }; }

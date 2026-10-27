@@ -153,7 +153,7 @@
     frEl(); if(!R._prevT) R._prevT=setTimeout(()=>{ R._prevT=null; if(P.S.view==='rhfichas') P.rerender(); },700); return null; }
 
   /* ---------- pedaços de tela ---------- */
-  const TELA_EY={rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhvagas:'VAGAS E CANDIDATOS',rhfuncoes:'CADASTROS'};
+  const TELA_EY={rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhvagas:'VAGAS E CANDIDATOS',rhunif:'UNIFORMES',rhfuncoes:'CADASTROS'};
 const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('RH'+((P.S&&TELA_EY[P.S.view])?' · '+TELA_EY[P.S.view]:''))}</div><h1>${t}</h1>${s?`<div class="sub">${s}</div>`:''}</div>${acoes?`<div class="rh-acoes">${acoes}</div>`:''}</div>`;
   const opts=(xs,v)=>xs.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
   const unicos=k=>[...new Set(R.func.map(x=>x[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -179,6 +179,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     tDocAvisos().forEach(({x,d,s})=>av.push({c:s.c,r:s.c==='crit'?'Vencido':'Atenção',t:'Documento: '+d.nome+' · '+x.nome,s:s.t.toLowerCase()+(okIso(d.validade)?' ('+br(d.validade).slice(0,5)+')':''),act:`data-act="rh-tdoc" data-go-terc="1" data-id="${x._id}"`,l:'Abrir'}));
     const semFunc=ativos().filter(f=>!f.funcao);
     if(semFunc.length) av.push({c:'warn',r:'Atenção',t:semFunc.length+(semFunc.length===1?' funcionário sem função':' funcionários sem função'),s:'a ficha não tem itens: '+semFunc.slice(0,3).map(f=>f.nome).join(', ')+(semFunc.length>3?'…':''),act:'data-go="rhfunc"',l:'Resolver'});
+    try{ if(window.RHUnif) window.RHUnif.avisos(unifCtx()).forEach(a=>av.push({c:'warn',r:'Uniforme',t:a.titulo,s:a.texto,act:'data-go="rhunif"',l:'Abrir'})); }catch(e){} /* entregas de uniforme para lançar (27/10) */
     avisosMais().forEach(a=>av.unshift(a));
     return av; }
   function barra(c,tot){ const p=n=>tot?(n/tot*100).toFixed(2):0; return `<div class="rh-bar" role="img" aria-label="${c.ass} assinadas, ${c.imp} falta assinar, ${c.nao} não geradas"><i class="ok" style="width:${p(c.ass)}%"></i><i class="warn" style="width:${p(c.imp)}%"></i></div>`; }
@@ -1567,7 +1568,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:()=>{ const h=vInicio(), i=h.indexOf('Próximos 7 dias'); if(i<0) return h+avCardRH();
       /* fim do bloco dos 7 dias (conta seções abertas dentro dele) → os avisos entram logo depois, na largura toda */
       let k=h.lastIndexOf('<section',i), d=0, j=k; const re=/<\/?section\b/g; re.lastIndex=k; let m; while((m=re.exec(h))){ if(m[0]==='<section') d++; else { d--; if(d===0){ j=h.indexOf('>',m.index)+1; break; } } }
-      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhpres:{nome:'Pessoas na empresa',mob:'Pessoas',render:vPresRH}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas},
+      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhpres:{nome:'Pessoas na empresa',mob:'Pessoas',render:vPresRH}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas}, rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
     rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'}, rhvagas:{nome:'Vagas',mob:'Vagas',render:()=>window.RHVagas?window.RHVagas.render(vagCtx()):'<section class="card">Carregando…</section>'}, rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros} };
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return r()+modalConv()+modalFicha()+(window.RHCartao?RHCartao.modal({P,R,esc,baixar}):''); }; });
   /* tela Almoço (modulos/rh-almoco.js): controle do almoço pelo Face ID */
@@ -1576,6 +1577,10 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   const vagCtx=()=>({P,R,esc,eu,br,topo,addDias,guardar:guardarArqRH,funcoes:()=>R.funcoes.map(x=>x.nome).sort((a,b)=>a.localeCompare(b,'pt-BR')),setores:setoresCad,
     admIni:d=>{ R.f=Object.assign({status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr()},d,{empresa:d.tipo==='PJ'?'':'COLAFIX'}); R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); P.toast('Nova admissão de '+d.nome+': confira os dados e complete o cadastro.'); }});
   avRH(()=>window.RHVagas?window.RHVagas.avisos(vagCtx()):[]);
+  /* tela Uniformes (modulos/rh-uniformes.js, 27/10): entregas de uniforme para o RH lançar na ficha + e-mail pronto */
+  const unifCtx=()=>({P,R,esc,eu,br,topo,titulo,funcaoDe,setores:setoresCad});
+  avRH(()=>window.RHUnif?window.RHUnif.avisos(unifCtx()):[]);
+  window.RHUnifNovo=()=>{ P.go('rhunif'); setTimeout(()=>{ try{ window.RHUnif.render(unifCtx()); window.RHUnif.novo(); }catch(e){} },60); };
   /* ---------- Férias pelo relatório do sistema de folha (PDF "Programação de férias", Alleader) ----------
      O RH importa o PDF; o painel guarda em cada funcionário a situação da folha (ferFolha) e cria as férias já programadas.
      Daí em diante os períodos, dias de direito, gozados e o limite para gozo vêm da folha (consideram faltas e afastamentos). */
@@ -1912,7 +1917,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
   window.RHBusca={pessoas:()=>(R.func||[]).filter(f=>f&&f.nome&&!f.removido).map(f=>({id:f._id,nome:f.nome,setor:f.setor||'',funcao:f.funcao||'',status:f.status||''}))}; /* busca da lateral (js/56) */
   function navSolo(){ const ms=P.modsVis?P.modsVis():[], solo=ms.length===1&&ms[0]==='rh'&&!!TELAS[P.S.view]; document.body.classList.toggle('rh-solo',solo); if(!solo) return;
-    const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhpres:'fabrica',rhfichas:'folha',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhvagas:'mais',rhfuncoes:'ajuste'};
+    const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhpres:'fabrica',rhfichas:'folha',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhvagas:'mais',rhunif:'folha',rhfuncoes:'ajuste'};
     const h=Object.keys(TELAS).filter(v=>P.viewOk(v)&&TELAS[v].menu!==false).map(v=>`<button class="navbtn" data-go="${v}" ${P.S.view===v?'aria-current="page"':''}>${NIC[v]?P.ic(NIC[v],18):''}${esc(TELAS[v].nome)}</button>`).join('');
     if(nl.dataset.rh!==h){ nl.dataset.rh=h; nl.innerHTML=h; } const lb=nl.previousElementSibling; if(lb&&lb.classList.contains('modulo')) lb.textContent='RH'; }
   { const nl=document.getElementById('navlist'); if(nl&&window.MutationObserver) new MutationObserver(()=>{ if(document.body.classList.contains('rh-solo')&&!nl.querySelector('[data-go^="rh"]')){ nl.dataset.rh=''; navSolo(); } }).observe(nl,{childList:true}); }
