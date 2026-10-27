@@ -1119,7 +1119,7 @@ function vAnlEst(R){ const A=S.anl; if(!A.es||A.es.v!==2) A.es={v:2,q:'',vis:'pr
   const M=F.mais, ncol=11+(M?3:0)+(typeof eswTh==='function'?1:0);
   const row=r=>{ const cb=r.cob>=999?999:r.cob, cc=cb<=3?'var(--crit)':cb<=15?'var(--warn)':'var(--ok)', [st,stc]=ANL_SIT[r.sit2]||['—','neu'];
     const empT=r.emp?Object.keys(r.emp).sort().map(e=>'E'+e+' '+anlN((+r.emp[e].a3||0)+(+r.emp[e].a30||0))).join(' + ')+' · ':'';
-    return `<tr class="b-${typeof eswCor==='function'?eswCor(r,stc==='teal'?'ok':stc):(stc==='teal'?'ok':stc)}" data-act="anl-item" data-c="${esc(r.c)}"><td class="cd num">${esc(r.c)}</td><td class="pr" title="${esc(r.d)}">${esc(r.d)}</td>
+    return `<tr class="b-${typeof eswCor==='function'?eswCor(r,stc==='teal'?'ok':stc):(stc==='teal'?'ok':stc)}" data-act="anl-item" data-c="${esc(r.c)}"><td class="cd num">${esc(r.c)}</td><td class="pr" title="${esc(r.d)}">${esc(r.d)}${!F.agr||r.lp.length>1?`<small class="anl-lnt">${r.lp.length?esc(r.lp.join(' · ')):'sem linha'}</small>`:''}</td>
      <td class="nr num" title="${esc(empT+'Almox 3 '+anlN(r.a3)+' · Almox 30 '+anlN(r.a30))}"><b class="t-teal">${anlN(r.tot)}</b>${(()=>{ const es=r.emp?Object.keys(r.emp).sort().filter(e=>(+r.emp[e].a3||0)+(+r.emp[e].a30||0)!==0):[]; return es.length>1?`<small>${es.map(e=>'E'+e+' '+anlN((+r.emp[e].a3||0)+(+r.emp[e].a30||0))).join(' · ')}</small>`:''; })()}</td>
      ${M?`<td class="nr num t-mut">${anlN(r.a3)}</td><td class="nr num t-mut">${anlN(r.a30)}</td>`:''}
      <td class="nr num t-mut">${r.enc?'—':anlN(r.seg)}</td>
@@ -1134,7 +1134,9 @@ function vAnlEst(R){ const A=S.anl; if(!A.es||A.es.v!==2) A.es={v:2,q:'',vis:'pr
      <td><span class="anl-bdg ${stc}">${st}</span></td>
      <td>${S.anl.salvo&&S.anl.salvo.c===r.c?'<span class="anl-plan ok">✓ Salvo</span>':''}<button class="anl-plan" data-act="anl-sug" data-c="${esc(r.c)}" title="Incluir uma previsão (planejada) deste item">+ planejar</button></td></tr>`; };
   let corpo='';
-  if(F.agr&&!F.col){ const L=linhasOrd(), grp=new Map(); xs.forEach(r=>{ const k=r.lin0||'__sem'; if(!grp.has(k)) grp.set(k,[]); grp.get(k).push(r); });
+  /* 27/10 (pedido "quando filtrar tem que aparecer a linha, está se misturando"): agrupa por linha também com a coluna ordenada
+     (a ordem vale dentro de cada linha) e, com uma linha escolhida, todos os itens ficam no grupo dela (antes iam para a 1ª linha do item). */
+  if(F.agr){ const L=linhasOrd(), grp=new Map(), fl=F.linha&&F.linha!=='__sem'?F.linha:''; xs.forEach(r=>{ const k=fl||r.lin0||'__sem'; if(!grp.has(k)) grp.set(k,[]); grp.get(k).push(r); });
     const ord=[...grp.keys()].sort((a,b)=>(a==='__sem')-(b==='__sem')||L.indexOf(a)-L.indexOf(b));
     corpo=ord.map(k=>{ const rs=grp.get(k), f=sm(rs.filter(r=>!r.enc),'falta'), cap=k!=='__sem'?capDe(k):0;
       return `<tr class="anl-gh"><td colspan="${ncol}"><b>${k==='__sem'?'Sem linha cadastrada':esc(k)}</b><span>${rs.length} ${rs.length===1?'item':'itens'}</span>${f>0?`<span>falta programar <b class="t-crit num">${anlN(f)}</b>${cap?` · ≈ ${(f/cap).toFixed(1).replace('.',',')} dia${f/cap>=2?'s':''} de linha (${anlN(cap)}/dia)`:''}</span>`:'<span class="t-ok">nada a programar</span>'}</td></tr>`+rs.map(row).join(''); }).join(''); }

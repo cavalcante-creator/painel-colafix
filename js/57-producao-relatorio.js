@@ -10,16 +10,18 @@
    Dados: busca sob demanda, só o período escolhido (`entregas` por `em`, `paradas` por `inicio`, `perdas` por `em`, com limite) e
    guarda na memória da tela. Prefixo `pra`. */
 "use strict";
-S.pra=S.pra||{f:{per:'mes',de:'',ate:'',med:'sc',por:'produto',ls:[],prod:'',semSetup:true,comp:false},cache:{},salvas:null,salvando:false};
+S.pra=S.pra||{f:{per:'mes',de:'',ate:'',med:'sc',por:'produto',ls:[],prod:'',semSetup:true,comp:false,compCp:''},cache:{},salvas:null,salvando:false};
 const PRA_MED={sc:'Produção (sacos)',t:'Produção (toneladas)',par:'Tempo parado',npar:'Número de paradas',perda:'Perdas (sacos)'};
-const PRA_POR={dia:'Dia',semana:'Semana',mes:'Mês',linha:'Linha',produto:'Produto',familia:'Família do produto',motivo:'Motivo da parada'};
+const PRA_POR={dia:'Dia',semana:'Semana',mes:'Mês',linha:'Linha',produto:'Produto',linprod:'Linha e produto',familia:'Família do produto',motivo:'Motivo da parada'};
+const praSemProd=k=>k==='produto'||k==='familia'||k==='linprod'; /* não servem para paradas */
 const PRA_PER={mes:'Este mês',mesant:'Mês passado',d7:'Últimos 7 dias',d30:'Últimos 30 dias',ano:'Este ano',datas:'Escolher datas'};
 const PRA_SUG=[
   {n:'Produção por produto no mês',f:{per:'mes',med:'sc',por:'produto'}},
   {n:'Toneladas por semana',f:{per:'d30',med:'t',por:'semana'}},
   {n:'Paradas por motivo',f:{per:'mes',med:'par',por:'motivo'}},
   {n:'Toneladas mês a mês no ano',f:{per:'ano',med:'t',por:'mes'}},
-  {n:'Perdas por linha',f:{per:'mes',med:'perda',por:'linha'}}];
+  {n:'Perdas por linha',f:{per:'mes',med:'perda',por:'linha'}},
+  {n:'Materiais de cada linha',f:{per:'mes',med:'sc',por:'linprod'}}];
 const praTempo=p=>p==='dia'||p==='semana'||p==='mes';
 const praPar=m=>m==='par'||m==='npar';
 const praSetup=p=>/setup|troca|limpez/i.test(p.motivo||'');
@@ -37,7 +39,8 @@ function praPeriodo(f,cpRel){ const h=hojeStr(), cp=cpRel||h.slice(0,7);
   if(f.per==='ano') return {de:cp.slice(0,4)+'-01-01',ate:cp.slice(0,4)===h.slice(0,4)?h:cp.slice(0,4)+'-12-31',txt:'ano de '+cp.slice(0,4)};
   if(f.per==='datas'&&f.de&&f.ate){ const de=f.de<=f.ate?f.de:f.ate, ate=f.de<=f.ate?f.ate:f.de; return {de,ate,txt:praDmy(de)+' a '+praDmy(ate)}; }
   const fim=praMesFim(cp); return {de:cp+'-01',ate:fim>h&&cp===h.slice(0,7)?h:fim,txt:pdMes(cp)}; }
-function praAnterior(f,P){ if(f.per==='mes'||f.per==='mesant'){ const a=praMesAnt(P.de.slice(0,7)); return {de:a+'-01',ate:praMesFim(a),txt:pdMes(a)}; }
+function praAnterior(f,P){ if(f.compCp&&/^\d{4}-\d{2}$/.test(f.compCp)){ const a=f.compCp, h=hojeStr(), fim=praMesFim(a); return {de:a+'-01',ate:fim>h&&a===h.slice(0,7)?h:fim,txt:pdMes(a)}; } /* 27/10: mês escolhido para comparar */
+  if(f.per==='mes'||f.per==='mesant'){ const a=praMesAnt(P.de.slice(0,7)); return {de:a+'-01',ate:praMesFim(a),txt:pdMes(a)}; }
   if(f.per==='ano'){ const y=+P.de.slice(0,4)-1; return {de:y+'-01-01',ate:y+P.ate.slice(4),txt:'mesmo período de '+y}; }
   const n=praDias(P.de,P.ate), ate=addDias(P.de,-1), de=addDias(ate,-(n-1)); return {de,ate,txt:praDmy(de)+' a '+praDmy(ate)}; }
 
@@ -73,19 +76,22 @@ function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.l
     dados.ent.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const o=ordById(e.ordem)||(S.ritOrdX||{})[e.ordem]; if(!o){ faltam++; try{ ritFaltaOrdem(e.ordem); }catch(x){} }
       const p=o?praProd(o):{c:'',n:'Ordem '+(e.num||'?')+' (carregando)'}, q=+e.qtd||0, kg=o&&p.c?(()=>{ try{ return ritKg(p.c); }catch(x){ return 20; } })():20;
       add(hojeStr(new Date(e.em)),e.linha||(o&&o.linha),p,'',f.med==='t'?q*kg/1000:q); }); }
-  const por=f.por==='motivo'&&!praPar(f.med)?'linha':f.por;
-  const chave=x=>por==='dia'?x.d:por==='semana'?praSemana(x.d):por==='mes'?x.d.slice(0,7):por==='linha'?x.l:por==='produto'?(x.p||'—'):por==='familia'?(x.fam||'—'):(x.mot||'—');
+  const por=f.por==='motivo'&&!praPar(f.med)?'linha':praPar(f.med)&&praSemProd(f.por)?'motivo':f.por;
+  const chave=x=>por==='dia'?x.d:por==='semana'?praSemana(x.d):por==='mes'?x.d.slice(0,7):por==='linha'?x.l:por==='produto'?(x.p||'—'):por==='linprod'?x.l+PRA_SEP+(x.p||'—'):por==='familia'?(x.fam||'—'):(x.mot||'—');
   const g={}; it.forEach(x=>{ const k=chave(x); g[k]=(g[k]||0)+x.v; });
   if(praTempo(por)){ let d=de; const ks=new Set(Object.keys(g)); for(let i=0;i<400&&d<=ate;i++){ const w=new Date(d+'T12:00:00').getDay(); const k=por==='dia'?d:por==='semana'?praSemana(d):d.slice(0,7); if(por!=='dia'||(w>0&&w<6)) ks.add(k); d=addDias(d,1); }
     var rows=[...ks].sort().map(k=>({k,v:g[k]||0})); }
+  else if(por==='linprod'){ const LO=linhasOrd(), tl={}; Object.entries(g).forEach(([k,v])=>{ const l=k.split(PRA_SEP)[0]; tl[l]=(tl[l]||0)+v; }); const ix=l=>{ const i=LO.indexOf(l); return i<0?999:i; };
+    var rows=Object.entries(g).map(([k,v])=>({k,v,l:k.split(PRA_SEP)[0]})).sort((a,b)=>ix(a.l)-ix(b.l)||a.l.localeCompare(b.l)||b.v-a.v); rows.tl=tl; }
   else var rows=Object.entries(g).map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);
   const tot=it.reduce((a,x)=>a+x.v,0), dias=new Set(it.filter(x=>x.v>0).map(x=>x.d)).size;
   return {rows,tot,dias,n:it.length,por,faltam}; }
+const PRA_SEP=' › ';
 function praRot(por,k){ if(por==='dia'){ const w=['dom','seg','ter','qua','qui','sex','sáb'][new Date(k+'T12:00:00').getDay()]; return praDm(k)+' '+w; } if(por==='semana') return 'semana de '+praDm(k); if(por==='mes') return pdMes(k); return k; }
 function praFmt(med,v){ if(med==='t') return (Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' t'; if(med==='par') return pdHrs(v); if(med==='npar') return Math.round(v)+(Math.round(v)===1?' parada':' paradas'); return Math.round(v).toLocaleString('pt-BR')+' sc'; }
 function praVar(a,b){ if(!b) return ''; const p=Math.round((a-b)/b*100); return (p>0?'+':'')+p+'%'; }
 function praDesc(f,P){ const xs=[PRA_MED[f.med]+' por '+PRA_POR[f.por==='motivo'&&!praPar(f.med)?'linha':f.por].toLowerCase(),P?P.txt:PRA_PER[f.per].toLowerCase()];
-  if(f.ls&&f.ls.length) xs.push(f.ls.join(', ')); if(f.prod&&!praPar(f.med)) xs.push('produto com "'+f.prod+'"'); if(praPar(f.med)&&f.semSetup) xs.push('sem setup'); return xs.join(' · '); }
+  if(f.ls&&f.ls.length) xs.push(f.ls.join(', ')); if(f.prod&&!praPar(f.med)) xs.push('produto com "'+f.prod+'"'); if(praPar(f.med)&&f.semSetup) xs.push('sem setup'); if(f.comp) xs.push('comparando com '+(f.compCp?pdMes(f.compCp):'o período anterior')); return xs.join(' · '); }
 function praResultado(f,cpRel){ const P=praPeriodo(f,cpRel), d=praTem(P.de,P.ate); if(!d) return {P,carregando:true};
   const R=praCalc(f,d,P.de,P.ate); let A=null, RA=null; if(f.comp){ A=praAnterior(f,P); const da=praTem(A.de,A.ate); if(da) RA=praCalc(f,da,A.de,A.ate); else return {P,carregando:true}; }
   const ant={}; if(RA&&!praTempo(R.por)) RA.rows.forEach(r=>ant[r.k]=r.v);
@@ -96,21 +102,25 @@ function praSalvasCarrega(){ if(S.pra.salvas!==null||S.pra._lendo||!S.db||!S.uid
   S.db.doc('perfis/'+S.uid).get().then(g=>{ S.pra.salvas=(g.exists&&g.data().prodAnalises)||[]; render(); }).catch(e=>{ console.warn('[análises]',e); S.pra.salvas=[]; }).finally(()=>{ S.pra._lendo=false; }); }
 async function praSalvasGrava(){ try{ await S.db.doc('perfis/'+S.uid).set({prodAnalises:S.pra.salvas},{merge:true}); }catch(e){ erro(e); } }
 
+/* ---------- 27/10: mês de comparação e cabeçalho de linha (Linha e produto) ---------- */
+function praMesesOpc(){ const d=new Date(); d.setDate(1); return [...Array(24)].map((_,i)=>{ const x=new Date(d.getFullYear(),d.getMonth()-i,1); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }); }
+function praGrupo(R,l,med){ const rs=R.rows.filter(x=>x.l===l), t=(R.rows.tl||{})[l]||0;
+  return `<div class="pra-gh"><b>${esc(l)}</b><span>${rs.length} ${rs.length===1?'material':'materiais'} · ${praFmt(med,t)}${R.tot?' · '+Math.round(t/R.tot*100)+'% do total':''}</span></div>`; }
 /* ---------- tela ---------- */
 function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=linhasOrd(), sv=S.pra.salvas||[];
   const opt=(o,v)=>Object.entries(o).map(([k,t])=>`<option value="${k}" ${k===v?'selected':''}>${t}</option>`).join('');
-  const porOpt=Object.entries(PRA_POR).filter(([k])=>k!=='motivo'||praPar(F.med)).filter(([k])=>!praPar(F.med)||!['produto','familia'].includes(k)).map(([k,t])=>`<option value="${k}" ${k===F.por?'selected':''}>${t}</option>`).join('');
+  const porOpt=Object.entries(PRA_POR).filter(([k])=>k!=='motivo'||praPar(F.med)).filter(([k])=>!praPar(F.med)||!praSemProd(k)).map(([k,t])=>`<option value="${k}" ${k===F.por?'selected':''}>${t}</option>`).join('');
   let res;
   if(X.carregando) res='<div class="empty">Buscando os dados do período…</div>';
-  else { const R=X.R, mx=Math.max(1,...R.rows.map(r=>r.v)), comp=!!X.RA, cat=!praTempo(R.por), totA=X.RA?X.RA.tot:null, mostra=R.rows.slice(0,60);
+  else { const R=X.R, mx=Math.max(1,...R.rows.map(r=>r.v)), comp=!!X.RA, cat=!praTempo(R.por), totA=X.RA?X.RA.tot:null, lp=R.por==='linprod', mostra=R.rows.slice(0,lp?400:60);
     const media=R.dias?R.tot/R.dias:0;
     res=`<div class="pra-tot"><div><b>${praFmt(F.med,R.tot)}</b><span>Total · ${esc(X.P.txt)}</span></div>
       ${F.med!=='npar'?`<div><b>${praFmt(F.med,media)}</b><span>Média por dia com registro (${R.dias})</span></div>`:''}
       ${comp?`<div><b class="${!totA?'':R.tot>=totA?(praPar(F.med)||F.med==='perda'?'crit':'ok'):(praPar(F.med)||F.med==='perda'?'ok':'crit')}">${praVar(R.tot,totA)||'—'}</b><span>${totA?'Antes: '+praFmt(F.med,totA)+' · '+esc(X.A.txt):'Sem dados antes ('+esc(X.A.txt)+')'}</span></div>`:''}
-      <div><b>${R.rows.filter(r=>r.v>0).length}</b><span>${PRA_POR[R.por]==='Dia'?'dias com registro':(PRA_POR[R.por]||'').toLowerCase()+(cat?'s':'')+' no resultado'}</span></div></div>
+      <div><b>${R.rows.filter(r=>r.v>0).length}</b><span>${lp?'materiais (linha × produto) no resultado':PRA_POR[R.por]==='Dia'?'dias com registro':(PRA_POR[R.por]||'').toLowerCase()+(cat?'s':'')+' no resultado'}</span></div></div>
       ${X.err?'<div class="pra-av">Não foi possível buscar todos os dados do período. Confira a internet e toque em Analisar de novo.</div>':''}
       ${R.faltam?`<div class="pra-av">Buscando ${R.faltam} ordem(ns) antiga(s) para saber o produto… o resultado se completa sozinho.</div>`:''}
-      ${R.n?`<div class="pra-bs">${mostra.map(r=>{ const a=X.ant[r.k]; return `<div class="pra-b"><span title="${esc(praRot(R.por,r.k))}">${esc(praRot(R.por,r.k))}</span><div><i style="width:${(r.v/mx*100).toFixed(1)}%"></i></div><b>${praFmt(F.med,r.v)}</b><small>${R.tot?Math.round(r.v/R.tot*100)+'%':''}${comp&&cat?' · antes '+praFmt(F.med,a||0)+(praVar(r.v,a||0)?' ('+praVar(r.v,a||0)+')':''):''}</small></div>`; }).join('')}</div>${R.rows.length>mostra.length?`<div class="sub">Mostrando ${mostra.length} de ${R.rows.length}. O PDF e o Excel têm tudo.</div>`:''}`
+      ${R.n?`<div class="pra-bs">${mostra.map((r,i)=>{ const a=X.ant[r.k], gh=lp&&(!i||mostra[i-1].l!==r.l)?praGrupo(R,r.l,F.med):'', rot=lp?r.k.slice(r.l.length+PRA_SEP.length):praRot(R.por,r.k); return gh+`<div class="pra-b"><span title="${esc(praRot(R.por,r.k))}">${esc(rot)}</span><div><i style="width:${(r.v/mx*100).toFixed(1)}%"></i></div><b>${praFmt(F.med,r.v)}</b><small>${lp?((R.rows.tl||{})[r.l]?Math.round(r.v/R.rows.tl[r.l]*100)+'% da linha':''):R.tot?Math.round(r.v/R.tot*100)+'%':''}${comp&&cat?' · antes '+praFmt(F.med,a||0)+(praVar(r.v,a||0)?' ('+praVar(r.v,a||0)+')':''):''}</small></div>`; }).join('')}</div>${R.rows.length>mostra.length?`<div class="sub">Mostrando ${mostra.length} de ${R.rows.length}. O PDF e o Excel têm tudo.</div>`:''}`
       :'<div class="empty">Nada encontrado com essas escolhas.</div>'}`; }
   return `<section class="card pra" id="pra">
     <div class="pra-h"><div><h2>Análise personalizada</h2><div class="sub">Escolha o período, o que medir e como separar. Salve as que você usa sempre e marque quais entram no relatório do mês.</div></div>
@@ -126,7 +136,7 @@ function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=l
       ${!praPar(F.med)?`<label>Produto contém<input class="txt" data-pra="prod" value="${esc(F.prod||'')}" placeholder="código ou nome"></label>`:''}
     </div>
     <div class="pra-f2"><span class="pra-lb">Linhas:</span><button class="pra-chip ${!F.ls.length?'on':''}" data-act="pra-ln" data-v="">Todas</button>${LS.map(l=>`<button class="pra-chip ${F.ls.includes(l)?'on':''}" data-act="pra-ln" data-v="${esc(l)}">${esc(l)}</button>`).join('')}
-      <span class="pra-sp"></span>${praPar(F.med)?`<label class="pra-ck"><input type="checkbox" data-pra="semSetup" ${F.semSetup?'checked':''}> Tirar setup, troca e limpeza</label>`:''}<label class="pra-ck"><input type="checkbox" data-pra="comp" ${F.comp?'checked':''}> Comparar com o período anterior</label></div>
+      <span class="pra-sp"></span>${praPar(F.med)?`<label class="pra-ck"><input type="checkbox" data-pra="semSetup" ${F.semSetup?'checked':''}> Tirar setup, troca e limpeza</label>`:''}<label class="pra-ck"><input type="checkbox" data-pra="comp" ${F.comp?'checked':''}> Comparar com</label><select class="txt pra-cmp" data-pra="compCp" aria-label="Comparar com qual período" ${F.comp?'':'disabled'}><option value="" ${!F.compCp?'selected':''}>o período anterior</option>${praMesesOpc().map(m=>`<option value="${m}" ${F.compCp===m?'selected':''}>${pdMes(m)}</option>`).join('')}</select></div>
     <div class="pra-r" aria-live="polite"><div class="pra-dsc">${esc(praDesc(F,X.P))}</div>${res}</div></section>`; }
 
 /* ---------- PDF de uma análise (sozinha ou dentro do relatório do mês) ---------- */
@@ -137,7 +147,7 @@ function praPdfSecao(P,f,X,titulo){ const R=X.R, C=GPDF.cor, cat=!praTempo(R.por
   P.kpis([{t:'Total',v:praFmt(f.med,R.tot),s:X.P.txt,c:'pet'},{t:'Média por dia com registro',v:f.med==='npar'?'—':praFmt(f.med,media),s:R.dias+' dia(s)'},
     comp?{t:'Período anterior',v:praFmt(f.med,X.RA.tot),s:X.A.txt}:{t:PRA_POR[R.por],v:String(R.rows.filter(r=>r.v>0).length),s:'no resultado'},
     comp?{t:'Variação',v:praVar(R.tot,X.RA.tot)||'—',s:X.RA.tot?'contra o período anterior':'sem dados no período anterior',c:!X.RA.tot?'cinza':(R.tot>=X.RA.tot)===(!(praPar(f.med)||f.med==='perda'))?'ok':'crit'}:{t:'Registros',v:String(R.n)}],4);
-  if(cat) P.hbar(R.rows.slice(0,20).map(r=>({l:praRot(R.por,r.k),v:r.v,txt:praFmt(f.med,r.v)+' · '+(R.tot?Math.round(r.v/R.tot*100):0)+'%',c:praPar(f.med)||f.med==='perda'?'crit':'pet'})),{lw:62});
+  if(cat&&R.por!=='linprod') P.hbar(R.rows.slice(0,20).map(r=>({l:praRot(R.por,r.k),v:r.v,txt:praFmt(f.med,r.v)+' · '+(R.tot?Math.round(r.v/R.tot*100):0)+'%',c:praPar(f.med)||f.med==='perda'?'crit':'pet'})),{lw:62});
   else { const doc=P.doc, h=38; P.cabe(h+16); const top=P.y+3, base=top+h, xs=R.rows, mx=Math.max(1,...xs.map(x=>x.v)), gw=P.cw/Math.max(1,xs.length), bw=Math.max(1.6,Math.min(9,gw*.62));
     P.dc(C.lin); doc.setLineWidth(.2); for(let i=0;i<=4;i++){ const y=base-h*i/4; doc.line(P.M,y,P.M+P.cw,y); } doc.setFontSize(6.5); P.tc(C.mut); doc.text(praFmt(f.med,mx),P.M,top-1.2);
     const passo=Math.ceil(xs.length/16);
@@ -145,7 +155,7 @@ function praPdfSecao(P,f,X,titulo){ const R=X.R, C=GPDF.cor, cat=!praTempo(R.por
       if(i%passo===0){ doc.setFont('helvetica','normal'); doc.setFontSize(6.2); P.tc(C.mut); const t=R.por==='dia'?praDm(x.k):R.por==='semana'?praDm(x.k):pdMes(x.k).slice(0,3)+'/'+x.k.slice(2,4); doc.text(t,cx,base+3.6,{align:'center'}); } });
     P.y=base+8; }
   const cols=[{t:PRA_POR[R.por],w:70},{t:PRA_MED[f.med],w:30,al:'r'},{t:'% do total',w:18,al:'r'}].concat(comp&&cat?[{t:'Antes',w:26,al:'r'},{t:'Variação',w:18,al:'r'}]:[]);
-  const rows=R.rows.filter(r=>r.v>0||!cat).slice(0,120).map(r=>{ const a=X.ant[r.k]||0, v=praVar(r.v,a), row=[praRot(R.por,r.k),praFmt(f.med,r.v),R.tot?Math.round(r.v/R.tot*100)+'%':''].concat(comp&&cat?[praFmt(f.med,a),v]:[]); if(comp&&cat&&v) row._cor={4:(r.v>=a)===(!(praPar(f.med)||f.med==='perda'))?'ok':'crit'}; return row; });
+  const rows=R.rows.filter(r=>r.v>0||!cat).slice(0,R.por==='linprod'?600:120).map(r=>{ const a=X.ant[r.k]||0, v=praVar(r.v,a), row=[praRot(R.por,r.k),praFmt(f.med,r.v),R.tot?Math.round(r.v/R.tot*100)+'%':''].concat(comp&&cat?[praFmt(f.med,a),v]:[]); if(comp&&cat&&v) row._cor={4:(r.v>=a)===(!(praPar(f.med)||f.med==='perda'))?'ok':'crit'}; return row; });
   rows.push(Object.assign(['Total',praFmt(f.med,R.tot),'100%'].concat(comp&&cat?[praFmt(f.med,X.RA.tot),praVar(R.tot,X.RA.tot)]:[]),{_tot:1}));
   P.tabela(cols,rows); }
 async function praEspera(f,cpRel){ const P=praPeriodo(f,cpRel); await praBusca(P.de,P.ate); if(f.comp){ const A=praAnterior(f,P); await praBusca(A.de,A.ate); } await new Promise(r=>setTimeout(r,50)); return praResultado(f,cpRel); }
@@ -159,6 +169,7 @@ async function praXls(){ const f=S.pra.f, X=praResultado(f); if(!X.R) return; co
   const num=v=>f.med==='t'?Math.round(v*10)/10:f.med==='par'?Math.round(v):Math.round(v);
   const linhas=[[praDesc(f,X.P)],[],head].concat(R.rows.map(r=>[praRot(R.por,r.k),num(r.v),R.tot?Math.round(r.v/R.tot*1000)/10:0].concat(comp&&cat?[num(X.ant[r.k]||0),praVar(r.v,X.ant[r.k]||0)]:[]))).concat([['Total',num(R.tot),100].concat(comp&&cat?[num(X.RA.tot),praVar(R.tot,X.RA.tot)]:[])]);
   if(f.med==='par') linhas[2][1]='Tempo parado (min)';
+  if(R.por==='linprod') linhas.forEach((r,i)=>{ if(i===2) r.splice(0,1,'Linha','Produto'); else if(i>2){ const k=String(r[0]), j=k.indexOf(PRA_SEP); if(r[0]==='Total') r.splice(1,0,''); else r.splice(0,1,j<0?k:k.slice(0,j),j<0?'':k.slice(j+PRA_SEP.length)); } });
   const nome='Analise-producao-'+X.P.de+'-a-'+X.P.ate;
   if(window.XLSX){ const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(linhas),'Análise'); XLSX.writeFile(wb,nome+'.xlsx'); return; }
   const csv=linhas.map(r=>r.map(c=>{ const s=String(c==null?'':c); return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(';')).join('\r\n');
@@ -218,7 +229,7 @@ window.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.close
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="pra-"]'); if(!b) return; const a=b.dataset.act, F=S.pra.f;
   if(a==='pra-ln'){ const v=b.dataset.v; F.ls=!v?[]:F.ls.includes(v)?F.ls.filter(x=>x!==v):F.ls.concat([v]); render(); return; }
   if(a==='pra-sug'){ const s=PRA_SUG[+b.dataset.i]; if(s){ Object.assign(F,{ls:[],prod:''},s.f); render(); } return; }
-  if(a==='pra-usar'){ const s=(S.pra.salvas||[]).find(x=>x.id===b.dataset.id); if(s){ S.pra.f=Object.assign({ls:[],prod:'',semSetup:true,comp:true},JSON.parse(JSON.stringify(s.f))); render(); } return; }
+  if(a==='pra-usar'){ const s=(S.pra.salvas||[]).find(x=>x.id===b.dataset.id); if(s){ S.pra.f=Object.assign({ls:[],prod:'',semSetup:true,comp:true,compCp:''},JSON.parse(JSON.stringify(s.f))); render(); } return; }
   if(a==='pra-tirar'){ if(b.dataset.c!=='1'){ b.dataset.c='1'; b.textContent='apagar?'; setTimeout(()=>{ if(b.isConnected){ b.dataset.c=''; b.textContent='×'; } },3000); return; }
     S.pra.salvas=(S.pra.salvas||[]).filter(x=>x.id!==b.dataset.id); render(); praSalvasGrava(); return; }
   if(a==='pra-salvar'){ S.pra.salvando=true; render(); setTimeout(()=>{ const i=$('#pra-nome'); i&&(i.focus(),i.select()); },30); return; }
@@ -231,7 +242,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!t.closest||!t.closest('#pra')) return; const F=S.pra.f;
   if(t.dataset.praNomes){ const s=(S.pra.salvas||[]).find(x=>x.id===t.dataset.praNomes); if(s){ s.noMes=t.checked; praSalvasGrava(); toast(t.checked?'Entra no relatório do mês.':'Saiu do relatório do mês.'); } return; }
   const k=t.dataset.pra; if(!k) return; F[k]=t.type==='checkbox'?t.checked:t.value;
-  if(k==='med'){ if(praPar(F.med)&&['produto','familia'].includes(F.por)) F.por='motivo'; if(!praPar(F.med)&&F.por==='motivo') F.por='produto'; }
+  if(k==='med'){ if(praPar(F.med)&&praSemProd(F.por)) F.por='motivo'; if(!praPar(F.med)&&F.por==='motivo') F.por='produto'; }
   if(k==='per'&&F.per==='datas'&&!F.de){ F.ate=hojeStr(); F.de=addDias(F.ate,-13); }
   render(); });
 document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.target.id==='pra-nome'){ ev.preventDefault(); const b=document.querySelector('[data-act="pra-salvar-ok"]'); b&&b.click(); } });
@@ -250,6 +261,8 @@ document.head.insertAdjacentHTML('beforeend',`<style id="pra-css">
 .pra-sp{flex:1}.pra-ck{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:inherit}
 .pra-r{border-top:1px solid var(--line,#DDE4E9);padding-top:12px;display:flex;flex-direction:column;gap:12px}
 .pra-dsc{font-size:13px;color:var(--muted)}
+.pra-gh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:8px;padding:6px 0 4px;border-bottom:2px solid var(--teal-strong,#143F54)}.pra-gh:first-child{margin-top:0}.pra-gh b{font-size:14.5px;color:var(--teal-strong,#143F54)}.pra-gh span{font-size:12.5px;color:var(--muted)}
+.pra-cmp{height:34px;width:auto;min-width:150px;font-size:13px;padding:0 8px}.pra-cmp:disabled{opacity:.5}
 .pra-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.pra-tot>div{background:var(--ground);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
 .pra-tot b{font-size:24px;font-weight:700;line-height:1.1}.pra-tot b.ok{color:var(--ok-ink,var(--ok))}.pra-tot b.crit{color:var(--crit-ink,var(--crit))}.pra-tot span{font-size:12.5px;color:var(--muted)}
 .pra-av{background:var(--warn-bg,#FBF3E2);color:var(--warn-ink,#7A5B1C);border-radius:10px;padding:8px 12px;font-size:13px}

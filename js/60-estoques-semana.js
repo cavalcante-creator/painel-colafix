@@ -247,6 +247,7 @@ async function eswXls(){ const W=eswSemanas(), rows=eswLinhas(), nm=eswEscopoNom
   const buf=await wb.xlsx.writeBuffer(); baixa(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); }
 window.Painel=window.Painel||{}; window.Painel.estoquesSemana={semanas:eswSemanas,linhas:eswLinhas,estado:()=>S.esw};
 document.head.insertAdjacentHTML('beforeend',`<style id="esw-css">
+.anl-t td.pr .anl-lnt{display:block;font-size:11.5px;font-weight:600;color:var(--teal-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .esw-sc small{display:block;white-space:nowrap}.esw-sc .anl-bdg{margin-top:3px;white-space:nowrap}.esw-thd{min-width:132px}
 .esw{display:flex;flex-direction:column;gap:14px}
 .esw-hd{margin-bottom:0}.esw-rb{position:relative;display:inline-flex;align-items:center;gap:8px}.esw-rbn{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--crit);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
