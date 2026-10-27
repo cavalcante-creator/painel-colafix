@@ -10,7 +10,7 @@
    Dados: busca sob demanda, só o período escolhido (`entregas` por `em`, `paradas` por `inicio`, `perdas` por `em`, com limite) e
    guarda na memória da tela. Prefixo `pra`. */
 "use strict";
-S.pra=S.pra||{f:{per:'mes',de:'',ate:'',med:'sc',por:'produto',ls:[],prod:'',semSetup:true,comp:false,compCp:''},cache:{},salvas:null,salvando:false};
+S.pra=S.pra||{f:{per:'mes',de:'',ate:'',med:'sc',por:'produto',ls:[],prod:'',semSetup:true,comp:false,compCp:'',fonte:''},cache:{},salvas:null,salvando:false};
 const PRA_MED={sc:'Produção (sacos)',t:'Produção (toneladas)',par:'Tempo parado',npar:'Número de paradas',perda:'Perdas (sacos)'};
 const PRA_POR={dia:'Dia',semana:'Semana',mes:'Mês',linha:'Linha',produto:'Produto',linprod:'Linha e produto',familia:'Família do produto',motivo:'Motivo da parada'};
 const praSemProd=k=>k==='produto'||k==='familia'||k==='linprod'; /* não servem para paradas */
@@ -21,7 +21,8 @@ const PRA_SUG=[
   {n:'Paradas por motivo',f:{per:'mes',med:'par',por:'motivo'}},
   {n:'Toneladas mês a mês no ano',f:{per:'ano',med:'t',por:'mes'}},
   {n:'Perdas por linha',f:{per:'mes',med:'perda',por:'linha'}},
-  {n:'Materiais de cada linha',f:{per:'mes',med:'sc',por:'linprod'}}];
+  {n:'Materiais de cada linha',f:{per:'mes',med:'sc',por:'linprod'}},
+  {n:'Produzido no ano pelo Focco, por linha',f:{per:'ano',med:'sc',por:'linha',fonte:'focco'}}];
 const praTempo=p=>p==='dia'||p==='semana'||p==='mes';
 const praPar=m=>m==='par'||m==='npar';
 const praSetup=p=>/setup|troca|limpez/i.test(p.motivo||'');
@@ -64,13 +65,31 @@ function praBusca(de,ate){ const k=de+'|'+ate, C=S.pra.cache; const L=praLocal(d
   return it.pr; }
 function praTem(de,ate){ const L=praLocal(de,ate); if(L.ent&&L.par&&L.per) return {ent:L.ent,par:L.par,per:L.per};
   const it=S.pra.cache[de+'|'+ate]; if(it&&it.d) return it.d; praBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
+/* ---------- 27/10: produção pelo Extrato do Focco (EPP por item e dia, coleção pcpvendas/<AAAA-MM>) ----------
+   Pedido "ele pode pegar do extrato do item? preciso da quantidade produzida da linha 3 nesse ano". O Extrato não diz a linha:
+   a linha vem do item (cadastro de Itens; senão a linha do Focco na base, igual à Análise PCP — anlLinhasDe). Item feito em mais
+   de uma linha entra com as linhas juntas ("Linha 1 / Linha 3") e conta no filtro de qualquer uma delas. Lê 1 documento por mês. */
+const praFocoOk=f=>f.fonte==='focco'&&(f.med==='sc'||f.med==='t');
+function praMeses(de,ate){ const xs=[]; let cp=de.slice(0,7); for(let i=0;i<40&&cp<=ate.slice(0,7);i++){ xs.push(cp); const [y,m]=cp.split('-').map(Number); cp=m===12?(y+1)+'-01':y+'-'+String(m+1).padStart(2,'0'); } return xs; }
+function praFocBusca(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,ate);
+  return Promise.all(ms.map(cp=>{ if(C[cp]&&C[cp].pr) return C[cp].pr; const it={d:null}; C[cp]=it;
+    it.pr=S.db.doc('pcpvendas/'+cp).get().then(g=>{ it.d=g.exists?(g.data().d||{}):{}; return it.d; }).catch(e=>{ console.warn('[análise] extrato '+cp,e); delete C[cp]; return {}; }); return it.pr; })); }
+function praFocTem(de,ate){ const C=(S.pra.foc=S.pra.foc||{}), ms=praMeses(de,ate);
+  if(ms.every(cp=>C[cp]&&C[cp].d)){ const foc=[]; ms.forEach(cp=>{ const M=C[cp].d; for(const c in M) for(const dd in M[c]){ const q=+((M[c][dd]||[])[0])||0; if(q) foc.push({d:cp+'-'+dd,c,q}); } }); return {foc,ent:[],par:[],per:[]}; }
+  praFocBusca(de,ate).then(()=>{ try{ if(S.view==='prodind') render(); }catch(e){} }); return null; }
+function praFocItem(c){ const B=(S.anl&&S.anl.base)||{}, it=((B.itens||{}).l||{})[c]||{}; let ls=[]; try{ ls=anlLinhasDe(c,it); }catch(e){}
+  let n=''; try{ n=ritNome(c); }catch(e){} if(!n||n===c) n=String(it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||'').replace(/^ARGAMASSA\s+/i,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b.*$/i,'');
+  return {ls,p:{c,n:(c+' · '+n).trim()}}; }
+const praDad=(f,de,ate)=>praFocoOk(f)?praFocTem(de,ate):praTem(de,ate);
+const praEsp=(f,de,ate)=>praFocoOk(f)?praFocBusca(de,ate):praBusca(de,ate);
 /* ---------- conta ---------- */
 function praSemana(d){ const x=new Date(d+'T12:00:00'), w=(x.getDay()+6)%7; return addDias(d,-w); }
 function praProd(o){ const c=codigoDe(o); let n=''; try{ n=ritNome(c); }catch(e){} if(!n||n===c) n=String(o.produto||'').replace(/^\S+\s*[-—]\s*/,'').replace(/\s+\d+(?:[.,]\d+)?\s*KG\b.*$/i,''); return {c,n:(c+' · '+n).trim()}; }
 function praFam(nome){ const w=String(nome||'').replace(/^\S+\s·\s/,'').replace(/^ARGAMASSA\s+/i,'').split(/\s+/).filter(x=>x&&!/^\d/.test(x)); return w.slice(0,2).join(' ')||'Outros'; }
 function praCalc(f,dados,de,ate){ const it=[], an=new Set(), lsOk=l=>!f.ls||!f.ls.length||f.ls.includes(l), pq=praN(f.prod).trim(); let faltam=0;
-  const add=(d,l,p,mot,v)=>{ if(d<de||d>ate||!lsOk(l||'—')) return; if(pq&&p&&!praN(p.n).includes(pq)) return; it.push({d,l:l||'—',p:p?p.n:'',fam:p?praFam(p.n):'',mot:mot||'',v}); };
-  if(praPar(f.med)) dados.par.forEach(p=>{ if(!p.inicio||(f.semSetup&&praSetup(p))) return; if(pq) return; add(hojeStr(new Date(p.inicio)),p.linha,null,p.motivo||'Sem motivo',f.med==='par'?pdMin(p.inicio,p.fim):1); });
+  const add=(d,l,p,mot,v,semLs)=>{ if(d<de||d>ate||(!semLs&&!lsOk(l||'—'))) return; if(pq&&p&&!praN(p.n).includes(pq)) return; it.push({d,l:l||'—',p:p?p.n:'',fam:p?praFam(p.n):'',mot:mot||'',v}); };
+  if(dados.foc&&praFocoOk(f)){ dados.foc.forEach(x=>{ const I=praFocItem(x.c); if(f.ls&&f.ls.length&&!I.ls.some(l=>f.ls.includes(l))) return; const l=I.ls.length?I.ls.join(' / '):'Sem linha'; add(x.d,l,I.p,'',f.med==='t'?x.q*(()=>{ try{ return ritKg(x.c); }catch(e){ return 20; } })()/1000:x.q,true); }); }
+  else if(praPar(f.med)) dados.par.forEach(p=>{ if(!p.inicio||(f.semSetup&&praSetup(p))) return; if(pq) return; add(hojeStr(new Date(p.inicio)),p.linha,null,p.motivo||'Sem motivo',f.med==='par'?pdMin(p.inicio,p.fim):1); });
   else if(f.med==='perda') dados.per.forEach(x=>{ if(!x.em) return; const o=ordById(x.ordem)||(S.ritOrdX||{})[x.ordem]; const p=o?praProd(o):{c:'',n:String(x.produto||'—')}; add(hojeStr(new Date(x.em)),x.linha||(o&&o.linha),p,'',+x.qtd||0); });
   else { dados.ent.forEach(e=>{ if(e.anula) an.add(e.anula); });
     dados.ent.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const o=ordById(e.ordem)||(S.ritOrdX||{})[e.ordem]; if(!o){ faltam++; try{ ritFaltaOrdem(e.ordem); }catch(x){} }
@@ -91,9 +110,9 @@ function praRot(por,k){ if(por==='dia'){ const w=['dom','seg','ter','qua','qui',
 function praFmt(med,v){ if(med==='t') return (Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' t'; if(med==='par') return pdHrs(v); if(med==='npar') return Math.round(v)+(Math.round(v)===1?' parada':' paradas'); return Math.round(v).toLocaleString('pt-BR')+' sc'; }
 function praVar(a,b){ if(!b) return ''; const p=Math.round((a-b)/b*100); return (p>0?'+':'')+p+'%'; }
 function praDesc(f,P){ const xs=[PRA_MED[f.med]+' por '+PRA_POR[f.por==='motivo'&&!praPar(f.med)?'linha':f.por].toLowerCase(),P?P.txt:PRA_PER[f.per].toLowerCase()];
-  if(f.ls&&f.ls.length) xs.push(f.ls.join(', ')); if(f.prod&&!praPar(f.med)) xs.push('produto com "'+f.prod+'"'); if(praPar(f.med)&&f.semSetup) xs.push('sem setup'); if(f.comp) xs.push('comparando com '+(f.compCp?pdMes(f.compCp):'o período anterior')); return xs.join(' · '); }
-function praResultado(f,cpRel){ const P=praPeriodo(f,cpRel), d=praTem(P.de,P.ate); if(!d) return {P,carregando:true};
-  const R=praCalc(f,d,P.de,P.ate); let A=null, RA=null; if(f.comp){ A=praAnterior(f,P); const da=praTem(A.de,A.ate); if(da) RA=praCalc(f,da,A.de,A.ate); else return {P,carregando:true}; }
+  if(f.ls&&f.ls.length) xs.push(f.ls.join(', ')); if(f.prod&&!praPar(f.med)) xs.push('produto com "'+f.prod+'"'); if(praPar(f.med)&&f.semSetup) xs.push('sem setup'); if(praFocoOk(f)){ const V=((S.anl&&S.anl.base)||{}).vendas||{}; xs.push('pelo Extrato do Focco'+(V.ate?' (importado até '+praDm(V.ate)+')':'')); } if(f.comp) xs.push('comparando com '+(f.compCp?pdMes(f.compCp):'o período anterior')); return xs.join(' · '); }
+function praResultado(f,cpRel){ const P=praPeriodo(f,cpRel), d=praDad(f,P.de,P.ate); if(!d) return {P,carregando:true};
+  const R=praCalc(f,d,P.de,P.ate); let A=null, RA=null; if(f.comp){ A=praAnterior(f,P); const da=praDad(f,A.de,A.ate); if(da) RA=praCalc(f,da,A.de,A.ate); else return {P,carregando:true}; }
   const ant={}; if(RA&&!praTempo(R.por)) RA.rows.forEach(r=>ant[r.k]=r.v);
   return {P,A,R,RA,ant,err:(S.pra.cache[P.de+'|'+P.ate]||{}).err}; }
 
@@ -119,6 +138,7 @@ function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=l
       ${comp?`<div><b class="${!totA?'':R.tot>=totA?(praPar(F.med)||F.med==='perda'?'crit':'ok'):(praPar(F.med)||F.med==='perda'?'ok':'crit')}">${praVar(R.tot,totA)||'—'}</b><span>${totA?'Antes: '+praFmt(F.med,totA)+' · '+esc(X.A.txt):'Sem dados antes ('+esc(X.A.txt)+')'}</span></div>`:''}
       <div><b>${R.rows.filter(r=>r.v>0).length}</b><span>${lp?'materiais (linha × produto) no resultado':PRA_POR[R.por]==='Dia'?'dias com registro':(PRA_POR[R.por]||'').toLowerCase()+(cat?'s':'')+' no resultado'}</span></div></div>
       ${X.err?'<div class="pra-av">Não foi possível buscar todos os dados do período. Confira a internet e toque em Analisar de novo.</div>':''}
+      ${praFocoOk(F)?(()=>{ const V=((S.anl&&S.anl.base)||{}).vendas||{}, h=hojeStr(); return V.ate&&V.ate<X.P.ate&&V.ate<h?`<div class="pra-av">O Extrato do Focco importado vai até ${praDmy(V.ate)}. Para ter os dias depois disso, importe o Extrato em Análise PCP › Sistema › Base de dados.</div>`:''; })()+(R.rows.some(r=>/ \/ /.test(String(r.k)))?'<div class="sub" style="margin:0;font-size:12.5px">No Extrato não vem a linha: ela vem do cadastro do item. Item feito em mais de uma linha aparece com as linhas juntas (ex.: "Linha 1 / Linha 3").</div>':''):''}
       ${R.faltam?`<div class="pra-av">Buscando ${R.faltam} ordem(ns) antiga(s) para saber o produto… o resultado se completa sozinho.</div>`:''}
       ${R.n?`<div class="pra-bs">${mostra.map((r,i)=>{ const a=X.ant[r.k], gh=lp&&(!i||mostra[i-1].l!==r.l)?praGrupo(R,r.l,F.med):'', rot=lp?r.k.slice(r.l.length+PRA_SEP.length):praRot(R.por,r.k); return gh+`<div class="pra-b"><span title="${esc(praRot(R.por,r.k))}">${esc(rot)}</span><div><i style="width:${(r.v/mx*100).toFixed(1)}%"></i></div><b>${praFmt(F.med,r.v)}</b><small>${lp?((R.rows.tl||{})[r.l]?Math.round(r.v/R.rows.tl[r.l]*100)+'% da linha':''):R.tot?Math.round(r.v/R.tot*100)+'%':''}${comp&&cat?' · antes '+praFmt(F.med,a||0)+(praVar(r.v,a||0)?' ('+praVar(r.v,a||0)+')':''):''}</small></div>`; }).join('')}</div>${R.rows.length>mostra.length?`<div class="sub">Mostrando ${mostra.length} de ${R.rows.length}. O PDF e o Excel têm tudo.</div>`:''}`
       :'<div class="empty">Nada encontrado com essas escolhas.</div>'}`; }
@@ -133,6 +153,7 @@ function praCard(){ praSalvasCarrega(); const F=S.pra.f, X=praResultado(F), LS=l
       ${F.per==='datas'?`<label>De<input class="txt" type="date" data-pra="de" value="${esc(F.de||'')}"></label><label>Até<input class="txt" type="date" data-pra="ate" value="${esc(F.ate||'')}"></label>`:''}
       <label>O que medir<select class="txt" data-pra="med">${opt(PRA_MED,F.med)}</select></label>
       <label>Separar por<select class="txt" data-pra="por">${porOpt}</select></label>
+      ${F.med==='sc'||F.med==='t'?`<label>Produção de onde<select class="txt" data-pra="fonte"><option value="" ${F.fonte!=='focco'?'selected':''}>Apontamentos do painel</option><option value="focco" ${F.fonte==='focco'?'selected':''}>Extrato do Focco (EPP do item)</option></select></label>`:''}
       ${!praPar(F.med)?`<label>Produto contém<input class="txt" data-pra="prod" value="${esc(F.prod||'')}" placeholder="código ou nome"></label>`:''}
     </div>
     <div class="pra-f2"><span class="pra-lb">Linhas:</span><button class="pra-chip ${!F.ls.length?'on':''}" data-act="pra-ln" data-v="">Todas</button>${LS.map(l=>`<button class="pra-chip ${F.ls.includes(l)?'on':''}" data-act="pra-ln" data-v="${esc(l)}">${esc(l)}</button>`).join('')}
@@ -158,7 +179,7 @@ function praPdfSecao(P,f,X,titulo){ const R=X.R, C=GPDF.cor, cat=!praTempo(R.por
   const rows=R.rows.filter(r=>r.v>0||!cat).slice(0,R.por==='linprod'?600:120).map(r=>{ const a=X.ant[r.k]||0, v=praVar(r.v,a), row=[praRot(R.por,r.k),praFmt(f.med,r.v),R.tot?Math.round(r.v/R.tot*100)+'%':''].concat(comp&&cat?[praFmt(f.med,a),v]:[]); if(comp&&cat&&v) row._cor={4:(r.v>=a)===(!(praPar(f.med)||f.med==='perda'))?'ok':'crit'}; return row; });
   rows.push(Object.assign(['Total',praFmt(f.med,R.tot),'100%'].concat(comp&&cat?[praFmt(f.med,X.RA.tot),praVar(R.tot,X.RA.tot)]:[]),{_tot:1}));
   P.tabela(cols,rows); }
-async function praEspera(f,cpRel){ const P=praPeriodo(f,cpRel); await praBusca(P.de,P.ate); if(f.comp){ const A=praAnterior(f,P); await praBusca(A.de,A.ate); } await new Promise(r=>setTimeout(r,50)); return praResultado(f,cpRel); }
+async function praEspera(f,cpRel){ const P=praPeriodo(f,cpRel); await praEsp(f,P.de,P.ate); if(f.comp){ const A=praAnterior(f,P); await praEsp(f,A.de,A.ate); } await new Promise(r=>setTimeout(r,50)); return praResultado(f,cpRel); }
 async function praPdf(){ const f=JSON.parse(JSON.stringify(S.pra.f)), X=await praEspera(f); if(X.carregando||!X.R) throw new Error('os dados ainda não chegaram');
   const img=await gpImgs(), P=gpNovo('Análise da produção',praDesc(f,X.P),img); P.capa(); praPdfSecao(P,f,X,'Resultado');
   P.fim('Analise-producao-'+X.P.de+'-a-'+X.P.ate+'.pdf'); }
@@ -228,8 +249,8 @@ const praBusy=async(b,fn,ok)=>{ if(b.dataset.gerando) return; b.dataset.gerando=
 window.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="pd-pdf"]'); if(!b) return; ev.stopImmediatePropagation(); ev.preventDefault(); praBusy(b,praRelMes,'PDF do mês baixado.'); },true);
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="pra-"]'); if(!b) return; const a=b.dataset.act, F=S.pra.f;
   if(a==='pra-ln'){ const v=b.dataset.v; F.ls=!v?[]:F.ls.includes(v)?F.ls.filter(x=>x!==v):F.ls.concat([v]); render(); return; }
-  if(a==='pra-sug'){ const s=PRA_SUG[+b.dataset.i]; if(s){ Object.assign(F,{ls:[],prod:''},s.f); render(); } return; }
-  if(a==='pra-usar'){ const s=(S.pra.salvas||[]).find(x=>x.id===b.dataset.id); if(s){ S.pra.f=Object.assign({ls:[],prod:'',semSetup:true,comp:true,compCp:''},JSON.parse(JSON.stringify(s.f))); render(); } return; }
+  if(a==='pra-sug'){ const s=PRA_SUG[+b.dataset.i]; if(s){ Object.assign(F,{ls:[],prod:'',fonte:''},s.f); render(); } return; }
+  if(a==='pra-usar'){ const s=(S.pra.salvas||[]).find(x=>x.id===b.dataset.id); if(s){ S.pra.f=Object.assign({ls:[],prod:'',semSetup:true,comp:true,compCp:'',fonte:''},JSON.parse(JSON.stringify(s.f))); render(); } return; }
   if(a==='pra-tirar'){ if(b.dataset.c!=='1'){ b.dataset.c='1'; b.textContent='apagar?'; setTimeout(()=>{ if(b.isConnected){ b.dataset.c=''; b.textContent='×'; } },3000); return; }
     S.pra.salvas=(S.pra.salvas||[]).filter(x=>x.id!==b.dataset.id); render(); praSalvasGrava(); return; }
   if(a==='pra-salvar'){ S.pra.salvando=true; render(); setTimeout(()=>{ const i=$('#pra-nome'); i&&(i.focus(),i.select()); },30); return; }
