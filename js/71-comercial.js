@@ -50,8 +50,11 @@ function cmCarrega(cp){ const D=S.cm.dados; if(D[cp]||S.cm.lendo[cp]||!S.db) ret
 
 /* ---------- contas ---------- */
 const cmDias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
-function cmFrac(cp){ const h=hojeStr(); if(cp<h.slice(0,7)) return {f:1,ate:cmFimMes(cp),fechado:true}; if(cp>h.slice(0,7)) return {f:0,ate:cp+'-01',fechado:false};
-  let t=0,p=0; for(let d=cp+'-01';d<=cmFimMes(cp);d=addDias(d,1)){ if(anlUtil(d)){ t++; if(d<=h) p++; } } return {f:t?p/t:1,ate:h,fechado:false,du:p,dt:t}; }
+/* até onde dá para comparar: hoje, fim do mês e o último dia do Extrato importado (vendido e produzido só existem até lá) */
+function cmFrac(cp){ const h=hojeStr(), fim=cmFimMes(cp), ext=((S.anl.base||{}).vendas||{}).ate||'';
+  let corte=[fim,h,ext||fim].sort()[0]; if(corte<cp+'-01') return {f:0,ate:cp+'-01',fechado:false,ext,du:0,semExt:true};
+  let t=0,p=0; for(let d=cp+'-01';d<=fim;d=addDias(d,1)){ if(anlUtil(d)){ t++; if(d<=corte) p++; } }
+  const fechado=corte>=fim; return {f:fechado?1:(t?p/t:1),ate:corte,fechado,du:p,dt:t,ext,porExt:!fechado&&ext&&ext<h&&ext<fim}; }
 function cmLinha(r){ const ls=(r.linhas||[]).filter(Boolean); return ls.length===1?ls[0]:ls.length?'Mais de uma linha':'Sem linha'; }
 function cmEstDia(snaps,dia,c){ let s=null; snaps.forEach(x=>{ if(x.data<=dia&&x.s&&x.s[c]!=null) s=x.s[c]; }); return s; }
 function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return null; const R=anlDados();
@@ -60,7 +63,8 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
   /* vendeu sem previsão nenhuma: o comercial não previu o item */
   for(const c in (V.mensal||{})){ const mm=V.mensal[c][cp]; if(!mm||tem.has(c)||!(mm[1]>0)) continue; const it=IL[c]||{};
     rows0.push({c,cp,d:it.d||((itemDe(c)||{}).descricao)||'',linhas:anlLinhasDe(c,it),ei:E[c]||0,prev:0,fat:mm[1],prod:mm[0]}); }
-  const rows=rows0.map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
+  const y=+cp.slice(0,4), mm=+cp.slice(5,7), prox=(mm===12?(y+1)+'-01':y+'-'+String(mm+1).padStart(2,'0')), EF=F.fechado&&(B.prev.est||{})[prox]||null; /* mês fechado: estoque do começo do mês seguinte = fim do mês */
+  const rows=rows0.map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:EF?(EF[r.c]||0):(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
   /* 1 · faltou produto */
   const tP=rows.reduce((a,r)=>a+r.pr,0), tF=rows.reduce((a,r)=>a+r.fat,0), tPm=rows.reduce((a,r)=>a+r.prev,0), tPd=rows.reduce((a,r)=>a+r.prod,0);
   const err=rows.reduce((a,r)=>a+Math.abs(r.fat-r.pr),0);
@@ -82,9 +86,9 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
   /* 3 · produziu o previsto */
   const pl={}; rows.forEach(r=>{ const o=pl[r.ln]=pl[r.ln]||{l:r.ln,prev:0,pr:0,prod:0,fat:0}; o.prev+=r.prev; o.pr+=r.pr; o.prod+=r.prod; o.fat+=r.fat; });
   const LO=linhasOrd(); const porLinha=Object.values(pl).sort((a,b)=>{ const i=x=>{ const k=LO.indexOf(x.l); return k<0?99:k; }; return i(a)-i(b)||a.l.localeCompare(b.l); });
-  const sem=F.fechado?4.3:Math.max(.2,(F.du||1)/5);
+  const sem=F.fechado?(F.dt||22)/5:Math.max(.2,(F.du||1)/5);
   const sobra=rows.filter(r=>r.pr>0&&r.fat<r.pr*0.9&&r.pr-r.fat>=50).map(r=>{ const vs=r.fat/sem; return Object.assign(r,{falta:r.pr-r.fat,semanas:r.est!=null&&vs>0?r.est/vs:null}); }).sort((a,b)=>b.falta-a.falta);
-  const s3={porLinha,sobra,prodPct:tP?tPd/tP:0,fatPct:tP?tF/tP:0,sobrou:sobra.reduce((a,r)=>a+(r.est||0),0)};
+  const s3={estFim:!!EF,porLinha,sobra,prodPct:tP?tPd/tP:0,fatPct:tP?tF/tP:0,sobrou:sobra.reduce((a,r)=>a+(r.est||0),0)};
   /* 4 · em cima da hora */
   const ser=cs.length>=2?cs.map(x=>({dia:x.dia,dc:Object.fromEntries(Object.entries(x.l||{}).map(([c,o])=>[c,Object.values(o).reduce((a,b)=>a+b,0)]))})):D.snaps.filter(x=>x.dc).map(x=>({dia:x.data,dc:x.dc}));
   const dias=[], saltos=[]; for(let i=1;i<ser.length;i++){ const a=ser[i-1], b=ser[i]; if(b.dia.slice(0,7)!==cp) continue; let t=0;
@@ -124,7 +128,7 @@ function vAnlCom(){ const A=S.cm; const ms=cmMeses(); if(!A.cp||!ms.includes(A.c
     <div class="cm-ks">${k('Previsão do comercial'+ref,cmN(a.tP),X.F.fechado?'do mês':'mês inteiro: '+cmN(a.tPm))}${k('Vendido (faturado)',cmN(a.tF),cmP(a.tP?a.tF/a.tP:0)+' da previsão','c')}${k('Erro da previsão',cmP(a.erro),'diferenças somadas ÷ previsão','w')}${k('Venda acima do previsto','+'+cmN(a.dif),a.acima.length+' itens','c')}</div>
     ${tab(['Item','Produto','Previsto','Vendido','Diferença','Tinha dia 1º','Produzido','Tinha o previsto?'],a.acima.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.pr),cmN(r.fat),`<span class="cm-neg">+${cmN(r.dif)}${r.pr?' ('+Math.round(r.dif/r.pr*100)+'%)':' (sem previsão)'}</span>`,cmN(r.ei),cmN(r.prod),r.tinha?pill('sim','o'):pill(r.pr?Math.round(r.disp/r.pr*100)+'%':'—','w')]),'Nenhum item vendeu acima da previsão.')}</section>`;
   const sec2=`<section class="card cm-s"><div class="cm-q">“ATRASOU O PEDIDO”</div><p class="cm-r">${esc(T.f2)}</p>
-    ${b.fonte==='snap'?`<div class="cm-av">A carteira com a data de entrega de cada pedido começou a ser guardada ${b.desde?'em '+cmD(b.desde):'agora'}. Até ter duas fotos no mês, a lista mostra o aumento da carteira de cada item, sem a data de entrega. Importe o Perfil (RPLA0300) todo dia.</div>`:''}
+    ${b.fonte==='snap'?`<div class="cm-av">A carteira com a data de entrega de cada pedido começou a ser guardada ${b.desde?'em '+cmD(b.desde):'agora'}. Até ter duas fotos no mês, a lista mostra o aumento da carteira de cada item, sem a data de entrega; como a carteira cai quando se fatura, um pedido faturado no mesmo dia em que entrou não aparece. Importe o Perfil (RPLA0300) todo dia.</div>`:''}
     <div class="cm-ks">${k('Pedidos no mês',String(b.ped.length),'aumentos da carteira por item')}${b.fonte==='cart'?k('Prazo menor que a reposição',String(b.curtos.length),b.ped.length?cmP(b.curtos.length/b.ped.length)+' dos pedidos':'','c'):''}${k('Sem estoque no dia em que entrou',String(b.semEst.length),'estoque menor que o pedido','w')}${b.fonte==='cart'?k('Prazo médio dado',b.prazoMed==null?'—':(Math.round(b.prazoMed*10)/10).toLocaleString('pt-BR')+' d',b.repMed==null?'':'reposição média '+(Math.round(b.repMed*10)/10).toLocaleString('pt-BR')+' d'):''}</div>
     ${tab(b.fonte==='cart'?['Item','Produto','Qtd.','Entrou','Entrega pedida','Prazo dado','Reposição','Estoque no dia']:['Item','Produto','Subiu','Entrou','Estoque no dia'],
       (b.fonte==='cart'?b.ped.slice().sort((x,y)=>(y.curto-x.curto)||(y.semEst-x.semEst)||x.ate.localeCompare(y.ate)):b.ped.slice().sort((x,y)=>y.q-x.q)).slice(0,30).map(p=>b.fonte==='cart'
@@ -134,14 +138,14 @@ function vAnlCom(){ const A=S.cm; const ms=cmMeses(); if(!A.cp||!ms.includes(A.c
   const sec3=`<section class="card cm-s"><div class="cm-q">“NÃO PRODUZIU O PREVISTO”</div><p class="cm-r">${esc(T.f3)}</p>
     <div class="cm-bars">${c.porLinha.map(x=>`<div class="cm-bl"><b>${esc(x.l)}</b>${[['Previsto',x.pr,'p'],['Produzido',x.prod,'d'],['Faturado',x.fat,'f']].map(([t,v,cl])=>`<div class="cm-br"><span>${t}</span><i><em class="${cl}" style="width:${Math.max(0.5,v/mx*100)}%"></em></i><span class="num">${cmN(v)}</span></div>`).join('')}</div>`).join('')}</div>
     <h3 class="cm-h3">Venderam menos que a previsão${ref}</h3>
-    ${tab(['Item','Produto','Previsto','Vendido','Faltou vender','Estoque hoje','Semanas de estoque'],c.sobra.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.pr),cmN(r.fat),cmN(r.falta),cmN(r.est),r.semanas==null?'—':pill((Math.round(r.semanas*10)/10).toLocaleString('pt-BR')+' sem.',r.semanas>=4?'w':'n')]),'Nenhum item vendeu bem menos que a previsão.')}</section>`;
+    ${tab(['Item','Produto','Previsto','Vendido','Faltou vender',c.estFim?'Estoque no fim do mês':'Estoque hoje','Semanas de estoque'],c.sobra.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.pr),cmN(r.fat),cmN(r.falta),cmN(r.est),r.semanas==null?'—':pill((Math.round(r.semanas*10)/10).toLocaleString('pt-BR')+' sem.',r.semanas>=4?'w':'n')]),'Nenhum item vendeu bem menos que a previsão.')}</section>`;
   const mxd=Math.max(1,...d.dias.map(x=>x.t));
   const sec4=`<section class="card cm-s"><div class="cm-q">“MUDARAM EM CIMA DA HORA”</div><p class="cm-r">${esc(T.f4)}</p>
     ${d.dias.length?`<div class="cm-dd">${d.dias.map(x=>`<div class="cm-dc" title="${cmD(x.dia)}: +${cmN(x.t)}"><i class="${x.t>=CM_SALTO?'c':''}" style="height:${Math.max(2,x.t/mxd*100)}%"></i><span>${x.dia.slice(8)}</span></div>`).join('')}</div>`:''}
     <div class="cm-2"><div><h3 class="cm-h3">Maiores saltos (${cmN(CM_SALTO)} ou mais de um dia para o outro)</h3>${tab(['Dia','Item','Antes','Depois','Subiu'],d.saltos.slice(0,15).map(s=>[cmD(s.dia),`<b>${esc(s.c)}</b>`,cmN(s.antes),cmN(s.depois),`<span class="cm-neg">+${cmN(s.inc)}</span>`]),'Nenhum salto grande no mês.')}</div>
     <div><h3 class="cm-h3">Trocas da previsão no mês</h3>${tab(['Importada em','Itens mudados','Subiu','Desceu','Saldo'],d.vers.map(v=>v.primeira?[v.ant?'já estava'+(v.em&&/^\d{4}-/.test(v.em)?' ('+cmD(v.em.slice(0,10))+')':''):cmD(String(v.em).slice(0,10)),'—','—','—','1ª versão · '+cmN(v.tot)]:[cmD(String(v.em).slice(0,10)),String(v.n),v.up?'+'+cmN(v.up):'—',v.dn?'−'+cmN(v.dn):'—',`<span class="${v.saldo>0?'cm-neg':''}">${v.saldo>0?'+':v.saldo<0?'−':''}${cmN(Math.abs(v.saldo))}</span>`]),'Cada importação da previsão passa a ficar guardada a partir de agora.')}</div></div></section>`;
-  return head+(X.carregado?'':'<div class="cm-av">Buscando as fotos da carteira do mês…</div>')+`<div class="cm">${sec1}${sec2}${sec3}${sec4}
-    <p class="cm-nota">Quantidades na unidade do item (sacos, fardos…). Previsão: RPRE0301. Vendido e produzido: Extrato do Focco (NFS e EPP). Carteira: Perfil (RPLA0300, pedidos DC); o dia em que o pedido entrou é o primeiro dia em que ele aparece numa importação do Perfil (se não houve importação no dia anterior, aparece "de … a …" e o prazo conta do primeiro dia possível). Reposição: cadastro do item no Focco.${X.F.fechado?'':' Mês em andamento: a previsão é contada até hoje, na proporção dos dias úteis.'}</p></div>`; }
+  return head+(X.carregado?'':'<div class="cm-av">Buscando as fotos da carteira do mês…</div>')+(X.F.porExt?`<div class="cm-av">O Extrato do Focco importado vai até ${cmD(X.F.ext)}. Vendido e produzido contam até esse dia, e a previsão também (na proporção dos dias úteis). Importe o Extrato de novo para ter o mês até hoje.</div>`:'')+(X.F.semExt?'<div class="cm-av">Ainda não há Extrato do Focco deste mês. Importe o Extrato em Sistema › Base de dados.</div>':'')+`<div class="cm">${sec1}${sec2}${sec3}${sec4}
+    <p class="cm-nota">Quantidades na unidade do item (sacos, fardos…). Previsão: RPRE0301. Vendido e produzido: Extrato do Focco (NFS e EPP). Carteira: Perfil (RPLA0300, pedidos DC); o dia em que o pedido entrou é o primeiro dia em que ele aparece numa importação do Perfil (se não houve importação no dia anterior, aparece "de … a …" e o prazo conta do primeiro dia possível). Reposição: cadastro do item no Focco.${X.F.fechado?'':' A previsão é contada até '+cmD(X.F.ate)+(X.F.porExt?' (último dia do Extrato importado)':'')+', na proporção dos dias úteis.'}</p></div>`; }
 
 /* ---------- PDF ---------- */
 function cmCols(P,cats,series,o){ o=o||{}; const doc=P.doc, C=GPDF.cor, h=o.h||46; P.cabe(h+20); const top=P.y+4, base=top+h, mx=Math.max(1,...series.flatMap(s=>s.v));
@@ -186,10 +190,10 @@ async function cmPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com/
       c.porLinha.map(x=>{ const r=[x.l,cmN(x.pr),cmN(x.prod),x.pr?cmP(x.prod/x.pr):'—',cmN(x.fat),x.pr?cmP(x.fat/x.pr):'—']; r._cor={3:x.pr?gpCor(x.prod/x.pr*100):null}; return r; })
       .concat([Object.assign(['Total',cmN(a.tP),cmN(a.tPd),cmP(c.prodPct),cmN(a.tF),cmP(c.fatPct)],{_tot:1})])); }
   P.secao('Venderam menos que a previsão','estoque que sobrou');
-  if(c.sobra.length) P.tabela([{t:'Item',w:16},{t:'Produto',w:52},{t:'Previsto',w:17,al:'r'},{t:'Vendido',w:17,al:'r'},{t:'Faltou vender',w:18,al:'r'},{t:'Estoque hoje',w:18,al:'r'},{t:'Semanas',w:14,al:'r'}],
+  if(c.sobra.length) P.tabela([{t:'Item',w:16},{t:'Produto',w:52},{t:'Previsto',w:17,al:'r'},{t:'Vendido',w:17,al:'r'},{t:'Faltou vender',w:18,al:'r'},{t:c.estFim?'Estoque fim do mês':'Estoque hoje',w:18,al:'r'},{t:'Semanas',w:14,al:'r'}],
     c.sobra.slice(0,40).map(r=>{ const x=[r.c,r.d,cmN(r.pr),cmN(r.fat),cmN(r.falta),cmN(r.est),r.semanas==null?'—':(Math.round(r.semanas*10)/10).toLocaleString('pt-BR')]; x._cor={6:r.semanas>=4?'warn':null}; return x; }));
   else P.vazio('Nenhum item vendeu bem menos que a previsão.');
-  P.texto('Semanas de estoque = estoque de hoje ÷ venda média por semana no mês.',{fs:7.5});
+  P.texto('Semanas de estoque = '+(c.estFim?'estoque no fim do mês':'estoque de hoje')+' ÷ venda média por semana no mês.',{fs:7.5});
   /* 4 */
   P.nova(); P.secao('4 · “Mudaram em cima da hora”','entradas na carteira e trocas da previsão'); P.texto(T.f4,{c:'ink',fs:9.5});
   if(d.dias.length) cmCols(P,d.dias.map(x=>x.dia.slice(8)),[{v:d.dias.map(x=>x.t),c:(v)=>v>=CM_SALTO?C.crit:C.teal}],{h:40});
@@ -202,7 +206,7 @@ async function cmPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com/
   else P.vazio(d.vers.length?'A previsão não foi trocada neste mês.':'Cada importação da previsão passa a ficar guardada a partir de agora.');
   /* como foi contado */
   P.secao('Como foi contado');
-  ['Previsão do comercial: relatório RPRE0301 do Focco, importado na Base de dados; cada importação fica guardada com a data.'+(X.F.fechado?'':' Mês em andamento: a previsão é contada até '+cmD(X.F.ate)+', na proporção dos dias úteis.'),
+  ['Previsão do comercial: relatório RPRE0301 do Focco, importado na Base de dados; cada importação fica guardada com a data.'+(X.F.fechado?'':' A previsão é contada até '+cmD(X.F.ate)+(X.F.porExt?' (último dia do Extrato importado)':'')+', na proporção dos dias úteis.'),
    'Vendido e produzido: Extrato do Focco (NFS = faturado, EPP = produzido). Estoque do dia 1º: saldo do começo do mês.',
    'Pedidos: carteira do Perfil (RPLA0300, linhas DC) com a data de entrega. O pedido entrou no primeiro dia em que aparece numa importação do Perfil; se não houve importação no dia anterior, o prazo conta do primeiro dia possível (o mais favorável ao comercial).',
    'Prazo curto: dias entre a entrada do pedido e a entrega pedida menores que o tempo de reposição do item (cadastro do Focco). Estoque no dia: saldo do Focco (almox 3 + 30) importado naquele dia.',
