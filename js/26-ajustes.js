@@ -3,7 +3,7 @@
 "use strict";
 /* ---------- 3 e 6: as TVs ficam só no módulo Telas de TV (continuam funcionando por trás) ---------- */
 /* só nos menus da Produção e dos Silos (no módulo Telas de TV elas continuam) */
-{ const _mt=mTabs, FORA={producao:['tvfab','tvnmon','tvncal'],silos:['tvnsil']}; mTabs=function(m){ const xs=_mt.apply(this,arguments), id=m&&(m.id||m), f=FORA[id]; return f?xs.filter(v=>!f.includes(v)):xs; }; }
+{ const _mt=mTabs, FORA={producao:['tvfab','tvnmon','tvncal','tvnprod','tvnrit'],silos:['tvnsil']}; mTabs=function(m){ const xs=_mt.apply(this,arguments), id=m&&(m.id||m), f=FORA[id]; return f?xs.filter(v=>!f.includes(v)):xs; }; }
 /* abrir uma TV direto, em outra aba: ?tela=silos (a mesma apresentação de Telas de TV) */
 (function(){ let k=''; try{ k=new URLSearchParams(location.search).get('tela')||''; }catch(e){} if(!k) return; let n=0;
   const t=setInterval(()=>{ if(++n>120) return clearInterval(t); try{ if(!S.uid||typeof aprTelas!=='function') return; const x=aprTelas().find(y=>y.k===k); if(!x) return; clearInterval(t); aprIniciar([x]); }catch(e){} },500); })();

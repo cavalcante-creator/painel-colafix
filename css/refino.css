@@ -1,0 +1,58 @@
+/* Painel Colafix · refino visual (out/2026)
+   Mesma estrutura e mesmas telas; só o acabamento: tipografia com hierarquia mais clara, números grandes e finos
+   (como mostradores), superfícies mais limpas, sombras suaves, menu lateral e abas com mais vida.
+   Carregado depois de visual-novo.css. Para desfazer: tirar o <link> de refino.css do index.html. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
+:root:not([data-theme="dark"]){
+  --ground:#F2F4F6; --surface-2:#F6F8F9; --line:#E2E6EA; --line-2:#EEF1F3;
+  --shadow:0 1px 2px rgba(16,32,40,.04),0 6px 18px rgba(16,32,40,.06);
+  --v-lima:#7AC943; --v-azul:#1E9BD7;
+}
+:root[data-theme="dark"]{ --v-lima:#8FD65A; --v-azul:#3FB0E8; }
+/* letra: Archivo (padrão) ou Geist (Ajustes → Aparência) */
+html[data-letra="geist"] body, html[data-letra="geist"] body :where(button,input,select,textarea,h1,h2,h3,h4,h5,h6,p,span,div,a,label,li,td,th,b,strong,small,em,i,section,header,footer,nav,main,article,aside):not(code):not(pre):not(kbd):not(samp):not(.cr-ad){
+  font-family:Geist,-apple-system,"Segoe UI",system-ui,sans-serif!important;
+}
+body{font-size:15px;letter-spacing:-.003em}
+/* títulos: mais firmes e mais próximos (menos "antigo") */
+h1{font-size:32px!important;line-height:38px!important;font-weight:650!important;letter-spacing:-.025em!important}
+h2{letter-spacing:-.015em}
+h3{letter-spacing:-.01em}
+.sub{color:var(--muted);line-height:1.5}
+/* rótulos pequenos acima dos títulos: discretos, sem gritar */
+.eyebrow{font-size:11.5px!important;letter-spacing:.08em!important;color:var(--muted)!important;font-weight:600!important;margin-bottom:2px}
+.label{letter-spacing:.06em!important;color:var(--muted)}
+/* cartões: sem borda dura, sombra leve em duas camadas, cantos um pouco maiores */
+.card{border-radius:18px!important;border:1px solid transparent!important;box-shadow:var(--shadow)!important}
+:root[data-theme="dark"] .card{border-color:var(--line)!important;box-shadow:none!important}
+/* números grandes finos, como os mostradores */
+.mo-k b,.rh-tn,.gs-n,.alm-big,.tank .q,.smc-c b,.aj-capn b,.aj-ctot b,.alm-big{font-weight:300!important;letter-spacing:-.03em!important;font-variant-numeric:tabular-nums}
+.mo-k b{font-size:42px!important;line-height:1.05!important}
+.rh-tn{font-size:40px!important}
+.gs-clk,.sv-clk{font-weight:300!important;letter-spacing:-.03em!important}
+/* botões: cantos mais suaves, leve relevo e resposta ao clique */
+.btn{border-radius:12px!important;font-weight:600!important;letter-spacing:-.005em;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(16,32,40,.14);transition:filter .15s ease,transform .06s ease,box-shadow .15s ease}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn.sec{box-shadow:0 1px 2px rgba(16,32,40,.06)!important}
+.btn.sec:hover:not(:disabled){box-shadow:0 2px 6px rgba(16,32,40,.10)!important}
+/* campos */
+.txt{border-radius:12px!important;transition:border-color .15s ease,box-shadow .15s ease}
+/* barra de cima translúcida */
+.top{background:rgba(255,255,255,.86)!important;backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px)}
+:root[data-theme="dark"] .top{background:rgba(30,36,39,.86)!important}
+/* menu lateral: o item atual com a marca do "V" da Colafix */
+.navbtn{border-radius:10px!important;position:relative;transition:background .15s ease,color .15s ease}
+.navbtn[aria-current="page"]{background:rgba(255,255,255,.14)!important;font-weight:600!important}
+.navbtn[aria-current="page"]::before{content:"";position:absolute;left:-10px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--v-lima)}
+/* abas: indicador mais fino e arredondado, na cor da marca */
+.tab{font-weight:500;transition:color .15s ease}
+.tab[aria-current="page"]{border-bottom-width:2.5px!important;border-bottom-color:var(--v-azul)!important;font-weight:650!important}
+.tab:hover{color:var(--ink)}
+/* selos de situação: um ponto de cor antes do texto dá leitura mais rápida */
+.pill.ok::before,.pill.warn::before,.pill.crit::before,.pill.info::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
+/* tabelas: cabeçalho mais leve, linhas mais limpas */
+th{font-weight:600!important;color:var(--muted)!important;letter-spacing:.04em}
+tbody tr>td{border-bottom-color:var(--line-2)!important}
+/* cartões clicáveis respondem ao passar o mouse */
+.card[data-go]:hover,.card[role="link"]:hover,a.card:hover,button.card:hover{box-shadow:0 2px 4px rgba(16,32,40,.06),0 10px 24px rgba(16,32,40,.10)!important;transition:box-shadow .2s ease}
+@media (prefers-reduced-motion:reduce){ .btn,.txt,.navbtn,.tab,.card{transition:none!important} }
