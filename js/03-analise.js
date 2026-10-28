@@ -354,14 +354,16 @@ function anlPdfSaldo(pags){ const l={}; let cur=null, desc=false, n=0;
   const linhas=pags.join('\n').split('\n').map(s=>s.trim()).filter(Boolean);
   for(const s of linhas){
     const tk=s.split(' ');
-    if(/^[A-Z]{1,4}\d{3,6}$/.test(tk[0])&&tk.length>=8&&tk.slice(-4).every(x=>ANL_NUMRE.test(x))&&/^\d+$/.test(tk[tk.length-5])){
-      cur=tk[0]; l[cur]={d:tk.slice(1,-6).join(' '),a3:0,a30:0,seg:anlNumBR(tk[tk.length-4])}; desc=true; n++; continue; }
+    if(/^[A-Z]{1,4}\d{3,6}$/.test(tk[0])&&tk.length>=7&&tk.slice(-3).every(x=>ANL_NUMRE.test(x))){
+      /* item: código, descrição, UN, Tmp Rep, [Estoque Seg], Custo Méd, Valor Estoque, Saldo Atual — o Estoque Seg. vem em branco em alguns itens (ex.: RE0003), aí a linha tem um número a menos (28/10) */
+      const com=tk.length>=8&&ANL_NUMRE.test(tk[tk.length-4])&&/^\d+$/.test(tk[tk.length-5]), sem=!com&&/^\d+$/.test(tk[tk.length-4]);
+      if(com||sem){ cur=tk[0]; l[cur]={d:tk.slice(1,com?-6:-5).join(' '),a3:0,a30:0,seg:com?anlNumBR(tk[tk.length-4]):0}; desc=true; n++; continue; } }
     const m=s.match(/^Almoxarifado:\s*(\d+)\b.*?\s(-?[\d.]+,\d+)\s+(-?[\d.]+,\d+)$/);
     if(m&&cur){ desc=false; const q=anlNumBR(m[3]); if(m[1]==='3') l[cur].a3+=q; else if(m[1]==='30') l[cur].a30+=q; continue; }
     if(desc&&cur&&!/^(FOCCOERP|Relat|Data|P[áa]g|Tmp|C[óo]d\.|Rep Seg|Total Geral)/i.test(s)&&s.length<60) l[cur].d+=' '+s;
     if(/^(FOCCOERP|Relat)/.test(s)) desc=false; }
   if(!n) return {erro:'Não encontrei itens neste PDF de saldo.'};
-  const at=anlPdfData(pags[0]||''); const me=(pags[0]||'').match(/Empresa\s*:?\s*0*(\d{1,2})\b/i); return {atual:at,l,emp:me?String(+me[1]):null}; }
+  const at=anlPdfData(pags[0]||''); const me=(pags[0]||'').match(/Empresa[.\s]*:?\s*0*(\d{1,2})\b/i); /* "Empresa........: 1 - COLFIX" */ return {atual:at,l,emp:me?String(+me[1]):null}; }
 // Perfil de itens (Focco3i RPLA0300): movimentos com data fim e quantidade; o sinal vem do estoque projetado
 function anlPdfPerfil(pags){ const out=[], par={}; let cur=null, est=null, rel='', n=0;
   const at=anlPdfData(pags[0]||'');
