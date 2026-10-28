@@ -38,8 +38,8 @@ async function cmSemente(cp){ if(!S.db) return; const B=S.anl.base||{};
   }catch(e){ /* só ver: não grava */ } }
 
 /* ---------- leitura (sob demanda, só o mês) ---------- */
-/* ensacado, premix e intermediários (M…) não são material pronto: ficam fora do relatório */
-function cmInt(c){ const B=S.anl.base||{}, it=((B.itens||{}).l||{})[c]||{}; const d=it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||''; return /^M\d/.test(c)||/ENSACAD|PREMIX/i.test(d); }
+/* ensacado, premix, intermediários (M…) e nivelador (comprado) não são material produzido aqui: ficam fora do relatório */
+function cmInt(c){ const B=S.anl.base||{}, it=((B.itens||{}).l||{})[c]||{}; const d=it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||''; return /^M\d/.test(c)||/ENSACAD|PREMIX|NIVELAD/i.test(d); }
 /* filtros da tela (valem também para o PDF): linha, família, embalagem e busca */
 S.cm.f=S.cm.f||{ln:'',fam:'',emb:'',q:''};
 function cmDesc(c){ const it=(((S.anl.base||{}).itens||{}).l||{})[c]||{}; return it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||''; }
@@ -79,7 +79,7 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
   for(const c in (V.mensal||{})){ const mm=V.mensal[c][cp]; if(!mm||tem.has(c)||!(mm[1]>0)) continue; const it=IL[c]||{};
     rows0.push({c,cp,d:it.d||((itemDe(c)||{}).descricao)||'',linhas:anlLinhasDe(c,it),ei:E[c]||0,prev:0,fat:mm[1],prod:mm[0]}); }
   const y=+cp.slice(0,4), mm=+cp.slice(5,7), prox=(mm===12?(y+1)+'-01':y+'-'+String(mm+1).padStart(2,'0')), EF=F.fechado&&(B.prev.est||{})[prox]||null; /* mês fechado: estoque do começo do mês seguinte = fim do mês */
-  const rows=rows0.filter(r=>!cmFora(r.c,r.d)&&!/ENSACAD|PREMIX/i.test(r.d||'')).map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:EF?(EF[r.c]||0):(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
+  const rows=rows0.filter(r=>!cmFora(r.c,r.d)&&!/ENSACAD|PREMIX|NIVELAD/i.test(r.d||'')).map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:EF?(EF[r.c]||0):(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
   const rowsE=rows.filter(r=>cmExp(r.c,r.d)), rowsAll=rows.slice(); { const n=rows.filter(r=>!cmExp(r.c,r.d)); rows.length=0; n.forEach(r=>rows.push(r)); }
   /* 1 · faltou produto */
   const tP=rows.reduce((a,r)=>a+r.pr,0), tF=rows.reduce((a,r)=>a+r.fat,0), tPm=rows.reduce((a,r)=>a+r.prev,0), tPd=rows.reduce((a,r)=>a+r.prod,0);
@@ -131,7 +131,7 @@ function cmFrases(X){ const a=X.s1, b=X.s2, c=X.s3, d=X.s4, ref=X.F.fechado?'':'
     f3:`A produção fez ${cmP(c.prodPct)} da previsão${ref}; o faturamento ficou em ${cmP(c.fatPct)}.${a.ex.prod>0?' Além disso, '+cmN(a.ex.prod)+' foram produzidos para exportação ('+cmP(a.ex.peso)+' de tudo o que foi produzido), sem previsão do comercial.':''}${c.sobra.length?' '+c.sobra.length+(c.sobra.length===1?' item vendeu':' itens venderam')+' menos que o previsto.':''}`,
     f4:d.dias.length?`Em ${d.diasGrandes.length} ${d.diasGrandes.length===1?'dia':'dias'} a carteira subiu ${cmN(CM_SALTO)} ou mais de uma vez.${d.trocas.length?' A previsão foi trocada '+d.trocas.length+(d.trocas.length===1?' vez':' vezes')+' no mês.':''}`:'Sem fotos da carteira neste mês para comparar.' }; }
 function cmBarra(cp){ const f=S.cm.f, B=S.anl.base||{}, pm=((B.prev||{}).mes||{})[cp]||{}, V=(B.vendas||{}).mensal||{};
-  const cods=[...new Set(Object.keys(pm).concat(Object.keys(V).filter(c=>V[c][cp])))].filter(c=>!cmInt(c)&&!/ENSACAD|PREMIX/i.test(cmDesc(c)));
+  const cods=[...new Set(Object.keys(pm).concat(Object.keys(V).filter(c=>V[c][cp])))].filter(c=>!cmInt(c)&&!/ENSACAD|PREMIX|NIVELAD/i.test(cmDesc(c)));
   const lns=[...new Set(cods.map(cmLnDe))], LO=linhasOrd(); lns.sort((a,b)=>{ const i=x=>{ const k=LO.indexOf(x); return k<0?99:k; }; return i(a)-i(b)||a.localeCompare(b); });
   const fams=[...new Set(cods.map(c=>eswFam(cmDesc(c))))].sort(), embs=[...new Set(cods.map(c=>eswEmb(cmDesc(c))))].sort();
   const sel=(k,rot,ops)=>`<label class="cm-fl${f[k]?' on':''}"><span>${rot}</span><select class="txt" data-cmf="${k}"><option value="">Todas</option>${ops.map(o=>`<option ${f[k]===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
