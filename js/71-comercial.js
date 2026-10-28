@@ -48,6 +48,9 @@ function cmFiltrando(){ const f=S.cm.f; return !!(f.ln||f.fam||f.emb||f.q); }
 function cmOk(c,d){ const f=S.cm.f; if(!cmFiltrando()) return true; d=d||cmDesc(c);
   if(f.ln&&cmLnDe(c)!==f.ln) return false; if(f.fam&&eswFam(d)!==f.fam) return false; if(f.emb&&eswEmb(d)!==f.emb) return false;
   if(f.q){ const t=anlNorm(c+' '+d); if(!anlNorm(f.q).split(/\s+/).filter(Boolean).every(w=>t.includes(w))) return false; } return true; }
+/* exportação (RE…, ou "EXPORTAÇÃO" na descrição): não tem previsão do comercial — fica fora do erro da previsão, mas conta como produção (peso) */
+function cmExp(c,d){ return /^RE\d/.test(c)||/EXPORTA/i.test(d||cmDesc(c)); }
+const cmTon=(c,q)=>{ try{ return q*(ritKg(c)||0)/1000; }catch(e){ return 0; } };
 function cmFora(c,d){ return cmInt(c)||!cmOk(c,d); }
 function cmFiltroTxt(){ const f=S.cm.f, xs=[]; if(f.ln) xs.push(f.ln); if(f.fam) xs.push('família '+f.fam); if(f.emb) xs.push('embalagem '+f.emb.toLowerCase()); if(f.q) xs.push('"'+f.q+'"'); return xs.join(' · '); }
 const cmFimMes=cp=>{ const y=+cp.slice(0,4), m=+cp.slice(5,7); return cp+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'); };
@@ -77,11 +80,14 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
     rows0.push({c,cp,d:it.d||((itemDe(c)||{}).descricao)||'',linhas:anlLinhasDe(c,it),ei:E[c]||0,prev:0,fat:mm[1],prod:mm[0]}); }
   const y=+cp.slice(0,4), mm=+cp.slice(5,7), prox=(mm===12?(y+1)+'-01':y+'-'+String(mm+1).padStart(2,'0')), EF=F.fechado&&(B.prev.est||{})[prox]||null; /* mês fechado: estoque do começo do mês seguinte = fim do mês */
   const rows=rows0.filter(r=>!cmFora(r.c,r.d)&&!/ENSACAD|PREMIX/i.test(r.d||'')).map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:EF?(EF[r.c]||0):(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
+  const rowsE=rows.filter(r=>cmExp(r.c,r.d)), rowsAll=rows.slice(); { const n=rows.filter(r=>!cmExp(r.c,r.d)); rows.length=0; n.forEach(r=>rows.push(r)); }
   /* 1 · faltou produto */
   const tP=rows.reduce((a,r)=>a+r.pr,0), tF=rows.reduce((a,r)=>a+r.fat,0), tPm=rows.reduce((a,r)=>a+r.prev,0), tPd=rows.reduce((a,r)=>a+r.prod,0);
   const err=rows.reduce((a,r)=>a+Math.abs(r.fat-r.pr),0);
   const acima=rows.filter(r=>r.fat>r.pr*1.05&&r.fat-r.pr>=50).map(r=>Object.assign(r,{dif:r.fat-r.pr,disp:r.ei+r.prod,tinha:r.pr>0&&r.ei+r.prod>=r.pr*0.97})).sort((a,b)=>b.dif-a.dif);
-  const s1={tP,tF,tPm,tPd,erro:tP?err/tP:0,acima,semPrev:acima.filter(r=>!r.prev),dif:acima.reduce((a,r)=>a+r.dif,0),tinha:acima.filter(r=>r.tinha).length};
+  const ex={itens:rowsE.slice().sort((a,b)=>(b.prod+b.fat)-(a.prod+a.fat)),prod:rowsE.reduce((a,r)=>a+r.prod,0),fat:rowsE.reduce((a,r)=>a+r.fat,0),prodT:rowsE.reduce((a,r)=>a+cmTon(r.c,r.prod),0)};
+  ex.prodTot=tPd+ex.prod; ex.tonTot=rowsAll.reduce((a,r)=>a+cmTon(r.c,r.prod),0); ex.peso=ex.prodTot?ex.prod/ex.prodTot:0; ex.pesoT=ex.tonTot?ex.prodT/ex.tonTot:0;
+  const s1={ex,tP,tF,tPm,tPd,erro:tP?err/tP:0,acima,semPrev:acima.filter(r=>!r.prev),dif:acima.reduce((a,r)=>a+r.dif,0),tinha:acima.filter(r=>r.tinha).length};
   /* 2 · pedidos (carteira com data de entrega) */
   const ped=[]; let fonte2='cart';
   const cs=D.carts; if(cs.length>=2){ for(let i=1;i<cs.length;i++){ const a=cs[i-1], b=cs[i]; if(b.dia.slice(0,7)!==cp) continue; const desde=addDias(a.dia,1);
@@ -96,7 +102,7 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
   const s2={ped,fonte:fonte2,curtos:ped.filter(p=>p.curto),semEst:ped.filter(p=>p.semEst),comData:ped.filter(p=>p.prazo!=null),desde:(cs[0]||{}).dia||''};
   s2.prazoMed=s2.comData.length?s2.comData.reduce((a,p)=>a+p.prazo,0)/s2.comData.length:null; const ct=s2.comData.filter(p=>p.trep!=null); s2.repMed=ct.length?ct.reduce((a,p)=>a+p.trep,0)/ct.length:null;
   /* 3 · produziu o previsto */
-  const pl={}; rows.forEach(r=>{ const o=pl[r.ln]=pl[r.ln]||{l:r.ln,prev:0,pr:0,prod:0,fat:0}; o.prev+=r.prev; o.pr+=r.pr; o.prod+=r.prod; o.fat+=r.fat; });
+  const pl={}; rowsAll.forEach(r=>{ const o=pl[r.ln]=pl[r.ln]||{l:r.ln,prev:0,pr:0,prod:0,fat:0,prodE:0,fatE:0}; if(cmExp(r.c,r.d)){ o.prodE+=r.prod; o.fatE+=r.fat; return; } o.prev+=r.prev; o.pr+=r.pr; o.prod+=r.prod; o.fat+=r.fat; });
   const LO=linhasOrd(); const porLinha=Object.values(pl).sort((a,b)=>{ const i=x=>{ const k=LO.indexOf(x.l); return k<0?99:k; }; return i(a)-i(b)||a.l.localeCompare(b.l); });
   const sem=F.fechado?(F.dt||22)/5:Math.max(.2,(F.du||1)/5);
   const sobra=rows.filter(r=>r.pr>0&&r.fat<r.pr*0.9&&r.pr-r.fat>=50).map(r=>{ const vs=r.fat/sem; return Object.assign(r,{falta:r.pr-r.fat,semanas:r.est!=null&&vs>0?r.est/vs:null}); }).sort((a,b)=>b.falta-a.falta);
@@ -122,7 +128,7 @@ function cmFrases(X){ const a=X.s1, b=X.s2, c=X.s3, d=X.s4, ref=X.F.fechado?'':'
   return {
     f1:a.acima.length?`${a.acima.length} ${a.acima.length===1?'item vendeu':'itens venderam'} acima da previsão${ref} (+${cmN(a.dif)}). Em ${a.tinha} deles a produção tinha o previsto (estoque do dia 1º + produzido).${a.semPrev.length?' '+a.semPrev.length+' sem previsão nenhuma.':''}`:`Nenhum item vendeu acima da previsão${ref}.`,
     f2:b.ped.length?(b.fonte==='cart'?`${b.curtos.length} de ${b.ped.length} pedidos entraram com prazo menor que o tempo de reposição do item${b.semEst.length?'; '+b.semEst.length+' sem estoque no dia em que entraram':''}.`:`${b.ped.length} aumentos de carteira no mês${b.semEst.length?', '+b.semEst.length+' sem estoque no dia em que entraram':''}. A data de entrega de cada pedido começou a ser guardada agora.`):'Sem fotos da carteira neste mês para comparar.',
-    f3:`A produção fez ${cmP(c.prodPct)} da previsão${ref}; o faturamento ficou em ${cmP(c.fatPct)}.${c.sobra.length?' '+c.sobra.length+(c.sobra.length===1?' item vendeu':' itens venderam')+' menos que o previsto.':''}`,
+    f3:`A produção fez ${cmP(c.prodPct)} da previsão${ref}; o faturamento ficou em ${cmP(c.fatPct)}.${a.ex.prod>0?' Além disso, '+cmN(a.ex.prod)+' foram produzidos para exportação ('+cmP(a.ex.peso)+' de tudo o que foi produzido), sem previsão do comercial.':''}${c.sobra.length?' '+c.sobra.length+(c.sobra.length===1?' item vendeu':' itens venderam')+' menos que o previsto.':''}`,
     f4:d.dias.length?`Em ${d.diasGrandes.length} ${d.diasGrandes.length===1?'dia':'dias'} a carteira subiu ${cmN(CM_SALTO)} ou mais de uma vez.${d.trocas.length?' A previsão foi trocada '+d.trocas.length+(d.trocas.length===1?' vez':' vezes')+' no mês.':''}`:'Sem fotos da carteira neste mês para comparar.' }; }
 function cmBarra(cp){ const f=S.cm.f, B=S.anl.base||{}, pm=((B.prev||{}).mes||{})[cp]||{}, V=(B.vendas||{}).mensal||{};
   const cods=[...new Set(Object.keys(pm).concat(Object.keys(V).filter(c=>V[c][cp])))].filter(c=>!cmInt(c)&&!/ENSACAD|PREMIX/i.test(cmDesc(c)));
@@ -147,7 +153,11 @@ function vAnlCom(){ const A=S.cm; const ms=cmMeses(); if(!A.cp||!ms.includes(A.c
   const a=X.s1, b=X.s2, c=X.s3, d=X.s4;
   const sec1=`<section class="card cm-s"><div class="cm-q">“FALTOU PRODUTO”</div><p class="cm-r">${esc(T.f1)}</p>
     <div class="cm-ks">${k('Previsão do comercial'+ref,cmN(a.tP),X.F.fechado?'do mês':'mês inteiro: '+cmN(a.tPm))}${k('Vendido (faturado)',cmN(a.tF),cmP(a.tP?a.tF/a.tP:0)+' da previsão','c')}${k('Erro da previsão',cmP(a.erro),'diferenças somadas ÷ previsão','w')}${k('Venda acima do previsto','+'+cmN(a.dif),a.acima.length+' itens','c')}</div>
-    ${tab(['Item','Produto','Previsto','Vendido','Diferença','Tinha dia 1º','Produzido','Tinha o previsto?'],a.acima.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.pr),cmN(r.fat),`<span class="cm-neg">+${cmN(r.dif)}${r.pr?' ('+Math.round(r.dif/r.pr*100)+'%)':' (sem previsão)'}</span>`,cmN(r.ei),cmN(r.prod),r.tinha?pill('sim','o'):pill(r.pr?Math.round(r.disp/r.pr*100)+'%':'—','w')]),'Nenhum item vendeu acima da previsão.')}</section>`;
+    ${tab(['Item','Produto','Previsto','Vendido','Diferença','Tinha dia 1º','Produzido','Tinha o previsto?'],a.acima.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.pr),cmN(r.fat),`<span class="cm-neg">+${cmN(r.dif)}${r.pr?' ('+Math.round(r.dif/r.pr*100)+'%)':' (sem previsão)'}</span>`,cmN(r.ei),cmN(r.prod),r.tinha?pill('sim','o'):pill(r.pr?Math.round(r.disp/r.pr*100)+'%':'—','w')]),'Nenhum item vendeu acima da previsão.')}
+    ${a.ex.itens.length?`<h3 class="cm-h3">Exportação · não tem previsão do comercial, mas ocupa a produção</h3>
+    <div class="cm-ks">${k('Produzido para exportação',cmN(a.ex.prod),cmP(a.ex.peso)+' de tudo o que foi produzido','w')}${k('Toneladas',(Math.round(a.ex.prodT*10)/10).toLocaleString('pt-BR')+' t',cmP(a.ex.pesoT)+' do peso produzido','w')}${k('Faturado (exportação)',cmN(a.ex.fat),a.ex.itens.length+' itens')}</div>
+    ${tab(['Item','Produto','Produzido','Toneladas','Faturado'],a.ex.itens.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.prod),(Math.round(cmTon(r.c,r.prod)*10)/10).toLocaleString('pt-BR'),cmN(r.fat)]),'')}
+    <p class="cm-nota">Fica fora do erro da previsão e de "venderam acima da previsão".</p>`:''}</section>`;
   const sec2=`<section class="card cm-s"><div class="cm-q">“ATRASOU O PEDIDO”</div><p class="cm-r">${esc(T.f2)}</p>
     ${b.fonte==='snap'?`<div class="cm-av">A carteira com a data de entrega de cada pedido começou a ser guardada ${b.desde?'em '+cmD(b.desde):'agora'}. Até ter duas fotos no mês, a lista mostra o aumento da carteira de cada item, sem a data de entrega; como a carteira cai quando se fatura, um pedido faturado no mesmo dia em que entrou não aparece. Importe o Perfil (RPLA0300) todo dia.</div>`:''}
     <div class="cm-ks">${k('Pedidos no mês',String(b.ped.length),'aumentos da carteira por item')}${b.fonte==='cart'?k('Prazo menor que a reposição',String(b.curtos.length),b.ped.length?cmP(b.curtos.length/b.ped.length)+' dos pedidos':'','c'):''}${k('Sem estoque no dia em que entrou',String(b.semEst.length),'estoque menor que o pedido','w')}${b.fonte==='cart'?k('Prazo médio dado',b.prazoMed==null?'—':(Math.round(b.prazoMed*10)/10).toLocaleString('pt-BR')+' d',b.repMed==null?'':'reposição média '+(Math.round(b.repMed*10)/10).toLocaleString('pt-BR')+' d'):''}</div>
@@ -155,9 +165,9 @@ function vAnlCom(){ const A=S.cm; const ms=cmMeses(); if(!A.cp||!ms.includes(A.c
       (b.fonte==='cart'?b.ped.slice().sort((x,y)=>(y.curto-x.curto)||(y.semEst-x.semEst)||x.ate.localeCompare(y.ate)):b.ped.slice().sort((x,y)=>y.q-x.q)).slice(0,30).map(p=>b.fonte==='cart'
         ?[`<b>${esc(p.c)}</b>`,esc(p.d),cmN(p.q),p.de===p.ate?cmD(p.ate):cmD(p.de)+' a '+cmD(p.ate),cmD(p.f),p.curto?`<span class="cm-neg">${p.prazo} d</span>`:p.prazo+' d',p.trep!=null?p.trep+' d':'—',p.est==null?'—':p.semEst?pill(cmN(p.est),'c'):cmN(p.est)]
         :[`<b>${esc(p.c)}</b>`,esc(p.d),'+'+cmN(p.q),p.de===p.ate?cmD(p.ate):cmD(p.de)+' a '+cmD(p.ate),p.est==null?'—':p.semEst?pill(cmN(p.est),'c'):cmN(p.est)]),'Sem pedidos novos nas fotos deste mês.')}</section>`;
-  const mx=Math.max(1,...c.porLinha.map(x=>Math.max(x.pr,x.prod,x.fat)));
+  const mx=Math.max(1,...c.porLinha.map(x=>Math.max(x.pr,x.prod,x.fat,x.prodE||0)));
   const sec3=`<section class="card cm-s"><div class="cm-q">“NÃO PRODUZIU O PREVISTO”</div><p class="cm-r">${esc(T.f3)}</p>
-    <div class="cm-bars">${c.porLinha.map(x=>`<div class="cm-bl"><b>${esc(x.l)}</b>${[['Previsto',x.pr,'p'],['Produzido',x.prod,'d'],['Faturado',x.fat,'f']].map(([t,v,cl])=>`<div class="cm-br"><span>${t}</span><i><em class="${cl}" style="width:${Math.max(0.5,v/mx*100)}%"></em></i><span class="num">${cmN(v)}</span></div>`).join('')}</div>`).join('')}</div>
+    <div class="cm-bars">${c.porLinha.map(x=>`<div class="cm-bl"><b>${esc(x.l)}</b>${[['Previsto',x.pr,'p'],['Produzido',x.prod,'d'],['Faturado',x.fat,'f']].concat(x.prodE>0?[['Exportação',x.prodE,'e']]:[]).map(([t,v,cl])=>`<div class="cm-br"><span>${t}</span><i><em class="${cl}" style="width:${Math.max(0.5,v/mx*100)}%"></em></i><span class="num">${cmN(v)}</span></div>`).join('')}</div>`).join('')}</div>
     <h3 class="cm-h3">Venderam menos que a previsão${ref}</h3>
     ${tab(['Item','Produto','Previsto','Vendido','Faltou vender',c.estFim?'Estoque no fim do mês':'Estoque hoje','Semanas de estoque'],c.sobra.slice(0,25).map(r=>[`<b>${esc(r.c)}</b>`,esc(r.d),cmN(r.pr),cmN(r.fat),cmN(r.falta),cmN(r.est),r.semanas==null?'—':pill((Math.round(r.semanas*10)/10).toLocaleString('pt-BR')+' sem.',r.semanas>=4?'w':'n')]),'Nenhum item vendeu bem menos que a previsão.')}</section>`;
   const mxd=Math.max(1,...d.dias.map(x=>x.t));
@@ -194,6 +204,11 @@ async function cmPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com/
       .concat([Object.assign(['Total','',cmN(a.acima.reduce((s,r)=>s+r.pr,0)),cmN(a.acima.reduce((s,r)=>s+r.fat,0)),'+'+cmN(a.dif),'','',''],{_tot:1})])); }
   else P.vazio('Nenhum item vendeu acima da previsão.');
   P.texto('Tinha? = estoque do dia 1º + produzido no mês cobre a previsão (97% ou mais).',{fs:7.5});
+  if(a.ex.itens.length){ P.secao('Exportação','não tem previsão do comercial, mas ocupa a produção');
+    P.kpis([{t:'Produzido p/ exportação',v:cmN(a.ex.prod),s:cmP(a.ex.peso)+' de tudo o que foi produzido',c:'warn'},{t:'Toneladas',v:(Math.round(a.ex.prodT*10)/10).toLocaleString('pt-BR')+' t',s:cmP(a.ex.pesoT)+' do peso produzido',c:'warn'},{t:'Faturado (exportação)',v:cmN(a.ex.fat),s:a.ex.itens.length+' itens',c:'pet'}],3);
+    P.tabela([{t:'Item',w:16},{t:'Produto',w:70},{t:'Produzido',w:20,al:'r'},{t:'Toneladas',w:18,al:'r'},{t:'Faturado',w:20,al:'r'}],a.ex.itens.map(r=>[r.c,r.d,cmN(r.prod),(Math.round(cmTon(r.c,r.prod)*10)/10).toLocaleString('pt-BR'),cmN(r.fat)])
+      .concat([Object.assign(['Total','',cmN(a.ex.prod),(Math.round(a.ex.prodT*10)/10).toLocaleString('pt-BR'),cmN(a.ex.fat)],{_tot:1})]));
+    P.texto('Fica fora do erro da previsão e de "venderam acima da previsão".',{fs:7.5}); }
   /* 2 */
   P.nova(); P.secao('2 · Prazo dos pedidos','quanto tempo a produção teve'); P.texto(T.f2,{c:'ink',fs:9.5});
   if(b.fonte==='snap') P.texto('A carteira com a data de entrega de cada pedido começou a ser guardada '+(b.desde?'em '+cmD(b.desde):'agora')+'. Até ter duas fotos no mês, a lista mostra o aumento da carteira de cada item, sem a data de entrega.',{fs:8});
@@ -206,10 +221,10 @@ async function cmPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com/
   else P.vazio('Sem fotos da carteira neste mês para comparar.');
   /* 3 */
   P.nova(); P.secao('3 · Previsto × produzido × faturado',ref?ref.trim():''); P.texto(T.f3,{c:'ink',fs:9.5});
-  if(c.porLinha.length){ cmCols(P,c.porLinha.map(x=>x.l),[{n:'Previsto',v:c.porLinha.map(x=>x.pr),c:C.cinza},{n:'Produzido',v:c.porLinha.map(x=>x.prod),c:C.pet},{n:'Faturado',v:c.porLinha.map(x=>x.fat),c:C.crit}]);
-    P.tabela([{t:'Linha',w:34},{t:'Previsto',w:20,al:'r'},{t:'Produzido',w:20,al:'r'},{t:'% previsto',w:16,al:'r'},{t:'Faturado',w:20,al:'r'},{t:'% previsto',w:16,al:'r'}],
-      c.porLinha.map(x=>{ const r=[x.l,cmN(x.pr),cmN(x.prod),x.pr?cmP(x.prod/x.pr):'—',cmN(x.fat),x.pr?cmP(x.fat/x.pr):'—']; r._cor={3:x.pr?gpCor(x.prod/x.pr*100):null}; return r; })
-      .concat([Object.assign(['Total',cmN(a.tP),cmN(a.tPd),cmP(c.prodPct),cmN(a.tF),cmP(c.fatPct)],{_tot:1})])); }
+  if(c.porLinha.length){ cmCols(P,c.porLinha.map(x=>x.l),[{n:'Previsto',v:c.porLinha.map(x=>x.pr),c:C.cinza},{n:'Produzido',v:c.porLinha.map(x=>x.prod),c:C.pet},{n:'Faturado',v:c.porLinha.map(x=>x.fat),c:C.crit}].concat(a.ex.prod>0?[{n:'Exportação',v:c.porLinha.map(x=>x.prodE),c:C.warn}]:[]));
+    P.tabela([{t:'Linha',w:30},{t:'Previsto',w:18,al:'r'},{t:'Produzido',w:18,al:'r'},{t:'% previsto',w:15,al:'r'},{t:'Faturado',w:18,al:'r'},{t:'% previsto',w:15,al:'r'},{t:'Exportação',w:18,al:'r'}],
+      c.porLinha.map(x=>{ const r=[x.l,cmN(x.pr),cmN(x.prod),x.pr?cmP(x.prod/x.pr):'—',cmN(x.fat),x.pr?cmP(x.fat/x.pr):'—',x.prodE?cmN(x.prodE):'—']; r._cor={3:x.pr?gpCor(x.prod/x.pr*100):null}; return r; })
+      .concat([Object.assign(['Total',cmN(a.tP),cmN(a.tPd),cmP(c.prodPct),cmN(a.tF),cmP(c.fatPct),a.ex.prod?cmN(a.ex.prod):'—'],{_tot:1})])); }
   P.secao('Venderam menos que a previsão','estoque que sobrou');
   if(c.sobra.length) P.tabela([{t:'Item',w:16},{t:'Produto',w:52},{t:'Previsto',w:17,al:'r'},{t:'Vendido',w:17,al:'r'},{t:'Faltou vender',w:18,al:'r'},{t:c.estFim?'Estoque fim do mês':'Estoque hoje',w:18,al:'r'},{t:'Semanas',w:14,al:'r'}],
     c.sobra.slice(0,40).map(r=>{ const x=[r.c,r.d,cmN(r.pr),cmN(r.fat),cmN(r.falta),cmN(r.est),r.semanas==null?'—':(Math.round(r.semanas*10)/10).toLocaleString('pt-BR')]; x._cor={6:r.semanas>=4?'warn':null}; return x; }));
@@ -274,7 +289,7 @@ document.head.insertAdjacentHTML('beforeend',`<style id="cm-css">
 .cm-bl{display:flex;flex-direction:column;gap:4px}.cm-bl>b{font-size:14px}
 .cm-br{display:grid;grid-template-columns:76px 1fr 72px;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
 .cm-br i{height:10px;border-radius:5px;background:var(--ground);overflow:hidden;display:block}.cm-br em{display:block;height:100%;border-radius:5px}
-.cm-br em.p{background:var(--muted);opacity:.45}.cm-br em.d{background:var(--teal)}.cm-br em.f{background:var(--crit)}.cm-br .num{text-align:right;color:var(--ink,inherit)}
+.cm-br em.e{background:var(--warn)}.cm-br em.p{background:var(--muted);opacity:.45}.cm-br em.d{background:var(--teal)}.cm-br em.f{background:var(--crit)}.cm-br .num{text-align:right;color:var(--ink,inherit)}
 .cm-dd{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:6px}
 .cm-dc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;min-width:0}
 .cm-dc i{width:100%;max-width:26px;background:var(--teal);border-radius:3px 3px 0 0}.cm-dc i.c{background:var(--crit)}
