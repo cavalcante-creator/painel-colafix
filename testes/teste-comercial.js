@@ -3,12 +3,12 @@
 const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=H.seed(); const D=d.docs; const now=new Date(), loc=x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10);
  const hj=loc(now), cp=hj.slice(0,7); const y=+cp.slice(0,4), m=+cp.slice(5,7); const pm=m===1?(y-1)+'-12':y+'-'+String(m-1).padStart(2,'0'); const t=now.toISOString();
- const l={AC0005:{d:'ARGAMASSA CINZA AC3 20 KG',a3:5000,a30:0,sal:1,trep:6,ln:['Linha 1']},AC0019:{d:'ARGAMASSA QUERO QUERO 20 KG',a3:3000,a30:0,sal:1,trep:8,ln:['Linha 1']},AC0030:{d:'ARGAMASSA POZOSUL AC1 20 KG',a3:1400,a30:0,sal:1,trep:5,ln:['Linha 2']}};
+ const l={AC0005:{d:'ARGAMASSA CINZA AC3 20 KG',a3:5000,a30:0,sal:1,trep:6,ln:['Linha 1']},AC0019:{d:'ARGAMASSA QUERO QUERO 20 KG',a3:3000,a30:0,sal:1,trep:8,ln:['Linha 1']},AC0030:{d:'ARGAMASSA POZOSUL AC1 20 KG',a3:1400,a30:0,sal:1,trep:5,ln:['Linha 2']},RE0901:{d:'ENSACADO REJUNTE FLEX CINZA',a3:0,a30:0,sal:1,trep:2,ln:['Linha 2']}};
  D['pcpbase/itens']={l,atual:{SALDO:t},em:t}; D['pcpbase/meta']={em:t,hist:[]}; D['pcpbase/perfil']={atual:t,l:[]};
- D['pcpbase/vendas']={mensal:{AC0005:{[pm]:[6400,10100]},AC0019:{[pm]:[0,500]},AC0030:{[pm]:[1000,900]}}};
- D['pcpbase/prev']={mes:{[pm]:{AC0005:8000,AC0030:1800}},est:{[pm]:{AC0005:6200,AC0019:0,AC0030:1400}},mesEm:{[pm]:pm+'-15'}};
+ D['pcpbase/vendas']={mensal:{AC0005:{[pm]:[6400,10100]},AC0019:{[pm]:[0,500]},AC0030:{[pm]:[1000,900]},RE0901:{[pm]:[3000,2500]}}};
+ D['pcpbase/prev']={mes:{[pm]:{AC0005:8000,AC0030:1800,RE0901:400}},est:{[pm]:{AC0005:6200,AC0019:0,AC0030:1400}},mesEm:{[pm]:pm+'-15'}};
  D['pcpcart/'+pm+'-02']={dia:pm+'-02',l:{AC0005:{[pm+'-10']:1000}}};
- D['pcpcart/'+pm+'-03']={dia:pm+'-03',l:{AC0005:{[pm+'-10']:1000,[pm+'-05']:3200},AC0019:{[pm+'-20']:1500}}};
+ D['pcpcart/'+pm+'-03']={dia:pm+'-03',l:{AC0005:{[pm+'-10']:1000,[pm+'-05']:3200},AC0019:{[pm+'-20']:1500},RE0901:{[pm+'-04']:4000}}};
  D['pcpsnap/'+pm+'-03']={data:pm+'-03',em:t,d:[],p:{},s:{AC0005:2000,AC0019:3000},dc:{AC0005:4200,AC0019:1500}};
  D['pcpprevver/'+pm+'_0']={cp:pm,em:pm+'-01',ant:true,l:{AC0005:7000,AC0030:1800}};
  D['pcpprevver/'+pm+'_1']={cp:pm,em:pm+'-15T10:00:00Z',l:{AC0005:8000,AC0030:1800}};
@@ -32,6 +32,7 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
    const y=Painel.comercial.calc(pm); r.est=(y.s3.sobra.find(z=>z.c==='AC0030')||{}).est; r.estFim=y.s3.estFim; delete B.prev.est[cp]; return r; },{pm,cp});
  ok('Extrato importado só até o dia 15: vendido, produzido e previsão contam até 15/'+pm.slice(5)+' (dias úteis '+Z.du+' de '+Z.dt+')', Z.ate===pm+'-15'&&Z.porExt&&Math.abs(Z.pr5-8000*Z.du/Z.dt)<1e-6&&Z.f<1, JSON.stringify(Z));
  ok('Mês fechado: "estoque no fim do mês" = estoque do começo do mês seguinte (AC0030: 700)', Z.est===700&&Z.estFim, JSON.stringify(Z));
+ ok('Ensacado (RE0901 "ENSACADO REJUNTE…") fica fora: previsão, vendido, pedidos e saltos', !/RE0901/.test(await txt())&&!JSON.stringify(X).includes('RE0901'));
  /* PDF */
  const pdf=await p.evaluate(async()=>{ try{ await Painel.comercial.pdf(); return 'ok'; }catch(e){ return 'erro: '+e.message; } });
  ok('Baixar PDF do mês gera o arquivo sem erro', pdf==='ok', pdf);
