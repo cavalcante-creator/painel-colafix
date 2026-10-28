@@ -26,6 +26,16 @@ const H=require('./harness'); const fs=require('fs'); const res=[]; const ok=(n,
  ok('2 · Pedido do AC0005 entrou em '+pm.slice(5)+'/03 para o dia 05 (2 dias, reposição 6): prazo curto e sem estoque; AC0019 com prazo de 17 dias', X.fonte==='cart'&&X.ped.join(',')==='AC0005:3200:2:true:true,AC0019:1500:17:false:false'&&/1 de 2 pedidos entraram com prazo menor/.test(s), JSON.stringify(X.ped));
  ok('3 · Por linha (previsto × produzido × faturado) e AC0030 vendeu menos: faltou 900, semanas = estoque ÷ venda por semana (dias úteis do mês ÷ 5)', X.sobra.join(',')==='AC0030:900:'+(1400/(900/(X.dt/5))).toFixed(1)&&X.lin.some(z=>/^Linha 1:8000:6400:10600$/.test(z))&&/Venderam menos que a previsão/.test(s), JSON.stringify([X.sobra,X.lin]));
  ok('4 · Em cima da hora: dia 03 entrou 4.700 (salto AC0005 +3.200 e AC0019 +1.500) e 1 troca da previsão (+1.000)', X.dias.length===1&&X.dias[0].t===4700&&X.saltos.join(',')==='AC0005:3200,AC0019:1500'&&X.vers.length===2&&X.vers[1].up===1000&&/A previsão foi trocada 1 vez/.test(s), JSON.stringify([X.dias,X.vers]));
+ /* filtros */
+ await p.selectOption('[data-cmf="ln"]','Linha 2'); await H.dorme(700);
+ let F1=await p.evaluate(()=>{ const x=Painel.comercial.calc(); return {rows:x.rows.map(r=>r.c),ped:x.s2.ped.length,saltos:x.s4.saltos.length,on:!!document.querySelector('.cm-fl.on [data-cmf="ln"]')}; });
+ ok('Filtro Linha 2: só o AC0030; sem pedidos nem saltos da Linha 1; o filtro fica marcado', F1.rows.join(',')==='AC0030'&&F1.ped===0&&F1.saltos===0&&F1.on, JSON.stringify(F1));
+ await p.click('[data-act="cm-limpar"]'); await H.dorme(600);
+ await p.fill('#cm-q','quero'); await p.press('#cm-q','Enter'); await H.dorme(700);
+ F1=await p.evaluate(()=>{ const x=Painel.comercial.calc(); return {rows:x.rows.map(r=>r.c),ped:x.s2.ped.map(q=>q.c),q:document.getElementById('cm-q').value}; });
+ ok('Busca "quero": só o AC0019 (previsão × vendido e pedidos)', F1.rows.join(',')==='AC0019'&&F1.ped.join(',')==='AC0019'&&F1.q==='quero', JSON.stringify(F1));
+ await p.click('[data-act="cm-limpar"]'); await H.dorme(600);
+ ok('Limpar filtros volta tudo', await p.evaluate(()=>Painel.comercial.calc().rows.length)===3&&!(await p.$('[data-act="cm-limpar"]')));
  /* Extrato só até o dia 15 do mês: compara até lá; mês fechado usa o estoque do começo do mês seguinte */
  const Z=await p.evaluate(({pm,cp})=>{ const S=Painel.comercial.S(), B=S.anl.base; B.vendas.ate=pm+'-15'; B.prev.est[cp]={AC0030:700};
    const x=Painel.comercial.calc(pm); const r={f:x.F.f,ate:x.F.ate,porExt:x.F.porExt,du:x.F.du,dt:x.F.dt,pr5:(x.rows.find(z=>z.c==='AC0005')||{}).pr}; delete B.vendas.ate;

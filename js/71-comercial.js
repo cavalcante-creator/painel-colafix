@@ -40,6 +40,16 @@ async function cmSemente(cp){ if(!S.db) return; const B=S.anl.base||{};
 /* ---------- leitura (sob demanda, só o mês) ---------- */
 /* ensacado, premix e intermediários (M…) não são material pronto: ficam fora do relatório */
 function cmInt(c){ const B=S.anl.base||{}, it=((B.itens||{}).l||{})[c]||{}; const d=it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||''; return /^M\d/.test(c)||/ENSACAD|PREMIX/i.test(d); }
+/* filtros da tela (valem também para o PDF): linha, família, embalagem e busca */
+S.cm.f=S.cm.f||{ln:'',fam:'',emb:'',q:''};
+function cmDesc(c){ const it=(((S.anl.base||{}).itens||{}).l||{})[c]||{}; return it.d||((typeof itemDe==='function'&&itemDe(c))||{}).descricao||''; }
+function cmLnDe(c){ const it=(((S.anl.base||{}).itens||{}).l||{})[c]||{}; return cmLinha({linhas:anlLinhasDe(c,it)}); }
+function cmFiltrando(){ const f=S.cm.f; return !!(f.ln||f.fam||f.emb||f.q); }
+function cmOk(c,d){ const f=S.cm.f; if(!cmFiltrando()) return true; d=d||cmDesc(c);
+  if(f.ln&&cmLnDe(c)!==f.ln) return false; if(f.fam&&eswFam(d)!==f.fam) return false; if(f.emb&&eswEmb(d)!==f.emb) return false;
+  if(f.q){ const t=anlNorm(c+' '+d); if(!anlNorm(f.q).split(/\s+/).filter(Boolean).every(w=>t.includes(w))) return false; } return true; }
+function cmFora(c,d){ return cmInt(c)||!cmOk(c,d); }
+function cmFiltroTxt(){ const f=S.cm.f, xs=[]; if(f.ln) xs.push(f.ln); if(f.fam) xs.push('família '+f.fam); if(f.emb) xs.push('embalagem '+f.emb.toLowerCase()); if(f.q) xs.push('"'+f.q+'"'); return xs.join(' · '); }
 const cmFimMes=cp=>{ const y=+cp.slice(0,4), m=+cp.slice(5,7); return cp+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0'); };
 function cmCarrega(cp){ const D=S.cm.dados; if(D[cp]||S.cm.lendo[cp]||!S.db) return D[cp]||null; S.cm.lendo[cp]=true;
   const ini=addDias(cp+'-01',-10), fim=cmFimMes(cp);
@@ -66,7 +76,7 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
   for(const c in (V.mensal||{})){ const mm=V.mensal[c][cp]; if(!mm||tem.has(c)||!(mm[1]>0)) continue; const it=IL[c]||{};
     rows0.push({c,cp,d:it.d||((itemDe(c)||{}).descricao)||'',linhas:anlLinhasDe(c,it),ei:E[c]||0,prev:0,fat:mm[1],prod:mm[0]}); }
   const y=+cp.slice(0,4), mm=+cp.slice(5,7), prox=(mm===12?(y+1)+'-01':y+'-'+String(mm+1).padStart(2,'0')), EF=F.fechado&&(B.prev.est||{})[prox]||null; /* mês fechado: estoque do começo do mês seguinte = fim do mês */
-  const rows=rows0.filter(r=>!cmInt(r.c)&&!/ENSACAD|PREMIX/i.test(r.d||'')).map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:EF?(EF[r.c]||0):(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
+  const rows=rows0.filter(r=>!cmFora(r.c,r.d)&&!/ENSACAD|PREMIX/i.test(r.d||'')).map(r=>Object.assign({},r,{pr:r.prev*F.f,ln:cmLinha(r),est:EF?(EF[r.c]||0):(IL[r.c]?(IL[r.c].a3||0)+(IL[r.c].a30||0):null)}));
   /* 1 · faltou produto */
   const tP=rows.reduce((a,r)=>a+r.pr,0), tF=rows.reduce((a,r)=>a+r.fat,0), tPm=rows.reduce((a,r)=>a+r.prev,0), tPd=rows.reduce((a,r)=>a+r.prod,0);
   const err=rows.reduce((a,r)=>a+Math.abs(r.fat-r.pr),0);
@@ -78,9 +88,9 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
       for(const c in b.l){ const nb=b.l[c], na=(a.l&&a.l[c])||{}; const sum=o=>Object.values(o).reduce((x,y)=>x+y,0); let sobe=sum(nb)-sum(na); if(sobe<1) continue;
         Object.keys(nb).sort().forEach(f=>{ if(sobe<1) return; const inc=Math.min(sobe,nb[f]-(na[f]||0)); if(inc<1) return; sobe-=inc;
           const pr=Math.max(0,cmDias(desde,f)), tr=IL[c]&&IL[c].trep||null, est=cmEstDia(D.snaps,b.dia,c);
-          if(cmInt(c)) return; ped.push({c,d:(IL[c]||{}).d||'',q:inc,de:desde,ate:b.dia,f,prazo:pr,trep:tr,est,curto:tr!=null&&pr<tr,semEst:est!=null&&est<inc}); }); } } }
+          if(cmFora(c)) return; ped.push({c,d:(IL[c]||{}).d||'',q:inc,de:desde,ate:b.dia,f,prazo:pr,trep:tr,est,curto:tr!=null&&pr<tr,semEst:est!=null&&est<inc}); }); } } }
   else { fonte2='snap'; const sn=D.snaps; for(let i=1;i<sn.length;i++){ const a=sn[i-1], b=sn[i]; if(b.data.slice(0,7)!==cp||!a.dc||!b.dc) continue; const desde=addDias(a.data,1);
-      for(const c in b.dc){ if(cmInt(c)) continue; const inc=(b.dc[c]||0)-(a.dc[c]||0); if(inc<1) continue; const tr=IL[c]&&IL[c].trep||null, est=b.s&&b.s[c]!=null?b.s[c]:null;
+      for(const c in b.dc){ if(cmFora(c)) continue; const inc=(b.dc[c]||0)-(a.dc[c]||0); if(inc<1) continue; const tr=IL[c]&&IL[c].trep||null, est=b.s&&b.s[c]!=null?b.s[c]:null;
         ped.push({c,d:(IL[c]||{}).d||'',q:inc,de:desde,ate:b.data,f:'',prazo:null,trep:tr,est,curto:false,semEst:est!=null&&est<inc}); } } }
   ped.sort((a,b)=>a.ate.localeCompare(b.ate)||b.q-a.q);
   const s2={ped,fonte:fonte2,curtos:ped.filter(p=>p.curto),semEst:ped.filter(p=>p.semEst),comData:ped.filter(p=>p.prazo!=null),desde:(cs[0]||{}).dia||''};
@@ -94,10 +104,10 @@ function cmCalc(cp){ const B=S.anl.base||{}; if(!(B.prev&&B.prev.mes)) return nu
   /* 4 · em cima da hora */
   const ser=cs.length>=2?cs.map(x=>({dia:x.dia,dc:Object.fromEntries(Object.entries(x.l||{}).map(([c,o])=>[c,Object.values(o).reduce((a,b)=>a+b,0)]))})):D.snaps.filter(x=>x.dc).map(x=>({dia:x.data,dc:x.dc}));
   const dias=[], saltos=[]; for(let i=1;i<ser.length;i++){ const a=ser[i-1], b=ser[i]; if(b.dia.slice(0,7)!==cp) continue; let t=0;
-    for(const c in b.dc){ if(cmInt(c)) continue; const inc=(b.dc[c]||0)-(a.dc[c]||0); if(inc>0){ t+=inc; if(inc>=CM_SALTO) saltos.push({dia:b.dia,c,antes:a.dc[c]||0,depois:b.dc[c],inc}); } } dias.push({dia:b.dia,t}); }
+    for(const c in b.dc){ if(cmFora(c)) continue; const inc=(b.dc[c]||0)-(a.dc[c]||0); if(inc>0){ t+=inc; if(inc>=CM_SALTO) saltos.push({dia:b.dia,c,antes:a.dc[c]||0,depois:b.dc[c],inc}); } } dias.push({dia:b.dia,t}); }
   saltos.sort((a,b)=>b.inc-a.inc);
-  const vers=D.vers.map((v,i)=>{ const a=i?D.vers[i-1].l||{}:null; if(!a) return {em:v.em,ant:v.ant,n:Object.keys(v.l||{}).length,primeira:true,tot:Object.values(v.l||{}).reduce((x,y)=>x+y,0)};
-    let up=0,dn=0,n=0; const ks=new Set([...Object.keys(a),...Object.keys(v.l||{})]); ks.forEach(c=>{ const d=((v.l||{})[c]||0)-(a[c]||0); if(Math.abs(d)>=1){ n++; if(d>0) up+=d; else dn-=d; } });
+  const vers=D.vers.map((v,i)=>{ const a=i?D.vers[i-1].l||{}:null; if(!a){ const ks=Object.keys(v.l||{}).filter(c=>!cmFora(c)); return {em:v.em,ant:v.ant,n:ks.length,primeira:true,tot:ks.reduce((x,c)=>x+(v.l[c]||0),0)}; }
+    let up=0,dn=0,n=0; const ks=new Set([...Object.keys(a),...Object.keys(v.l||{})].filter(c=>!cmFora(c))); ks.forEach(c=>{ const d=((v.l||{})[c]||0)-(a[c]||0); if(Math.abs(d)>=1){ n++; if(d>0) up+=d; else dn-=d; } });
     return {em:v.em,n,up,dn,saldo:up-dn}; });
   const s4={dias,saltos,diasGrandes:dias.filter(d=>d.t>=CM_SALTO),vers,trocas:vers.filter(v=>!v.primeira&&v.n>0),fonte:cs.length>=2?'cart':'snap'};
   return {cp,F,rows,s1,s2,s3,s4,carregado:!!S.cm.dados[cp]}; }
@@ -114,12 +124,21 @@ function cmFrases(X){ const a=X.s1, b=X.s2, c=X.s3, d=X.s4, ref=X.F.fechado?'':'
     f2:b.ped.length?(b.fonte==='cart'?`${b.curtos.length} de ${b.ped.length} pedidos entraram com prazo menor que o tempo de reposição do item${b.semEst.length?'; '+b.semEst.length+' sem estoque no dia em que entraram':''}.`:`${b.ped.length} aumentos de carteira no mês${b.semEst.length?', '+b.semEst.length+' sem estoque no dia em que entraram':''}. A data de entrega de cada pedido começou a ser guardada agora.`):'Sem fotos da carteira neste mês para comparar.',
     f3:`A produção fez ${cmP(c.prodPct)} da previsão${ref}; o faturamento ficou em ${cmP(c.fatPct)}.${c.sobra.length?' '+c.sobra.length+(c.sobra.length===1?' item vendeu':' itens venderam')+' menos que o previsto.':''}`,
     f4:d.dias.length?`Em ${d.diasGrandes.length} ${d.diasGrandes.length===1?'dia':'dias'} a carteira subiu ${cmN(CM_SALTO)} ou mais de uma vez.${d.trocas.length?' A previsão foi trocada '+d.trocas.length+(d.trocas.length===1?' vez':' vezes')+' no mês.':''}`:'Sem fotos da carteira neste mês para comparar.' }; }
+function cmBarra(cp){ const f=S.cm.f, B=S.anl.base||{}, pm=((B.prev||{}).mes||{})[cp]||{}, V=(B.vendas||{}).mensal||{};
+  const cods=[...new Set(Object.keys(pm).concat(Object.keys(V).filter(c=>V[c][cp])))].filter(c=>!cmInt(c)&&!/ENSACAD|PREMIX/i.test(cmDesc(c)));
+  const lns=[...new Set(cods.map(cmLnDe))], LO=linhasOrd(); lns.sort((a,b)=>{ const i=x=>{ const k=LO.indexOf(x); return k<0?99:k; }; return i(a)-i(b)||a.localeCompare(b); });
+  const fams=[...new Set(cods.map(c=>eswFam(cmDesc(c))))].sort(), embs=[...new Set(cods.map(c=>eswEmb(cmDesc(c))))].sort();
+  const sel=(k,rot,ops)=>`<label class="cm-fl${f[k]?' on':''}"><span>${rot}</span><select class="txt" data-cmf="${k}"><option value="">Todas</option>${ops.map(o=>`<option ${f[k]===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  return `<section class="card cm-fb"><label class="srch cm-busca">${ic('lupa',16,2)}<input class="txt" id="cm-q" value="${esc(f.q)}" placeholder="Buscar código ou produto (Enter)" autocomplete="off"></label>
+    ${sel('ln','Linha',lns)}${sel('fam','Família',fams)}${sel('emb','Embalagem',embs)}
+    ${cmFiltrando()?`<button class="lnk" data-act="cm-limpar">Limpar filtros</button>`:''}</section>`; }
 function vAnlCom(){ const A=S.cm; const ms=cmMeses(); if(!A.cp||!ms.includes(A.cp)) A.cp=ms[0]||hojeStr().slice(0,7);
-  const head=`<div class="head"><div><div class="eyebrow">ANÁLISE PCP · ${esc(cmMesNome(A.cp).toUpperCase())}</div><h1>Produção × Comercial</h1>
+  let head=`<div class="head"><div><div class="eyebrow">ANÁLISE PCP · ${esc(cmMesNome(A.cp).toUpperCase())}</div><h1>Produção × Comercial</h1>
     <p class="sub">Previsão do comercial, pedidos, produção e faturamento do mês. Para levar à reunião.</p></div>
     <div class="row" style="gap:8px;flex-wrap:wrap"><select class="txt" id="cm-mes" style="height:42px;width:auto">${ms.map(m=>`<option value="${m}" ${m===A.cp?'selected':''}>${esc(cmMesNome(m))}</option>`).join('')}</select>
     <button class="btn" data-act="cm-pdf" style="height:42px">${ic('baixar',16,2)}Baixar PDF do mês</button></div></div>`;
   if(!S.anl.lidos.prev&&!S.anl.base.prev) return head+'<div class="empty">Carregando a base…</div>';
+  const head0=head; head=head0+cmBarra(A.cp);
   if(!(S.anl.base.prev&&S.anl.base.prev.mes&&S.anl.base.prev.mes[A.cp])) return head+'<section class="card"><div class="empty">Sem a previsão deste mês. Importe o relatório de previsão (RPRE0301) em Sistema › Base de dados.</div></section>';
   cmCarrega(A.cp); const X=cmCalc(A.cp); if(!X) return head+'<div class="empty">Carregando…</div>'; const T=cmFrases(X);
   const k=(t,v,s,c)=>`<div class="cm-k ${c||''}"><span>${t}</span><b class="num">${v}</b><i>${s||''}</i></div>`;
@@ -159,7 +178,7 @@ function cmCols(P,cats,series,o){ o=o||{}; const doc=P.doc, C=GPDF.cor, h=o.h||4
 async function cmPdf(){ try{ await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }catch(e){}
   const cp=S.cm.cp; if(!S.cm.dados[cp]){ cmCarrega(cp); for(let i=0;i<40&&!S.cm.dados[cp];i++) await new Promise(r=>setTimeout(r,250)); }
   const X=cmCalc(cp); if(!X){ toast('Sem a previsão deste mês.'); return; } const T=cmFrases(X), C=GPDF.cor, img=await gpImgs(); const a=X.s1,b=X.s2,c=X.s3,d=X.s4, ref=X.F.fechado?'':' até '+cmD(X.F.ate);
-  const P=gpNovo('Produção × Comercial',cmMesNome(cp).replace(/^./,x=>x.toUpperCase())+' · previsão, pedidos, produção e faturamento',img); P.capa();
+  const P=gpNovo('Produção × Comercial',cmMesNome(cp).replace(/^./,x=>x.toUpperCase())+(cmFiltrando()?' · '+cmFiltroTxt():' · previsão, pedidos, produção e faturamento'),img); P.capa();
   P.secao('Resumo do mês'+(X.F.fechado?'':' (até '+cmD(X.F.ate)+')'));
   P.kpis([{t:'Vendido acima da previsão',v:a.acima.length+' itens',s:'+'+cmN(a.dif)+' além do previsto',c:a.acima.length?'crit':'ok'},
     b.fonte==='cart'?{t:'Pedidos com prazo menor que a reposição',v:String(b.curtos.length)+' de '+b.ped.length,s:'pedidos do mês',c:b.curtos.length?'crit':'ok'}:{t:'Pedidos sem estoque no dia',v:String(b.semEst.length)+' de '+b.ped.length,s:'aumentos da carteira',c:b.semEst.length?'warn':'ok'},
@@ -220,13 +239,20 @@ VIEWS.anlcom={nome:'Produção × Comercial',ic:'grafico',mob:'Comercial'}; CRUM
 function cmReg(){ const M=MODS.find(x=>x.id==='analise'); if(M&&!M.views.includes('anlcom')){ const i=M.views.indexOf('anlmes'); if(i>=0) M.views.splice(i+1,0,'anlcom'); else M.views.push('anlcom'); }
   try{ const g=(NAV_GRP.analise||[]).find(x=>x.k==='mes'); if(g&&!g.v.includes('anlcom')) g.v.push('anlcom'); }catch(e){} }
 cmReg(); setTimeout(cmReg,0);
-document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='cm-mes'){ S.cm.cp=ev.target.value; render(); } });
+document.addEventListener('change',ev=>{ const t=ev.target; if(!t) return; if(t.id==='cm-mes'){ S.cm.cp=t.value; render(); return; }
+  if(t.dataset&&t.dataset.cmf){ S.cm.f[t.dataset.cmf]=t.value; render(); return; } if(t.id==='cm-q'){ S.cm.f.q=t.value.trim(); render(); } });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.target.id==='cm-q'){ ev.preventDefault(); S.cm.f.q=ev.target.value.trim(); render(); setTimeout(()=>{ const i=document.getElementById('cm-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },30); } });
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cm-limpar"]'); if(!b) return; S.cm.f={ln:'',fam:'',emb:'',q:''}; render(); });
 window.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="cm-pdf"]'); if(!b) return; ev.stopImmediatePropagation(); if(b.dataset.gerando) return;
   b.dataset.gerando='1'; const t0=b.innerHTML; b.disabled=true; b.textContent='Gerando…';
   cmPdf().then(()=>toast('PDF baixado.')).catch(e=>{ console.warn('[comercial pdf]',e); toast('Não foi possível gerar: '+((e&&e.message)||e)); }).finally(()=>{ delete b.dataset.gerando; b.disabled=false; b.innerHTML=t0; }); },true);
 try{ window.Painel=window.Painel||{}; window.Painel.comercial={pdf:()=>cmPdf(),gravar:()=>anlGravar(),S:()=>S,calc:cp=>cmCalc(cp||S.cm.cp),dados:()=>S.cm.dados,frases:cp=>cmFrases(cmCalc(cp||S.cm.cp))}; }catch(e){}
 document.head.insertAdjacentHTML('beforeend',`<style id="cm-css">
 .cm{display:flex;flex-direction:column;gap:16px}
+.cm-fb{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:12px 14px;margin-bottom:16px}
+.cm-busca{flex:2 1 260px;margin:0;max-width:none}
+.cm-fl{display:flex;flex-direction:column;gap:3px;flex:1 1 150px;min-width:0}.cm-fl span{font-size:11.5px;font-weight:600;color:var(--muted)}
+.cm-fl select{height:40px;width:100%}.cm-fl.on select{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal)}
 .cm-s{display:flex;flex-direction:column;gap:12px}
 .cm-q{font-size:12px;font-weight:700;letter-spacing:.07em;color:var(--muted)}
 .cm-r{margin:0;font-size:17px;font-weight:600;line-height:1.35;max-width:900px}
