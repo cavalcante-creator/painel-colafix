@@ -130,5 +130,13 @@
   .fc-mais{display:grid;grid-template-columns:1fr 2fr;gap:10px}.fc-mais label{font-size:14px;color:#44545D;display:flex;flex-direction:column;gap:4px}.fc-mais input{font:inherit;font-size:17px;min-height:52px;border-radius:12px;border:1px solid #C9D2D9;padding:0 12px}
   .fc-fim{align-items:center;justify-content:center;text-align:center}.fc-okc{width:110px;height:110px;border-radius:50%;background:#3C8A63;color:#FFFFFF;font-size:64px;display:flex;align-items:center;justify-content:center}.fc-fim>b{font-size:32px}.fc-fim>span{font-size:20px;color:#44545D}
   .fc-grande{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:76px;margin:0 0 14px;padding:12px 20px;border-radius:16px;border:0;background:#143F54;color:#FFFFFF;font:inherit;font-size:22px;font-weight:700;cursor:pointer;text-align:left}.fc-grande small{font-size:14px;font-weight:400;opacity:.85}
-  @media (max-width:560px){.fc-mais{grid-template-columns:1fr}.fc-c b{font-size:38px}}</style>`);
+  @media (max-width:560px){.fc-mais{grid-template-columns:1fr}.fc-c b{font-size:38px}}
+  /* tablet deitado (Redmi Pad 2, 1280×800): teclado à direita, tudo cabe sem rolar */
+  @media (min-width:1000px) and (orientation:landscape){
+    .fc-corpo:has(> .fc-tec){display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,420px);column-gap:24px;row-gap:12px;max-width:1240px;align-content:start}
+    .fc-corpo:has(> .fc-tec)>*{grid-column:1}.fc-corpo:has(> .fc-tec)>.fc-tec{grid-column:2;grid-row:1 / span 20;align-self:start;grid-auto-rows:minmax(84px,1fr);height:min(calc(100vh - 210px),520px)}
+    .fc-corpo:has(> .fc-tec) .fc-tec button{min-height:0;font-size:34px}
+    .fc-corpo:has(> .fc-tec) .fc-item{padding:12px 16px}.fc-corpo:has(> .fc-tec) .fc-item b{font-size:24px}
+    .fc-corpo:has(> .fc-tec) .fc-c{min-height:84px;padding:10px 14px}.fc-corpo:has(> .fc-tec) .fc-c b{font-size:40px}
+    .fc-top{padding:10px 18px}.fc-bot{padding-top:10px}.fc-bot button{min-height:58px}}</style>`);
 })();

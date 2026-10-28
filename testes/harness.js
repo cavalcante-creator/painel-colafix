@@ -10,7 +10,7 @@ async function abrir(op) {
   op = op || {};
   const args = ['--no-sandbox']; if (op.camera) args.push('--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-video-capture=' + op.camera, '--unsafely-treat-insecure-origin-as-secure=http://painel.test');
   const browser = await chromium.launch(Object.assign({ args }, CHROME ? { executablePath: CHROME } : {}));
-  const ctx = await browser.newContext({ viewport: op.viewport || { width: 1280, height: 900 }, acceptDownloads: true });
+  const ctx = await browser.newContext(Object.assign({ viewport: op.viewport || { width: 1280, height: 900 }, acceptDownloads: true }, op.ctx || {}));
   if (op.decodificador) { /* faz o papel do leitor de QR nativo do tablet Android (BarcodeDetector), usando o OpenCV */
     const { spawn } = require('child_process'); const py = spawn('python3', [__dirname + '/cam.py', 'servidor']); const fila = []; let buf = '';
     py.stdout.on('data', d => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); const r = fila.shift(); r && r(l); } });
