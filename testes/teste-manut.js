@@ -38,6 +38,8 @@ const res = []; const ok = (n, c, det) => { res.push({ n, ok: !!c, det }); conso
   ok('Permissão: operador acompanha mas não atende (sem botões; ação forçada bloqueada)', botoesOp === 0 && /não possui permissão/.test(tOp) && s['chamados/os-00001'].status === 'Aberta', `botões=${botoesOp} aviso="${tOp}"`);
   // Tela da linha (antes perdia foto e equipamento)
   await page.evaluate(() => __T.go('linhatv')); await H.dorme(400);
+  /* 28/10: o botão "Chamar manutenção" saiu da Tela da linha; o formulário ainda abre pela leitura do QR da linha */
+  await page.evaluate(() => { const v = document.getElementById('view'); const b = document.createElement('button'); b.dataset.act = 'mlt-abrir'; b.dataset.l = 'Linha 2'; b.id = 'mlt-teste'; v.appendChild(b); });
   const temLtv = await page.$('[data-act="mlt-abrir"][data-l="Linha 2"]');
   if (temLtv) { await page.click('[data-act="mlt-abrir"][data-l="Linha 2"]'); await H.dorme(200); await page.fill('.mm-box textarea', 'Compressor desarmando'); await page.click('[data-act="mlt-imp"][data-v="reduziu"]');
     await page.click('.mm-box [data-act="mx-f-eq"][data-id="eqcmp"]'); await page.setInputFiles('#mx-foto-in', 'foto-b.png'); await H.dorme(500); await page.click('[data-act="mlt-ok"]'); await H.dorme(1600); }
