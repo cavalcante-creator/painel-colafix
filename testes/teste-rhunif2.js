@@ -40,6 +40,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.fill('#rhu-rq',''); await H.dorme(800);
  const [dl]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('[data-act="rhu-rxls"]')]);
  ok('Excel do relatório baixa', !!dl||!!(await p.evaluate(()=>window.__rhuUltimoXls)), dl?dl.suggestedFilename():await p.evaluate(()=>window.__rhuUltimoXls));
+ await p.click('[data-act="rhu-rpdf"]'); await H.dorme(2500);
+ const pdfs=await p.evaluate(()=>window.__pdfSalvo||[]); ok('"Baixar PDF" baixa o arquivo no padrão do painel', pdfs.some(n=>/^Uniformes-\d{4}-\d{2}\.pdf$/.test(n)), JSON.stringify(pdfs));
  ok('Sem erros no console (RH)', !erros.length, erros.join(' | ')); await B.browser.close();
  // Marcelo
  B=await H.abrir({viewport:{width:1440,height:950}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(4000);

@@ -87,4 +87,7 @@ if(typeof GXN_TELAS!=='undefined'&&!GXN_TELAS.includes('gxunif')){ const i=GXN_T
 try{ const g=GXG.find(x=>x.id==='g-pes'); if(g&&!g.tabs.some(t=>t[0]==='gxunif')){ const i=g.tabs.findIndex(t=>t[0]==='gxqd'); g.tabs.splice(i>=0?i+1:g.tabs.length,0,['gxunif','Uniformes']);
   const f=S.extViews.gxunif; S.extViews.gxunif=function(){ const h=f.apply(this,arguments); try{ if(!gxSolo()) return h; return gxgAbas('gxunif')+h; }catch(e){ return h; } }; } }catch(e){}
 try{ if(typeof GXS_ACOES!=='undefined'&&Array.isArray(GXS_ACOES)) GXS_ACOES.push(['Uniformes entregues (quem pegou)','uniforme camiseta calça entrega relatório quem pegou','gxunif',()=>go('gxunif')]); }catch(e){}
+/* PDF no padrão do painel para os módulos (RH · uniformes): o mesmo gerador dos relatórios do gestor/comercial
+   (jsPDF, faixa com as logos, quadros, tabelas, rodapé com página; baixa o arquivo). */
+window.Painel=window.Painel||{}; window.Painel.pdf={ carregar:()=>carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'), imgs:()=>gpImgs(), novo:(t,s,i)=>gpNovo(t,s,i), cor:GPDF.cor };
 /* ===FIM AJUSTES 29/10=== */

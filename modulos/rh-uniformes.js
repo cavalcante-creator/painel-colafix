@@ -150,36 +150,34 @@
       blob=new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); arq=nome+'.xlsx'; }
     else { const L=[['Por pessoa']].concat(res,[[],['Entregas']],det); blob=new Blob(['﻿'+L.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n')],{type:'text/csv'}); arq=nome+'.csv'; }
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=arq; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); window.__rhuUltimoXls=arq; }
-  function relPdf(c){ const D=relDados(c), e=c.esc, pr=precosDe(c), logo=(document.querySelector('.brand img')||{}).src||'', hoje=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    const pcs=g=>[...g.pc.entries()].map(([t,q])=>`<span class="pc">${q}× ${e(t)}</span>`).join('');
-    const resumo=`<table class="t"><thead><tr><th>Funcionário</th><th>Setor</th><th>Peças</th><th class="n">Entregas</th>${c.rh?'<th class="c">Descontar</th><th class="n">Desconto</th>':''}</tr></thead><tbody>
-      ${D.ps.map(g=>{ const st=c.rh?pesSit(g):''; return `<tr><td><b>${e(g.nome)}</b></td><td>${e(g.setor||'—')}</td><td>${pcs(g)}</td><td class="n">${g.n}</td>${c.rh?`<td class="c"><span class="tg ${st}">${st==='sim'?'Sim':st==='nao'?'Não':'Parcial'}</span></td><td class="n"><b>${st==='nao'?'—':brl(g.desc)}</b></td>`:''}</tr>`; }).join('')}</tbody>
-      ${c.rh?`<tfoot><tr><td colspan="3">Total</td><td class="n">${D.xs.length}</td><td></td><td class="n">${brl(D.desc)}</td></tr></tfoot>`:''}</table>`;
-    const det=D.ps.map(g=>`<div class="pes"><div class="ph"><b>${e(g.nome)}</b><span>${e(g.setor||'')}</span>${c.rh?`<em>${pesSit(g)==='nao'?'não descontar':brl(g.desc)}</em>`:''}</div>
-      <table class="t d"><colgroup><col style="width:92px"><col><col style="width:34%">${c.rh?'<col style="width:92px">':''}</colgroup><tbody>${g.xs.map(x=>{ const d=c.rh?descDe(x,pr):null; return `<tr><td class="dt">${e(br(x.data))}<small>${e(x.per||'')}</small></td><td>${itensOk(x).map(i=>`<span class="pc">${Math.max(1,parseInt(i.qtd,10)||1)}× ${e(i.t)}${i.tam?' '+e(i.tam):''}</span>`).join('')}</td>
-        <td class="sm">${x.sol?'Solicitação Nº '+e(x.sol):'sem nº de solicitação'}<small>entregue por ${e(x.porNome||'—')}${x.st==='lancado'?' · lançado na ficha':''}</small></td>${c.rh?`<td class="n">${d.tipo==='nao'?'<span class="tg nao">Não</span>':d.v==null?'<small>sem preço</small>':brl(d.v)}</td>`:''}</tr>`; }).join('')}</tbody></table></div>`).join('');
-    const css=`@page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}body{margin:0;font:10pt/1.45 "Segoe UI",Arial,sans-serif;color:#1C2B33;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      .top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:3px solid #143F54}.top img{height:30px}.top .ey{font-size:8pt;letter-spacing:.12em;color:#5B6B78;font-weight:700;text-align:right}
-      h1{font-size:18pt;margin:14px 0 2px;color:#143F54}.sub{color:#5B6B78;font-size:9.5pt}
-      .ks{display:flex;gap:8px;margin:14px 0 6px}.k{flex:1;border:1px solid #DCE3E8;border-radius:8px;padding:8px 12px}.k span{display:block;font-size:8pt;color:#5B6B78;text-transform:uppercase;letter-spacing:.06em}.k b{font-size:15pt;color:#143F54}.k.dsc{background:#143F54;border-color:#143F54}.k.dsc span{color:#C9D8E1}.k.dsc b{color:#fff}
-      h2{font-size:11pt;margin:18px 0 6px;color:#143F54;text-transform:uppercase;letter-spacing:.06em}
-      .t{width:100%;border-collapse:collapse}.t th{background:#EEF2F5;color:#3D4F5C;font-size:8pt;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:6px 8px}.t td{padding:6px 8px;border-bottom:1px solid #E5EAEE;vertical-align:top}
-      .t tbody tr:nth-child(even) td{background:#FAFBFC}.t .n{text-align:right;white-space:nowrap}.t .c{text-align:center}.t tfoot td{font-weight:700;border-top:2px solid #143F54;border-bottom:0;padding-top:8px}
-      .pc{display:inline-block;background:#EEF2F5;border-radius:5px;padding:1px 7px;margin:1px 4px 1px 0;font-size:9pt}
-      .tg{display:inline-block;border-radius:99px;padding:1px 9px;font-size:8.5pt;font-weight:700;background:#E3F1E8;color:#2F6B45}.tg.nao{background:#F1E4E2;color:#8A3B32}.tg.parc{background:#F6EED9;color:#8A6A1F}
-      .pes{break-inside:avoid;margin-top:10px;border:1px solid #DCE3E8;border-radius:8px;overflow:hidden}.ph{display:flex;align-items:baseline;gap:10px;background:#F4F7F9;padding:7px 10px}.ph span{color:#5B6B78;font-size:9pt}.ph em{margin-left:auto;font-style:normal;font-weight:700;color:#143F54}
-      .d{table-layout:fixed}.d td{border-bottom:1px solid #EEF1F4}.d tr:last-child td{border-bottom:0}.d .dt{white-space:nowrap}.d small,.t small{display:block;color:#7A8893;font-size:8pt}.d .sm{font-size:9pt}
-      .ass{display:flex;gap:40px;margin-top:36px}.ass div{flex:1;border-top:1px solid #1C2B33;padding-top:4px;font-size:8.5pt;color:#5B6B78;text-align:center}
-      .rod{margin-top:16px;font-size:8pt;color:#7A8893;text-align:right}`;
-    const w=window.open('','_blank'); if(!w) return c.P.toast('O navegador bloqueou a janela. Permita janelas deste site.');
-    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Entregas de uniforme - ${e(nomePer(D))}</title><style>${css}</style></head><body>
-      <div class="top">${logo?`<img src="${e(logo)}" alt="Colafix">`:'<b>Colafix</b>'}<div class="ey">RECURSOS HUMANOS<br>RELATÓRIO DE UNIFORMES</div></div>
-      <h1>Entregas de uniforme</h1><div class="sub">Período: ${e(nomePer(D))}${U.rel.q?' · busca: '+e(U.rel.q):''}</div>
-      <div class="ks"><div class="k"><span>Pessoas</span><b>${D.ps.length}</b></div><div class="k"><span>Entregas</span><b>${D.xs.length}</b></div><div class="k"><span>Peças</span><b>${D.pecas}</b></div>${c.rh?`<div class="k dsc"><span>Desconto total</span><b>${brl(D.desc)}</b></div>`:''}</div>
-      <h2>Resumo por pessoa</h2>${D.ps.length?resumo:'<div class="sub">Nenhuma entrega no período.</div>'}
-      ${D.ps.length?`<h2>Entregas de cada pessoa</h2>${det}`:''}
-      ${c.rh?'<div class="ass"><div>Responsável pelo RH</div><div>Data</div></div>':''}
-      <div class="rod">Painel Colafix · gerado em ${e(hoje)}</div><script>window.onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close(); }
+  /* PDF no padrão do painel (Painel.pdf = o mesmo gerador dos relatórios do gestor e do comercial): baixa o arquivo */
+  async function relPdf(c){ const PP=window.Painel&&window.Painel.pdf; if(!PP) return c.P.toast('O gerador de PDF ainda não carregou. Tente de novo.');
+    const bt=document.querySelector('[data-act="rhu-rpdf"]'); if(bt){ bt.disabled=true; bt.dataset.tx=bt.innerHTML; bt.textContent='Gerando PDF…'; }
+    try{ try{ await PP.carregar(); }catch(e){}
+      const D=relDados(c), pr=precosDe(c), img=await PP.imgs(), per=nomePer(D);
+      const P=PP.novo('Entregas de uniforme','Período: '+per+(U.rel.q?' · busca: '+U.rel.q:'')+' · '+(c.rh?'RH':'Visão do gestor'),img); P.capa();
+      P.secao('Resumo do período');
+      const nNao=c.rh?D.ps.filter(g=>pesSit(g)==='nao').length:0;
+      P.kpis([{t:'Pessoas',v:String(D.ps.length),s:'receberam uniforme',c:'pet'},{t:'Entregas',v:String(D.xs.length),s:D.xs.filter(x=>x.st!=='lancado').length+' falta lançar na ficha',c:D.xs.some(x=>x.st!=='lancado')?'warn':'ok'},
+        {t:'Peças',v:String(D.pecas),s:'entregues no período',c:'teal'}].concat(c.rh?[{t:'Desconto total',v:brl(D.desc),s:nNao?nNao+' pessoa'+(nNao>1?'s':'')+' sem desconto':'todas descontadas',c:'crit'}]:[]),c.rh?4:3);
+      P.secao('Por pessoa',c.rh?'Descontar = decisão do RH':'');
+      if(!D.ps.length) P.vazio('Nenhuma entrega no período.');
+      else { const cols=[{t:'Funcionário',w:34},{t:'Setor',w:18},{t:'Peças',w:42},{t:'Entregas',w:14,al:'r'}].concat(c.rh?[{t:'Descontar',w:15},{t:'Desconto',w:17,al:'r'}]:[]);
+        const rows=D.ps.map(g=>{ const st=c.rh?pesSit(g):'', r=[g.nome,g.setor||'—',pcTxt(g),String(g.n)].concat(c.rh?[st==='sim'?'Sim':st==='nao'?'Não':'Parcial',st==='nao'?'—':brl(g.desc)]:[]); if(c.rh) r._cor={4:st==='sim'?'ok':st==='nao'?'crit':'warn'}; return r; });
+        if(c.rh) rows.push(Object.assign(['Total','',D.pecas+' peças',String(D.xs.length),'',brl(D.desc)],{_tot:1}));
+        P.tabela(cols,rows); }
+      if(D.xs.length){ P.secao('Entrega a entrega','em ordem de pessoa e data');
+        const cols=[{t:'Data',w:15},{t:'Funcionário',w:30},{t:'Peças',w:46},{t:'Solicitação',w:16},{t:'Na ficha',w:12}].concat(c.rh?[{t:'Desconto',w:17,al:'r'}]:[]);
+        const xs=D.ps.flatMap(g=>g.xs);
+        const rows=xs.map(x=>{ const d=c.rh?descDe(x,pr):null, r=[br(x.data)+(x.per?' '+x.per.slice(0,1)+'.':''),c.titulo(x.nome||''),itensOk(x).map(i=>(Math.max(1,parseInt(i.qtd,10)||1))+'× '+i.t+(i.tam?' '+i.tam:'')).join(', '),x.sol?'Nº '+x.sol:'—',x.st==='lancado'?'sim':'não']
+            .concat(c.rh?[d.tipo==='nao'?'não descontar':d.v==null?'sem preço':brl(d.v)]:[]); r._cor={4:x.st==='lancado'?'ok':'warn'}; if(c.rh&&d.tipo==='nao') r._cor[5]='crit'; return r; });
+        P.tabela(cols,rows); }
+      if(c.rh){ const doc=P.doc; P.cabe(24); P.y+=12; P.dc([28,43,51]); doc.setLineWidth(.3); const w=(P.cw-16)/2; doc.line(P.M,P.y,P.M+w,P.y); doc.line(P.M+w+16,P.y,P.M+P.cw,P.y);
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); P.tc([85,102,111]); doc.text('Responsável pelo RH',P.M+w/2,P.y+4,{align:'center'}); doc.text('Data',P.M+w+16+w/2,P.y+4,{align:'center'}); P.y+=8; }
+      const nome='Uniformes-'+(D.de==='0000-00-00'?'todos':D.de===D.ate.slice(0,8)+'01'&&D.de.slice(0,7)===D.ate.slice(0,7)?D.de.slice(0,7):D.de+'_a_'+D.ate)+'.pdf';
+      P.fim(nome); window.__rhuUltimoPdf=nome; c.P.toast('PDF baixado: '+nome); }
+    catch(e){ c.P.erro?c.P.erro(e):c.P.toast(String(e&&e.message||e)); }
+    finally{ const b=document.querySelector('[data-act="rhu-rpdf"]'); if(b){ b.disabled=false; if(b.dataset.tx) b.innerHTML=b.dataset.tx; } } }
   /* tela do Marcelo (Visão do gestor › Pessoas › Uniformes): só o relatório, sem desconto. Lê rh/dados/uniformes
      (regra nova no firestore.rules: quem tem a Visão do gestor só LÊ as entregas de uniforme). */
   function ctxGestor(){ const P=window.Painel; const tit=s=>String(s||'').toLowerCase().replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase()).replace(/\s(D[aeo]s?|E)\s/g,m=>m.toLowerCase());
