@@ -51,5 +51,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Marcelo vê quem pegou o quê, sem desconto', /Uniformes entregues/.test(tv)&&/Carlos Rannan da Silva/.test(tv)&&/Carla Souza/.test(tv)&&!/Desconto|R\$/.test(tv), tv.replace(/\n/g,' | ').slice(0,400));
  const ab=await p.evaluate(()=>[...document.querySelectorAll('#view [data-go], #view .gxg-tab, #view button')].map(b=>b.innerText.trim()).filter(Boolean).join(' | '));
  ok('Aba "Uniformes" no grupo Pessoas do Marcelo', /Uniformes/.test(ab), ab.slice(0,300));
+ await p.click('[data-act="rhu-rpdf"]'); await H.dorme(2500);
+ const pm=await p.evaluate(()=>window.__pdfSalvo||[]); ok('Marcelo: "Baixar PDF" funciona', pm.some(n=>/^Uniformes-\d{4}-\d{2}\.pdf$/.test(n)), JSON.stringify(pm));
+ await p.click('[data-act="rhu-rper"][data-v="tudo"]'); await H.dorme(600); ok('Marcelo: trocar o período funciona', /PESSOAS/i.test(await p.evaluate(()=>document.querySelector('.rhu-rk').innerText))&&await p.evaluate(()=>document.querySelector('[data-act="rhu-rper"][data-v="tudo"]').getAttribute('aria-pressed'))==='true');
  ok('Sem erros no console (Marcelo)', !erros.length, erros.join(' | '));
  console.log(res.every(x=>x.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

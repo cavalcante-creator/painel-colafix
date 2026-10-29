@@ -181,7 +181,7 @@
   /* tela do Marcelo (Visão do gestor › Pessoas › Uniformes): só o relatório, sem desconto. Lê rh/dados/uniformes
      (regra nova no firestore.rules: quem tem a Visão do gestor só LÊ as entregas de uniforme). */
   function ctxGestor(){ const P=window.Painel; const tit=s=>String(s||'').toLowerCase().replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase()).replace(/\s(D[aeo]s?|E)\s/g,m=>m.toLowerCase());
-    return {P,esc:P.esc,titulo:tit,R:{cfg:{},func:[]},rh:false,gestor:true}; }
+    return {P,esc:P.esc,titulo:tit,eu:()=>{ try{ return (P.S&&P.S.nomes&&P.S.nomes[P.S.uid])||''; }catch(e){ return ''; } },R:{cfg:{},func:[],funcoes:[]},rh:false,gestor:true}; }
   function gestor(){ const c=ctxGestor(); C=c; assina(c);
     return `<div class="head"><div><div class="eyebrow">PESSOAS</div><h1>Uniformes entregues</h1><div class="sub">Quem pegou uniforme e quais peças, por período.</div></div></div>
       <section class="card rhu-l"><div class="rhu-tb"><span></span><label class="rhu-bq"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input class="txt" id="rhu-rq" type="search" placeholder="Buscar pessoa, setor ou peça" value="${c.esc(U.rel.q)}"></label></div>${relHtml(c)}</section>`; }

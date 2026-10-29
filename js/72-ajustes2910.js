@@ -105,4 +105,13 @@ try{ const g=GXG.find(x=>x.id==='g-man'); if(g&&!g.tabs.some(t=>t[0]==='manequip
     if(!(manPodeAtender()||p29Gestor())){ ev.stopImmediatePropagation(); ev.preventDefault(); toast('Você não possui permissão para esta ação. Ela é da equipe de manutenção e do gestor.'); } },true); }
 if(typeof GXN_TELAS!=='undefined'&&!GXN_TELAS.includes('manequip')) GXN_TELAS.push('manequip');
 try{ if(typeof GXS_ACOES!=='undefined'&&Array.isArray(GXS_ACOES)) GXS_ACOES.push(['Máquinas e equipamentos (cadastrar)','maquina equipamento cadastro manutenção qr','manequip',()=>go('manequip')]); }catch(e){}
+/* (8) Produção × Comercial no login do Marcelo (pedido de 29/10): a tela anlcom (Análise PCP › Mês) abre para quem tem
+   a Visão do gestor e entra em Produção, depois de "Produção do ano" (mesmo jeito do prodano, js/64). Os dados já
+   carregam para o gestor (LEIT_GRUPOS.prod inclui gestor). */
+{ const _vo=viewOk; viewOk=function(v){ if(v==='anlcom'&&p29Gestor()) return true; return _vo.apply(this,arguments); }; }
+{ const _md=modDe; modDe=function(v){ if(v==='anlcom'){ try{ if(gxSolo()) return 'gestor'; }catch(e){} } return _md.apply(this,arguments); }; }
+try{ const g=GXG.find(x=>x.id==='g-prod'); if(g&&!g.tabs.some(t=>t[0]==='anlcom')){ const i=g.tabs.findIndex(t=>t[0]==='prodano'); g.tabs.splice(i>=0?i+1:g.tabs.length,0,['anlcom','Produção × Comercial']);
+  const f=S.extViews.anlcom; S.extViews.anlcom=function(){ const h=f.apply(this,arguments); try{ if(!gxSolo()) return h; return gxgAbas('anlcom')+h; }catch(e){ return h; } }; } }catch(e){}
+if(typeof GXN_TELAS!=='undefined'&&!GXN_TELAS.includes('anlcom')) GXN_TELAS.push('anlcom');
+try{ if(typeof GXS_ACOES!=='undefined'&&Array.isArray(GXS_ACOES)) GXS_ACOES.push(['Produção × Comercial (relatório do mês)','comercial previsão vendido faturado pedidos reunião pdf','anlcom',()=>go('anlcom')]); }catch(e){}
 /* ===FIM AJUSTES 29/10=== */

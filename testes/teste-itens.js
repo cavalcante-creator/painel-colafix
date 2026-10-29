@@ -62,5 +62,16 @@ const LINHAS=['Focco3i RITE0250','Relatório de Itens Data: 29/10/2026 10:51:30'
  ok('"Não está na lista" libera e marca para o Marcelo conferir', await p.evaluate(()=>{ const b=document.querySelector('[data-act="of-peca-ok"]'); return b&&!b.disabled&&/Fora da lista/.test(document.body.innerText); }));
  await p.click('[data-act="of-peca-ok"]'); await H.dorme(1500);
  const pp=await p.evaluate(()=>(__T.S().pedpecas||[])[0]); ok('Pedido vai com a descrição completa e o código', pp&&pp.itens[0].t==='ROLAMENTO 6205 2RS · NP0100'&&pp.itens[1].t==='Graxa especial XYZ', JSON.stringify(pp&&pp.itens));
+ const dados3=await p.evaluate(()=>localStorage.getItem('__srv')); await B.browser.close();
+ // Marcelo troca o item pedido fora da lista pelo item certo
+ B=await H.abrir({viewport:{width:1440,height:950}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,JSON.parse(dados3)); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(4000);
+ await p.evaluate(()=>__T.go('gxpec')); await H.dorme(1500);
+ const tg=await p.evaluate(()=>[...document.querySelectorAll('.mi-pc')].map(e=>e.innerText.trim()));
+ ok('Pedidos de peça: item da lista mostra o código e o de fora mostra "Trocar pelo item da lista"', tg.some(t=>/item da lista NP0100/.test(t))&&tg.some(t=>/Trocar pelo item da lista/.test(t)), JSON.stringify(tg));
+ await p.click('[data-act="mi-trab"]'); await H.dorme(600); await p.fill('#mi-tq','correia'); await H.dorme(900);
+ await p.click('[data-act="mi-trpick"]'); await H.dorme(400); await p.click('[data-act="mi-trok"]'); await H.dorme(1200);
+ const pd=await p.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('__srv')).docs; const k=Object.keys(d).find(k=>k.startsWith('pedpecas/')&&d[k].itens&&d[k].itens.length===2); return d[k]; });
+ ok('Troca grava o item certo, mantém a quantidade e avisa o técnico', pd&&pd.itens[1].t==='CORREIA A-42 · NP0200'&&pd.itens[1].qtd==='1'&&/Troquei "Graxa especial XYZ"/.test(pd.resp[pd.resp.length-1].t)&&/Item trocado/.test(pd.hist[pd.hist.length-1].o), JSON.stringify(pd&&{it:pd.itens,r:pd.resp}).slice(0,300));
+ ok('Depois da troca o item aparece com o código', await p.evaluate(()=>[...document.querySelectorAll('.mi-pc')].filter(e=>/NP0200/.test(e.innerText)).length>0));
  ok('Sem erros no console', !erros.length, erros.join(' | '));
  console.log(res.every(x=>x.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

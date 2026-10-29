@@ -214,5 +214,37 @@ document.head.insertAdjacentHTML('beforeend',`<style id="mi-css">
 .mi-file{display:inline-flex;gap:6px;align-items:center;cursor:pointer}.mi-amo{display:flex;flex-direction:column;gap:2px;font-size:13px;background:var(--ground);border-radius:10px;padding:8px 12px}
 .mi-of{font-size:13px;margin-top:4px;font-weight:600}.mi-of.ok{color:var(--ok,#3C8A63)}.mi-of.warn{color:var(--warn-ink,#8A6A1F)}.mi-of.fora{color:var(--crit-ink,#B5473F)}.mi-of .lnk{padding:0;font-size:13px}
 </style>`);
+/* ---------- Marcelo: trocar o que o pessoal já pediu pelo item certo da lista (pedido de 29/10) ----------
+   Em Pedidos de peça, cada item que não veio da lista mostra "Trocar pelo item da lista"; o que veio mostra o código.
+   A troca grava o item como "DESCRIÇÃO · CÓDIGO" (a quantidade fica), uma linha no histórico e uma resposta para o técnico.
+   Na janela "Editar pedido" o campo do item também sugere os itens da lista. */
+S.mi.troca=null;
+{ const _pc=ppcCard; ppcCard=function(p){ let h=_pc.apply(this,arguments); try{ if(!miItens().length) return h; const its=ppcItens(p); let k=0;
+    h=h.replace(/<li><span class="ppc-q">([\s\S]*?)<\/li>/g,(m)=>{ const i=k++, it=its[i]; if(!it) return m; const x=miAchaTxt(it.t);
+      const tag=x?`<small class="mi-pc ok">✓ ${x.c?'item da lista '+esc(x.c):'item novo da lista (aguardando cadastro)'}</small>`:`<button class="mi-pc tr" data-act="mi-trab" data-id="${esc(p._id)}" data-v="${i}">Trocar pelo item da lista</button>`;
+      return m.replace(/<\/li>$/,tag+'</li>'); }); }catch(e){ console.warn('[itens] card',e); } return h; }; }
+function miTrocaModal(){ const T=S.mi.troca; if(!T) return ''; const p=ofPeds().find(x=>x._id===T.pid), it=p&&ppcItens(p)[T.i]; if(!it) return '';
+  const cand=miBusca(T.q!=null?T.q:it.t.split(/\s+/).slice(0,2).join(' '),miItens().filter(miUsa),12);
+  return `<div class="gx-modal" role="dialog" aria-modal="true" aria-labelledby="mi-tt"><div class="card gx-mc mi-fm"><h2 id="mi-tt">Trocar pelo item da lista</h2>
+    <div class="mi-old"><span>${esc(String(p.porNome||'O técnico').split(' ')[0])} pediu:</span> <b>${esc(it.t)}</b>${ppcQtd(it)?' · '+esc(ppcQtd(it)):''}${it.ref?' · '+esc(it.ref):''}</div>
+    <label class="gx-f">Buscar o item certo<input id="mi-tq" value="${esc(T.q!=null?T.q:it.t.split(/\s+/).slice(0,2).join(' '))}" placeholder="Código ou descrição"></label>
+    <div class="mi-cands">${cand.map(y=>`<button type="button" class="${T.sel===y.id?'on':''}" data-act="mi-trpick" data-id="${esc(y.id)}"><em>${esc(y.c||'novo')}</em> ${esc(y.d)}</button>`).join('')||'<div class="empty">Nada encontrado. Se não existir, crie em Itens › Novo item.</div>'}</div>
+    <div class="gx-ac"><button class="btn sec" data-act="mi-trx">Cancelar</button><button class="btn" data-act="mi-trok" ${T.sel?'':'disabled'}>Trocar no pedido</button></div></div></div>`; }
+{ const f=S.extViews.gxpec; if(typeof f==='function') S.extViews.gxpec=function(){ const h=f.apply(this,arguments); try{ miAssina(); return h+miTrocaModal(); }catch(e){ return h; } }; }
+document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!S.mi.troca) return; if(t.id==='mi-tq'){ S.mi.troca.q=t.value; S.mi.troca.sel=''; clearTimeout(S.mi._t); S.mi._t=setTimeout(()=>{ render(); const i=document.getElementById('mi-tq'); if(i){ i.focus(); const n=i.value.length; try{ i.setSelectionRange(n,n); }catch(e){} } },300); } });
+document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mi-tr"]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); const a=b.dataset.act;
+  if(a==='mi-trab'){ S.mi.troca={pid:b.dataset.id,i:+b.dataset.v,q:null,sel:''}; render(); setTimeout(()=>{ const i=document.getElementById('mi-tq'); i&&(i.focus(),i.select()); },50); return; }
+  if(a==='mi-trx'){ S.mi.troca=null; render(); return; } if(a==='mi-trpick'){ S.mi.troca.sel=b.dataset.id; render(); return; }
+  if(a==='mi-trok'){ const T=S.mi.troca, p=ofPeds().find(x=>x._id===T.pid), x=miItens().find(y=>y.id===T.sel); if(!p||!x) return; b.disabled=true;
+    const its=ppcItens(p).map(i=>Object.assign({},i)), it=its[T.i]; if(!it) return; const antes=it.t, novo=miOpc(x).replace(/ · aguardando cadastro$/,''); it.t=novo; if(!it.un&&x.u){ const un=String(x.u).toLowerCase().replace('pc','pç'); if(typeof PPC_UN!=='undefined'&&PPC_UN.includes(un)) it.un=un; }
+    const agora=new Date().toISOString(), por=(typeof gchNome==='function'&&gchNome())||miEu()||'Marcelo', resumo=its.length===1?its[0].t:its.map(i=>i.t).join('; ');
+    const up={itens:its,t:resumo.slice(0,300),hist:(p.hist||[]).concat([{em:agora,o:'Item trocado por '+por+': "'+antes+'" → "'+novo+'"'}]).slice(-50),resp:(p.resp||[]).concat([{em:agora,por,t:'Troquei "'+antes+'" pelo item da lista: '+novo+'.'}]).slice(-20)};
+    try{ await S.db.doc('pedpecas/'+p._id).update(up); Object.assign(p,up); S.mi.troca=null; toast('Item trocado no pedido. O técnico vê a troca em "Seus pedidos".'); }catch(e){ toast('Não foi possível trocar. Verifique a internet.'); b.disabled=false; } render(); } },true);
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&S.mi.troca){ S.mi.troca=null; render(); } });
+/* janela "Editar pedido" do Marcelo: o campo do item sugere os itens da lista */
+if(typeof ppeModal==='function'){ const _pm=ppeModal; ppeModal=function(){ let h=_pm.apply(this,arguments); try{ if(!miItens().length) return h; h=h.replace(/<input id="ppe-t(\d+)"/g,(m,i)=>`<datalist id="mi-dlp${i}"></datalist><input id="ppe-t${i}" list="mi-dlp${i}"`); }catch(e){} return h; }; }
+document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!t.id||!/^ppe-t\d+$/.test(t.id)) return; const dl=document.getElementById('mi-dlp'+t.id.slice(5)); if(dl) dl.innerHTML=miDl(t.value); });
+document.head.insertAdjacentHTML('beforeend',`<style id="mi-css2">.mi-pc{display:block;font-size:12px;margin-top:2px}.mi-pc.ok{color:var(--ok,#3C8A63);font-weight:600}
+.mi-pc.tr{border:1px dashed var(--teal,#2B7A99);background:none;color:var(--teal-strong,#143F54);border-radius:99px;padding:2px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;width:max-content}.mi-pc.tr:hover{background:var(--ground)}</style>`);
 window.Painel=window.Painel||{}; window.Painel.itens={lePdfLinhas:miLePdfLinhas,previa:miPrevia,importaLidos:async(l,arq)=>{ S.mi.imp={arq:arq||"teste",prev:miPrevia(l)}; await miImporta(); },itens:miItens};
 /* ===FIM ITENS=== */
