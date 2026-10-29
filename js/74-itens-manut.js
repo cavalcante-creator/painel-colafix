@@ -17,15 +17,15 @@
    confirmação ("Não está na lista") antes de mandar. Dados: config/manitens {itens:[{id,c,d,u,st,de,para,mot,obs,em,por,porNome,cadEm,cadPor}],imp}
    st: ok (no sistema) · cad (para cadastrar) · inc (incorreto) · rep (repetido) · sub (substituído). Regras: config/* (grava()). Prefixo `mi`. */
 "use strict";
-S.mi={d:null,sub:false,tab:'todos',q:'',lim:150,fm:null,inc:null,imp:null,cod:{},sel:null};
+S.mi={d:null,sub:false,tab:'todos',at:'todos',q:'',lim:150,fm:null,inc:null,imp:null,cod:{},sel:null};
 const MI_ST={ok:['No sistema','ok'],cad:['Para cadastrar','warn'],inc:['Incorreto','crit'],rep:['Repetido','crit'],sub:['Substituído','neu']};
 const MI_UN=['UN','PC','PAR','JG','KIT','M','CM','KG','G','L','ML','CX','RL','GL','BD','FD','PCT','CJ'];
 const miN=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
 const miK=s=>miN(s).replace(/[^A-Z0-9]/g,'');
 const miId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const miItens=()=>((S.mi.d&&S.mi.d.itens)||[]);
-const miUsa=x=>x.st==='ok'||x.st==='cad';
-const miCurta=x=>x.st==='ok'&&(String(x.d||'').trim().split(/\s+/).length<2||String(x.d||'').trim().length<10);
+const miUsa=x=>(x.st==='ok'&&!x.ina)||x.st==='cad';
+const miCurta=x=>x.st==='ok'&&!x.ina&&(String(x.d||'').trim().split(/\s+/).length<2||String(x.d||'').trim().length<10);
 function miPode(){ try{ return !!(S.acs&&S.acs.dono)||viewOk('gxitens'); }catch(e){ return false; } }
 const miDono=()=>!!(S.acs&&S.acs.dono);
 function miAssina(){ if(S.mi.sub||!S.db) return; S.mi.sub=true;
@@ -69,29 +69,35 @@ async function miImporta(){ const P=S.mi.imp; if(!P||!P.prev) return; const pv=P
 /* ---------- descrição montada (padrão do sistema) ---------- */
 function miMonta(F){ return miN([F.oq,F.med,F.marca,F.mat].map(v=>String(v||'').trim()).filter(Boolean).join(' ')).replace(/\s+/g,' ').trim(); }
 /* ---------- tela ---------- */
-function miGrupos(){ const g=new Map(); miItens().filter(x=>x.st==='ok').forEach(x=>{ const k=miK(x.d); if(!k) return; (g.get(k)||g.set(k,[]).get(k)).push(x); });
+function miGrupos(){ const g=new Map(); miItens().filter(x=>x.st==='ok'&&!x.ina).forEach(x=>{ const k=miK(x.d); if(!k) return; (g.get(k)||g.set(k,[]).get(k)).push(x); });
   return [...g.values()].filter(v=>v.length>1).sort((a,b)=>b.length-a.length); }
 function vGxItens(){ miAssina(); const M=S.mi; if(!M.d) return `${gxCab('MANUTENÇÃO','Itens de manutenção')}<section class="card"><div class="empty">Carregando…</div></section>`;
   const xs=miItens(), nOk=xs.filter(x=>x.st==='ok').length, cad=xs.filter(x=>x.st==='cad'), curt=xs.filter(miCurta), fora=xs.filter(x=>x.st==='inc'||x.st==='rep'||x.st==='sub'), grp=miGrupos(), dono=miDono();
   const tabs=[['todos','Todos',xs.length],['cad','Para cadastrar',cad.length],['curta','Descrição incompleta',curt.length],['rep','Mesma descrição',grp.reduce((a,v)=>a+v.length,0)],['fora','Fora de uso',fora.length]];
   let lista=M.tab==='cad'?cad:M.tab==='curta'?curt:M.tab==='fora'?fora:M.tab==='rep'?grp.flat():xs.slice().sort((a,b)=>(a.st==='cad'?0:1)-(b.st==='cad'?0:1)||String(a.d).localeCompare(String(b.d),'pt-BR'));
-  lista=miBusca(M.q,lista); const tot=lista.length; lista=lista.slice(0,M.lim);
+  if(M.at==='ativos') lista=lista.filter(x=>!x.ina); else if(M.at==='inativos') lista=lista.filter(x=>x.ina);
+  lista=miBusca(M.q,lista); const tot=lista.length; S.mi._filtro=lista.filter(x=>x.st==='ok'); const nAtF=S.mi._filtro.filter(x=>!x.ina).length, nInF=S.mi._filtro.length-nAtF; lista=lista.slice(0,M.lim);
+  const nIna=xs.filter(x=>x.ina).length;
   const lin=x=>{ const s=MI_ST[x.st]||MI_ST.ok, alvo=x.para?xs.find(y=>y.id===x.para):null, ant=x.de?xs.find(y=>y.id===x.de):null, ed=M.cod[x.id]!=null;
-    return `<tr class="mi-${x.st}"><td class="num mi-c">${esc(x.c||'—')}</td><td><b>${esc(x.d)}</b>${x.u?` <small class="mi-u">${esc(x.u)}</small>`:''}
+    return `<tr class="mi-${x.st}${x.ina?' mi-inat':''}"><td class="num mi-c">${esc(x.c||'—')}</td><td><b>${esc(x.d)}</b>${x.u?` <small class="mi-u">${esc(x.u)}</small>`:''}
         ${ant?`<small>corrige ${esc(ant.c||'')} · “${esc(ant.d)}”</small>`:''}${alvo?`<small>${x.st==='rep'?'use':'trocado por'} ${esc(alvo.c||'(novo)')} · “${esc(alvo.d)}”</small>`:''}${x.mot&&x.st!=='ok'?`<small>${esc(x.mot)}</small>`:''}${x.obs?`<small>${esc(x.obs)}</small>`:''}
         ${x.st==='cad'?`<small>pedido por ${esc(x.porNome||'—')} · ${x.em?dm(hojeStr(new Date(x.em))):''}</small>`:''}</td>
-      <td><span class="pill ${s[1]}">${s[0]}</span></td>
-      <td class="mi-ac">${x.st==='ok'?`<button class="lnk" data-act="mi-inc" data-id="${esc(x.id)}">Está incorreto</button><button class="lnk" data-act="mi-rep" data-id="${esc(x.id)}">É repetido</button>`
+      <td><span class="pill ${s[1]}">${s[0]}</span>${x.ina?' <span class="pill neu">Inativo</span>':''}</td>
+      <td class="mi-ac">${x.st==='ok'?`<button class="lnk" data-act="mi-ina" data-id="${esc(x.id)}">${x.ina?'Ativar':'Inativar'}</button>`:''}${x.st==='ok'&&!x.ina?`<button class="lnk" data-act="mi-inc" data-id="${esc(x.id)}">Está incorreto</button><button class="lnk" data-act="mi-rep" data-id="${esc(x.id)}">É repetido</button>`
         :x.st==='cad'?(dono?(ed?`<span class="mi-cod"><input class="txt" id="mi-cod-${esc(x.id)}" placeholder="Código no sistema" value="${esc(M.cod[x.id])}"><button class="btn mi-sm" data-act="mi-cadok" data-id="${esc(x.id)}">Salvar</button></span>`
             :`<button class="btn mi-sm" data-act="mi-caded" data-id="${esc(x.id)}">Cadastrei no sistema</button><button class="lnk" data-act="mi-copia" data-id="${esc(x.id)}">Copiar descrição</button>`):'<small>esperando a administradora cadastrar</small>')+`<button class="lnk mi-del" data-act="mi-tira" data-id="${esc(x.id)}">Tirar</button>`
         :(x.st==='inc'||x.st==='rep')?`<button class="lnk" data-act="mi-volta" data-id="${esc(x.id)}">Desfazer</button>`:''}</td></tr>`; };
   const grupos=M.tab==='rep'?(()=>{ const ids=new Set(lista.map(x=>x.id)); return grp.filter(v=>v.some(x=>ids.has(x.id))).slice(0,60).map(v=>`<tbody class="mi-g"><tr class="mi-gh"><td colspan="4">${v.length} itens com a descrição “${esc(v[0].d)}”${v[0].d.split(/\s+/).length<2?' — falta a medida/modelo':''}</td></tr>${v.map(lin).join('')}</tbody>`).join(''); })():'';
   return `${gxCab('MANUTENÇÃO','Itens de manutenção',`<button class="btn sec" data-act="mi-imp">${ic('folha',16,2)}Importar lista do sistema</button><button class="btn" data-act="mi-novo">${ic('mais',16,2.2)}Novo item</button>`)}
     <div class="sub mi-sub">A lista que o pessoal da manutenção usa para pedir peça. Item novo ou corrigido fica "Para cadastrar" até a administradora cadastrar no sistema.${M.d.imp?` Última lista do sistema: ${esc(dm(hojeStr(new Date(M.d.imp.em))))}${M.d.imp.por?' por '+esc(M.d.imp.por):''} (${M.d.imp.n} itens).`:''}</div>
+    <div class="mi-ofc ${miOfOn()?'on':''}"><div><b>Lista na oficina (Pedir peça)</b><span>${miOfOn()?'Ligada: o pessoal da manutenção escolhe os itens desta lista ao pedir peça.':'Desligada: o pessoal pede como antes, escrevendo. Ligue quando a lista estiver conferida.'}</span></div>
+      <div class="seg" role="group" aria-label="Lista na oficina"><button class="${miOfOn()?'':'on'}" aria-pressed="${!miOfOn()}" data-act="mi-ofc" data-v="0">Desligada</button><button class="${miOfOn()?'on':''}" aria-pressed="${miOfOn()}" data-act="mi-ofc" data-v="1">Ligada</button></div></div>
     <div class="mi-kp"><div><span>No sistema</span><b>${nOk}</b></div><div class="${cad.length?'warn':''}"><span>Para cadastrar</span><b>${cad.length}</b></div><div class="${curt.length?'crit':''}"><span>Descrição incompleta</span><b>${curt.length}</b></div><div><span>Mesma descrição</span><b>${grp.reduce((a,v)=>a+v.length,0)}</b></div></div>
     ${!xs.length?`<section class="card mi-vz"><h2>Comece pela lista do sistema</h2><p>No Focco, tire o <b>Relatório de Itens (RITE0250)</b> da classificação <b>10.400.013 · Materiais de manutenção</b> e salve em PDF (ou exporte em Excel com as colunas Código e Descrição). Depois toque em <b>Importar lista do sistema</b>.</p><button class="btn" data-act="mi-imp">Importar lista do sistema</button></section>`:`
     <section class="card mi-l"><div class="mi-tb"><div class="seg" role="group" aria-label="Mostrar">${tabs.map(([k,t,n])=>`<button class="${M.tab===k?'on':''}" aria-pressed="${M.tab===k}" data-act="mi-tab" data-v="${k}">${t}<small class="num"> ${n}</small></button>`).join('')}</div>
       <label class="mi-bq">${ic('lupa',16,2)}<input class="txt" id="mi-q" type="search" placeholder="Buscar código ou descrição" value="${esc(M.q)}"></label></div>
+      <div class="mi-bk"><div class="seg" role="group" aria-label="Ativos ou inativos">${[['todos','Ativos e inativos'],['ativos','Só ativos'],['inativos','Só inativos ('+nIna+')']].map(([k,t])=>`<button class="${M.at===k?'on':''}" aria-pressed="${M.at===k}" data-act="mi-at" data-v="${k}">${t}</button>`).join('')}</div>
+        <span class="mi-bkn">${tot} no filtro</span><span class="mi-sp"></span>${nAtF?`<button class="btn sec mi-sm" data-act="mi-inatodos">Inativar todos do filtro (${nAtF})</button>`:''}${nInF?`<button class="btn sec mi-sm" data-act="mi-atvtodos">Ativar todos do filtro (${nInF})</button>`:''}</div>
       ${M.tab==='curta'?'<div class="mi-dica">Itens sem a medida ou o modelo na descrição: quem pede não sabe qual é. Toque em <b>Está incorreto</b> e escreva a descrição completa.</div>':M.tab==='rep'?'<div class="mi-dica">Itens no sistema com a mesma descrição. Se forem o mesmo item, marque <b>É repetido</b> no que sobra; se forem diferentes, falta a medida: <b>Está incorreto</b>.</div>':''}
       ${tot?`<div class="mi-tw"><table class="mi-t"><thead><tr><th>Código</th><th>Descrição</th><th>Situação</th><th></th></tr></thead>${M.tab==='rep'?grupos:`<tbody>${lista.map(lin).join('')}</tbody>`}</table></div>
         ${tot>M.lim?`<div class="mi-mais"><button class="btn sec" data-act="mi-mais">Mostrar mais (${tot-M.lim} restantes)</button></div>`:''}`:`<div class="empty">${M.q?'Nada encontrado.':M.tab==='cad'?'Nenhum item esperando cadastro.':'Nada aqui.'}</div>`}</section>`}
@@ -140,7 +146,13 @@ document.addEventListener('change',async ev=>{ const t=ev.target; if(!t||t.id!==
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="mi-"]'); if(!b||!miPode()) return; const a=b.dataset.act, M=S.mi, id=b.dataset.id, agora=new Date().toISOString(), eu=miEu();
   const x=id?miItens().find(y=>y.id===id):null;
   try{
-  if(a==='mi-tab'){ M.tab=b.dataset.v; M.lim=150; render(); return; } if(a==='mi-mais'){ M.lim+=300; render(); return; }
+  if(a==='mi-ofc'){ const on=b.dataset.v==='1'; if(on===miOfOn()) return; if(on&&!confirm('Ligar a lista na oficina? O pessoal da manutenção vai escolher os itens desta lista ao pedir peça.')) return;
+    await miGrava(D=>{ D.oficina=on; D.oficinaEm=agora; D.oficinaPor=eu; },on?'Lista ligada na oficina.':'Lista desligada na oficina: o pessoal pede escrevendo, como antes.'); return; }
+  if(a==='mi-tab'){ M.tab=b.dataset.v; M.lim=150; render(); return; } if(a==='mi-at'){ M.at=b.dataset.v; M.lim=150; render(); return; }
+  if(a==='mi-ina'&&x){ const ina=!x.ina; await miGrava(D=>{ const o=D.itens.find(y=>y.id===x.id); if(!o) return; if(ina){ o.ina=true; o.inaEm=agora; o.inaPor=eu; } else { delete o.ina; delete o.inaEm; delete o.inaPor; } },ina?'Item inativado: não aparece mais para pedir.':'Item ativado.'); return; }
+  if(a==='mi-inatodos'||a==='mi-atvtodos'){ const ina=a==='mi-inatodos', ids=new Set((S.mi._filtro||[]).filter(y=>!!y.ina!==ina).map(y=>y.id)); if(!ids.size) return;
+    if(!confirm((ina?'Inativar ':'Ativar ')+ids.size+' ite'+(ids.size>1?'ns':'m')+' do filtro?'+(ina?' Eles deixam de aparecer para o pessoal pedir.':''))) return;
+    await miGrava(D=>{ D.itens.forEach(o=>{ if(!ids.has(o.id)) return; if(ina){ o.ina=true; o.inaEm=agora; o.inaPor=eu; } else { delete o.ina; delete o.inaEm; delete o.inaPor; } }); },ids.size+' ite'+(ids.size>1?'ns':'m')+(ina?' inativado':' ativado')+(ids.size>1?'s':'')+'.'); return; } if(a==='mi-mais'){ M.lim+=300; render(); return; }
   if(a==='mi-imp'){ M.imp={}; render(); return; } if(a==='mi-ix'){ M.imp=null; render(); return; } if(a==='mi-iok'){ b.disabled=true; await miImporta(); return; }
   if(a==='mi-novo'){ M.fm={oq:'',med:'',marca:'',mat:'',u:'UN',obs:''}; render(); setTimeout(()=>{ const i=document.getElementById('mi-oq'); i&&i.focus(); },50); return; }
   if(a==='mi-inc'&&x){ const w=String(x.d).split(/\s+/); M.fm={de:x.id,oq:w[0]||'',med:w.slice(1).join(' '),marca:'',mat:'',u:x.u||'UN',obs:''}; render(); setTimeout(()=>{ const i=document.getElementById('mi-med'); i&&i.focus(); },50); return; }
@@ -177,8 +189,10 @@ try{ if(typeof GXS_ACOES!=='undefined'&&Array.isArray(GXS_ACOES)) GXS_ACOES.push
 function miOpc(x){ return x.d+(x.c?' · '+x.c:' · aguardando cadastro'); }
 function miAchaTxt(t){ t=String(t||'').trim(); if(!t) return null; const m=t.match(/·\s*([A-Z]{2,3}\d{3,6})\s*$/); const xs=miItens();
   if(m){ const x=xs.find(y=>y.c===m[1]&&miUsa(y)); if(x) return x; } const k=miK(t.replace(/·\s*aguardando cadastro\s*$/,'')); return xs.find(y=>miUsa(y)&&miK(y.d)===k)||null; }
+/* a lista na oficina só vale quando o Marcelo ligar (config/manitens.oficina; pedido de 29/10: "por enquanto não, os itens estão errados") */
+const miOfOn=()=>!!(S.mi.d&&S.mi.d.oficina===true);
 function miDl(q){ const xs=miItens().filter(miUsa); return miBusca(q,xs,40).map(x=>`<option value="${esc(miOpc(x))}"></option>`).join(''); }
-if(typeof vOfPeca==='function'){ const _vp=vOfPeca; vOfPeca=function(){ let h=_vp.apply(this,arguments); try{ miAssina(); if(!miItens().length) return h; const P=S.of&&S.of.peca, its=(P&&P.itens)||[]; let pend=0;
+if(typeof vOfPeca==='function'){ const _vp=vOfPeca; vOfPeca=function(){ let h=_vp.apply(this,arguments); try{ miAssina(); if(!miItens().length||!miOfOn()) return h; const P=S.of&&S.of.peca, its=(P&&P.itens)||[]; let pend=0;
     its.forEach((it,i)=>{ const s=i?String(i):'', t=String(it.t||'').trim(), x=miAchaTxt(t), id='of-pt'+s;
       h=h.replace(`id="${id}" class="of-in"`,`id="${id}" class="of-in" list="mi-dl${s}"`);
       const aviso=!t?'':x?`<div class="mi-of ok">✓ ${x.c?'Item do sistema '+esc(x.c):'Item novo, aguardando cadastro'}${x.u?' · '+esc(x.u):''}</div>`:it.miFora?`<div class="mi-of fora">Fora da lista — o Marcelo vai conferir a descrição. <button class="lnk" data-act="mi-ofdesf" data-v="${i}">Escolher da lista</button></div>`
@@ -187,9 +201,9 @@ if(typeof vOfPeca==='function'){ const _vp=vOfPeca; vOfPeca=function(){ let h=_v
       const k=`<label class="of-lb ofp-t" for="${id}">`; const j=h.indexOf(k); if(j>=0){ const e=h.indexOf('</label>',j); if(e>=0) h=h.slice(0,e+8)+`<datalist id="mi-dl${s}">${miDl(t)}</datalist>`+aviso+h.slice(e+8); } });
     if(pend) h=h.replace(/(<button[^>]*data-act="of-peca-ok")/,'$1 disabled title="Escolha os itens da lista"');
     return h; }catch(e){ console.warn('[itens] pedir peça',e); return h; } }; }
-document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!t.id||!/^of-pt\d*$/.test(t.id)) return; miAssina(); if(!miItens().length) return; const s=t.id.slice(5); let dl=document.getElementById('mi-dl'+s);
+document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!t.id||!/^of-pt\d*$/.test(t.id)) return; miAssina(); if(!miItens().length||!miOfOn()) return; const s=t.id.slice(5); let dl=document.getElementById('mi-dl'+s);
   if(!dl){ dl=document.createElement('datalist'); dl.id='mi-dl'+s; t.insertAdjacentElement('afterend',dl); } if(t.getAttribute('list')!==dl.id) t.setAttribute('list',dl.id); dl.innerHTML=miDl(t.value); });
-document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!t.id||!/^of-pt\d*$/.test(t.id)||!miItens().length) return; const P=S.of&&S.of.peca; if(!P||!P.itens) return; const i=+(t.id.slice(5)||0), it=P.itens[i]; if(!it) return;
+document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!t.id||!/^of-pt\d*$/.test(t.id)||!miItens().length||!miOfOn()) return; const P=S.of&&S.of.peca; if(!P||!P.itens) return; const i=+(t.id.slice(5)||0), it=P.itens[i]; if(!it) return;
   it.t=t.value; it.miFora=false; const x=miAchaTxt(t.value); if(x&&x.u){ const un=String(x.u).toLowerCase().replace('pc','pç').replace('un','un'); if(typeof PPC_UN!=='undefined'&&PPC_UN.includes(un)&&!it.un) it.un=un; } setTimeout(()=>{ try{ render(); }catch(e){} },0); });
 document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="mi-offora"],[data-act="mi-ofdesf"]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); const P=S.of&&S.of.peca; if(!P||!P.itens) return; try{ ppcLe(); }catch(e){}
   const it=P.itens[+b.dataset.v]; if(!it) return; if(b.dataset.act==='mi-offora'){ it.miFora=true; } else { it.miFora=false; it.t=''; } render(); },true);
@@ -199,6 +213,8 @@ document.head.insertAdjacentHTML('beforeend',`<style id="mi-css">
 .mi-kp.sm{margin:12px 0}.mi-kp.sm b{font-size:20px}@media (max-width:760px){.mi-kp{grid-template-columns:1fr 1fr}}
 .mi-tb{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}.mi-tb .seg{margin:0!important;flex-wrap:wrap}
 .mi-bq{position:relative;display:flex;align-items:center;flex:0 1 320px;min-width:220px}.mi-bq svg{position:absolute;left:12px;color:var(--muted)}.mi-bq input{width:100%;padding-left:36px;height:40px}
+.mi-t tr.mi-inat td{opacity:.6}.mi-ofc{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:14px;background:var(--surface)}.mi-ofc>div:first-child{display:flex;flex-direction:column;gap:2px}.mi-ofc span{font-size:13px;color:var(--muted)}.mi-ofc.on{box-shadow:inset 4px 0 0 var(--ok)}.mi-ofc .seg{margin:0!important}
+.mi-bk{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.mi-bk .seg{margin:0!important}.mi-bkn{font-size:13px;color:var(--muted)}.mi-sp{flex:1}.mi-t tr td .pill.neu{background:var(--ground)}
 .mi-dica{background:var(--ground);border-radius:10px;padding:8px 12px;font-size:13.5px;margin-bottom:10px}.mi-dica.crit{background:#F8E1DE;color:#7A2A20}
 .mi-tw{overflow-x:auto}.mi-t{width:100%;border-collapse:collapse;font-size:14px}.mi-t th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
 .mi-t td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}.mi-t td small{display:block;color:var(--muted);font-size:12px}.mi-c{white-space:nowrap;font-weight:600}.mi-u{display:inline!important;font-size:11px!important;background:var(--ground);border-radius:5px;padding:0 5px}

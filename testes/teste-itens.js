@@ -37,6 +37,21 @@ const LINHAS=['Focco3i RITE0250','Relatório de Itens Data: 29/10/2026 10:51:30'
  const par=await p.evaluate(()=>document.getElementById('mi-par').innerText); ok('Novo item mostra os parecidos que já existem', /CORREIA A-42/.test(par), par);
  await p.click('[data-act="mi-salvar"]'); await H.dorme(700); ok('Não deixa criar item repetido', (await srv()).itens.filter(x=>/CORREIA A-42/.test(x.d)).length===1);
  await p.click('[data-act="mi-fx"]'); await H.dorme(300);
+ ok('Tela do Marcelo: "Lista na oficina" começa desligada', await p.evaluate(()=>{ const b=document.querySelector('[data-act="mi-ofc"][data-v="0"]'); return b&&b.getAttribute('aria-pressed')==='true'; }));
+ await p.click('[data-act="mi-ofc"][data-v="1"]'); await H.dorme(900); ok('Marcelo liga a lista na oficina', (await srv()).oficina===true);
+ await p.click('[data-act="mi-ofc"][data-v="0"]'); await H.dorme(900); ok('…e desliga', (await srv()).oficina===false);
+ // ativo / inativo
+ const id200=await p.evaluate(()=>Painel.itens.itens().find(x=>x.c==='NP0200').id);
+ await p.click('[data-act="mi-tab"][data-v="todos"]'); await H.dorme(400); await p.click(`[data-act="mi-ina"][data-id="${id200}"]`); await H.dorme(900);
+ ok('Inativar um item', (await srv()).itens.find(x=>x.c==='NP0200').ina===true);
+ await p.click(`[data-act="mi-ina"][data-id="${id200}"]`); await H.dorme(900); ok('Ativar de novo', !(await srv()).itens.find(x=>x.c==='NP0200').ina);
+ await p.fill('#mi-q','parafuso'); await H.dorme(900);
+ const bt=await p.evaluate(()=>(document.querySelector('[data-act="mi-inatodos"]')||{}).innerText||''); ok('Botão "Inativar todos do filtro" com a quantidade', /Inativar todos do filtro \(1\)/.test(bt), bt);
+ await p.click('[data-act="mi-inatodos"]'); await H.dorme(1000); s=await srv();
+ ok('Inativa todos do filtro (só os "no sistema" ativos do filtro)', s.itens.filter(x=>/PARAFUSO/.test(x.d)&&x.st==='ok').every(x=>x.ina)&&!s.itens.find(x=>x.c==='NP0200').ina);
+ await p.click('[data-act="mi-at"][data-v="inativos"]'); await H.dorme(600); const ni=await p.evaluate(()=>document.querySelectorAll('.mi-t tbody tr').length); ok('Filtro "Só inativos"', ni===1, ni);
+ await p.click('[data-act="mi-atvtodos"]'); await H.dorme(1000); ok('Ativar todos do filtro', (await srv()).itens.every(x=>!x.ina));
+ await p.click('[data-act="mi-at"][data-v="todos"]'); await H.dorme(600); await p.click('[data-act="mi-inatodos"]'); await H.dorme(1000); await p.fill('#mi-q',''); await H.dorme(900);
  ok('Marcelo não tem "Cadastrei no sistema" (é da administradora)', !(await p.$('[data-act="mi-caded"]')));
  ok('Sem erros (Marcelo)', !erros.length, erros.join(' | ')); const dados=await p.evaluate(()=>localStorage.getItem('__srv')); await B.browser.close();
  // administradora cadastra
@@ -50,9 +65,12 @@ const LINHAS=['Focco3i RITE0250','Relatório de Itens Data: 29/10/2026 10:51:30'
  // oficina: pedir peça escolhendo da lista
  B=await H.abrir({viewport:{width:1600,height:900}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,JSON.parse(dados2)); await p.goto(H.BASE); await H.entrar(p,'oficina','of1234'); await H.dorme(3500);
  await p.evaluate(()=>{ __T.S().tt.recente={}; }); await p.keyboard.type('777888',{delay:12}); await p.keyboard.press('Enter'); await H.dorme(1100); await p.keyboard.press('4'); await H.dorme(900);
- await p.fill('#of-pt','rolamento 62'); await H.dorme(300);
+ await p.fill('#of-pt','rolamento 62'); await H.dorme(400);
+ ok('Lista desligada (padrão): a oficina pede escrevendo, sem sugestões nem trava', await p.evaluate(()=>!document.getElementById('of-pt').getAttribute('list')&&!document.querySelector('.mi-of')&&!document.querySelector('[data-act="of-peca-ok"]').disabled));
+ await p.evaluate(()=>__T.S().db.doc('config/manitens').update({oficina:true})); await H.dorme(1200); await p.fill('#of-pt',''); await p.fill('#of-pt','rolamento 62'); await H.dorme(400);
  ok('Pedir peça: o campo sugere os itens da lista', await p.evaluate(()=>!!document.getElementById('of-pt').getAttribute('list'))); const ops=await p.evaluate(()=>[...document.querySelectorAll('#mi-dl option')].map(o=>o.value));
  ok('Sugestões não mostram item incorreto/repetido', ops.includes('ROLAMENTO 6205 2RS · NP0100')&&ops.includes('ROLAMENTO 6206 ZZ SKF · NP5200')&&!ops.some(v=>/NP0082/.test(v)), JSON.stringify(ops));
+ await p.fill('#of-pt','parafuso'); await H.dorme(300); const op2=await p.evaluate(()=>[...document.querySelectorAll('#mi-dl option')].map(o=>o.value)); ok('Item inativo não aparece para pedir', !op2.some(v=>/PARAFUSO/.test(v)), JSON.stringify(op2)); await p.fill('#of-pt','rolamento 62'); await H.dorme(300);
  await p.dispatchEvent('#of-pt','change'); await H.dorme(600);
  ok('Texto fora da lista trava o "Mandar" e pede para escolher', await p.evaluate(()=>{ const b=document.querySelector('[data-act="of-peca-ok"]'); return b&&b.disabled&&/Não achei na lista/.test(document.body.innerText); }));
  await p.fill('#of-pt','ROLAMENTO 6205 2RS · NP0100'); await p.dispatchEvent('#of-pt','change'); await H.dorme(600);
