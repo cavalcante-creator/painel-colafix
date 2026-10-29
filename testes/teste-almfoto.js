@@ -3,14 +3,14 @@
    e manda a foto para o painel. Confere quem assinou, as diferenças com o Face ID, "Contar o almoço" e "Guardar conferência". */
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 const iso=x=>x.toISOString().slice(0,10), hj=(()=>{ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })(), m=hj.slice(0,7);
-const lista=JSON.parse(fs.readFileSync(__dirname+'/../modulos/rh-almoco.js','utf8').match(/const LISTA_BASE=(\[[^\]]*\])/)[1]);
+const lista=require('./lista-ficticia.json');
 const DIR=fs.mkdtempSync('/tmp/almfoto-');
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
   const F=(id,nome,cpf)=>{ D['rh/dados/funcionarios/'+id]={nome,cpf,tipo:'CLT',status:'Ativo',admissao:'2020-01-01'}; };
-  F('a','ADRIANO REUS DA SILVA','11111111111'); F('b','ALEXANDRE TEIXEIRA','22222222222');
+  F('a','ALBERTO RAMOS DA SILVA','11111111111'); F('b','AUGUSTO TELES','22222222222');
   D['rh/config']=Object.assign({},D['rh/config']||{},{almoco:{listaFolha:lista}});
-  /* Adriano almoçou pelo Face ID (e não vai assinar); Alexandre veio, não passou no refeitório (e vai assinar) */
-  D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ADRIANO REUS DA SILVA'},'22222222222':{n:'ALEXANDRE TEIXEIRA'}},dias:{[hj]:{'11111111111':{p:1,a:'11:40',t:['07:10:00 Portaria','11:40:00 REFEITÓRIO']},'22222222222':{p:1,t:['07:12:00 Portaria']}}},imp:[]};
+  /* Alberto almoçou pelo Face ID (e não vai assinar); Augusto veio, não passou no refeitório (e vai assinar) */
+  D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ALBERTO RAMOS DA SILVA'},'22222222222':{n:'AUGUSTO TELES'}},dias:{[hj]:{'11111111111':{p:1,a:'11:40',t:['07:10:00 Portaria','11:40:00 REFEITÓRIO']},'22222222222':{p:1,t:['07:12:00 Portaria']}}},imp:[]};
   const B=await H.abrir({viewport:{width:1440,height:1100}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
   await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; a.folhaAb=true; },hj); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1500);
   ok('Antes de imprimir: pede para imprimir pelo painel (a folha precisa das marcas)', /Imprima a folha por aqui primeiro/.test(await p.evaluate(()=>(document.querySelector('.alm-ff')||{}).innerText||'')));
@@ -22,13 +22,13 @@ const DIR=fs.mkdtempSync('/tmp/almfoto-');
   ok('O código guarda dia, folha e versão (e recusa um quadradinho trocado)', dec[0].dia===hj&&dec[0].pg===0&&dec[0].ver===1&&dec[1].pg===1&&dec[1].ver===3&&dec[2]===null, JSON.stringify(dec));
   const emit=await p.evaluate(x=>__T.S().db.doc('rh/dados/almocofolha/'+x).get().then(g=>g.data().emit),hj);
   ok('Ao imprimir guarda o que saiu em cada folha (emit.vs)', emit&&emit.vs&&emit.vs[emit.ver]&&emit.vs[emit.ver][0].length===45, emit&&JSON.stringify(Object.keys(emit.vs||{})));
-  /* assinar: algumas linhas de cada página (uma só com as iniciais), Alexandre assina, Adriano não */
+  /* assinar: algumas linhas de cada página (uma só com as iniciais), Augusto assina, Alberto não */
   const all=lay.rows.map((rs,pg)=>rs.map((r,i)=>Object.assign({pg,i},r))).flat().filter(r=>r.n);
-  const alvo=new Set(['Alexandre Teixeira']); [0,3,5,10,20,31,44,46,50,60,66].forEach(i=>{ const r=all[i]; if(r&&!r.cz&&r.n!=='Adriano Reus Da Silva'&&!/Adriano/i.test(r.n)) alvo.add(r.n); });
-  const nomeAdr=all.find(r=>/^Adriano/i.test(r.n)); alvo.delete(nomeAdr&&nomeAdr.n);
+  const alvo=new Set(['Augusto Teles']); [0,3,5,10,20,31,44,46,50,60,66].forEach(i=>{ const r=all[i]; if(r&&!r.cz&&r.n!=='Alberto Ramos Da Silva'&&!/Alberto/i.test(r.n)) alvo.add(r.n); });
+  const nomeAdr=all.find(r=>/^Alberto/i.test(r.n)); alvo.delete(nomeAdr&&nomeAdr.n);
   const ctx2=await B.browser.newContext({viewport:{width:900,height:1200},deviceScaleFactor:2}); const q=await ctx2.newPage(); await q.setContent(html); await H.dorme(300);
   await q.evaluate(([alvo,rows])=>{ const pgs=[...document.querySelectorAll('.pg')]; let k=0;
-    rows.forEach(r=>{ if(!alvo.includes(r.n)) return; const pg=pgs[r.pg], x0=93+((k*7)%20), len=r.n==='Alexandre Teixeira'?14:28+((k*13)%30), y=r.top; k++;
+    rows.forEach(r=>{ if(!alvo.includes(r.n)) return; const pg=pgs[r.pg], x0=93+((k*7)%20), len=r.n==='Augusto Teles'?14:28+((k*13)%30), y=r.top; k++;
       let dpath='M'+x0+' '+(y+3.6); for(let t=1;t<=12;t++){ const x=x0+len*t/12, yy=y+1.2+((t*37+k*11)%30)/10; dpath+=' Q'+(x-1.2)+' '+(y+(t%2?0.9:4.6))+' '+x+' '+yy; }
       const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 210 297'); svg.style.cssText='position:absolute;left:0;top:0;width:210mm;height:297mm;pointer-events:none';
       const pa=document.createElementNS('http://www.w3.org/2000/svg','path'); pa.setAttribute('d',dpath); pa.setAttribute('fill','none'); pa.setAttribute('stroke','#1b2a6b'); pa.setAttribute('stroke-width','0.35'); pa.setAttribute('stroke-linecap','round'); svg.appendChild(pa); pg.appendChild(svg); }); },[[...alvo],all]);
@@ -46,9 +46,9 @@ const DIR=fs.mkdtempSync('/tmp/almfoto-');
   ok('Acha exatamente quem assinou ('+alvo.size+'), sem marcar quem não assinou', !fp.length&&!fn.length&&!duv.length, JSON.stringify({fp,fn,duv:duv.map(n=>n+':'+st.o[n].t),ex:fn.map(n=>n+':'+(st.o[n]&&st.o[n].t))}));
   ok('As linhas em cinza (não almoçam hoje) não entram como em branco', Object.values(st.o).every(x=>x.s!=='nao'||true)&&!Object.keys(st.o).some(n=>st.o[n].s==='cz'&&alvo.has(n)));
   const txt=await p.evaluate(()=>(document.querySelector('.alm-ff')||{}).innerText.replace(/\s+/g,' '));
-  ok('Compara com o Face ID: Alexandre assinou e não passou no refeitório; Adriano passou e a linha está em branco', /Assinaram, mas não passaram no refeitório · 1 [^·]*Alexandre Teixeira Contar o almoço/.test(txt)&&/Passaram no refeitório, mas a linha está em branco · 1 [^·]*Adriano Reus Em branco/.test(txt), txt.slice(250,900));
+  ok('Compara com o Face ID: Augusto assinou e não passou no refeitório; Alberto passou e a linha está em branco', /Assinaram, mas não passaram no refeitório · 1 [^·]*Augusto Teles Contar o almoço/.test(txt)&&/Passaram no refeitório, mas a linha está em branco · 1 [^·]*Alberto Ramos Em branco/.test(txt), txt.slice(250,900));
   ok('Mostra a foto com as linhas marcadas', await p.evaluate(()=>document.querySelectorAll('.alm-ffv img').length===2));
-  await p.click('[data-act="alm-ffconta"][data-n="Alexandre Teixeira"]'); await H.dorme(800);
+  await p.click('[data-act="alm-ffconta"][data-n="Augusto Teles"]'); await H.dorme(800);
   const aj=await p.evaluate(x=>__T.S().db.doc('rh/dados/almocoaj/'+x.slice(0,7)).get().then(g=>g.exists?g.data().aj[x+'_22222222222']:null),hj);
   ok('"Contar o almoço" grava o ajuste (almoçou, assinou a folha)', aj&&aj.v==='sim'&&/Assinou a folha/.test(aj.mot), JSON.stringify(aj));
   const n0=all.find(r=>!alvo.has(r.n)&&!r.cz).n; await p.click(`.alm-ff [data-act="alm-fftg"][data-n="${n0}"]`); await H.dorme(300);

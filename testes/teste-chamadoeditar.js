@@ -2,8 +2,8 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const fs=require('fs'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs, t=new Date().toISOString(), hj=(x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10))(new Date()), mais=n=>{ const x=new Date(hj+'T12:00:00'); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
  d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
- D['crachas/T1']={codigo:'T1',nome:'CARLOS RANNA',papel:'tecnico',ativo:true,criadoEm:t}; D['crachas/T2']={codigo:'T2',nome:'YURI',papel:'tecnico',ativo:true,criadoEm:t};
- D['chamados/os-00009']={numero:9,linha:'Prédio / escritório',local:'ADM',quando:t,defeito:'Trocar a lâmpada da sala do PCP',tipo:'eletrico',impacto:'nao',prioridade:'normal',prazo:mais(2),paraTec:'CARLOS RANNA',tarefa:true,nome:'Marcelo Souza',equip:'ADM · Tarefa · Elétrico',status:'Aberta',criado:t,por:'uMAR',origem:'gestor',hist:[{em:t,por:'uMAR',o:'Tarefa criada'}]};
+ D['crachas/T1']={codigo:'T1',nome:'CARLOS ROCHA',papel:'tecnico',ativo:true,criadoEm:t}; D['crachas/T2']={codigo:'T2',nome:'YURI',papel:'tecnico',ativo:true,criadoEm:t};
+ D['chamados/os-00009']={numero:9,linha:'Prédio / escritório',local:'ADM',quando:t,defeito:'Trocar a lâmpada da sala do PCP',tipo:'eletrico',impacto:'nao',prioridade:'normal',prazo:mais(2),paraTec:'CARLOS ROCHA',tarefa:true,nome:'Marcelo Souza',equip:'ADM · Tarefa · Elétrico',status:'Aberta',criado:t,por:'uMAR',origem:'gestor',hist:[{em:t,por:'uMAR',o:'Tarefa criada'}]};
  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(3500);
  const doc=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['chamados/os-00009']);
  await p.evaluate(()=>__T.go('gxch')); await H.dorme(900);
@@ -16,7 +16,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  await p.fill('#gce-mot','esperando a lâmpada chegar'); await p.click('[data-act="gce-salvar"]'); await H.dorme(1200);
  let c=await doc(); const hh=c.hist[c.hist.length-1].o;
  ok('Salvar grava o texto, o técnico e o prazo novos', c.defeito==='Trocar as 2 lâmpadas da sala do PCP'&&c.paraTec==='YURI'&&c.prazo===mais(5)&&c.prazoAntes&&c.prazoAntes[0].de===mais(2), JSON.stringify({d:c.defeito,t:c.paraTec,p:c.prazo}));
- ok('Linha do tempo: "Editado por Marcelo Souza: … prazo prorrogado … (motivo: esperando a lâmpada chegar)"', /Editado por Marcelo Souza/.test(hh)&&/prazo prorrogado de/.test(hh)&&/para quem de CARLOS RANNA para YURI/.test(hh)&&/motivo: esperando a lâmpada chegar/.test(hh), hh);
+ ok('Linha do tempo: "Editado por Marcelo Souza: … prazo prorrogado … (motivo: esperando a lâmpada chegar)"', /Editado por Marcelo Souza/.test(hh)&&/prazo prorrogado de/.test(hh)&&/para quem de CARLOS ROCHA para YURI/.test(hh)&&/motivo: esperando a lâmpada chegar/.test(hh), hh);
  ok('Janela fecha depois de salvar', !(await p.$('.gx-mc')));
  await p.click('[data-act="man-abrir"][data-n="9"]'); await H.dorme(1000); s=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Detalhe da OS: cartão "O QUE FAZER" com o texto, onde, tipo, prazo, para quem e técnico', /O QUE FAZER/.test(s)&&/Trocar as 2 lâmpadas da sala do PCP/.test(s)&&/Prédio \/ escritório · ADM/.test(s)&&/Elétrico/.test(s)&&/Para quem\s*YURI/i.test(s)&&/prorrogado 1×/.test(s)&&/Faltam 5 dias/.test(s), s.slice(0,600).replace(/\n/g,' | '));

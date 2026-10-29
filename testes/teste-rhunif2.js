@@ -4,8 +4,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
  d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao'],locais:[],ativo:true};
  D['rh/config']={setores:['Manutenção','Linha 1']};
- D['rh/dados/funcionarios/f1']={nome:'CARLOS RANNAN DA SILVA',setor:'Manutenção',funcao:'Mecânico',status:'Ativo',tipo:'CLT',empresa:'COLAFIX'};
- D['rh/dados/uniformes/u1']={nome:'Carlos Rannan da Silva',fid:'f1',setor:'Manutenção',data:iso,per:'Manhã',itens:[{t:'Camiseta',tam:'GG',qtd:2},{t:'Calça',tam:'44',qtd:1}],sol:'10102',obs:'',em,por:'uDONA',porNome:'Iasmyn',st:'novo'};
+ D['rh/dados/funcionarios/f1']={nome:'CARLOS ROCHAN DA SILVA',setor:'Manutenção',funcao:'Mecânico',status:'Ativo',tipo:'CLT',empresa:'COLAFIX'};
+ D['rh/dados/uniformes/u1']={nome:'Carlos Rochan da Silva',fid:'f1',setor:'Manutenção',data:iso,per:'Manhã',itens:[{t:'Camiseta',tam:'GG',qtd:2},{t:'Calça',tam:'44',qtd:1}],sol:'10102',obs:'',em,por:'uDONA',porNome:'Iasmyn',st:'novo'};
  D['rh/dados/uniformes/u2']={nome:'Carla Souza',fid:'',setor:'Linha 1',data:iso,per:'Tarde',itens:[{t:'Camiseta',tam:'M',qtd:1}],sol:'',obs:'',em,por:'uDONA',porNome:'Iasmyn',st:'novo'};
  const erros=[]; let B=await H.abrir({viewport:{width:1440,height:950}}); let p=B.page; p.on('pageerror',e=>erros.push(e.message));
  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3500);
@@ -36,7 +36,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click('[data-act="rhu-pdesc"][data-v="sim"][data-k="f1"]'); await H.dorme(800);
  ok('"Sim" de novo no Carlos mantém o valor digitado pelo RH (R$ 80,00)', ((await srv())['rh/dados/uniformes/u1'].desc||{}).v===80&&!((await srv())['rh/dados/uniformes/u1'].desc||{}).nao);
  await p.click('[data-act="rhu-pdesc"][data-v="nao"][data-k="carla souza"]'); await H.dorme(800);
- await p.fill('#rhu-rq','carla'); await H.dorme(900); t=await txt('.rhu-rel'); ok('Busca no relatório filtra a pessoa', /Carla Souza/.test(t)&&!/Carlos Rannan/.test(t), t.replace(/\n/g,' | ').slice(0,200));
+ await p.fill('#rhu-rq','carla'); await H.dorme(900); t=await txt('.rhu-rel'); ok('Busca no relatório filtra a pessoa', /Carla Souza/.test(t)&&!/Carlos Rochan/.test(t), t.replace(/\n/g,' | ').slice(0,200));
  await p.fill('#rhu-rq',''); await H.dorme(800);
  const [dl]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('[data-act="rhu-rxls"]')]);
  ok('Excel do relatório baixa', !!dl||!!(await p.evaluate(()=>window.__rhuUltimoXls)), dl?dl.suggestedFilename():await p.evaluate(()=>window.__rhuUltimoXls));
@@ -48,7 +48,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const vo=await p.evaluate(()=>__T.vo('gxunif')); ok('Marcelo pode abrir Uniformes (Visão do gestor)', vo===true, String(vo));
  await p.evaluate(()=>__T.go('gxunif')); await H.dorme(1500);
  const tv=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Marcelo vê quem pegou o quê, sem desconto', /Uniformes entregues/.test(tv)&&/Carlos Rannan da Silva/.test(tv)&&/Carla Souza/.test(tv)&&!/Desconto|R\$/.test(tv), tv.replace(/\n/g,' | ').slice(0,400));
+ ok('Marcelo vê quem pegou o quê, sem desconto', /Uniformes entregues/.test(tv)&&/Carlos Rochan da Silva/.test(tv)&&/Carla Souza/.test(tv)&&!/Desconto|R\$/.test(tv), tv.replace(/\n/g,' | ').slice(0,400));
  const ab=await p.evaluate(()=>[...document.querySelectorAll('#view [data-go], #view .gxg-tab, #view button')].map(b=>b.innerText.trim()).filter(Boolean).join(' | '));
  ok('Aba "Uniformes" no grupo Pessoas do Marcelo', /Uniformes/.test(ab), ab.slice(0,300));
  await p.click('[data-act="rhu-rpdf"]'); await H.dorme(2500);

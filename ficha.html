@@ -37,6 +37,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:v
 .go:disabled{opacity:.6}
 .ck{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:14px;color:var(--ink)}
 .ck input{width:22px;height:22px;flex:none;margin:0}
+.lgpd{margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--sunken,#EEF2F5);font-size:14px;line-height:1.45}.lgpd b{display:block;margin-bottom:4px}.lgpd p{margin:6px 0 0}
 .er{color:var(--crit-ink);font-weight:700;margin-top:10px;min-height:1px}
 .recado{border-left:5px solid var(--teal)}.recado small{font-size:11.5px;font-weight:700;letter-spacing:1.5px;color:var(--teal)}.recado p{margin:6px 0 0}
 .fim{text-align:center;padding:30px 18px}
@@ -101,7 +102,8 @@ input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:v
       <section class="card"><h2>Fotos dos documentos</h2><p class="dica">Tire uma foto de cada documento, bem de perto e com luz. Se não tiver algum agora, pode entregar no RH.</p>
         ${docs.map((n,k)=>`<div class="doc"><div><b>${esc(n)}</b><small id="s${k}">ainda não mandou</small></div><label class="bt">Tirar foto<input type="file" accept="image/*,application/pdf" data-doc="${esc(n)}" data-k="${k}"></label></div>`).join('')}</section>
       <section class="card"><label for="obs">Quer avisar alguma coisa ao RH?</label><textarea id="obs" rows="3" maxlength="400"></textarea>
-        <label class="ck" style="margin-top:14px"><input type="checkbox" id="ok"> <span>Confirmo que os dados estão certos e autorizo a Colafix a usá-los na minha admissão.</span></label>
+        <div class="lgpd" role="note"><b>Como usamos os seus dados (LGPD)</b><p>Os dados e as fotos desta ficha servem só para a sua admissão e para cumprir as obrigações do contrato de trabalho (registro, folha, benefícios e documentos exigidos por lei).</p><p>Ficam guardados no sistema da Colafix, e só o RH e a administração têm acesso. Não são passados para outras empresas, a não ser quando a lei exige (governo, eSocial, contabilidade).</p><p>Se a admissão não acontecer, o RH apaga a ficha e as fotos. Você pode pedir ao RH, a qualquer momento, para ver, corrigir ou apagar os seus dados.</p></div>
+        <label class="ck" style="margin-top:14px"><input type="checkbox" id="ok"> <span>Li como os meus dados são usados, confirmo que estão certos e autorizo a Colafix a usá-los na minha admissão.</span></label>
         <div class="er" id="er" role="alert"></div><button class="go" type="submit">Enviar para o RH</button></section></form>`;
     $('#cpf').addEventListener('input',e=>{ e.target.value=mascCPF(e.target.value); });
     ['#telefone','#emergTel'].forEach(s=>$(s).addEventListener('input',e=>{ e.target.value=mascTel(e.target.value); }));

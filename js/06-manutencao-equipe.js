@@ -881,7 +881,7 @@ S.eq={maisCg:false,aba:'pessoas',q:'',fil:'',nv:null,cartao:null,conf:null,cg:nu
 function eqOnline(){ return !!(window.claude&&window.claude.online&&typeof window.claude.criarUsuario==='function'); }
 function eqLimpo(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'.').replace(/[^a-z0-9._-]/g,'').replace(/\.{2,}/g,'.').replace(/^\.|\.$/g,''); }
 function eqUsuSug(nome){ const p=eqLimpo(nome).split('.').filter(Boolean); return p.length>1?p[0]+'.'+p[p.length-1]:(p[0]||''); }
-function eqSenha(){ const L='abcdefghjkmnpqrstuvwxyz', a=new Uint32Array(7); crypto.getRandomValues(a); return [0,1,2].map(i=>L[a[i]%L.length]).join('')+[3,4,5,6].map(i=>a[i]%10).join(''); }
+function eqSenha(){ const L='abcdefghjkmnpqrstuvwxyz', a=new Uint32Array(8); crypto.getRandomValues(a); return [0,1,2,3].map(i=>L[a[i]%L.length]).join('')+[4,5,6,7].map(i=>a[i]%10).join(''); /* 29/10: 8 caracteres */ }
 function eqIni(n){ return String(n||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
 function eqCorDe(id){ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return EQ_COR[h%EQ_COR.length]; }
 function eqVis(d){ return d&&d._id!=='_geral'&&!d.apagado; }
@@ -1026,12 +1026,12 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='eq-nv-gera'){ E.nv.sen=eqSenha(); render(); return; }
   if(a==='eq-nv-cargo'){ E.nv.cargo=b.dataset.v; E.nv.err=''; render(); return; }
   if(a==='eq-nv-criar'){ const N=E.nv; N.nome=String(N.nome||'').trim(); N.usu=eqLimpo(N.usu); N.sen=String(N.sen||'').trim();
-    N.err=!N.nome?'Escreva o nome da pessoa.':!N.usu?'Escreva o usuário.':N.sen.length<6?'A senha precisa ter pelo menos 6 caracteres.':!N.cargo&&!eqAntigoDe(N.usu)?'Escolha o cargo.':''; if(N.err){ render(); return; }
+    N.err=!N.nome?'Escreva o nome da pessoa.':!N.usu?'Escreva o usuário.':N.sen.length<8?'A senha precisa ter pelo menos 8 caracteres.':!N.cargo&&!eqAntigoDe(N.usu)?'Escolha o cargo.':''; if(N.err){ render(); return; }
     E.salv=true; render();
     try{ const ant=(N.de&&(A.lista||[]).find(x=>x._id===N.de))||eqAntigoDe(N.usu); const uid=await window.claude.criarUsuario(N.usu,N.nome,N.sen); S.nomes[uid]=N.nome; E.usu[uid]=N.usu; (E.proj=E.proj||{})[uid]=eqProjeto();
       const ok=ant?await eqHerdar(uid,ant,N.cargo):await acsGravar(uid,acsPreset(N.cargo),true); if(ant&&!N.cargo) N.cargo=ant.perfil; E.salv=false;
       if(ok){ E.cartao={nome:N.nome,usu:N.usu,sen:N.sen,cargo:pnlPerfilNome(N.cargo),perfil:N.cargo}; E.nv=null; } render(); }
-    catch(e){ E.salv=false; N.err=e&&e.code==='auth/email-already-in-use'?'Já existe o usuário @'+N.usu+'. Escolha outro (ex.: '+N.usu+'2).':e&&e.code==='auth/weak-password'?'Senha fraca: use pelo menos 6 caracteres.':e&&e.code==='auth/network-request-failed'?'Sem internet. Tente de novo.':'Não deu certo ('+((e&&e.code)||'erro')+').'; render(); }
+    catch(e){ E.salv=false; N.err=e&&e.code==='auth/email-already-in-use'?'Já existe o usuário @'+N.usu+'. Escolha outro (ex.: '+N.usu+'2).':e&&e.code==='auth/weak-password'?'Senha fraca: use pelo menos 8 caracteres.':e&&e.code==='auth/network-request-failed'?'Sem internet. Tente de novo.':'Não deu certo ('+((e&&e.code)||'erro')+').'; render(); }
     return; }
   if(a==='eq-c-x'){ E.cartao=null; render(); return; }
   if(a==='eq-c-copiar'){ const t=eqTextoCartao(E.cartao); try{ await navigator.clipboard.writeText(t); toast('Copiado.'); }catch(e){ toast('Não consegui copiar. Selecione e copie à mão.'); } return; }
@@ -1166,7 +1166,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
   if(a==='eq-lote-mais'){ L.rows.push(eqLoteLinha()); render(); return; }
   if(a==='eq-lote-del'){ L.rows.splice(+b.dataset.i,1); if(!L.rows.length) L.rows.push(eqLoteLinha()); render(); return; }
   if(a==='eq-lote-criar'){ const fila=L.rows.filter(r=>r.st!=='ok'&&r.nome.trim()); let falta=false; if(!fila.length){ toast('Escreva pelo menos um nome.'); return; }
-    fila.forEach(r=>{ r.usu=eqLimpo(r.usu||eqUsuSug(r.nome)); r.err=!r.cargo&&!eqAntigoDe(r.usu)?'Escolha o cargo.':!r.usu?'Escreva o usuário.':String(r.sen||'').length<6?'Senha com pelo menos 6 caracteres.':''; if(r.err){ r.st='err'; falta=true; } else r.st=''; });
+    fila.forEach(r=>{ r.usu=eqLimpo(r.usu||eqUsuSug(r.nome)); r.err=!r.cargo&&!eqAntigoDe(r.usu)?'Escolha o cargo.':!r.usu?'Escreva o usuário.':String(r.sen||'').length<8?'Senha com pelo menos 8 caracteres.':''; if(r.err){ r.st='err'; falta=true; } else r.st=''; });
     const us=fila.map(r=>r.usu); fila.forEach(r=>{ if(us.filter(u=>u===r.usu).length>1){ r.err='Usuário repetido na lista.'; r.st='err'; falta=true; } });
     if(falta){ render(); return; } L.rodando=true; render();
     for(const r of fila){ r.st='vai'; render(); try{ const ant=eqAntigoDe(r.usu); const uid=await window.claude.criarUsuario(r.usu,r.nome.trim(),r.sen); S.nomes[uid]=r.nome.trim(); E.usu[uid]=r.usu; (E.proj=E.proj||{})[uid]=eqProjeto(); const ok=ant?await eqHerdar(uid,ant,r.cargo):await acsGravar(uid,acsPreset(r.cargo),true); r.st=ok?'ok':'err'; if(!ok) r.err='Conta criada, mas o cargo não gravou: escolha o cargo na lista.'; }

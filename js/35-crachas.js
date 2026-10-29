@@ -5,7 +5,7 @@
 const CR_AREAS=['Mecânica','Elétrica','Mecânica e elétrica','Serralheria','Predial','Apoio / limpeza','Apoio / elétrica'];
 S.cr.ed=null; S.cr.apagar=null;
 function crAreaTxt(c){ return String(c&&c.area||'').trim(); }
-/* "CARLOS RANNA - ELETRICA" → nome "CARLOS RANNA" e área "Elétrica" (para quem escreveu a área no nome) */
+/* "CARLOS ROCHA - ELETRICA" → nome "CARLOS ROCHA" e área "Elétrica" (para quem escreveu a área no nome) */
 function crSeparaArea(nome){ const m=String(nome||'').match(/^(.*?)\s+-\s+(.+)$/); if(!m) return null; const resto=m[2].trim(), n=mxNorm(resto).replace(/\s*\/\s*/g,' / ');
   const ach=CR_AREAS.find(a=>mxNorm(a).replace(/\s*\/\s*/g,' / ')===n)||(/mec/.test(n)&&/el[eé]tr/.test(n)?'Mecânica e elétrica':/^mec/.test(n)?'Mecânica':/^el[eé]tr/.test(n)?'Elétrica':null);
   return {nome:m[1].trim(),area:ach||resto.replace(/^./,x=>x.toUpperCase()).replace(/(\/\s*)(\S)/g,(a,b,c)=>b+c.toUpperCase())}; }

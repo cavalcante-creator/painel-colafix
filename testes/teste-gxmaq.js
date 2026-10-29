@@ -8,6 +8,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const ab=await p.evaluate(()=>[...document.querySelectorAll('.gxg-tabs .gxg-tb')].map(b=>b.innerText.trim()).join('|'));
  ok('Aba "Máquinas" no grupo Manutenção do Marcelo', /Máquinas/.test(ab), ab);
  await p.evaluate(()=>{ const b=[...document.querySelectorAll('.gxg-tabs .gxg-tb')].find(x=>/Máquinas/.test(x.innerText)); b&&b.click(); }); await H.dorme(1500);
+ ok('Sem as abas de cima da Manutenção (só as do Marcelo)', await p.evaluate(()=>{ const n=document.querySelector('#view>nav.tabs'); return document.body.classList.contains('gx-mod')&&(!n||getComputedStyle(n).display==='none')&&!!document.querySelector('.gxg-tabs'); }));
  ok('Abre a tela de Máquinas com o formulário de novo equipamento', await p.evaluate(()=>__T.S().view)==='manequip'&&!!(await p.$('#mx-eqn-n')), await p.evaluate(()=>__T.S().view));
  const l=await p.evaluate(()=>{ const s=document.getElementById('mx-eqn-l'); return s&&s.options.length>1?s.options[1].value:''; });
  await p.selectOption('#mx-eqn-l',l); await p.fill('#mx-eqn-n','Misturador Teste'); await p.fill('#mx-eqn-t','MX-01'); await p.click('[data-act="mx-eq-novo"]'); await H.dorme(1500);

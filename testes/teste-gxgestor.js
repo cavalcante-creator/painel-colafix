@@ -3,7 +3,7 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs;
  const AGORA=new Date(); AGORA.setHours(15,0,0,0); const hs=AGORA.getFullYear()+'-'+String(AGORA.getMonth()+1).padStart(2,'0')+'-'+String(AGORA.getDate()).padStart(2,'0'), cp=hs.slice(0,7); const ago=m=>new Date(AGORA.getTime()-m*60000).toISOString();
- d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Maciel de Souza'}; D['perfis/uMAR']={nome:'Marcelo Maciel de Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
+ d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Mendes de Souza'}; D['perfis/uMAR']={nome:'Marcelo Mendes de Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
  D['ordens/5001'].data=hs; D['ordens/5001'].produto='IT100 - ARGAMASSA AC1 20KG'; D['ordens/5001'].total=1000; D['ordens/5002'].data=hs; D['ordens/5002'].produto='IT200 - ARGAMASSA AC2 25KG';
  D['pcpbase/prev']={mes:{[cp]:{IT100:21000,IT200:10500}}}; D['pcpbase/itens']={l:{IT100:{d:'ARGAMASSA AC1 20KG',ln:['Linha 1']},IT200:{d:'ARGAMASSA AC2 25KG',ln:['Linha 2']}}};
  D['entregas/e1']={ordem:'5001',num:'5001',linha:'Linha 1',qtd:300,em:ago(90),por:'x'}; D['entregas/e2']={ordem:'5001',num:'5001',linha:'Linha 1',qtd:200,em:ago(30),por:'x'};

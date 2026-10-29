@@ -220,7 +220,7 @@
     el.innerHTML = `<div class="lg-wrap ${AREA && !pri ? 'tem' : ''}">${AREA && !pri ? ladoArea(AREA) : ''}<form class="bx" autocomplete="on">${logo ? `<img class="lg-logo" src="${logo}" alt="Colafix">` : ''}<h1>${AREA && !pri ? 'Entrar' : 'Painel de Operação'}</h1><div class="lg-sub">${pri ? 'Primeiro acesso da responsável pelo PCP' : RANCHO_QR ? 'Entre para abrir o rancho <b>' + esc(RANCHO_QR) + '</b> no diário de bordo' : QR_LINHA ? 'Entre para abrir o chamado da <b>' + esc(QR_LINHA) + '</b>' : 'Entre com o usuário e a senha que o PCP passou para você'}</div>
       ${pri ? '<label for="lg-n">SEU NOME</label><div class="lg-in"><input id="lg-n" autocomplete="name" required></div>' : ''}
       <label for="lg-e">USUÁRIO</label><div class="lg-in"><input id="lg-e" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="ex.: joao.silva"></div>
-      <label for="lg-s">SENHA</label><div class="lg-in"><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="6" style="padding-right:76px"><button type="button" class="lg-olho" id="lg-o" aria-label="Mostrar senha">Mostrar</button></div>
+      <label for="lg-s">SENHA</label><div class="lg-in"><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="${pri ? 8 : 6}" style="padding-right:76px"><button type="button" class="lg-olho" id="lg-o" aria-label="Mostrar senha">Mostrar</button></div>
       <div class="er" id="lg-er" role="alert"></div><button type="submit" class="lg-go">${pri ? 'Criar e entrar' : 'Entrar'}</button>
       ${instalarPossivel() ? '<button type="button" class="lg-inst" id="lg-inst">⤓ Instalar o app neste aparelho</button>' : ''}
       <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">${pri ? '' : 'Esqueceu a senha? Fale com o PCP.'}</span><button type="button" class="lk" id="lg-t">${pri ? 'Voltar' : 'Primeiro acesso'}</button></div>
@@ -416,7 +416,7 @@
   function fecharModal() { const m = document.getElementById('pf-m'); if (m) m.remove(); }
 
   /* trocar a própria senha */
-  function trocarSenha() { modal(`<h2>Trocar minha senha</h2><p>Usuário <b>${usuarioDe(EU.email)}</b></p><label>SENHA ATUAL</label><input type="password" id="ts-a" required autocomplete="current-password"><label>NOVA SENHA</label><input type="password" id="ts-n" required minlength="6" autocomplete="new-password"><div class="er" id="ts-er"></div><div class="rw"><button type="button" id="ts-x">Cancelar</button><button class="p">Trocar</button></div>`, f => {
+  function trocarSenha() { modal(`<h2>Trocar minha senha</h2><p>Usuário <b>${usuarioDe(EU.email)}</b></p><label>SENHA ATUAL</label><input type="password" id="ts-a" required autocomplete="current-password"><label>NOVA SENHA</label><input type="password" id="ts-n" required minlength="8" autocomplete="new-password"><div class="er" id="ts-er"></div><div class="rw"><button type="button" id="ts-x">Cancelar</button><button class="p">Trocar</button></div>`, f => {
       f.querySelector('#ts-x').onclick = fecharModal;
       f.onsubmit = async ev => { ev.preventDefault(); const er = f.querySelector('#ts-er'), b = f.querySelector('.p'); b.disabled = true; er.textContent = '';
         try { const cred = firebase.auth.EmailAuthProvider.credential(EU.email, f.querySelector('#ts-a').value); await EU.reauthenticateWithCredential(cred); await EU.updatePassword(f.querySelector('#ts-n').value); fecharModal(); aviso('Senha trocada.'); }

@@ -31,12 +31,12 @@ service cloud.firestore {
 
     // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
     match /{col}/{id} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra']);
     }
     match /{col}/{id}/{resto=**} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra']);
     }
 
     // Silos: histórico do saldo (consumo, estorno, medição). Só inclusão: ninguém altera nem apaga uma movimentação.
@@ -126,6 +126,16 @@ service cloud.firestore {
       allow read: if rhOk() || (liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])));
       allow write: if rhOk();
     }
+    // Hora extra (nomes e horas, 29/10 · LGPD): só quem tem a Visão do gestor (autoriza) e o RH (fechamento da folha) — antes todos os liberados liam.
+    function gestorOk() { return liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])); }
+    match /horaextra/{id} {
+      allow read: if dono() || rhOk() || gestorOk();
+      allow write: if dono() || (gestorOk() && !soVer());
+    }
+    // Pedidos de melhoria (29/10 · LGPD): têm foto da tela, que pode mostrar dados do RH — só a administradora.
+    match /melhorias/{id} {
+      allow read, write: if dono();
+    }
     // Quadro de pessoas do gestor (27/10: quem fica e quem sai, por linha/setor): só a dona e quem tem a Visão do gestor.
     match /gxquadro/{id} {
       allow read, write: if dono() || (liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])));
@@ -154,7 +164,8 @@ service cloud.firestore {
 
     // Nome de cada pessoa (aparece nos históricos).
     match /perfis/{uid} {
-      allow read: if logado() && provedor() != 'anonymous';
+      // 29/10 (LGPD): os nomes só para quem já foi liberado (ou o próprio perfil); conta criada e não liberada não lista ninguém
+      allow read: if le() || (logado() && request.auth.uid == uid);
       allow write: if dono() || (logado() && provedor() != 'anonymous' && request.auth.uid == uid);
     }
   }

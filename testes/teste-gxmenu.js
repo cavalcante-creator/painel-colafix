@@ -2,7 +2,7 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs; const ago=m=>new Date(Date.now()-m*6e4).toISOString();
  d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Marcelo Souza'}; D['perfis/uMAR']={nome:'Marcelo Souza',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],locais:[],ativo:true};
- D['pedpecas/b']={t:'Rolamento 6205',qtd:'2',itens:[{t:'Rolamento 6205',qtd:'2',un:'pç'}],porNome:'CARLOS RANNA',em:ago(80),status:'enviado',urg:'semana',hist:[]};
+ D['pedpecas/b']={t:'Rolamento 6205',qtd:'2',itens:[{t:'Rolamento 6205',qtd:'2',un:'pç'}],porNome:'CARLOS ROCHA',em:ago(80),status:'enviado',urg:'semana',hist:[]};
  D['chamados/os-00017']={numero:17,linha:'Linha 2',defeito:'Compressor desarmou',impacto:'parou',nome:'Ana',status:'Aberta',criado:ago(40)};
  const erros=[]; const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'marcelo','mar123'); await H.dorme(4000);
  const nav=()=>p.evaluate(()=>[...document.querySelectorAll('#navlist > .navbtn')].map(b=>b.querySelector('span').innerText));
@@ -29,7 +29,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click('#gxs-q'); await p.keyboard.type('compras'); await H.dorme(300);
  s=await p.evaluate(()=>document.getElementById('gxs-res').innerText); ok('"compras" acha a tela e a ação de pedidos de peça', /Mandar pedidos de peça para o compras/.test(s)&&/Pedidos de peça/.test(s), s.replace(/\n/g,'|'));
  await p.fill('#gxs-q','rolamento'); await H.dorme(300); s=await p.evaluate(()=>document.getElementById('gxs-res').innerText);
- ok('Acha o pedido de peça pelo item', /Rolamento 6205/.test(s)&&/CARLOS RANNA/.test(s), s.replace(/\n/g,'|'));
+ ok('Acha o pedido de peça pelo item', /Rolamento 6205/.test(s)&&/CARLOS ROCHA/.test(s), s.replace(/\n/g,'|'));
  await p.fill('#gxs-q','os 17'); await H.dorme(300); s=await p.evaluate(()=>document.getElementById('gxs-res').innerText);
  ok('Acha o chamado pelo número', /OS 00017 · Linha 2/.test(s), s.replace(/\n/g,'|'));
  await p.click('[data-gxsi]'); await H.dorme(900); s=await p.evaluate(()=>({v:__T.S().view,cur:__T.S().man&&__T.S().man.cur}));

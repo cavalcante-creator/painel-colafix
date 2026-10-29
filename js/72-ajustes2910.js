@@ -97,6 +97,8 @@ function p29Gestor(){ try{ const p=acsP(); return !!p&&!p.tudo&&((p.mods||[]).in
 { const _vo=viewOk; viewOk=function(v){ if(v==='manequip'&&p29Gestor()) return true; return _vo.apply(this,arguments); }; }
 setInterval(()=>{ try{ const X=S.mx; if(!X||X.sub||!S.db||!S.acs||!S.acs.pronto||!viewOk('manequip')) return; X.sub=true;
   S.db.doc('config/manut').onSnapshot(s=>{ const d=s.exists?(s.data()||{}):{}; X.cfg={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}; X.lido=true; rerenderSeguro(); },()=>{ X.lido=true; }); }catch(e){} },900);
+/* no login do Marcelo a tela Máquinas é da Visão do gestor: sem as abas de cima da Manutenção (Painel, Chamados, Preventivas…) */
+{ const _md=modDe; modDe=function(v){ if(v==='manequip'){ try{ if(gxSolo()) return 'gestor'; }catch(e){} } return _md.apply(this,arguments); }; }
 S.extViews=S.extViews||{}; S.extViews.manequip=function(){ let a=''; try{ if(typeof gxSolo==='function'&&gxSolo()) a=gxgAbas('manequip'); }catch(e){} return a+manView('manequip'); };
 try{ const g=GXG.find(x=>x.id==='g-man'); if(g&&!g.tabs.some(t=>t[0]==='manequip')) g.tabs.push(['manequip','Máquinas']); }catch(e){}
 /* as ações de máquina eram só da equipe de manutenção (MAN_ACOES_ATENDER no js/07): agora também do gestor */
