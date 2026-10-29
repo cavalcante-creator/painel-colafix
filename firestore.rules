@@ -69,6 +69,10 @@ service cloud.firestore {
     match /rh/{resto=**} {
       allow read, write: if rhOk();
     }
+    // Entregas de uniforme (29/10): quem tem a Visão do gestor (Marcelo) só LÊ, para ver o relatório de quem pegou.
+    match /rh/dados/uniformes/{id} {
+      allow read: if liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor']));
+    }
 
     // Ficha de admissão pelo celular (ficha.html?c=CÓDIGO, sem login): o RH cria o convite (código de 20 letras e números);
     // a pessoa só lê o próprio convite e só CRIA a ficha e as fotos, uma vez, enquanto o convite vale. Não lê nada do RH.

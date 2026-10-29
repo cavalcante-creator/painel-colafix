@@ -34,7 +34,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Grava a entrega para o RH (pessoa, setor, período, itens, nº da solicitação, quem entregou, para conferir)', us.length===1&&u.nome==='Carlos Rannan da Silva'&&u.fid==='f1'&&u.setor==='Manutenção'&&u.per==='Manhã'&&u.itens.length===1&&u.itens[0].t==='Camiseta'&&u.itens[0].tam==='GG'&&u.itens[0].qtd===1&&u.sol==='10102'&&u.st==='novo'&&!!u.porNome&&!!u.emailEm, JSON.stringify(us));
  const mail=await p.evaluate(()=>window.__rhuUltimoMail||'');
  const dec=decodeURIComponent(mail);
- ok('Abre o e-mail para o RH: para, cópia, assunto e o mesmo texto', /^mailto:stefani@colafix\.com;departamentopessoal@colafix\.com\?/.test(mail)&&/cc=marcelo@colafix\.com/.test(mail)&&dec.includes('subject=Entrega de uniforme - Carlos Rannan da Silva - '+hjBr)&&dec.includes(esp), mail.slice(0,300));
+ ok('Abre o e-mail no Outlook na internet: para, cópia, assunto e o mesmo texto', /^https:\/\/outlook\.office\.com\/mail\/deeplink\/compose\?/.test(mail)&&dec.includes('to=stefani@colafix.com;departamentopessoal@colafix.com')&&dec.includes('cc=marcelo@colafix.com')&&dec.includes('subject=Entrega de uniforme - Carlos Rannan da Silva - '+hjBr)&&dec.includes(esp), mail.slice(0,300));
  let s=await view(); ok('Lista "Para o RH lançar (1)" com a entrega', /Para o RH lançar \(1\)/.test(s)&&/Carlos Rannan da Silva/.test(s)&&/Camiseta GG - 1 un/.test(s)&&/RH ainda não lançou/.test(s), s.slice(0,400).replace(/\n/g,' | '));
  /* nome fora do cadastro (terceiro) + validação */
  await p.click('[data-act="rhu-novo"]'); await H.dorme(500); await p.click('[data-act="rhu-ok"][data-v="so"]'); await H.dorme(300);
