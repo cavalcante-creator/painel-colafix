@@ -90,4 +90,19 @@ try{ if(typeof GXS_ACOES!=='undefined'&&Array.isArray(GXS_ACOES)) GXS_ACOES.push
 /* PDF no padrão do painel para os módulos (RH · uniformes): o mesmo gerador dos relatórios do gestor/comercial
    (jsPDF, faixa com as logos, quadros, tabelas, rodapé com página; baixa o arquivo). */
 window.Painel=window.Painel||{}; window.Painel.pdf={ carregar:()=>carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'), imgs:()=>gpImgs(), novo:(t,s,i)=>gpNovo(t,s,i), cor:GPDF.cor };
+/* (7) Marcelo cadastra as máquinas e equipamentos da manutenção (pedido de 29/10): a tela Máquinas (manequip, a mesma
+   da Manutenção, config/manut.equips) entra na Visão do gestor › Manutenção › Máquinas e abre para quem tem o
+   módulo `gestor` (antes só para quem tinha `manut`). A regra do banco já deixa gravar config/manut (grava()). */
+function p29Gestor(){ try{ const p=acsP(); return !!p&&!p.tudo&&((p.mods||[]).includes('gestor')||(p.extras||[]).includes('gestor')); }catch(e){ return false; } }
+{ const _vo=viewOk; viewOk=function(v){ if(v==='manequip'&&p29Gestor()) return true; return _vo.apply(this,arguments); }; }
+setInterval(()=>{ try{ const X=S.mx; if(!X||X.sub||!S.db||!S.acs||!S.acs.pronto||!viewOk('manequip')) return; X.sub=true;
+  S.db.doc('config/manut').onSnapshot(s=>{ const d=s.exists?(s.data()||{}):{}; X.cfg={equips:d.equips||[],prev:d.prev||[],pecas:d.pecas||[],limites:d.limites||null}; X.lido=true; rerenderSeguro(); },()=>{ X.lido=true; }); }catch(e){} },900);
+S.extViews=S.extViews||{}; S.extViews.manequip=function(){ let a=''; try{ if(typeof gxSolo==='function'&&gxSolo()) a=gxgAbas('manequip'); }catch(e){} return a+manView('manequip'); };
+try{ const g=GXG.find(x=>x.id==='g-man'); if(g&&!g.tabs.some(t=>t[0]==='manequip')) g.tabs.push(['manequip','Máquinas']); }catch(e){}
+/* as ações de máquina eram só da equipe de manutenção (MAN_ACOES_ATENDER no js/07): agora também do gestor */
+{ const P29_EQ=['mx-eq-novo','mx-eq-salvar','mx-eq-del','mx-eq-conf','mx-eq-sug','mx-eq-ed']; P29_EQ.forEach(a=>{ const i=MAN_ACOES_ATENDER.indexOf(a); if(i>=0) MAN_ACOES_ATENDER.splice(i,1); });
+  window.addEventListener('click',ev=>{ const b=ev.target&&ev.target.closest&&ev.target.closest('[data-act]'); if(!b||!P29_EQ.includes(b.dataset.act)) return;
+    if(!(manPodeAtender()||p29Gestor())){ ev.stopImmediatePropagation(); ev.preventDefault(); toast('Você não possui permissão para esta ação. Ela é da equipe de manutenção e do gestor.'); } },true); }
+if(typeof GXN_TELAS!=='undefined'&&!GXN_TELAS.includes('manequip')) GXN_TELAS.push('manequip');
+try{ if(typeof GXS_ACOES!=='undefined'&&Array.isArray(GXS_ACOES)) GXS_ACOES.push(['Máquinas e equipamentos (cadastrar)','maquina equipamento cadastro manutenção qr','manequip',()=>go('manequip')]); }catch(e){}
 /* ===FIM AJUSTES 29/10=== */

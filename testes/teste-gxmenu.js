@@ -9,7 +9,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  let n=await nav(); ok('Lateral com 7 itens', JSON.stringify(n)===JSON.stringify(['Início','Produção','Manutenção','Pessoas','Plano de ação','TVs da fábrica','Cadastros']), JSON.stringify(n));
  await p.click('#navlist [data-go="gxch"]'); await H.dorme(800);
  let s=await p.evaluate(()=>({sub:[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.innerText.replace(/\d+$/,'').trim()),tabs:[...document.querySelectorAll('.gxg-tabs .gxg-tb')].map(b=>b.innerText.replace(/\d+$/,'').trim()),v:__T.S().view}));
- ok('Manutenção abre Chamados, com Chamados · Pedidos de peça · Preventivas na lateral e nas abas', s.v==='gxch'&&s.sub.join('|')==='Chamados|Pedidos de peça|Preventivas'&&s.tabs.join('|')==='Chamados|Pedidos de peça|Preventivas', JSON.stringify(s));
+ ok('Manutenção abre Chamados, com Chamados · Pedidos de peça · Itens · Preventivas · Máquinas na lateral e nas abas', s.v==='gxch'&&s.sub.join('|')==='Chamados|Pedidos de peça|Itens|Preventivas|Máquinas'&&s.tabs.join('|')==='Chamados|Pedidos de peça|Itens|Preventivas|Máquinas', JSON.stringify(s));
  await p.click('.gxg-tabs [data-go="gxpec"]'); await H.dorme(800); ok('Aba "Pedidos de peça" abre a tela', await p.evaluate(()=>__T.S().view==='gxpec'));
  await p.click('#navlist [data-go="gxpres"]'); await H.dorme(800);
  s=await p.evaluate(()=>[...document.querySelectorAll('.gxg-tabs .gxg-tb')].map(b=>b.innerText.trim())); ok('Pessoas: Quem está hoje · Hora extra · Quadro de pessoas · Uniformes · Segurança', s.join('|')==='Quem está hoje|Hora extra|Quadro de pessoas|Uniformes|Segurança', s.join('|'));
