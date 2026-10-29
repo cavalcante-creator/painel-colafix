@@ -12,15 +12,14 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
  const txt=s=>p.evaluate(s=>(document.querySelector(s)||{}).innerText||'',s);
  await p.evaluate(()=>__T.go('rhunif')); await H.dorme(1500);
- let t=await txt('.rhu-l'); ok('RH: sem preço cadastrado, o desconto pede os preços', /sem preço cadastrado/.test(t), t.replace(/\n/g,' | ').slice(0,300));
+ let t=await txt('.rhu-l'); ok('RH: sem preço cadastrado, o desconto pede os preços', /sem preço/.test(t)&&/cadastre o preço das peças/.test(t), t.replace(/\n/g,' | ').slice(0,300));
  await p.click('[data-act="rhu-prab"]'); await H.dorme(500);
  await p.fill('[data-rhu-pr="Camiseta"]','25,50'); await p.fill('[data-rhu-pr="Calça"]','40'); await p.click('[data-act="rhu-prok"]'); await H.dorme(900);
  const pr=((await srv())['rh/config']||{}).unifPrecos||{};
  ok('Preços guardados em rh/config.unifPrecos', pr.camiseta&&pr.camiseta.v===25.5&&pr.calca&&pr.calca.v===40, JSON.stringify(pr).slice(0,200));
  t=await txt('.rhu-l'); ok('Desconto calculado: Carlos 2×25,50 + 40 = R$ 91,00; Carla R$ 25,50', /R\$\s?91,00/.test(t)&&/R\$\s?25,50/.test(t), t.replace(/\n/g,' | ').slice(0,400));
  // Carla: não descontar
- await p.evaluate(()=>{ const b=[...document.querySelectorAll('[data-act="rhu-ded"]')].find(x=>x.dataset.id==='u2'); b&&b.click(); }); await H.dorme(400);
- await p.click('[data-act="rhu-dnao"]'); await H.dorme(700);
+ await p.click('[data-act="rhu-dnao"][data-id="u2"]'); await H.dorme(700);
  ok('"Não descontar" grava na entrega', ((await srv())['rh/dados/uniformes/u2'].desc||{}).nao===true);
  // Carlos: valor do RH
  await p.evaluate(()=>{ const b=[...document.querySelectorAll('[data-act="rhu-ded"]')].find(x=>x.dataset.id==='u1'); b&&b.click(); }); await H.dorme(400);
@@ -28,7 +27,15 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Valor mudado pelo RH (R$ 80,00) grava na entrega', ((await srv())['rh/dados/uniformes/u1'].desc||{}).v===80);
  // relatório
  await p.click('[data-act="rhu-st"][data-v="rel"]'); await H.dorme(700);
- t=await txt('.rhu-rel'); ok('Relatório: 2 pessoas, 2 entregas, 4 peças, R$ 80,00 de desconto, peças por pessoa', /2\s*pessoas/.test(t)&&/2\s*entregas/.test(t)&&/4\s*peças/.test(t)&&/R\$\s?80,00\s*de desconto/.test(t)&&/2 Camiseta GG, 1 Calça 44/.test(t), t.replace(/\n/g,' | ').slice(0,400));
+ t=await txt('.rhu-rel'); const kk=await p.evaluate(()=>[...document.querySelectorAll('.rhu-rk > div')].map(d=>d.querySelector('span').innerText.trim().toUpperCase()+'='+d.querySelector('b').innerText.trim()).join(' · '));
+ ok('Relatório: 2 pessoas, 2 entregas, 4 peças, R$ 80,00 de desconto, peças por pessoa', /PESSOAS=2/.test(kk)&&/ENTREGAS=2/.test(kk)&&/PEÇAS=4/.test(kk)&&/DESCONTO NO PERÍODO=R\$\s?80,00/.test(kk)&&/2× Camiseta GG/.test(t)&&/1× Calça 44/.test(t), kk);
+ await p.click('[data-act="rhu-pdesc"][data-v="sim"][data-k="'+'carla souza'+'"]'); await H.dorme(800);
+ t=await txt('.rhu-rel'); ok('Relatório: "Sim" na Carla volta a descontar (R$ 80,00 + R$ 25,50 = R$ 105,50)', /R\$\s?105,50/.test(t)&&!((await srv())['rh/dados/uniformes/u2'].desc), t.replace(/\n/g,' | ').slice(0,300));
+ await p.click('[data-act="rhu-pdesc"][data-v="nao"][data-k="f1"]'); await H.dorme(800);
+ ok('Relatório: "Não" no Carlos marca as entregas dele como não descontadas', ((await srv())['rh/dados/uniformes/u1'].desc||{}).nao===true);
+ await p.click('[data-act="rhu-pdesc"][data-v="sim"][data-k="f1"]'); await H.dorme(800);
+ ok('"Sim" de novo no Carlos mantém o valor digitado pelo RH (R$ 80,00)', ((await srv())['rh/dados/uniformes/u1'].desc||{}).v===80&&!((await srv())['rh/dados/uniformes/u1'].desc||{}).nao);
+ await p.click('[data-act="rhu-pdesc"][data-v="nao"][data-k="carla souza"]'); await H.dorme(800);
  await p.fill('#rhu-rq','carla'); await H.dorme(900); t=await txt('.rhu-rel'); ok('Busca no relatório filtra a pessoa', /Carla Souza/.test(t)&&!/Carlos Rannan/.test(t), t.replace(/\n/g,' | ').slice(0,200));
  await p.fill('#rhu-rq',''); await H.dorme(800);
  const [dl]=await Promise.all([p.waitForEvent('download',{timeout:20000}).catch(()=>null),p.click('[data-act="rhu-rxls"]')]);

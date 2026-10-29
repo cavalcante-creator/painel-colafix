@@ -11,7 +11,7 @@
   const COL='rh/dados/uniformes';
   const PECAS=['Camiseta','Camiseta manga longa','Camisa polo','Calça','Bermuda','Jaqueta','Moletom','Boné','Avental'];
   const TAMS=['PP','P','M','G','GG','XG','XGG','EG','36','38','40','42','44','46','48','50'];
-  const U={xs:[],lido:false,sub:false,f:null,st:'conf',cx:null,cfg:false,salvando:false,rel:{per:'mes',de:'',ate:'',q:''},dEd:null,precos:false};
+  const U={xs:[],lido:false,sub:false,f:null,st:'conf',cx:null,cfg:false,salvando:false,rel:{per:'mes',de:'',ate:'',q:''},q:'',dEd:null,precos:false};
   let C=null;
   const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
   const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -99,11 +99,13 @@
       <div class="rhu-prs">${pecasConhecidas(c).map(t=>`<label class="rhu-pr"><span>${e(t)}</span><span class="rhu-prv">R$ <input class="txt" inputmode="decimal" data-rhu-pr="${e(t)}" value="${pr[pk(t)]&&+pr[pk(t)].v>0?e(String(pr[pk(t)].v).replace('.',',')):''}" placeholder="0,00"></span></label>`).join('')}</div>
       <label class="rhu-w"><span>Outra peça</span><span class="rhu-2"><input class="txt" id="rhu-prn" placeholder="Nome da peça"><span class="rhu-prv">R$ <input class="txt" id="rhu-prnv" inputmode="decimal" placeholder="0,00"></span></span></label>
       <div class="rhu-ac"><button class="btn" data-act="rhu-prok">Guardar preços</button></div></div></div></div>`; }
-  function descLinha(c,x){ if(!c.rh) return ''; const e=c.esc, pr=precosDe(c), d=descDe(x,pr);
-    if(U.dEd===x._id){ const k=descCalc(x,pr); return `<div class="rhu-de"><span>Desconto</span> R$ <input class="txt" id="rhu-dv" inputmode="decimal" value="${d.tipo==='rh'?e(String(d.v).replace('.',',')):k.v!=null?e(String(k.v).replace('.',',')):''}" placeholder="0,00">
-      <button class="btn sec rhu-sm" data-act="rhu-dok" data-id="${e(x._id)}">Salvar</button>${k.v!=null?`<button class="lnk" data-act="rhu-dcalc" data-id="${e(x._id)}">Usar o preço das peças (${brl(k.v)})</button>`:''}<button class="lnk" data-act="rhu-dnao" data-id="${e(x._id)}">Não descontar</button><button class="lnk" data-act="rhu-dx">Cancelar</button></div>`; }
-    const tx=d.tipo==='nao'?'Não descontar':d.v==null?'sem preço cadastrado':brl(d.v)+(d.tipo==='rh'?' (valor do RH)':d.falta&&d.falta.length?' (sem preço: '+d.falta.join(', ')+')':'');
-    return `<div class="rhu-de ${d.tipo==='nao'?'nao':''}"><span>Desconto</span> <b>${e(tx)}</b> <button class="lnk" data-act="rhu-ded" data-id="${e(x._id)}">${d.tipo==='calc'&&d.v==null?'Informar':'Mudar'}</button>${d.tipo==='calc'&&d.v==null?' · <button class="lnk" data-act="rhu-prab">cadastrar preços</button>':''}</div>`; }
+  function descLinha(c,x){ if(!c.rh) return ''; const e=c.esc, pr=precosDe(c), d=descDe(x,pr), nao=d.tipo==='nao';
+    if(U.dEd===x._id){ const k=descCalc(x,pr); return `<div class="rhu-dx2"><span class="rhu-dl">Valor do desconto</span><span class="rhu-prv">R$ <input class="txt" id="rhu-dv" inputmode="decimal" value="${d.tipo==='rh'?e(String(d.v).replace('.',',')):k.v!=null?e(String(k.v).replace('.',',')):''}" placeholder="0,00"></span>
+      <div class="rhu-dbt"><button class="btn rhu-sm" data-act="rhu-dok" data-id="${e(x._id)}">Salvar</button>${k.v!=null&&d.tipo==='rh'?`<button class="lnk" data-act="rhu-dcalc" data-id="${e(x._id)}">Voltar ao preço das peças (${brl(k.v)})</button>`:''}<button class="lnk" data-act="rhu-dx">Cancelar</button></div></div>`; }
+    const val=nao?'—':d.v==null?'sem preço':brl(d.v), sub=nao?'não será descontado':d.tipo==='rh'?'valor digitado pelo RH':d.v==null?'cadastre o preço das peças':d.falta&&d.falta.length?'sem preço: '+d.falta.join(', '):'pelo preço das peças';
+    return `<div class="rhu-dbox ${nao?'nao':d.v==null?'semp':''}"><span class="rhu-dl">Descontar?</span>
+      <div class="rhu-yn" role="group" aria-label="Descontar do salário"><button class="${!nao?'on':''}" aria-pressed="${!nao}" data-act="rhu-dsim" data-id="${e(x._id)}">Sim</button><button class="${nao?'on nao':''}" aria-pressed="${nao}" data-act="rhu-dnao" data-id="${e(x._id)}">Não</button></div>
+      <b class="rhu-dv">${e(val)}</b><small>${e(sub)}</small>${nao?'':d.v==null?`<button class="lnk" data-act="rhu-prab">Cadastrar preços</button>`:`<button class="lnk" data-act="rhu-ded" data-id="${e(x._id)}">Mudar o valor</button>`}</div>`; }
   /* ---------- relatório de quem pegou (pedido de 29/10): por período, por pessoa e entrega a entrega; imprimir e Excel.
      O RH vê também o desconto; o Marcelo (Visão do gestor) vê só quem pegou o quê. ---------- */
   const ymd=d=>{ const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4); return z.toISOString().slice(0,10); };
@@ -119,15 +121,21 @@
     const ps=[...by.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
     return {de,ate,xs,ps,pecas:xs.reduce((a,x)=>a+itensOk(x).reduce((s,i)=>s+(Math.max(1,parseInt(i.qtd,10)||1)),0),0),desc:ps.reduce((a,g)=>a+g.desc,0)}; }
   const pcTxt=g=>[...g.pc.entries()].map(([t,q])=>q+' '+t).join(', ');
+  /* a pessoa no período: todas descontadas (sim), nenhuma (nao) ou umas sim, outras não (parcial) */
+  const pesSit=g=>{ const n=g.xs.filter(x=>x.desc&&x.desc.nao).length; return n===0?'sim':n===g.xs.length?'nao':'parc'; };
+  const pesKey=x=>x.fid||pk(x.nome);
   function relHtml(c){ const e=c.esc, D=relDados(c), r=U.rel;
     const per=[['mes','Este mês'],['mesant','Mês passado'],['tudo','Tudo'],['datas','Escolher datas']];
     return `<div class="rhu-rel"><div class="rhu-rb"><div class="seg" role="group" aria-label="Período">${per.map(([k,t])=>`<button class="${r.per===k?'on':''}" aria-pressed="${r.per===k}" data-act="rhu-rper" data-v="${k}">${t}</button>`).join('')}</div>
-        ${r.per==='datas'?`<span class="rhu-rdt"><input class="txt" type="date" id="rhu-rde" value="${e(r.de)}"> até <input class="txt" type="date" id="rhu-rate" value="${e(r.ate)}"></span>`:''}
-        <input class="txt rhu-rq" id="rhu-rq" type="search" placeholder="Buscar pessoa, setor ou peça" value="${e(r.q)}">
-        <span style="flex:1"></span><button class="btn sec rhu-sm" data-act="rhu-rxls">Excel</button><button class="btn sec rhu-sm" data-act="rhu-rpdf">Imprimir / PDF</button></div>
-      <div class="rhu-rk"><div><b>${D.ps.length}</b><span>pessoas</span></div><div><b>${D.xs.length}</b><span>entregas</span></div><div><b>${D.pecas}</b><span>peças</span></div>${c.rh?`<div><b>${brl(D.desc)}</b><span>de desconto</span></div>`:''}</div>
-      ${D.ps.length?`<div class="rhu-tw"><table class="rhu-t"><thead><tr><th>Funcionário</th><th>Setor</th><th class="n">Entregas</th><th>Peças</th>${c.rh?'<th class="n">Desconto</th>':''}</tr></thead><tbody>
-        ${D.ps.map(g=>`<tr><td><b>${e(g.nome)}</b></td><td>${e(g.setor||'—')}</td><td class="n">${g.n}</td><td>${e(pcTxt(g))}<small>${g.xs.map(x=>e(br(x.data).slice(0,5))).join(' · ')}</small></td>${c.rh?`<td class="n">${brl(g.desc)}${g.semPreco?'<small>falta preço</small>':''}</td>`:''}</tr>`).join('')}</tbody></table></div>`
+        ${r.per==='datas'?`<span class="rhu-rdt"><input class="txt" type="date" id="rhu-rde" value="${e(r.de)}"><span>até</span><input class="txt" type="date" id="rhu-rate" value="${e(r.ate)}"></span>`:''}
+        <span class="rhu-rsp"></span><button class="btn sec rhu-sm" data-act="rhu-rxls">${c.P.ic?c.P.ic('folha',15,2):''}Excel</button><button class="btn rhu-sm" data-act="rhu-rpdf">${c.P.ic?c.P.ic('folha',15,2):''}Baixar PDF</button></div>
+      <div class="rhu-rk"><div><span>Pessoas</span><b>${D.ps.length}</b></div><div><span>Entregas</span><b>${D.xs.length}</b></div><div><span>Peças</span><b>${D.pecas}</b></div>${c.rh?`<div class="dsc"><span>Desconto no período</span><b>${brl(D.desc)}</b></div>`:''}</div>
+      ${D.ps.length?`<div class="rhu-tw"><table class="rhu-t"><thead><tr><th>Funcionário</th><th>Peças</th><th class="n">Entregas</th>${c.rh?'<th class="c">Descontar?</th><th class="n">Desconto</th>':''}</tr></thead><tbody>
+        ${D.ps.map(g=>{ const st=c.rh?pesSit(g):'', k=e(pesKey(g.xs[0]));
+          return `<tr><td><b>${e(g.nome)}</b><small>${e(g.setor||'sem setor')}</small></td><td><span class="rhu-ri">${[...g.pc.entries()].map(([t,q])=>`<span>${q}× ${e(t)}</span>`).join('')}</span><small>${g.xs.map(x=>e(br(x.data).slice(0,5))).join(' · ')}</small></td><td class="n">${g.n}</td>
+            ${c.rh?`<td class="c"><div class="rhu-yn sm" role="group" aria-label="Descontar ${e(g.nome)}"><button class="${st==='sim'?'on':''}" data-act="rhu-pdesc" data-k="${k}" data-v="sim">Sim</button><button class="${st==='nao'?'on nao':''}" data-act="rhu-pdesc" data-k="${k}" data-v="nao">Não</button></div>${st==='parc'?'<small>algumas entregas</small>':''}</td>
+            <td class="n"><b>${st==='nao'?'—':brl(g.desc)}</b>${g.semPreco?'<small>falta preço</small>':''}</td>`:''}</tr>`; }).join('')}</tbody>
+        ${c.rh?`<tfoot><tr><td>Total</td><td>${D.pecas} peças</td><td class="n">${D.xs.length}</td><td></td><td class="n">${brl(D.desc)}</td></tr></tfoot>`:''}</table></div>`
         :`<div class="empty">${U.lido?'Nenhuma entrega no período.':'Carregando…'}</div>`}</div>`; }
   function relLinhas(c){ const D=relDados(c), pr=precosDe(c);
     const res=[['Funcionário','Setor','Entregas','Peças'].concat(c.rh?['Desconto (R$)']:[])].concat(D.ps.map(g=>[g.nome,g.setor,g.n,pcTxt(g)].concat(c.rh?[Math.round(g.desc*100)/100]:[])));
@@ -142,30 +150,62 @@
       blob=new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); arq=nome+'.xlsx'; }
     else { const L=[['Por pessoa']].concat(res,[[],['Entregas']],det); blob=new Blob(['﻿'+L.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n')],{type:'text/csv'}); arq=nome+'.csv'; }
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=arq; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); window.__rhuUltimoXls=arq; }
-  function relPdf(c){ const {D,res,det}=relLinhas(c), e=c.esc, tb=a=>`<table><tr>${a[0].map(h=>`<th>${e(h)}</th>`).join('')}</tr>${a.slice(1).map(r=>`<tr>${r.map((v,i)=>`<td>${e(/^Desconto/.test(a[0][i])&&v!==''&&v!=null?brl(v):v)}</td>`).join('')}</tr>`).join('')}</table>`;
+  function relPdf(c){ const D=relDados(c), e=c.esc, pr=precosDe(c), logo=(document.querySelector('.brand img')||{}).src||'', hoje=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const pcs=g=>[...g.pc.entries()].map(([t,q])=>`<span class="pc">${q}× ${e(t)}</span>`).join('');
+    const resumo=`<table class="t"><thead><tr><th>Funcionário</th><th>Setor</th><th>Peças</th><th class="n">Entregas</th>${c.rh?'<th class="c">Descontar</th><th class="n">Desconto</th>':''}</tr></thead><tbody>
+      ${D.ps.map(g=>{ const st=c.rh?pesSit(g):''; return `<tr><td><b>${e(g.nome)}</b></td><td>${e(g.setor||'—')}</td><td>${pcs(g)}</td><td class="n">${g.n}</td>${c.rh?`<td class="c"><span class="tg ${st}">${st==='sim'?'Sim':st==='nao'?'Não':'Parcial'}</span></td><td class="n"><b>${st==='nao'?'—':brl(g.desc)}</b></td>`:''}</tr>`; }).join('')}</tbody>
+      ${c.rh?`<tfoot><tr><td colspan="3">Total</td><td class="n">${D.xs.length}</td><td></td><td class="n">${brl(D.desc)}</td></tr></tfoot>`:''}</table>`;
+    const det=D.ps.map(g=>`<div class="pes"><div class="ph"><b>${e(g.nome)}</b><span>${e(g.setor||'')}</span>${c.rh?`<em>${pesSit(g)==='nao'?'não descontar':brl(g.desc)}</em>`:''}</div>
+      <table class="t d"><colgroup><col style="width:92px"><col><col style="width:34%">${c.rh?'<col style="width:92px">':''}</colgroup><tbody>${g.xs.map(x=>{ const d=c.rh?descDe(x,pr):null; return `<tr><td class="dt">${e(br(x.data))}<small>${e(x.per||'')}</small></td><td>${itensOk(x).map(i=>`<span class="pc">${Math.max(1,parseInt(i.qtd,10)||1)}× ${e(i.t)}${i.tam?' '+e(i.tam):''}</span>`).join('')}</td>
+        <td class="sm">${x.sol?'Solicitação Nº '+e(x.sol):'sem nº de solicitação'}<small>entregue por ${e(x.porNome||'—')}${x.st==='lancado'?' · lançado na ficha':''}</small></td>${c.rh?`<td class="n">${d.tipo==='nao'?'<span class="tg nao">Não</span>':d.v==null?'<small>sem preço</small>':brl(d.v)}</td>`:''}</tr>`; }).join('')}</tbody></table></div>`).join('');
+    const css=`@page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}body{margin:0;font:10pt/1.45 "Segoe UI",Arial,sans-serif;color:#1C2B33;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:3px solid #143F54}.top img{height:30px}.top .ey{font-size:8pt;letter-spacing:.12em;color:#5B6B78;font-weight:700;text-align:right}
+      h1{font-size:18pt;margin:14px 0 2px;color:#143F54}.sub{color:#5B6B78;font-size:9.5pt}
+      .ks{display:flex;gap:8px;margin:14px 0 6px}.k{flex:1;border:1px solid #DCE3E8;border-radius:8px;padding:8px 12px}.k span{display:block;font-size:8pt;color:#5B6B78;text-transform:uppercase;letter-spacing:.06em}.k b{font-size:15pt;color:#143F54}.k.dsc{background:#143F54;border-color:#143F54}.k.dsc span{color:#C9D8E1}.k.dsc b{color:#fff}
+      h2{font-size:11pt;margin:18px 0 6px;color:#143F54;text-transform:uppercase;letter-spacing:.06em}
+      .t{width:100%;border-collapse:collapse}.t th{background:#EEF2F5;color:#3D4F5C;font-size:8pt;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:6px 8px}.t td{padding:6px 8px;border-bottom:1px solid #E5EAEE;vertical-align:top}
+      .t tbody tr:nth-child(even) td{background:#FAFBFC}.t .n{text-align:right;white-space:nowrap}.t .c{text-align:center}.t tfoot td{font-weight:700;border-top:2px solid #143F54;border-bottom:0;padding-top:8px}
+      .pc{display:inline-block;background:#EEF2F5;border-radius:5px;padding:1px 7px;margin:1px 4px 1px 0;font-size:9pt}
+      .tg{display:inline-block;border-radius:99px;padding:1px 9px;font-size:8.5pt;font-weight:700;background:#E3F1E8;color:#2F6B45}.tg.nao{background:#F1E4E2;color:#8A3B32}.tg.parc{background:#F6EED9;color:#8A6A1F}
+      .pes{break-inside:avoid;margin-top:10px;border:1px solid #DCE3E8;border-radius:8px;overflow:hidden}.ph{display:flex;align-items:baseline;gap:10px;background:#F4F7F9;padding:7px 10px}.ph span{color:#5B6B78;font-size:9pt}.ph em{margin-left:auto;font-style:normal;font-weight:700;color:#143F54}
+      .d{table-layout:fixed}.d td{border-bottom:1px solid #EEF1F4}.d tr:last-child td{border-bottom:0}.d .dt{white-space:nowrap}.d small,.t small{display:block;color:#7A8893;font-size:8pt}.d .sm{font-size:9pt}
+      .ass{display:flex;gap:40px;margin-top:36px}.ass div{flex:1;border-top:1px solid #1C2B33;padding-top:4px;font-size:8.5pt;color:#5B6B78;text-align:center}
+      .rod{margin-top:16px;font-size:8pt;color:#7A8893;text-align:right}`;
     const w=window.open('','_blank'); if(!w) return c.P.toast('O navegador bloqueou a janela. Permita janelas deste site.');
-    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Entregas de uniforme - ${e(nomePer(D))}</title><style>@page{size:A4;margin:14mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}h2{font-size:12pt;margin:18px 0 6px;color:#143F54}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;font-size:9.5pt;vertical-align:top}th{background:#f2efe7}.sub{color:#666}</style></head><body>
-      <h1>Entregas de uniforme</h1><div class="sub">${e(nomePer(D))} · ${D.ps.length} pessoas · ${D.xs.length} entregas · ${D.pecas} peças${c.rh?' · desconto total '+brl(D.desc):''}${U.rel.q?' · busca: '+e(U.rel.q):''}</div>
-      <h2>Por pessoa</h2>${tb(res)}<h2>Entrega a entrega</h2>${tb(det)}<script>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close(); }
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Entregas de uniforme - ${e(nomePer(D))}</title><style>${css}</style></head><body>
+      <div class="top">${logo?`<img src="${e(logo)}" alt="Colafix">`:'<b>Colafix</b>'}<div class="ey">RECURSOS HUMANOS<br>RELATÓRIO DE UNIFORMES</div></div>
+      <h1>Entregas de uniforme</h1><div class="sub">Período: ${e(nomePer(D))}${U.rel.q?' · busca: '+e(U.rel.q):''}</div>
+      <div class="ks"><div class="k"><span>Pessoas</span><b>${D.ps.length}</b></div><div class="k"><span>Entregas</span><b>${D.xs.length}</b></div><div class="k"><span>Peças</span><b>${D.pecas}</b></div>${c.rh?`<div class="k dsc"><span>Desconto total</span><b>${brl(D.desc)}</b></div>`:''}</div>
+      <h2>Resumo por pessoa</h2>${D.ps.length?resumo:'<div class="sub">Nenhuma entrega no período.</div>'}
+      ${D.ps.length?`<h2>Entregas de cada pessoa</h2>${det}`:''}
+      ${c.rh?'<div class="ass"><div>Responsável pelo RH</div><div>Data</div></div>':''}
+      <div class="rod">Painel Colafix · gerado em ${e(hoje)}</div><script>window.onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close(); }
   /* tela do Marcelo (Visão do gestor › Pessoas › Uniformes): só o relatório, sem desconto. Lê rh/dados/uniformes
      (regra nova no firestore.rules: quem tem a Visão do gestor só LÊ as entregas de uniforme). */
   function ctxGestor(){ const P=window.Painel; const tit=s=>String(s||'').toLowerCase().replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase()).replace(/\s(D[aeo]s?|E)\s/g,m=>m.toLowerCase());
     return {P,esc:P.esc,titulo:tit,R:{cfg:{},func:[]},rh:false,gestor:true}; }
   function gestor(){ const c=ctxGestor(); C=c; assina(c);
     return `<div class="head"><div><div class="eyebrow">PESSOAS</div><h1>Uniformes entregues</h1><div class="sub">Quem pegou uniforme e quais peças, por período.</div></div></div>
-      <section class="card">${relHtml(c)}</section>`; }
-  function render(c){ c.rh=true; assina(c); const e=c.esc, P=c.P, pend=U.xs.filter(x=>x.st!=='lancado'), xs=U.st==='conf'?pend:U.xs;
-    const card=x=>{ const lan=x.st==='lancado', pode=P.dono()||x.por===P.S.uid;
-      return `<div class="rhu-r ${lan?'ok':''}"><div class="rhu-rd"><b>${e(br(x.data).slice(0,5))}</b><small>${e(x.per||'')}</small></div>
-        <div class="rhu-rm"><b>${e(c.titulo(x.nome||''))}</b><small>${e(x.setor||'sem setor')}${x.sol?' · solicitação Nº '+e(x.sol):' · sem nº da solicitação'}</small>
-          <span class="rhu-ri">${itensOk(x).map(i=>`<span>${e(itTxt(i))}</span>`).join('')}</span>
-          <small>Entregue por ${e(x.porNome||'—')} · registrado ${e(hm(x.em))}${x.emailEm?' · e-mail aberto '+e(hm(x.emailEm)):''}${x.obs?' · '+e(x.obs):''}</small>${descLinha(c,x)}</div>
-        <div class="rhu-rs">${lan?`<span class="pill ok">Lançado na ficha</span><small>${e(x.lancPor||'')} · ${e(hm(x.lancEm))}</small><button class="lnk" data-act="rhu-volta" data-id="${e(x._id)}">Desfazer</button>`
-          :`<span class="pill warn">RH ainda não lançou</span><button class="btn sec rhu-sm" data-act="rhu-lanc" data-id="${e(x._id)}">Lancei na ficha</button>`}
-          <span class="rhu-ra"><button class="lnk" data-act="rhu-mail" data-id="${e(x._id)}">E-mail de novo</button>${pode?`<button class="lnk rhu-del" data-act="rhu-del" data-id="${e(x._id)}">${U.cx===x._id?'Confirmar: apagar':'Apagar'}</button>`:''}</span></div></div>`; };
-    return c.topo('Entregas de uniforme','Quem entregou registra aqui: o RH confere e lança na ficha, e o e-mail para o RH sai pronto.',`<button class="btn sec" data-act="rhu-prab">Preço das peças</button><button class="btn" data-act="rhu-novo">+ Registrar entrega</button>`)
-      +`<section class="card rhu-l"><div class="seg" role="group" aria-label="Mostrar">${[['conf','Para o RH lançar ('+pend.length+')'],['todas','Todas'],['rel','Relatório']].map(([a,b])=>`<button class="${U.st===a?'on':''}" aria-pressed="${U.st===a}" data-act="rhu-st" data-v="${a}">${b}</button>`).join('')}</div>
-        ${U.st==='rel'?relHtml(c):xs.length?xs.map(card).join(''):`<div class="empty">${!U.lido?'Carregando…':U.st==='conf'?'Nenhuma entrega esperando o RH.':'Nenhuma entrega registrada ainda. Toque em "+ Registrar entrega".'}</div>`}</section>`
+      <section class="card rhu-l"><div class="rhu-tb"><span></span><label class="rhu-bq"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input class="txt" id="rhu-rq" type="search" placeholder="Buscar pessoa, setor ou peça" value="${c.esc(U.rel.q)}"></label></div>${relHtml(c)}</section>`; }
+  function render(c){ c.rh=true; assina(c); const e=c.esc, P=c.P, pend=U.xs.filter(x=>x.st!=='lancado'), ws=norm(U.q||'').split(' ').filter(Boolean);
+    const xs=(U.st==='conf'?pend:U.xs).filter(x=>!ws.length||ws.every(w=>norm([x.nome,x.setor,x.sol,itensOk(x).map(i=>i.t).join(' ')].join(' ')).includes(w)));
+    const mes=P.hojeStr().slice(0,7), doMes=U.xs.filter(x=>String(x.data||'').slice(0,7)===mes), pr=precosDe(c);
+    const kMes=doMes.reduce((a,x)=>a+itensOk(x).reduce((s,i)=>s+(Math.max(1,parseInt(i.qtd,10)||1)),0),0), dMes=doMes.reduce((a,x)=>{ const d=descDe(x,pr); return a+(d.v||0); },0);
+    const card=x=>{ const lan=x.st==='lancado', pode=P.dono()||x.por===P.S.uid, ini=c.titulo(x.nome||'').split(' ').filter(Boolean), sig=((ini[0]||'?')[0]+(ini.length>1?ini[ini.length-1][0]:'')).toUpperCase();
+      return `<article class="rhu-c ${lan?'ok':''}">
+        <div class="rhu-ch"><span class="rhu-av">${e(sig)}</span><div class="rhu-cn"><b>${e(c.titulo(x.nome||''))}</b><small>${e(x.setor||'sem setor')} · ${e(br(x.data))}${x.per?' · '+e(x.per):''}</small></div>
+          ${lan?`<span class="pill ok">Lançado na ficha</span>`:`<span class="pill warn">Falta lançar na ficha</span>`}</div>
+        <div class="rhu-cb"><div class="rhu-cm"><span class="rhu-ri">${itensOk(x).map(i=>`<span>${e(itTxt(i))}</span>`).join('')}</span>
+            <small>${x.sol?'Solicitação Nº '+e(x.sol):'Sem nº da solicitação'} · entregue por ${e(x.porNome||'—')} · ${e(hm(x.em))}${x.emailEm?' · e-mail aberto':''}${x.obs?' · '+e(x.obs):''}</small></div>
+          ${descLinha(c,x)}</div>
+        <div class="rhu-cf">${lan?`<small>Lançado por ${e(x.lancPor||'')} · ${e(hm(x.lancEm))}</small><button class="lnk" data-act="rhu-volta" data-id="${e(x._id)}">Desfazer</button>`
+            :`<button class="btn rhu-sm" data-act="rhu-lanc" data-id="${e(x._id)}">${P.ic?P.ic('check',15,2.4):''}Lancei na ficha</button>`}
+          <span class="rhu-rsp"></span><button class="lnk" data-act="rhu-mail" data-id="${e(x._id)}">E-mail de novo</button>${pode?`<button class="lnk rhu-del" data-act="rhu-del" data-id="${e(x._id)}">${U.cx===x._id?'Confirmar: apagar':'Apagar'}</button>`:''}</div></article>`; };
+    return c.topo('Entregas de uniforme','Quem entregou registra aqui: o RH confere, lança na ficha e decide o desconto.',`<button class="btn sec" data-act="rhu-prab">Preço das peças</button><button class="btn" data-act="rhu-novo">+ Registrar entrega</button>`)
+      +`<div class="rhu-kp"><div class="${pend.length?'warn':''}"><span>Falta lançar na ficha</span><b>${pend.length}</b></div><div><span>Entregas no mês</span><b>${doMes.length}</b></div><div><span>Peças no mês</span><b>${kMes}</b></div><div><span>Desconto no mês</span><b>${brl(dMes)}</b></div></div>
+      <section class="card rhu-l"><div class="rhu-tb"><div class="seg" role="group" aria-label="Mostrar">${[['conf','Para lançar ('+pend.length+')'],['todas','Todas'],['rel','Relatório']].map(([a,b])=>`<button class="${U.st===a?'on':''}" aria-pressed="${U.st===a}" data-act="rhu-st" data-v="${a}">${b}</button>`).join('')}</div>
+        <label class="rhu-bq"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input class="txt" id="${U.st==='rel'?'rhu-rq':'rhu-lq'}" type="search" placeholder="Buscar pessoa, setor ou peça" value="${e(U.st==='rel'?U.rel.q:(U.q||''))}"></label></div>
+        ${U.st==='rel'?relHtml(c):xs.length?`<div class="rhu-cs">${xs.map(card).join('')}</div>`:`<div class="empty">${!U.lido?'Carregando…':ws.length?'Nada encontrado na busca.':U.st==='conf'?'Nenhuma entrega esperando o RH. Tudo lançado.':'Nenhuma entrega registrada ainda. Toque em "+ Registrar entrega".'}</div>`}</section>`
       +(U.f?form(c):'')+(U.precos?precosForm(c):''); }
   function avisos(c){ const xs=U.xs.filter(x=>x.st!=='lancado'); if(!xs.length) return [];
     return [{nivel:'warn',rotulo:'Uniforme',titulo:xs.length===1?'1 entrega de uniforme para lançar na ficha':xs.length+' entregas de uniforme para lançar na ficha',texto:xs.slice(0,3).map(x=>c.titulo(x.nome||'')).join(', '),go:'rhunif'}]; }
@@ -179,7 +219,7 @@
     pvAtualiza(); });
   let _rq=null;
   document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!C) return;
-    if(t.id==='rhu-rq'){ U.rel.q=t.value; clearTimeout(_rq); _rq=setTimeout(()=>{ C.P.render(); const i=document.getElementById('rhu-rq'); if(i){ i.focus(); const n=i.value.length; try{ i.setSelectionRange(n,n); }catch(e){} } },350); } });
+    if(t.id==='rhu-rq'||t.id==='rhu-lq'){ if(t.id==='rhu-rq') U.rel.q=t.value; else U.q=t.value; const iid=t.id; clearTimeout(_rq); _rq=setTimeout(()=>{ C.P.render(); const i=document.getElementById(iid); if(i){ i.focus(); const n=i.value.length; try{ i.setSelectionRange(n,n); }catch(e){} } },350); } });
   document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!C) return; if(t.id==='rhu-rde'||t.id==='rhu-rate'){ U.rel[t.id==='rhu-rde'?'de':'ate']=t.value; C.P.render(); } });
   document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.target.id==='rhu-dv'){ const b=document.querySelector('[data-act="rhu-dok"]'); if(b){ ev.preventDefault(); b.click(); } return; }
     if(!U.f) return; if(ev.key==='Escape'){ U.f=null; C&&C.P.render(); }
@@ -195,6 +235,10 @@
     if(a==='rhu-prok'){ const pr=Object.assign({},precosDe(C)||{}); document.querySelectorAll('[data-rhu-pr]').forEach(i=>{ const t=i.dataset.rhuPr, v=numBR(i.value); pr[pk(t)]={n:t,v:v>0?v:0}; });
       const nn=String(g('rhu-prn')||'').trim(), nv=numBR(g('rhu-prnv')); if(nn) pr[pk(nn)]={n:nn,v:nv>0?nv:0};
       try{ await db.doc('rh/config').set({unifPrecos:pr},{merge:true}); C.R.cfg=C.R.cfg||{}; C.R.cfg.unifPrecos=pr; U.precos=false; P.toast('Preços guardados. O desconto das entregas já usa os preços novos.'); }catch(e){ P.erro(e); } P.render(); return; }
+    if(a==='rhu-pdesc'){ const D=relDados(C), g=D.ps.find(y=>pesKey(y.xs[0])===b.dataset.k); if(!g) return; const nao=b.dataset.v==='nao'; let n=0;
+      for(const x of g.xs){ const cur=!!(x.desc&&x.desc.nao); if(cur===nao) continue; const d=nao?{nao:true,v:(x.desc&&x.desc.v!=null&&!x.desc.nao?x.desc.v:(x.desc&&x.desc.v!=null?x.desc.v:null)),por:eu,em:agora}:(x.desc&&x.desc.v!=null?{nao:false,v:x.desc.v,por:eu,em:agora}:null);
+        try{ await db.doc(COL+'/'+x._id).update({desc:d}); x.desc=d; n++; }catch(e){ P.erro(e); break; } }
+      P.toast(nao?g.nome+': não será descontado'+(g.xs.length>1?' (as '+g.xs.length+' entregas do período)':'')+'.':g.nome+': será descontado.'); P.render(); return; }
     if(a==='rhu-ded'){ U.dEd=b.dataset.id; P.render(); setTimeout(()=>{ const i=document.getElementById('rhu-dv'); i&&(i.focus(),i.select()); },40); return; }
     if(a==='rhu-dx'){ U.dEd=null; P.render(); return; } if(a==='rhu-fx'){ U.f=null; P.render(); return; } if(a==='rhu-st'){ U.st=b.dataset.v; P.render(); return; }
     if(a==='rhu-pick'&&F){ const f=(C.R.func||[]).find(x=>x._id===b.dataset.id); if(f){ Object.assign(F,{fid:f._id,nome:C.titulo(f.nome),setor:f.setor||F.setor||'',funcao:f.funcao||''});
@@ -218,9 +262,10 @@
         if(b.dataset.v==='mail') abreEmail(C,d,jan); P.toast('Entrega registrada'+(b.dataset.v==='mail'?' · e-mail aberto para mandar ao RH.':'. O RH vai ver em Uniformes.')); }
       catch(e){ if(jan) try{ jan.close(); }catch(_){} P.erro(e); } finally{ U.salvando=false; } P.render(); return; }
     const x=U.xs.find(y=>y._id===b.dataset.id); if(!x) return;
-    if(a==='rhu-dok'||a==='rhu-dnao'||a==='rhu-dcalc'){ let d;
-      if(a==='rhu-dnao') d={nao:true,v:null,por:eu,em:agora}; else if(a==='rhu-dcalc') d=null; else { const v=numBR(g('rhu-dv')); if(v==null||v<0) return P.toast('Digite o valor do desconto (ex.: 25,90).'); d={nao:false,v,por:eu,em:agora}; }
-      try{ await db.doc(COL+'/'+x._id).update({desc:d}); x.desc=d; U.dEd=null; P.toast(a==='rhu-dnao'?'Esta entrega não será descontada.':a==='rhu-dcalc'?'Desconto pelo preço das peças.':'Desconto guardado.'); }catch(e){ P.erro(e); } P.render(); return; }
+    if(a==='rhu-dok'||a==='rhu-dnao'||a==='rhu-dcalc'||a==='rhu-dsim'){ let d;
+      if(a==='rhu-dsim'&&!(x.desc&&x.desc.nao)) return;
+      if(a==='rhu-dnao') d={nao:true,v:(x.desc&&x.desc.v!=null&&!x.desc.nao?x.desc.v:(x.desc&&x.desc.v!=null?x.desc.v:null)),por:eu,em:agora}; else if(a==='rhu-dcalc') d=null; else if(a==='rhu-dsim') d=x.desc&&x.desc.v!=null?{nao:false,v:x.desc.v,por:eu,em:agora}:null; else { const v=numBR(g('rhu-dv')); if(v==null||v<0) return P.toast('Digite o valor do desconto (ex.: 25,90).'); d={nao:false,v,por:eu,em:agora}; }
+      try{ await db.doc(COL+'/'+x._id).update({desc:d}); x.desc=d; U.dEd=null; P.toast(a==='rhu-dnao'?'Esta entrega não será descontada.':a==='rhu-dsim'?'Esta entrega será descontada.':a==='rhu-dcalc'?'Desconto pelo preço das peças.':'Desconto guardado.'); }catch(e){ P.erro(e); } P.render(); return; }
     if(a==='rhu-mail'){ abreEmail(C,x,preJanela(C)); try{ const up={emailEm:agora,emailN:(x.emailN||0)+1}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); }catch(e){} P.render(); return; }
     if(a==='rhu-lanc'){ try{ const up={st:'lancado',lancEm:agora,lancPor:eu}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); P.toast('Marcado como lançado na ficha.'); }catch(e){ P.erro(e); } P.render(); return; }
     if(a==='rhu-volta'){ try{ const up={st:'novo',lancEm:null,lancPor:null}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); }catch(e){ P.erro(e); } P.render(); return; }
@@ -246,8 +291,28 @@
 .rhu-prs{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto}.rhu-pr{flex-direction:row!important;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line);font-size:14px!important;color:inherit!important}
 .rhu-prv{display:inline-flex;align-items:center;gap:6px;font-weight:600}.rhu-prv input{width:110px;text-align:right}
 .rhu-de{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;margin-top:2px}.rhu-de>span{color:var(--muted)}.rhu-de.nao b{color:var(--muted);font-weight:600}.rhu-de input{width:100px;height:34px}
+.rhu-kp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.rhu-kp>div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:2px}
+.rhu-kp span{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}.rhu-kp b{font-size:26px;line-height:1.15}.rhu-kp .warn{border-color:var(--warn);box-shadow:inset 4px 0 0 var(--warn)}
+@media (max-width:760px){.rhu-kp{grid-template-columns:1fr 1fr}}
+.rhu-tb{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}.rhu-tb .seg{margin:0!important}
+.rhu-bq{position:relative;display:flex;align-items:center;flex:0 1 320px;min-width:220px}.rhu-bq svg{position:absolute;left:12px;color:var(--muted)}.rhu-bq input{width:100%;padding-left:36px;height:40px}
+.rhu-cs{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:12px}@media (max-width:640px){.rhu-cs{grid-template-columns:1fr}}
+.rhu-c{border:1px solid var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;overflow:hidden}.rhu-c.ok{opacity:.8}
+.rhu-ch{display:flex;align-items:center;gap:12px;padding:14px 16px 10px}.rhu-av{width:40px;height:40px;border-radius:50%;background:var(--teal-strong);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.rhu-cn{display:flex;flex-direction:column;min-width:0;flex:1}.rhu-cn b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rhu-cn small{color:var(--muted);font-size:12.5px}
+.rhu-cb{display:flex;gap:12px;padding:0 16px 12px;align-items:stretch;flex-wrap:wrap}.rhu-cm{flex:1 1 200px;display:flex;flex-direction:column;gap:6px;min-width:0}.rhu-cm small{color:var(--muted);font-size:12px}
+.rhu-dbox{flex:0 0 190px;background:var(--ground);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:3px}.rhu-dbox.nao{opacity:.85}.rhu-dbox small{color:var(--muted);font-size:11.5px}.rhu-dbox .lnk{align-self:flex-start;padding:0;font-size:12.5px}
+.rhu-dl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}.rhu-dv{font-size:18px}.rhu-dbox.semp .rhu-dv{font-size:14px;color:var(--warn-ink,var(--warn))}
+.rhu-yn{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;align-self:flex-start;background:var(--surface)}.rhu-yn button{border:0;background:none;font:inherit;font-weight:700;font-size:13px;padding:5px 14px;cursor:pointer;color:var(--muted)}
+.rhu-yn button.on{background:var(--ok,#3C8A63);color:#fff}.rhu-yn button.on.nao{background:var(--crit,#B5473F)}.rhu-yn.sm button{padding:3px 10px;font-size:12px}
+.rhu-dx2{flex:0 0 230px;background:var(--ground);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}.rhu-dx2 input{width:110px;height:36px;text-align:right}.rhu-dbt{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rhu-cf{display:flex;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--line);margin-top:auto;flex-wrap:wrap}.rhu-cf small{color:var(--muted);font-size:12px}.rhu-rsp{flex:1}
+.rhu-cf .btn{display:inline-flex;gap:6px;align-items:center}
+.rhu-rk .dsc{background:var(--teal-strong)!important;color:#fff}.rhu-rk .dsc span{color:rgba(255,255,255,.75)!important}
+.rhu-t .c{text-align:center}.rhu-t tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0;padding-top:10px}.rhu-t td .rhu-ri span{font-size:12.5px}
+.rhu-rb .btn{display:inline-flex;gap:6px;align-items:center}
 .rhu-rel{display:flex;flex-direction:column;gap:12px}.rhu-rb{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.rhu-rq{width:240px;max-width:100%}.rhu-rdt{display:inline-flex;gap:6px;align-items:center}
-.rhu-rk{display:flex;gap:10px;flex-wrap:wrap}.rhu-rk div{background:var(--ground);border-radius:10px;padding:8px 14px;min-width:110px}.rhu-rk b{display:block;font-size:20px}.rhu-rk span{font-size:12px;color:var(--muted)}
+.rhu-rk{display:flex;gap:10px;flex-wrap:wrap}.rhu-rk div{background:var(--ground);border-radius:12px;padding:10px 16px;min-width:130px;display:flex;flex-direction:column}.rhu-rk b{font-size:22px}.rhu-rk span{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 .rhu-tw{overflow-x:auto}.rhu-t{width:100%;border-collapse:collapse;font-size:14px}.rhu-t th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}.rhu-t td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}.rhu-t .n{text-align:right;white-space:nowrap}.rhu-t small{display:block;color:var(--muted);font-size:12px}
 .rhu-l{display:flex;flex-direction:column;gap:0}.rhu-l .seg{margin-bottom:10px;align-self:flex-start}
 .rhu-r{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;padding:12px 0;border-top:1px solid var(--line);align-items:start}.rhu-r.ok{opacity:.75}

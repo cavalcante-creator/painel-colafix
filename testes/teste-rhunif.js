@@ -35,7 +35,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const mail=await p.evaluate(()=>window.__rhuUltimoMail||'');
  const dec=decodeURIComponent(mail);
  ok('Abre o e-mail no Outlook na internet: para, cópia, assunto e o mesmo texto', /^https:\/\/outlook\.office\.com\/mail\/deeplink\/compose\?/.test(mail)&&dec.includes('to=stefani@colafix.com;departamentopessoal@colafix.com')&&dec.includes('cc=marcelo@colafix.com')&&dec.includes('subject=Entrega de uniforme - Carlos Rannan da Silva - '+hjBr)&&dec.includes(esp), mail.slice(0,300));
- let s=await view(); ok('Lista "Para o RH lançar (1)" com a entrega', /Para o RH lançar \(1\)/.test(s)&&/Carlos Rannan da Silva/.test(s)&&/Camiseta GG - 1 un/.test(s)&&/RH ainda não lançou/.test(s), s.slice(0,400).replace(/\n/g,' | '));
+ let s=await view(); ok('Lista "Para lançar (1)" com a entrega', /Para lançar \(1\)/.test(s)&&/Carlos Rannan da Silva/.test(s)&&/Camiseta GG - 1 un/.test(s)&&/Falta lançar na ficha/.test(s), s.slice(0,400).replace(/\n/g,' | '));
  /* nome fora do cadastro (terceiro) + validação */
  await p.click('[data-act="rhu-novo"]'); await H.dorme(500); await p.click('[data-act="rhu-ok"][data-v="so"]'); await H.dorme(300);
  ok('Sem nome não grava', (await col('rh/dados/uniformes')).length===1);
@@ -61,7 +61,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>__T.go('rhunif')); await H.dorme(900);
  const id1=us[0]._k.split('/').pop(); await p.click(`[data-act="rhu-lanc"][data-id="${id1}"]`); await H.dorme(900);
  const x1=(await p.evaluate(id=>__T.S().db.doc('rh/dados/uniformes/'+id).get().then(g=>g.data()),id1));
- s=await view(); ok('"Lancei na ficha" marca lançado (quem e quando) e sai da lista do RH', x1.st==='lancado'&&/Stefani/.test(x1.lancPor||'')&&/Para o RH lançar \(1\)/.test(s), JSON.stringify(x1)+' | '+s.slice(0,200).replace(/\n/g,' | '));
+ s=await view(); ok('"Lancei na ficha" marca lançado (quem e quando) e sai da lista do RH', x1.st==='lancado'&&/Stefani/.test(x1.lancPor||'')&&/Para lançar \(1\)/.test(s), JSON.stringify(x1)+' | '+s.slice(0,200).replace(/\n/g,' | '));
  await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhunif-rh.png'});
  ok('Sem erros no console (RH)', !erros.length, erros.join(' | '));
  console.log(res.every(x=>x.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
