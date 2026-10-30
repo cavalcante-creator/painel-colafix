@@ -300,14 +300,19 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   /* Funcionários e Terceirizados no mesmo bloco (pedido de 13/10): Terceirizados é uma aba de Funcionários */
   const fsegH=()=>`<div class="seg" role="group" aria-label="Como ver">${[['lista','Lista'],['setor','Por setor'],['adm','Admissões'],['terc','Terceirizados']].map(([k,l])=>`<button data-act="rh-fview" data-v="${k}" aria-pressed="${(R.fview||'lista')===k}">${l}</button>`).join('')}</div>`;
   function vFunc(){ if(R.pess&&!R.f&&!R.fdesl) return vPessoa(); if(R.fview==='terc') return vTerc(true); return vFunc0(); }
-  function vFunc0(){ const F=R.filtro, q=norm(F.q);
-    let xs=R.func.filter(x=>(F.st==='ativos'?x.status!=='Desligado':F.st==='todos'?true:x.status===F.st)&&(!F.setor||x.setor===F.setor)&&(!F.emp||x.empresa===F.emp)&&(!F.tipo||x.tipo===F.tipo)&&(!q||norm(x.nome).includes(q)||dig(x.cpf).includes(dig(F.q)||'#')||(x.cnpj&&dig(x.cnpj).includes(dig(F.q)||'#'))||norm(x.funcao).includes(q)));
-    xs.sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+  function funcBase(){ const F=R.filtro, q=norm(F.q);
+    return R.func.filter(x=>(F.st==='ativos'?x.status!=='Desligado':F.st==='todos'?true:x.status===F.st)&&(!F.setor||x.setor===F.setor)&&(!F.emp||x.empresa===F.emp)&&(!F.tipo||x.tipo===F.tipo)&&(!q||norm(x.nome).includes(q)||dig(x.cpf).includes(dig(F.q)||'#')||(x.cnpj&&dig(x.cnpj).includes(dig(F.q)||'#'))||norm(x.funcao).includes(q)))
+      .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR')); }
+  /* a lista que está na tela (filtros + filtro rápido) é a que vai para o Excel e o PDF */
+  function funcExp(){ const F=R.filtro, ch=R.fuchip||'todos', xs=funcBase().filter(f=>fchipOk(f,ch)), st={ativos:'Ativos',todos:'Todos'}[F.st]||F.st;
+    const filtros=[F.st&&'Situação: '+st,F.emp&&'Empresa: '+(empNome(F.emp)||F.emp),F.tipo&&'Vínculo: '+F.tipo,F.setor&&'Setor: '+F.setor,F.q&&'Busca: '+F.q,ch!=='todos'&&'Filtro rápido: '+((FCHIPS.find(c=>c[0]===ch)||[])[1]||ch)].filter(Boolean);
+    return {xs,filtros}; }
+  function vFunc0(){ let xs=funcBase();
     const cnt=s=>R.func.filter(x=>x.status===s).length;
     const fseg=fsegH();
     if(R.fview==='setor'||R.fview==='adm') return topo('Funcionários',R.fview==='adm'?'Quem está entrando e em que etapa: documentos, contrato e ficha, experiência.':'Quem é quem: as pessoas de cada setor.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button>`)
       +(R.fdesl?formDesl():'')+(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':R.fview==='adm'?cartaoFichasCel()+vQuadroAdm():vOrg());
-    return topo('Funcionários','Cadastro, situação e o que cada um usa.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-csv">Exportar</button>`)
+    return topo('Funcionários','Cadastro, situação e o que cada um usa.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-fxls">Excel</button><button class="btn sec" data-act="rh-fpdf">Baixar PDF</button>`)
       +(R.carga?vCarga():'')+(R.adm&&!R.f?vAdm():'')+(R.fdesl?formDesl():'')+(R.f?formFunc():'')
       +vFuncLista(xs); }
   function formFunc(){ const f=R.f, fs=R.funcoes.map(x=>x.nome).sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -695,6 +700,18 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const d=fr.contentWindow.document; d.open(); d.write(html); d.close(); setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ P.erro(e); } setTimeout(()=>fr.remove(),60000); },300); }
   const carregarJs=src=>new Promise((ok,er)=>{ if([...document.scripts].some(s=>s.src===src)) return ok(); const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>er(new Error('Não consegui carregar '+src.split('/').pop()+'. Confira a internet.')); document.head.appendChild(s); });
   function baixar(blob,nome){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),60000); }
+  /* ===== RELATÓRIOS DO RH (30/10): filtros comuns empresa · vínculo · setor (R.rf) em Relatório do mês, Fechamento,
+     Indicadores e Perguntas rápidas; PDF que baixa e Excel pelo RHRel (modulos/rh-relatorios.js), com os filtros escritos. ===== */
+  R.rf=R.rf||{emp:'',vinc:'',setor:''};
+  const rfEmp=f=>String(f.empresa||(f.tipo==='PJ'?'':'COLAFIX')).toUpperCase();
+  const rfOk=f=>!!f&&(!R.rf.emp||rfEmp(f)===R.rf.emp)&&(!R.rf.vinc||(f.tipo==='PJ'?'PJ':'CLT')===R.rf.vinc)&&(!R.rf.setor||(R.rf.setor==='-'?!f.setor:(f.setor||'')===R.rf.setor));
+  const rfLista=()=>[R.rf.emp&&'Empresa: '+(empNome(R.rf.emp)||R.rf.emp),R.rf.vinc&&'Vínculo: '+R.rf.vinc,R.rf.setor&&'Setor: '+(R.rf.setor==='-'?'sem setor':R.rf.setor)].filter(Boolean);
+  function rfFil(){ const emps=[...new Set(R.func.map(rfEmp).filter(Boolean))].sort(), sets=[...new Set(setoresCad().concat(unicos('setor')))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const sel=(k,l,ops)=>`<label><span>${l}</span><select class="txt" data-rh-rf="${k}">${ops.map(([v,t])=>`<option value="${esc(v)}" ${R.rf[k]===v?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
+    return `<div class="rr-fil">${sel('emp','Empresa',[['','Todas']].concat(emps.map(e=>[e,empNome(e)||e])))}${sel('vinc','Vínculo',[['','CLT e PJ'],['CLT','CLT'],['PJ','PJ']])}${sel('setor','Setor',[['','Todos']].concat(sets.map(x=>[x,x]),[['-','Sem setor']]))}</div>`
+      +(window.RHRel?RHRel.barra({chips:[{t:'Empresa',v:R.rf.emp&&(empNome(R.rf.emp)||R.rf.emp)},{t:'Vínculo',v:R.rf.vinc},{t:'Setor',v:R.rf.setor&&(R.rf.setor==='-'?'sem setor':R.rf.setor)}],limpar:'rh-rflimpa'}):''); }
+  async function rrPdf(o){ if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou. Recarregue a página.'); try{ await RHRel.pdf(o); }catch(e){ P.toast(String(e&&e.message||e)); } }
+  async function rrXls(arq,abas,info){ if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou. Recarregue a página.'); try{ await RHRel.xls(arq,abas,info); }catch(e){ P.toast(String(e&&e.message||e)); } }
   /* nome de arquivo simples: sem "·" nem caracteres que o Windows não aceita */
   const nomeArq=s=>String(s).replace(/\s*[·•]\s*/g,' - ').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
   const pdfDoc=(f,md)=>pdfPartes([docCorpo(f,md,false)+assinaDg(f,md)],nomeArq(md.nome+' - '+f.nome)+'.pdf');
@@ -959,7 +976,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   function agendaJanela(){ const hj=P.hojeStr(), ate=addDias(hj,R.agDias), xs=agendaItens();
     return {atras:xs.filter(x=>x.data<hj&&(x.c==='crit'||x.c==='warn')),prox:xs.filter(x=>x.data>=hj&&x.data<=ate)}; }
   function vAgenda(){ const EY='RH · AGENDA', seg=`<div class="seg" role="group" aria-label="Agenda">${[['agenda','Agenda'],['rel','Relatório do mês'],['ind','Indicadores']].map(([k,l])=>`<button data-act="rh-agv" data-v="${k}" aria-pressed="${R.agv===k}">${l}</button>`).join('')}</div>`;
-    if(R.agv==='ind') return topo('Indicadores do RH','Pessoas na Colafix nos últimos 12 meses: quadro, entradas e saídas, tempo de casa, experiência e o que está em dia.',seg+`<button class="btn sec" data-act="rh-indimp">Imprimir / PDF</button>`,EY)+(R.lido.func?vIndicadores():'<section class="card"><div class="empty">Carregando…</div></section>');
+    if(R.agv==='ind') return topo('Indicadores do RH','Pessoas na Colafix nos últimos 12 meses: quadro, entradas e saídas, tempo de casa, experiência e o que está em dia.',seg+(window.RHRel?RHRel.botoes('rh-indpdf','rh-indxls'):''),EY)+`<section class="card rh-rfc">${rfFil()}</section>`+(R.lido.func?vIndicadores():'<section class="card"><div class="empty">Carregando…</div></section>');
     if(R.agv==='rel') return topo('Relatório do mês','Admissões, desligamentos, férias e experiência do mês, pronto para mandar para a contabilidade.',seg,EY)+vRelatorio();
     if(!R.lido.func) return topo('Agenda','',seg,EY)+'<section class="card"><div class="empty">Carregando…</div></section>';
     const {atras,prox}=agendaJanela(), hj=P.hojeStr();
@@ -979,17 +996,17 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     L.push('END:VCALENDAR'); return L.map(dobra).join('\r\n')+'\r\n'; }
 
   /* ---------- Indicadores do RH (pedido de 13/10) ---------- */
-  function indDados(){ const hj=P.hojeStr(), ini=addDias(addMeses(hj,-12),1), at=ativos();
+  function indDados(){ const hj=P.hojeStr(), ini=addDias(addMeses(hj,-12),1), at=ativos().filter(rfOk), FF=R.func.filter(rfOk);
     const saiuAte=(f,d)=>okIso(f.desligamento)&&f.desligamento<=d&&(f.status==='Desligado'||(f.desligAgendado&&f.desligamento<=hj));
-    const noQuadro=d=>R.func.filter(f=>(!okIso(f.admissao)||f.admissao<=d)&&!saiuAte(f,d)&&(f.status!=='Desligado'||okIso(f.desligamento))).length;
+    const noQuadro=d=>FF.filter(f=>(!okIso(f.admissao)||f.admissao<=d)&&!saiuAte(f,d)&&(f.status!=='Desligado'||okIso(f.desligamento))).length;
     const meses=[...Array(12)].map((_,i)=>{ const m=mesMais(hj.slice(0,7),i-11), fimM=m===hj.slice(0,7)?hj:addDias(addMeses(m+'-01',1),-1); return {m,n:noQuadro(fimM)}; });
-    const ent=R.func.filter(f=>okIso(f.admissao)&&f.admissao>=ini&&f.admissao<=hj), sai=R.func.filter(f=>f.status==='Desligado'&&okIso(f.desligamento)&&f.desligamento>=ini&&f.desligamento<=hj);
+    const ent=FF.filter(f=>okIso(f.admissao)&&f.admissao>=ini&&f.admissao<=hj), sai=FF.filter(f=>f.status==='Desligado'&&okIso(f.desligamento)&&f.desligamento>=ini&&f.desligamento<=hj);
     const media=meses.reduce((a,x)=>a+x.n,0)/12||1, rot=Math.round(((ent.length+sai.length)/2)/media*1000)/10;
     const tempos=at.filter(f=>okIso(f.admissao)).map(f=>diasEntre(f.admissao,hj)/365.25), tm=tempos.length?Math.round(tempos.reduce((a,x)=>a+x,0)/tempos.length*10)/10:0, mx=tempos.length?Math.floor(Math.max(...tempos)):0;
-    const expFeitas=R.func.filter(f=>f.tipo!=='PJ'&&okIso(f.admissao)&&f.admissao>=addDias(ini,-90)&&expFim2(f)<=hj||(f.exp&&['efetivado','desligado'].includes(f.exp.status)&&String(f.exp.em||'').slice(0,10)>=ini));
+    const expFeitas=FF.filter(f=>f.tipo!=='PJ'&&okIso(f.admissao)&&f.admissao>=addDias(ini,-90)&&expFim2(f)<=hj||(f.exp&&['efetivado','desligado'].includes(f.exp.status)&&String(f.exp.em||'').slice(0,10)>=ini));
     const efet=expFeitas.filter(f=>!(f.status==='Desligado'&&okIso(f.desligamento)&&f.desligamento<=expFim2(f))&&!(f.exp&&f.exp.status==='desligado')).length;
     const motivos={}; sai.forEach(f=>{ const k=f.desligMotivo||'Sem motivo informado'; motivos[k]=(motivos[k]||0)+1; });
-    const fv=clts().filter(f=>sitFer(f).c==='crit').length, mF=fichasMesIni(), fr=mF<=hj.slice(0,7)?fResumo(mF):null;
+    const fv=clts().filter(rfOk).filter(f=>sitFer(f).c==='crit').length, mF=fichasMesIni(), fr=mF<=hj.slice(0,7)?fResumo(mF):null;
     return {at,clt:at.filter(f=>f.tipo!=='PJ').length,pj:at.filter(f=>f.tipo==='PJ').length,meses,ent,sai,rot,tm,mx,expN:expFeitas.length,efet,motivos:Object.entries(motivos).sort((a,b)=>b[1]-a[1]),fv,fr,mF,tdoc:tDocAvisos().length+tAvisos().length}; }
   function vIndicadores(){ const D=indDados(), mx=Math.max(1,...D.meses.map(x=>x.n));
     const k=(n,l,s,c)=>`<div class="rh-k"><b class="num" ${c?`style="color:${c}"`:''}>${n}</b><span>${l}</span>${s?`<small>${s}</small>`:''}</div>`;
@@ -1004,15 +1021,28 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       <h2>Quadro mês a mês</h2><table>${D.meses.map(x=>`<tr><td style="width:120px">${esc(cap(mesLabel(x.m)))}</td><td><span class="b" style="width:${Math.round(x.n/Math.max(1,...D.meses.map(y=>y.n))*300)}px"></span> ${x.n}</td></tr>`).join('')}</table>
       <h2>Por que as pessoas saíram</h2>${D.motivos.length?`<table>${D.motivos.map(([m,n])=>L(m,n)).join('')}</table>`:'<div class="sub">Ninguém saiu nos últimos 12 meses.</div>'}</body></html>`; }
 
+  const indInfo=()=>({tit:'Indicadores do RH',sub:EMP_DOC.COLAFIX.nome+' · últimos 12 meses (até '+br(P.hojeStr())+')',filtros:rfLista()});
+  const indMov=D=>D.ent.map(f=>[f.nome,f.setor||'','Entrada',f.admissao,'']).concat(D.sai.map(f=>[f.nome,f.setor||'','Saída',f.desligamento,f.desligMotivo||''])).sort((a,b)=>String(a[3]).localeCompare(String(b[3]))).map(r=>[r[0],r[1],r[2],br(r[3]),r[4]]);
+  async function indPdf(){ const D=indDados(), mx=Math.max(1,...D.meses.map(x=>x.n));
+    await rrPdf(Object.assign(indInfo(),{arq:'Indicadores-RH-'+P.hojeStr(),kpiCols:3,
+      kpis:[{t:'No quadro',v:String(D.at.length),s:D.clt+' CLT · '+D.pj+' PJ',c:'pet'},{t:'Rotatividade',v:String(D.rot).replace('.',',')+'%',s:D.ent.length+' entradas · '+D.sai.length+' saídas',c:D.rot>5?'warn':'ok'},{t:'Tempo médio de casa',v:String(D.tm).replace('.',',')+' anos',s:D.mx?'mais antigo: '+plural(D.mx,'ano','anos'):'',c:'teal'},
+        {t:'Efetivados na experiência',v:D.expN?D.efet+' de '+D.expN:'—',s:D.expN-D.efet?plural(D.expN-D.efet,'saiu','saíram')+' antes dos 90 dias':'',c:'cinza'},{t:'Férias vencidas',v:String(D.fv),s:D.fv?'risco de pagar em dobro':'sem risco',c:D.fv?'crit':'ok'},{t:'Terceirizados vencendo',v:String(D.tdoc),s:'contrato ou documento',c:D.tdoc?'warn':'ok'}],
+      partes:[{secao:'Pessoas no quadro, mês a mês',hbar:D.meses.map(x=>({l:cap(mesLabel(x.m)),v:x.n,txt:String(x.n)})),hopt:{lw:34,max:mx}},
+        {secao:'Por que as pessoas saíram',nota:'últimos 12 meses',cols:[{t:'Motivo',w:120},{t:'Pessoas',w:30,al:'r'}],rows:D.motivos.map(([m,n])=>[m,String(n)]),vazio:'Ninguém saiu nos últimos 12 meses.'},
+        {secao:'Entradas e saídas',nota:'últimos 12 meses',cols:[{t:'Nome',w:60},{t:'Setor',w:34},{t:'O que',w:22},{t:'Data',w:22},{t:'Motivo',w:40}],rows:indMov(D),vazio:'Ninguém entrou nem saiu.'}],assina:false})); }
+  async function indXls(){ const D=indDados();
+    await rrXls('Indicadores-RH-'+P.hojeStr(),[['Resumo',[['No quadro','CLT','PJ','Entradas (12 meses)','Saídas (12 meses)','Rotatividade (%)','Tempo médio de casa (anos)','Efetivados na experiência','Experiências terminadas','Férias vencidas'],[D.at.length,D.clt,D.pj,D.ent.length,D.sai.length,D.rot,D.tm,D.efet,D.expN,D.fv]]],
+      ['Quadro mês a mês',[['Mês','Pessoas']].concat(D.meses.map(x=>[cap(mesLabel(x.m)),x.n]))],['Motivos de saída',[['Motivo','Pessoas']].concat(D.motivos)],
+      ['Entradas e saídas',[['Nome','Setor','O que','Data','Motivo']].concat(indMov(D))]],indInfo()); }
   /* ---------- Relatório do mês ---------- */
-  function relDados(m){ const ini=m+'-01', fim=addDias(addMeses(ini,1),-1), em=s=>okIso(s)&&s>=ini&&s<=fim;
+  function relDados(m){ const ini=m+'-01', fim=addDias(addMeses(ini,1),-1), em=s=>okIso(s)&&s>=ini&&s<=fim, FF=R.func.filter(rfOk), ok=new Set(FF.map(f=>f._id));
     const saiu=f=>okIso(f.desligamento)&&f.desligamento<=fim&&(f.status==='Desligado'||f.desligAgendado);
-    const quadro=R.func.filter(f=>(!okIso(f.admissao)||f.admissao<=fim)&&!saiu(f));
-    return {ini,fim,quadro,adm:R.func.filter(f=>em(f.admissao)).sort((a,b)=>a.admissao.localeCompare(b.admissao)),
-      desl:R.func.filter(f=>em(f.desligamento)&&(f.status==='Desligado'||f.desligAgendado)).sort((a,b)=>a.desligamento.localeCompare(b.desligamento)),
-      fer:R.fer.filter(x=>!x.anterior&&x.status!=='cancelada'&&okIso(x.inicio)&&x.inicio<=fim&&x.fim>=ini).sort((a,b)=>a.inicio.localeCompare(b.inicio)),
-      exp:R.func.filter(f=>f.exp&&['prorrogado','efetivado'].includes(f.exp.status)&&String(f.exp.em||'').slice(0,7)===m),
-      afast:R.func.filter(f=>f.status==='Afastado')}; }
+    const quadro=FF.filter(f=>(!okIso(f.admissao)||f.admissao<=fim)&&!saiu(f));
+    return {ini,fim,quadro,adm:FF.filter(f=>em(f.admissao)).sort((a,b)=>a.admissao.localeCompare(b.admissao)),
+      desl:FF.filter(f=>em(f.desligamento)&&(f.status==='Desligado'||f.desligAgendado)).sort((a,b)=>a.desligamento.localeCompare(b.desligamento)),
+      fer:R.fer.filter(x=>!x.anterior&&x.status!=='cancelada'&&okIso(x.inicio)&&x.inicio<=fim&&x.fim>=ini&&(ok.has(x.funcId)||(!R.func.some(f=>f._id===x.funcId)&&!rfLista().length))).sort((a,b)=>a.inicio.localeCompare(b.inicio)),
+      exp:FF.filter(f=>f.exp&&['prorrogado','efetivado'].includes(f.exp.status)&&String(f.exp.em||'').slice(0,7)===m),
+      afast:FF.filter(f=>f.status==='Afastado')}; }
   const REL_T=[['adm','Admissões',['Nome','CPF / CNPJ','Função','Setor','Vínculo','Admissão'],f=>[f.nome,docF(f),f.funcao||'',f.setor||'',f.tipo==='PJ'?'PJ · '+empNome(f.empresa):'CLT',br(f.admissao)]],
     ['desl','Desligamentos',['Nome','CPF / CNPJ','Função','Data','Motivo'],f=>[f.nome,docF(f),f.funcao||'',br(f.desligamento)+(f.status!=='Desligado'?' (aviso trabalhado)':''),f.desligMotivo||'']],
     ['fer','Férias',['Nome','Início','Fim','Dias','Volta','Período aquisitivo'],x=>[x.funcionario,br(x.inicio),br(x.fim),String(x.dias),br(x.retorno),br(x.aquisitivo)+' a '+br(x.aquisitivoFim)]],
@@ -1021,18 +1051,20 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   function relTabela(rows,cab){ return rows.length?`<div class="rh-tw"><table class="rh-t"><thead><tr>${cab.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="sub" style="margin:0">Nenhum.</div>'; }
   function vRelatorio(){ const m=R.relMes, D=relDados(m), clt=D.quadro.filter(f=>f.tipo!=='PJ').length;
     return `<section class="card"><div class="rh-ch" style="flex-wrap:wrap"><div style="display:flex;gap:8px;align-items:center"><button class="btn sec rh-sm" data-act="rh-relmes" data-v="-1">‹</button><h2 style="margin:0">${esc(mesTitulo(m))}</h2>${m<P.hojeStr().slice(0,7)?'<button class="btn sec rh-sm" data-act="rh-relmes" data-v="1">›</button>':''}</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn sec rh-sm" data-act="rh-relimp">Imprimir / PDF</button><button class="btn rh-sm" data-act="rh-relxls">Baixar Excel</button></div></div>
+        ${window.RHRel?RHRel.botoes('rh-relpdf','rh-relxls'):'<button class="btn rh-sm" data-act="rh-relxls">Baixar Excel</button>'}</div>${rfFil()}
       <div class="rh-kpi" style="margin:4px 0 0">${[[D.quadro.length,'no quadro no fim do mês'],[clt+' / '+(D.quadro.length-clt),'CLT / PJ'],[D.adm.length,D.adm.length===1?'admissão':'admissões'],[D.desl.length,D.desl.length===1?'desligamento':'desligamentos']].map(([n,l])=>`<div><b class="num">${n}</b><span>${l}</span></div>`).join('')}</div></section>`
       +fechCard(m)+REL_T.map(([k,t,cab,fn])=>`<section class="card"><h2>${t}${D[k].length?' · '+D[k].length:''}</h2>${relTabela(D[k].map(fn),cab)}</section>`).join(''); }
   function relHtml(m){ const D=relDados(m);
     return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório do RH - ${esc(mesTitulo(m))}</title><style>@page{size:A4;margin:16mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}h2{font-size:12pt;margin:18px 0 6px;color:#143F54}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;font-size:9.5pt}th{background:#f2efe7}.sub{color:#666}</style></head><body>
       <h1>Relatório do RH · ${esc(mesTitulo(m))}</h1><div class="sub">${esc(EMP_DOC.COLAFIX.nome)} · gerado em ${br(P.hojeStr())} · ${D.quadro.length} no quadro no fim do mês</div>
       ${REL_T.map(([k,t,cab,fn])=>`<h2>${t} (${D[k].length})</h2>${D[k].length?`<table><tr>${cab.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>${D[k].map(fn).map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`:'<div class="sub">Nenhum.</div>'}`).join('')}</body></html>`; }
-  async function relExcel(m){ const D=relDados(m); try{ if(!window.XLSX) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }catch(e){}
-    if(window.XLSX&&window.XLSX.utils){ const wb=XLSX.utils.book_new(); REL_T.forEach(([k,t,cab,fn])=>{ const ws=XLSX.utils.aoa_to_sheet([cab].concat(D[k].map(fn))); ws['!cols']=cab.map(()=>({wch:24})); XLSX.utils.book_append_sheet(wb,ws,t.slice(0,31).replace(/[()]/g,'')); });
-      const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}); baixar(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Relatorio-RH-'+m+'.xlsx'); return; }
-    const L=[]; REL_T.forEach(([k,t,cab,fn])=>{ L.push([t]); L.push(cab); D[k].map(fn).forEach(r=>L.push(r)); L.push([]); });
-    baixar(new Blob(['\ufeff'+L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(';')).join('\r\n')],{type:'text/csv'}),'Relatorio-RH-'+m+'.csv'); }
+  const relInfo=m=>({tit:'Relatório do RH · '+mesTitulo(m),sub:EMP_DOC.COLAFIX.nome+' · admissões, desligamentos, férias e experiência',filtros:rfLista()});
+  async function relExcel(m){ const D=relDados(m), clt=D.quadro.filter(f=>f.tipo!=='PJ').length;
+    const res=[['No quadro no fim do mês','CLT','PJ','Admissões','Desligamentos','Férias','Experiência','Afastados'],[D.quadro.length,clt,D.quadro.length-clt,D.adm.length,D.desl.length,D.fer.length,D.exp.length,D.afast.length]];
+    await rrXls('Relatorio-RH-'+m,[['Resumo',res]].concat(REL_T.map(([k,t,cab,fn])=>[t.replace(/[()]/g,''),[cab].concat(D[k].map(fn))])),relInfo(m)); }
+  async function relPdfMes(m){ const D=relDados(m), clt=D.quadro.filter(f=>f.tipo!=='PJ').length, W={Nome:44,'CPF / CNPJ':30,Função:30,Setor:26,Vínculo:22,Admissão:20,Data:22,Motivo:30,Início:18,Fim:18,Dias:10,Volta:18,'Período aquisitivo':36,Situação:34,Em:20};
+    await rrPdf(Object.assign(relInfo(m),{arq:'Relatorio-RH-'+m,kpis:[{t:'No quadro',v:String(D.quadro.length),s:'no fim do mês',c:'pet'},{t:'CLT / PJ',v:clt+' / '+(D.quadro.length-clt),s:'no quadro',c:'teal'},{t:'Admissões',v:String(D.adm.length),s:'no mês',c:D.adm.length?'ok':'cinza'},{t:'Desligamentos',v:String(D.desl.length),s:'no mês',c:D.desl.length?'crit':'cinza'}],
+      partes:REL_T.map(([k,t,cab,fn])=>({secao:t+(D[k].length?' · '+D[k].length:''),cols:cab.map(c=>({t:c,w:W[c]||24,al:c==='Dias'?'r':''})),rows:D[k].map(fn),vazio:'Nenhum.'})),assina:'Responsável pelo RH'})); }
 
   /* ---------- Fechamento do mês para a folha (pedido de 22/10): um Excel com tudo o que a contabilidade precisa ---------- */
   function fechDados(m){ const H=R.fech&&R.fech[m]; if(!H||H==='carregando') return null; const D=relDados(m), F=H.d, ini=D.ini, fim=D.fim;
@@ -1040,7 +1072,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const pon=(F&&F.ponto&&F.ponto.pes)||{}, alm=(F&&F.alm)||{};
     const ferDias=f=>R.fer.filter(x=>x.funcId===f._id&&!x.anterior&&x.status!=='cancelada'&&okIso(x.inicio)&&x.inicio<=fim&&x.fim>=ini).reduce((a,x)=>a+diasEntre(x.inicio>ini?x.inicio:ini,x.fim<fim?x.fim:fim)+1,0);
     const ocs=f=>R.oc.filter(x=>x.funcId===f._id&&!x.removido&&okIso(x.data)&&x.data>=ini&&x.data<=fim);
-    const pes=R.func.filter(f=>(!okIso(f.admissao)||f.admissao<=fim)&&!(okIso(f.desligamento)&&f.desligamento<ini&&f.status==='Desligado')).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(f=>{ const p=pon[k(f)]||{atr:[],sai:[],falt:[],dias:0}, a=alm[k(f)]||null, o=ocs(f);
+    const pes=R.func.filter(rfOk).filter(f=>(!okIso(f.admissao)||f.admissao<=fim)&&!(okIso(f.desligamento)&&f.desligamento<ini&&f.status==='Desligado')).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).map(f=>{ const p=pon[k(f)]||{atr:[],sai:[],falt:[],dias:0}, a=alm[k(f)]||null, o=ocs(f);
       return {f,p,a,o,fer:ferDias(f),he:window.HoraExtra?Math.round(HoraExtra.horasDe(f.nome,m)*100)/100:0,adv:o.filter(x=>/advert/i.test(x.tipo||'')).length,susp:o.filter(x=>/suspens/i.test(x.tipo||'')).reduce((s,x)=>s+(+x.dias||0),0),
         obs:[okIso(f.admissao)&&f.admissao>=ini?'admitido em '+br(f.admissao):'',okIso(f.desligamento)&&f.desligamento>=ini&&f.desligamento<=fim&&(f.status==='Desligado'||f.desligAgendado)?'desligado em '+br(f.desligamento):'',f.status==='Afastado'?'afastado':''].filter(Boolean).join(' · ')}; });
     return {m,D,F,pes,temFace:!!(F&&F.ponto),vd:(F&&F.valorDesc)||0}; }
@@ -1069,6 +1101,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     add('Almoço',[['Nome','Almoços','Sem justificativa','Justificados','Desconto (R$)']].concat(X.pes.filter(o=>o.a).map(o=>[o.f.nome,o.a.alm,o.a.sj,o.a.jj,Math.round(o.a.desc*100)/100])));
     add('Ocorrências',[['Nome','Data','Tipo','Dias','O que aconteceu']].concat(X.pes.flatMap(o=>o.o.map(x=>[o.f.nome,br(x.data),x.tipo||'',x.dias||'',x.motivo||'']))),[36,12,22,8,60]);
     REL_T.forEach(([k,t,cab,fn])=>add(t.slice(0,31).replace(/[()]/g,''),[cab].concat(X.D[k].map(fn))));
+    add('Sobre',[['Fechamento para a folha · '+mesTitulo(m)],[EMP_DOC.COLAFIX.nome],['Filtros: '+(rfLista().join(' · ')||'nenhum (tudo)')],['Gerado em '+new Date().toLocaleString('pt-BR')]],[70]);
     baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Fechamento-folha-'+m+'.xlsx'); P.toast('Fechamento baixado.'); }
   /* ---------- Ficha completa da pessoa ---------- */
   function tempoDe(iso){ const hj=P.hojeStr(); let a=+hj.slice(0,4)-+iso.slice(0,4), m=+hj.slice(5,7)-+iso.slice(5,7); if(hj.slice(8)<iso.slice(8)) m--; if(m<0){ a--; m+=12; } return {a,m}; }
@@ -1236,7 +1269,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         ${p.linhas.length?`<div class="rh-tw" style="max-height:340px;overflow:auto"><table class="rh-t"><thead><tr><th>Funcionário</th><th>O que muda</th><th>Problemas</th></tr></thead><tbody>${p.linhas.map(o=>`<tr><td><b>${esc(o.f.nome)}</b>${o.novo?' <span class="pill teal">novo</span>':''}</td><td>${esc(o.mud.join(', ')||'—')}</td><td style="color:var(--crit-ink)">${esc(o.erros.join(' · '))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="sub">Nada para mudar.</div>'}
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn" data-act="rh-cargaok" ${p.linhas.some(o=>o.mud.length)&&!R.salv?'':'disabled'}>Gravar as alterações</button></div>`:''}</section>`; }
   async function cargaAplicar(){ const p=R.carga.prev; let n=0, nf=0, nn=0;
-    for(const o of p.linhas){ if(o.novo){ const nid=id(); await grava(COL.func+'/'+nid,Object.assign({nome:o.f.nome,cpf:o.f.cpf,cnpj:o.f.cnpj||'',tipo:o.f.tipo,empresa:o.f.empresa,status:'Ativo',criadoEm:agora(),criadoPor:P.S.uid||null,origem:'planilha'},o.up)); o.f._id=nid; o.f.nome=o.f.nome; nn++; }
+    for(const o of p.linhas){ if(o.novo){ const nid=id(); await grava(COL.func+'/'+nid,Object.assign({nome:o.f.nome,cpf:o.f.cpf,cnpj:o.f.cnpj||'',tipo:o.f.tipo,empresa:o.f.empresa,status:'Ativo',criadoEm:agora(),criadoPor:P.S.uid||null,origem:'planilha'},o.up)); o.f._id=nid; nn++; }
       else if(Object.keys(o.up).length){ await grava(COL.func+'/'+o.f._id,Object.assign({},o.up)); n++; }
       for(const per of o.fer){ await P.db().doc(COL.ferias+'/'+id()).set({funcId:o.f._id,funcionario:o.f.nome,aquisitivo:per.ini,aquisitivoFim:per.fim,dias:per.saldo,anterior:true,status:'tirada',origem:'carga',em:agora(),por:P.S.uid||null,porNome:eu()}); nf++; } }
     return {n,nf,nn}; }
@@ -1343,6 +1376,12 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     if(k==='oc'){ const xs=R.oc.filter(x=>!x.removido&&String(x.data).slice(0,4)===String(ano)).sort((a,b)=>String(b.data).localeCompare(String(a.data)));
       return {t:'Ocorrências em '+ano,cols:['Nome','Data','Tipo','O que aconteceu'],rows:xs.map(x=>{ const f=fun(x.funcId); return [nomeT(f.nome?f:{nome:x.funcionario}),br(x.data),x.tipo,x.motivo||'']; }),ids:xs.map(x=>x.funcId),nc:0}; }
     return {t:'',cols:[],rows:[],ids:[]}; }
+  /* Perguntas rápidas com os filtros comuns (empresa · vínculo · setor): tira as linhas de quem não passa */
+  { const _pd=pergDados; pergDados=function(){ const D=_pd(); if(!rfLista().length||!D.ids) return D; const keep=D.ids.map(id=>{ const f=R.func.find(x=>x._id===id); return !f||rfOk(f); });
+      return Object.assign({},D,{rows:D.rows.filter((_,i)=>keep[i]),ids:D.ids.filter((_,i)=>keep[i])}); }; }
+  async function pergPdf(){ const D=pergDados(); await rrPdf({tit:D.t,sub:EMP_DOC.COLAFIX.nome+' · Perguntas rápidas do RH · '+plural(D.rows.length,'pessoa','pessoas'),filtros:rfLista(),arq:'RH-'+String(D.t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'-')+'-'+P.hojeStr(),
+      partes:[{cols:D.cols.map((c,i)=>({t:c,w:i===D.nc?56:/Dia|Data|Início|Fim|Volta|Admissão|Desde|Dias|Faz|Completa|Última|Próxima|Dar até/.test(c)?22:34})),rows:D.rows,vazio:'Ninguém.'}],assina:false}); }
+  async function pergXls(){ const D=pergDados(); await rrXls('RH-'+String(D.t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'-')+'-'+P.hojeStr(),[[String(D.t).slice(0,31),[D.cols].concat(D.rows)]],{tit:D.t,sub:'Perguntas rápidas do RH',filtros:rfLista()}); }
   const pergTexto=D=>D.t+'\n'+D.rows.map(r=>'• '+r.filter(Boolean).join(' · ')).join('\n')+(D.rows.length?'':'\n(ninguém)');
   function pergHtml(D){ return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(D.t)}</title><style>@page{size:A4;margin:16mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}table{width:100%;border-collapse:collapse;margin-top:12px}th{text-align:left;font-size:9pt;color:#555;border-bottom:2px solid #143F54;padding:5px 6px}td{padding:5px 6px;border-bottom:1px solid #ddd}.sub{color:#666}</style></head><body>
     <h1>${esc(D.t)}</h1><div class="sub">${esc(EMP_DOC.COLAFIX.nome)} · ${plural(D.rows.length,'pessoa','pessoas')} · ${br(P.hojeStr())}</div>
@@ -1353,9 +1392,9 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const D=pergDados();
     const filtro=g.k==='aniv'?`<label class="rh-pgf"><span class="label">Mês</span><select class="txt" id="rh-pgm">${MESES.map((n,i)=>{ const v=String(i+1).padStart(2,'0'); return `<option value="${v}" ${(g.mes||P.hojeStr().slice(5,7))===v?'selected':''}>${cap(n)}</option>`; }).join('')}</select></label>`
       :g.k==='setor'?`<label class="rh-pgf"><span class="label">Setor</span><select class="txt" id="rh-pgs">${(D.setores||[]).map(s=>`<option ${s===g.setor?'selected':''}>${esc(s)}</option>`).join('')}</select></label>`:'';
-    return `<section class="card rh-perg"><div class="rh-ch"><h2>Perguntas rápidas</h2><button class="lnk" data-act="rh-pergx">Fechar a lista</button></div>${chips}
+    return `<section class="card rh-perg"><div class="rh-ch"><h2>Perguntas rápidas</h2><button class="lnk" data-act="rh-pergx">Fechar a lista</button></div>${chips}${rfFil()}
       <div class="rh-pgr"><div class="rh-ch" style="flex-wrap:wrap;gap:10px"><div><b style="font-size:17px">${esc(D.t)}</b> <span class="pill neu">${plural(D.rows.length,'pessoa','pessoas')}</span></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">${filtro}<button class="btn sec rh-sm" data-act="rh-pgimp">Imprimir</button><button class="btn sec rh-sm" data-act="rh-pgcop">Copiar</button><button class="btn sec rh-sm" data-act="rh-pgwa">WhatsApp</button></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">${filtro}<button class="btn sec rh-sm" data-act="rh-pgxls">Excel</button><button class="btn sec rh-sm" data-act="rh-pgimp">Baixar PDF</button><button class="btn sec rh-sm" data-act="rh-pgcop">Copiar</button><button class="btn sec rh-sm" data-act="rh-pgwa">WhatsApp</button></div></div>
         ${D.rows.length?`<div class="rh-tw"><table class="rh-t"><thead><tr>${D.cols.map(c=>`<th>${esc(c)}</th>`).join('')}${D.ed?'<th></th>':''}</tr></thead><tbody>${D.rows.map((r,i)=>`<tr>${r.map((c,j)=>`<td${j===D.nc?'':' class="'+(/^\d{2}\/\d{2}/.test(c)?'num':'')+'"'}>${j===D.nc&&D.ids[i]?`<button class="rh-nm" data-act="rh-pess" data-id="${D.ids[i]}">${esc(c)}</button>`:esc(c)}</td>`).join('')}${D.ed?`<td><button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${D.ids[i]}">Completar</button></td>`:''}</tr>`).join('')}</tbody></table></div>`
           :'<div class="sub" style="margin:8px 0 0">Ninguém.</div>'}
         ${D.sem?`<div class="sub" style="margin:8px 0 0;font-size:12.5px">${plural(D.sem,'pessoa sem','pessoas sem')} data de nascimento no cadastro.</div>`:''}</div></section>`; }
@@ -1951,6 +1990,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     if(t&&t.dataset&&t.dataset.rhIt==='epis'&&t.dataset.c==='nome'){ const e=epiCat(t.value), ca=document.querySelector(`[data-rh-it="epis"][data-i="${t.dataset.i}"][data-c="ca"]`); if(e&&ca&&!ca.value) ca.value=e.ca||''; return; }
     try{
       if(t.dataset&&t.dataset.rhFil){ R.filtro[t.dataset.rhFil]=t.value; P.render(); return; }
+      if(t.dataset&&t.dataset.rhRf){ R.rf[t.dataset.rhRf]=t.value; P.render(); return; }
       if(t.id==='rh-pgm'&&R.perg){ R.perg.mes=t.value; P.render(); return; }
       if(t.id==='rh-pgs'&&R.perg){ R.perg.setor=t.value; P.render(); return; }
       if(t.id==='rh-desf'&&R.fdesl){ R.fdesl.funcId=t.value; P.render(); return; }
@@ -2022,7 +2062,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       /* perguntas rápidas */
       if(a==='rh-perg'){ const k=b.dataset.v; R.perg=R.perg&&R.perg.k===k?null:{k,mes:P.hojeStr().slice(5,7),setor:(R.perg&&R.perg.setor)||''}; P.render(); return; }
       if(a==='rh-pergx'){ R.perg=null; P.render(); return; }
-      if(a==='rh-pgimp'){ if(R.perg) imprimirDoc(pergHtml(pergDados())); return; }
+      if(a==='rh-pgimp'){ if(R.perg) await pergPdf(); return; } if(a==='rh-pgxls'){ if(R.perg) await pergXls(); return; }
       if(a==='rh-pgcop'){ if(!R.perg) return; const t=pergTexto(pergDados()); try{ await navigator.clipboard.writeText(t); P.toast('Lista copiada.'); }catch(e){ P.toast('Não consegui copiar.'); } return; }
       if(a==='rh-pgwa'){ if(!R.perg) return; window.open('https://wa.me/?text='+encodeURIComponent(pergTexto(pergDados())),'_blank','noopener'); return; }
       /* feriados */
@@ -2093,7 +2133,13 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         try{ await grava(COL.func+'/'+iD,Object.assign(v,R.f._id?{}:{criadoEm:agora(),criadoPor:P.S.uid||null}));
           if(fct){ try{ const n=await fichaCandFinalizar(iD,fct,v); if(n) setTimeout(()=>P.toast(plural(n,'foto de documento guardada','fotos de documentos guardadas')+' na admissão.'),1500); }catch(e){ console.warn('[RH] ficha do celular',e); P.toast('Cadastro salvo, mas as fotos da ficha não foram guardadas. Tente abrir a ficha de novo.'); } }
           R.f=null; if(adm){ R.adm={id:iD}; R.pess=null; P.toast('Cadastro salvo. Agora os documentos, o contrato e a ficha.'); } else P.toast('Funcionário salvo.'); } finally{ R.salv=false; P.render(); } return; }
-      if(a==='rh-csv'){ const L=[['Nome','CPF / CNPJ','Função','Setor','Empresa','Vínculo','Admissão','Situação','Desligamento','Telefone','Camisa','Calça','Calçado','Nascimento','Motivo do desligamento']].concat(R.func.map(x=>[x.nome,docF(x),x.funcao,x.setor,x.empresa,x.tipo,br(x.admissao),x.status,br(x.desligamento),x.telefone,x.camisa,x.calca,x.calcado,br(x.nascimento),x.desligMotivo||'']));
+      if(a==='rh-fxls'||a==='rh-csv'){ const {xs,filtros}=funcExp();
+        await rrXls('Funcionarios-'+P.hojeStr(),[['Funcionários',[['Nome','CPF / CNPJ','Função','Setor','Empresa','Vínculo','Admissão','Situação','Desligamento','Telefone','Camisa','Calça','Calçado','Nascimento','Motivo do desligamento']].concat(xs.map(x=>[x.nome,docF(x),x.funcao||'',x.setor||'',empNome(x.empresa)||x.empresa||'',x.tipo||'CLT',br(x.admissao),x.status||'',br(x.desligamento),x.telefone||'',x.camisa||'',x.calca||'',x.calcado||'',br(x.nascimento),x.desligMotivo||'']))]],{tit:'Funcionários',sub:EMP_DOC.COLAFIX.nome+' · '+plural(xs.length,'pessoa','pessoas'),filtros}); return; }
+      if(a==='rh-fpdf'){ const {xs,filtros}=funcExp(), clt=xs.filter(f=>f.tipo!=='PJ').length;
+        await rrPdf({tit:'Funcionários',sub:EMP_DOC.COLAFIX.nome+' · lista do cadastro do RH',filtros,arq:'Funcionarios-'+P.hojeStr(),
+          kpis:[{t:'Pessoas',v:String(xs.length),s:'na lista',c:'pet'},{t:'CLT',v:String(clt),s:'Colafix',c:'teal'},{t:'PJ',v:String(xs.length-clt),s:'Zenith, Nexus e outras',c:'cinza'},{t:'Setores',v:String(new Set(xs.map(f=>f.setor||'—')).size),s:'diferentes',c:'cinza'}],
+          partes:[{secao:'Lista',nota:'em ordem alfabética',cols:[{t:'Nome',w:50},{t:'Função',w:30},{t:'Setor',w:26},{t:'Vínculo',w:24},{t:'Admissão',w:20},{t:'Situação',w:20}],rows:xs.map(f=>[f.nome,f.funcao||'',f.setor||'',f.tipo==='PJ'?'PJ · '+(empNome(f.empresa)||''):'CLT',br(f.admissao),f.status||'']),vazio:'Ninguém com estes filtros.'}],assina:false}); return; }
+      if(a==='rh-csv-antigo'){ const L=[['Nome','CPF / CNPJ','Função','Setor','Empresa','Vínculo','Admissão','Situação','Desligamento','Telefone','Camisa','Calça','Calçado','Nascimento','Motivo do desligamento']].concat(R.func.map(x=>[x.nome,docF(x),x.funcao,x.setor,x.empresa,x.tipo,br(x.admissao),x.status,br(x.desligamento),x.telefone,x.camisa,x.calca,x.calcado,br(x.nascimento),x.desligMotivo||'']));
         const csv='﻿'+L.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(';')).join('\r\n'); baixar(new Blob([csv],{type:'text/csv'}),'funcionarios.csv'); return; }
       /* funções */
       if(a==='rh-cad'){ R.cad=b.dataset.v; R.ff=null; R.fe=null; if(b.dataset.goCad){ ev.preventDefault(); P.go('rhfuncoes'); } else P.render(); return; }
@@ -2205,8 +2251,9 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       if(a==='rh-agdias'){ R.agDias=+b.dataset.v||30; P.render(); return; }
       if(a==='rh-ics'){ const xs=agendaJanela().prox; if(!xs.length) return; baixar(new Blob([icsTexto(xs)],{type:'text/calendar'}),'Agenda-RH-Colafix.ics'); P.toast(plural(xs.length,'compromisso','compromissos')+' no arquivo. Abra o arquivo para mandar para o Outlook.'); return; }
       if(a==='rh-relmes'){ R.relMes=mesMais(R.relMes,+b.dataset.v); P.render(); return; }
-      if(a==='rh-indimp'){ imprimirDoc(indHtml()); return; }
-      if(a==='rh-relimp'){ imprimirDoc(relHtml(R.relMes)); return; }
+      if(a==='rh-indimp'||a==='rh-indpdf'){ await indPdf(); return; } if(a==='rh-indxls'){ await indXls(); return; }
+      if(a==='rh-relimp'||a==='rh-relpdf'){ await relPdfMes(R.relMes); return; }
+      if(a==='rh-rflimpa'){ R.rf={emp:'',vinc:'',setor:''}; P.render(); return; }
       if(a==='rh-relxls'){ await relExcel(R.relMes); return; }
       /* ficha da pessoa */
       if(a==='rh-pess'){ if(P.S.gxp) P.S.gxp.pes=null; R.pess=b.dataset.id; R.f=null; R.adm=null; R.buscaIni=''; P.go('rhfunc'); window.scrollTo(0,0); return; }

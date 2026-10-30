@@ -130,9 +130,12 @@
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Faltas sem justificativa</span><b class="num">${st.semJust}</b><small>vezes que alguém veio e não almoçou · ${st.just} justificadas · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
     if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty" style="padding:24px;text-align:center">Nenhum dado do Face ID em ${esc(mesNome(A.mes))}. Importe o CSV do Control iD. Ausências no almoço já podem ser programadas.</div><div style="text-align:center;padding-bottom:16px"><button class="btn sec" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button></div></section>`+vAus(c);
     const abas=`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="dir" aria-pressed="${A.vis==='dir'}">Diretoria</button><button data-act="alm-vis" data-v="pont" aria-pressed="${A.vis==='pont'}">Pontualidade</button></div>`;
-    if(A.vis==='pont') return topo+`<section class="card"><div class="alm-f">${abas}</div>${vPont(c)}</section>`+vPessoa(c,ds);
+    if(A.vis==='pont') return topo+`<section class="card"><div class="alm-f">${abas}</div><div class="alm-f alm-f2">
+      <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
+      ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
+      <input class="txt" id="alm-q" type="search" autocomplete="off" placeholder="Buscar nome, setor ou CPF" value="${esc(A.q)}" style="max-width:260px"><span class="sub" id="alm-qn"></span></div>${vPont(c)}</section>`+vPessoa(c,ds);
     if(A.vis==='dir') return topo+`<section class="card"><div class="alm-f">${abas}<span style="flex:1"></span><button class="btn sec" data-act="alm-pdf" ${A.pdf?'disabled':''}>${P.ic('baixar',18,2.2)}${A.pdf?'Gerando…':'Relatório em PDF'}</button><button class="btn" data-act="alm-ppt" ${A.ppt?'disabled':''}>${P.ic('baixar',18,2.2)}${A.ppt?'Gerando…':'Baixar apresentação (PowerPoint)'}</button></div>${vDir(c,st)}</section>`;
-    const filtros=`<div class="alm-f alm-f1">${abas}<span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button>${A.vis==='mes'?`<button class="btn sec rh-sm" data-act="alm-xls">${P.ic('baixar',16,2.2)}Excel</button><button class="btn sec rh-sm" data-act="alm-imp">Imprimir</button>`:''}</div>
+    const filtros=`<div class="alm-f alm-f1">${abas}<span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button>${A.vis==='mes'?`<button class="btn sec rh-sm" data-act="alm-xls">Excel</button><button class="btn rh-sm" data-act="alm-mpdf">Baixar PDF</button><button class="lnk" data-act="alm-imp">Imprimir a grade</button>`:''}</div>
       <div class="alm-f alm-f2">
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
       ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
@@ -376,9 +379,21 @@
     const ref=P.db().doc('rh/dados/almocoaj/'+m); const cur=A.aj[m]||{mes:m,aj:{},log:[]}; const it={v,mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()};
     const aj=Object.assign({},cur.aj||{}); aj[d+'_'+k]=it; const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k},it)]).slice(-500);
     try{ await ref.set({mes:m,aj,log}); P.toast('Ajuste guardado.'); }catch(e){ P.erro(e); } }
-  async function excel(){ const c=A.ctx, D=A.dados[A.mes]; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes));
+  /* ---------- relatórios no padrão (30/10): os filtros da tela (empresa, setor, situação e busca) valem no PDF e no Excel ---------- */
+  function qOk(p){ const ws=nrm(A.q).split(/\s+/).filter(Boolean), dq=String(A.q||'').replace(/\D/g,''), b=almChave(p); return !ws.length||ws.every(w=>b.includes(w))||(dq.length>=3&&b.slice(-11).includes(dq)); }
+  const SIT_NOME={sim:'Almoçou',nao:'Sem almoço e sem justificativa',just:'Justificado',fora:'Não almoça na empresa'};
+  const almFiltros=()=>[A.emp&&'Empresa: '+(A.emp==='-'?'sem empresa':empCurta(A.emp)),A.setor&&'Setor: '+(A.setor==='-'?'sem setor':A.setor),A.sit&&'Situação: '+(SIT_NOME[A.sit]||A.sit),A.q&&'Busca: '+A.q].filter(Boolean);
+  async function mesPdf(){ const c=A.ctx, P=c.P, D=A.dados[A.mes]; if(!D) return; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes)).filter(g=>qOk(g.p)), vd=+cfg().valorDesc||0, R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+    const s=k=>G.reduce((a,g)=>a+g[k],0); if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou.');
+    try{ await RHRel.pdf({tit:'Almoço · fechamento de '+mesNome(A.mes),sub:'Refeitório pelo Face ID · '+(ds.length?c.br(ds[0])+' a '+c.br(ds[ds.length-1]):'sem dados'),filtros:almFiltros(),arq:'Almoco-fechamento-'+A.mes,
+      kpis:[{t:'Pessoas',v:String(G.length),s:'na lista',c:'pet'},{t:'Almoços',v:s('tot').toLocaleString('pt-BR'),s:ds.length+' dias com Face ID',c:'teal'},{t:'Sem justificativa',v:String(s('sj')),s:vd?'desconto '+R$(s('sj')*vd):'veio e não almoçou',c:s('sj')?'crit':'ok'},{t:'Justificados',v:String(s('jj')),s:'médico, saiu cedo, ausência…',c:'cinza'}],
+      partes:[{secao:'Por pessoa',nota:'dias na empresa = dias com passagem no Face ID',cols:[{t:'Nome',w:52},{t:'Empresa',w:24},{t:'Setor',w:24},{t:'Na empresa',w:16,al:'r'},{t:'Almoços',w:15,al:'r'},{t:'Sem just.',w:15,al:'r'},{t:'Justif.',w:13,al:'r'}].concat(vd?[{t:'Desconto',w:20,al:'r'}]:[]),
+        rows:G.map(g=>{ const r=[g.p.nome,empCurta(g.p.emp),g.p.setor||'—',String(g.pres),String(g.tot),String(g.sj),String(g.jj)].concat(vd?[g.sj?R$(g.sj*vd):'—']:[]); if(g.sj) r._cor={5:'crit'}; return r; })
+          .concat(G.length?[Object.assign(['Total','','',String(s('pres')),String(s('tot')),String(s('sj')),String(s('jj'))].concat(vd?[R$(s('sj')*vd)]:[]),{_tot:1})]:[]),vazio:'Ninguém com estes filtros.'}],assina:'Conferido por (RH)'}); }catch(e){ P.toast(String(e&&e.message||e)); } }
+  async function excel(){ const c=A.ctx, D=A.dados[A.mes]; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes)).filter(g=>qOk(g.p));
     const cab=['Nome','CPF','Empresa','Setor'].concat(ds.map(d=>d.slice(8)+'/'+d.slice(5,7)),['Almoços','Sem justificativa','Justificados','Dias na empresa'].concat(+cfg().valorDesc?['Desconto (R$)']:[]));
     const L=[cab].concat(G.map(g=>[g.p.nome,c.fCPF(g.p.k),empCurta(g.p.emp),g.p.setor].concat(g.v.map(s=>s.v==='sim'?1:s.v==='nao'?0:s.v==='just'?'J':s.v==='fora'?'F':''),[g.tot,g.sj,g.jj,g.pres].concat(+cfg().valorDesc?[Math.round(g.sj*(+cfg().valorDesc)*100)/100]:[]))));
+    if(window.RHRel) return RHRel.xls('Almoco-'+A.mes,[['Almoço '+A.mes,L]],{tit:'Almoço · '+mesNome(A.mes),sub:'1 = almoçou · 0 = sem almoço e sem justificativa · J = justificado · F = não almoça na empresa',filtros:almFiltros()});
     if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const ws=XLSX.utils.aoa_to_sheet(L); ws['!cols']=cab.map((_,i)=>({wch:i===0?32:i<4?16:i>=cab.length-2?14:6})); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Almoço '+A.mes);
     c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Almoco-'+A.mes+'.xlsx'); }
@@ -398,6 +413,7 @@
     if(a==='alm-cel'){ const s=situacao(A.mes,b.dataset.d,b.dataset.k); if(s.v==='nao'||s.v==='just'){ A.jus={k:b.dataset.k,d:b.dataset.d}; P.rerender(); return; } if(s.v==='aus'&&!s.aj) return; ajustar(b.dataset.k,b.dataset.d,s.v==='sim'?'nao':'sim'); return; }
     if(a==='alm-xls'){ excel().catch(e=>P.erro(e)); return; }
     if(a==='alm-imp'){ imprimir(); return; }
+    if(a==='alm-mpdf'){ mesPdf(); return; }
     if(a==='alm-jus'){ A.jus={k:b.dataset.k,d:b.dataset.d}; P.rerender(); setTimeout(()=>{ const i=document.getElementById('alm-jmot'); if(i&&A.jus.tipo) i.focus(); },50); return; }
     if(a==='alm-jusx'||(a==='alm-jusx-fundo'&&ev.target===b)){ A.jus=null; P.rerender(); return; }
     if(a==='alm-jtipo'){ A.jus.tipo=b.dataset.v; A.jus.mot=(document.getElementById('alm-jmot')||{}).value||A.jus.mot; A.jus.erro=''; P.rerender(); return; }
@@ -792,8 +808,12 @@
     let G=[]; try{ A.mes=m; A.q=''; A.emp=''; A.setor=''; A.sit=''; G=grade(ds,pessoasDoMes(m)); } finally{ Object.assign(A,sv); }
     const vd=+cfg().valorDesc||0, alm={}; G.forEach(g=>{ alm[g.p.k]={nome:g.p.nome,emp:empCurta(g.p.emp),alm:g.tot,sj:g.sj,jj:g.jj,desc:g.sj*vd}; });
     return {m,valorDesc:vd,alm,ponto:pontoMes(c,m)}; }
-  function vPont(c){ const esc=c.esc, P=c.P, X=pontoMes(c,A.mes), pc=pontoCfg(), lim=+A.pontN||40;
-    if(!X||!X.dias.length) return '<div class="empty">Sem dias de expediente com Face ID neste mês.</div>';
+  /* filtros da tela na Pontualidade (empresa, setor; a busca filtra na tela e no PDF/Excel) */
+  const pontFil=o=>(!A.emp||(A.emp==='-'?o.emp==='Sem empresa':o.emp===empCurta(A.emp)))&&(!A.setor||(A.setor==='-'?!o.setor:o.setor===A.setor));
+  const pontLista=X=>Object.values(X.pes).filter(pontFil);
+  function vPont(c){ const esc=c.esc, P=c.P, X0=pontoMes(c,A.mes), pc=pontoCfg(), lim=+A.pontN||40;
+    if(!X0||!X0.dias.length) return '<div class="empty">Sem dias de expediente com Face ID neste mês.</div>';
+    const X=Object.assign({},X0,{pes:Object.fromEntries(pontLista(X0).map(o=>[o.k,o]))});
     let L=Object.values(X.pes).filter(o=>A.pontTodos||o.atr.length||o.sai.length||o.falt.length);
     const pts=o=>o.falt.length*3+o.atr.length+o.sai.length; L.sort((a,b)=>pts(b)-pts(a)||a.nome.localeCompare(b.nome,'pt-BR'));
     const tot=k=>Object.values(X.pes).reduce((a,o)=>a+o[k].length,0), nAtr=Object.values(X.pes).filter(o=>o.atr.length).length;
@@ -806,21 +826,36 @@
         <div class="sub" style="flex-basis:100%;margin:0;font-size:12.5px">Vale para quem não tem turno da linha cadastrado (Visão do gestor › Turnos usa o setor = nome da linha).</div></div>`:'';
     return `<div class="alm-pk"><div><span>Pessoas que chegaram atrasadas</span><b class="num">${nAtr}</b><small>${tot('atr')} atrasos no mês</small></div><div><span>Saídas antes do horário</span><b class="num">${tot('sai')}</b><small>última passagem antes do fim</small></div>
         <div class="${tot('falt')?'w':''}"><span>Faltas sem registro</span><b class="num">${tot('falt')}</b><small>dia de expediente sem passar no Face ID (sem férias)</small></div><div><span>Dias de expediente</span><b class="num">${X.dias.length}</b><small>horário padrão ${esc(pc.ini)}–${esc(pc.fim)} · tolerância ${esc(pc.tol)} min · <button class="lnk" data-act="alm-pcfg">mudar</button></small></div></div>${cfgH}
-      <div class="alm-pbar"><label class="ck"><input type="checkbox" data-act="alm-ptodos" ${A.pontTodos?'checked':''}> Mostrar também quem está em dia</label><span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-pxls">${P.ic('baixar',16,2.2)}Excel</button></div>
+      <div class="alm-pbar"><label class="ck"><input type="checkbox" data-act="alm-ptodos" ${A.pontTodos?'checked':''}> Mostrar também quem está em dia</label><span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-pxls">Excel</button><button class="btn rh-sm" data-act="alm-ppdf">Baixar PDF</button></div>
       ${L.length?`<div class="rh-tw"><table class="rh-t alm-pt"><thead><tr><th>Nome</th><th>Setor · empresa</th><th style="text-align:right">Atrasos</th><th style="text-align:right">Saídas antes</th><th style="text-align:right">Faltas</th><th style="text-align:right">Dias no Face ID</th><th></th></tr></thead><tbody>
-        ${L.slice(0,lim).map(o=>`<tr><td><button class="lnk alm-nm" data-act="alm-pab" data-k="${esc(o.k)}">${esc(o.nome)}</button></td><td>${esc([o.setor,o.emp].filter(Boolean).join(' · ')||'—')}</td>
+        ${L.slice(0,lim).map(o=>`<tr data-b="${esc(almChave(o))}"><td><button class="lnk alm-nm" data-act="alm-pab" data-k="${esc(o.k)}">${esc(o.nome)}</button></td><td>${esc([o.setor,o.emp].filter(Boolean).join(' · ')||'—')}</td>
           <td class="num" style="text-align:right">${o.atr.length?`<b>${o.atr.length}</b> <small>· ${o.atr.reduce((a,x)=>a+x.min,0)} min</small>`:'—'}</td><td class="num" style="text-align:right">${o.sai.length||'—'}</td><td class="num" style="text-align:right">${o.falt.length?`<span class="pill crit">${o.falt.length}</span>`:'—'}</td><td class="num" style="text-align:right">${o.dias}</td>
           <td class="rh-ac"><button class="lnk" data-act="alm-pab" data-k="${esc(o.k)}">${A.pontAb===o.k?'fechar':'ver dias'}</button>${o.funcId&&(o.atr.length>=3||o.falt.length)?` <button class="btn sec rh-sm" data-act="rh-presoc" data-id="${o.funcId}">Ocorrência</button>`:''}</td></tr>${det(o)}`).join('')}</tbody></table></div>
         ${L.length>lim?`<div style="text-align:center;margin-top:10px"><button class="btn sec" data-act="alm-pmais">Mostrar mais (${L.length-lim})</button></div>`:''}`:'<div class="empty">Ninguém atrasou, saiu antes ou faltou sem registro neste mês.</div>'}
       <div class="sub" style="margin:10px 0 0;font-size:12.5px">Chegada = primeira passagem do dia; saída = última passagem (num leitor de saída, quando houver). É um apoio para o RH conferir: o ponto oficial continua sendo o da folha.</div>`; }
-  async function pontoXls(c){ const X=pontoMes(c,A.mes); if(!X) return; if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
-    const L=Object.values(X.pes).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')), wb=XLSX.utils.book_new(), br=d=>d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4);
+  const pontFiltros=()=>almFiltros().filter(t=>!/^Situação/.test(t));
+  async function pontoPdf(c){ const X=pontoMes(c,A.mes); if(!X) return; const pc=pontoCfg(), L=pontLista(X).filter(o=>qOk(o)).filter(o=>A.pontTodos||o.atr.length||o.sai.length||o.falt.length).sort((a,b)=>(b.falt.length*3+b.atr.length+b.sai.length)-(a.falt.length*3+a.atr.length+a.sai.length)||a.nome.localeCompare(b.nome,'pt-BR'));
+    const T=pontLista(X).filter(o=>qOk(o)), tot=k=>T.reduce((a,o)=>a+o[k].length,0), br=d=>d.slice(8)+'/'+d.slice(5,7);
+    if(!window.RHRel) return c.P.toast('O gerador de relatórios ainda não carregou.');
+    try{ await RHRel.pdf({tit:'Pontualidade · '+mesNome(A.mes),sub:'Face ID · horário padrão '+pc.ini+'–'+pc.fim+' · tolerância '+pc.tol+' min · '+X.dias.length+' dias de expediente',filtros:pontFiltros().concat(A.pontTodos?[]:['Só quem atrasou, saiu antes ou faltou']),arq:'Pontualidade-'+A.mes,
+      kpis:[{t:'Chegaram atrasados',v:String(T.filter(o=>o.atr.length).length),s:tot('atr')+' atrasos no mês',c:tot('atr')?'warn':'ok'},{t:'Saídas antes',v:String(tot('sai')),s:'última passagem antes do fim',c:'cinza'},{t:'Faltas sem registro',v:String(tot('falt')),s:'sem passar no Face ID (sem férias)',c:tot('falt')?'crit':'ok'},{t:'Pessoas',v:String(T.length),s:'com Face ID no mês',c:'pet'}],
+      partes:[{secao:'Por pessoa',nota:'em ordem de gravidade',cols:[{t:'Nome',w:50},{t:'Setor · empresa',w:40},{t:'Atrasos',w:20,al:'r'},{t:'Minutos',w:16,al:'r'},{t:'Saídas antes',w:18,al:'r'},{t:'Faltas',w:14,al:'r'},{t:'Dias',w:12,al:'r'}],
+        rows:L.map(o=>{ const r=[o.nome,[o.setor,o.emp].filter(Boolean).join(' · ')||'—',String(o.atr.length||'—'),o.atr.length?String(o.atr.reduce((a,x)=>a+x.min,0)):'—',String(o.sai.length||'—'),String(o.falt.length||'—'),String(o.dias)]; if(o.falt.length) r._cor={5:'crit'}; return r; }),vazio:'Ninguém atrasou, saiu antes ou faltou sem registro.'},
+        {secao:'Dia a dia',cols:[{t:'Nome',w:50},{t:'Dia',w:16},{t:'O que',w:40},{t:'Horário',w:18},{t:'Esperado',w:18},{t:'Min',w:12,al:'r'}],rows:L.flatMap(o=>o.atr.map(x=>[o.nome,br(x.d),'Atraso',x.h,x.esp,String(x.min)]).concat(o.sai.map(x=>[o.nome,br(x.d),x.leitor?'Saída antes':'Última passagem antes do fim',x.h,x.esp,String(x.min)]),o.falt.map(d=>{ const r=[o.nome,br(d),'Falta sem registro','','','']; r._cor={2:'crit'}; return r; }))),vazio:'Nada no mês.'},
+        {texto:'Chegada = primeira passagem do dia; saída = última passagem (num leitor de saída, quando houver). É um apoio para o RH conferir: o ponto oficial continua sendo o da folha.'}],assina:'Conferido por (RH)'}); }catch(e){ c.P.toast(String(e&&e.message||e)); } }
+  async function pontoXls(c){ const X=pontoMes(c,A.mes); if(!X) return; const br=d=>d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4), L=pontLista(X).filter(o=>qOk(o)).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    if(window.RHRel){ const a1=[['Nome','Setor','Empresa','Dias no Face ID','Atrasos','Minutos de atraso','Saídas antes','Faltas sem registro']].concat(L.map(o=>[o.nome,o.setor,o.emp,o.dias,o.atr.length,o.atr.reduce((a,x)=>a+x.min,0),o.sai.length,o.falt.length]));
+      const a2=[['Nome','Dia','O que','Horário','Esperado','Minutos']]; L.forEach(o=>{ o.atr.forEach(x=>a2.push([o.nome,br(x.d),'Atraso',x.h,x.esp,x.min])); o.sai.forEach(x=>a2.push([o.nome,br(x.d),x.leitor?'Saída antes':'Última passagem antes do fim',x.h,x.esp,x.min])); o.falt.forEach(d=>a2.push([o.nome,br(d),'Falta sem registro','','',''])); });
+      return RHRel.xls('Pontualidade-'+A.mes,[['Resumo',a1],['Dia a dia',a2]],{tit:'Pontualidade · '+mesNome(A.mes),sub:'Face ID',filtros:pontFiltros()}); }
+    if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb=XLSX.utils.book_new();
     const a1=[['Nome','Setor','Empresa','Dias no Face ID','Atrasos','Minutos de atraso','Saídas antes','Faltas sem registro']].concat(L.map(o=>[o.nome,o.setor,o.emp,o.dias,o.atr.length,o.atr.reduce((a,x)=>a+x.min,0),o.sai.length,o.falt.length]));
     const a2=[['Nome','Dia','O que','Horário','Esperado','Minutos']]; L.forEach(o=>{ o.atr.forEach(x=>a2.push([o.nome,br(x.d),'Atraso',x.h,x.esp,x.min])); o.sai.forEach(x=>a2.push([o.nome,br(x.d),x.leitor?'Saída antes':'Última passagem antes do fim',x.h,x.esp,x.min])); o.falt.forEach(d=>a2.push([o.nome,br(d),'Falta sem registro','','',''])); });
     [['Resumo',a1],['Dia a dia',a2]].forEach(([n,a])=>{ const ws=XLSX.utils.aoa_to_sheet(a); ws['!cols']=a[0].map((h,i)=>({wch:i===0?34:16})); XLSX.utils.book_append_sheet(wb,ws,n); });
     c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Pontualidade-'+A.mes+'.xlsx'); }
   document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="alm-p"]'); if(!b||!A.ctx) return; const a=b.dataset.act, c=A.ctx, P=c.P;
     if(a==='alm-pab'){ A.pontAb=A.pontAb===b.dataset.k?null:b.dataset.k; P.render(); return; }
+    if(a==='alm-ppdf'){ pontoPdf(c); return; }
     if(a==='alm-ptodos'){ A.pontTodos=b.checked; P.render(); return; }
     if(a==='alm-pmais'){ A.pontN=(+A.pontN||40)+60; P.render(); return; }
     if(a==='alm-pcfg'){ A.pontCfg=!A.pontCfg; P.render(); return; }
