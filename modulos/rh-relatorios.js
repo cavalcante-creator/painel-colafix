@@ -3,11 +3,11 @@
    quadros de números, tabelas com cabeçalho repetido, rodapé com a página — e Excel com as mesmas colunas. Os dois dizem
    quais FILTROS foram usados (o relatório sai com o que está na tela). Usado por rh.js, rh-almoco.js e rh-uniformes.js:
      RHRel.pdf({tit, sub, filtros:[texto], kpis:[{t,v,s,c}], kpiCols, partes:[{secao,nota,cols,rows,vazio,texto,hbar}], arq, assina})
-     RHRel.xls(arq, abas:[[nome, linhas]], {tit, sub, filtros})   → .xlsx (ou .csv sem internet), com a aba "Sobre"
+     RHRel.xls(arq, abas:[[nome, linhas]] | [{nome,cab,linhas,tot}], {tit, sub, filtros}) → PainelXls.gerar (modulos/planilha.js)
      RHRel.barra({chips:[{k,t,v}], limpar}) → faixa "Filtros: … · Limpar" (o próprio módulo trata data-act)
    Precisa só do Painel.pdf (js/34) e carrega o jsPDF e o SheetJS do cdnjs quando faltam. Prefixo `rr`. */
 (function(){
-  const JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', XLSXJS='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  const JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   const carrega=src=>new Promise((ok,er)=>{ if([...document.scripts].some(s=>s.src===src&&s.dataset.ok)) return ok(); const s=document.createElement('script'); s.src=src; s.onload=()=>{ s.dataset.ok='1'; ok(); }; s.onerror=er; document.head.appendChild(s); });
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const toast=m=>{ try{ window.Painel.toast(m); }catch(e){} };
@@ -28,15 +28,9 @@
       doc.setFont('helvetica','normal'); doc.setFontSize(8); P.tc([85,102,111]); doc.text(o.assina||'Responsável pelo RH',P.M+w/2,P.y+4,{align:'center'}); doc.text('Data',P.M+w+16+w/2,P.y+4,{align:'center'}); P.y+=8; }
     const arq=String(o.arq||'Relatorio-RH').replace(/[\\/:*?"<>|]+/g,'-').replace(/\.pdf$/i,'')+'.pdf';
     P.fim(arq); window.__rrUltimoPdf=arq; toast('PDF baixado: '+arq); return arq; }
-  /* Excel com a aba "Sobre" (título, filtros, quando) */
-  async function xls(arq,abas,info){ info=info||{}; if(!(window.XLSX&&window.XLSX.utils)){ try{ await carrega(XLSXJS); }catch(e){} }
-    const sobre=[[info.tit||'Relatório do RH'],[info.sub||''],['Filtros: '+filtrosTxt(info.filtros)],['Gerado em '+new Date().toLocaleString('pt-BR')]];
-    arq=String(arq||'Relatorio-RH').replace(/[\\/:*?"<>|]+/g,'-').replace(/\.(xlsx|csv)$/i,'');
-    if(window.XLSX&&window.XLSX.utils){ const wb=XLSX.utils.book_new(), add=(n,a)=>{ const ws=XLSX.utils.aoa_to_sheet(a.length?a:[['(vazio)']]); ws['!cols']=(a[0]||['']).map((h,i)=>{ const mx=Math.max(String(h==null?'':h).length,...a.slice(1,200).map(r=>String(r[i]==null?'':r[i]).length)); return {wch:Math.min(48,Math.max(8,mx+2))}; }); XLSX.utils.book_append_sheet(wb,ws,String(n).replace(/[\\/?*[\]:]/g,'-').slice(0,31)); };
-      abas.forEach(([n,a])=>add(n,a)); add('Sobre',sobre);
-      baixa(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),arq+'.xlsx'); window.__rrUltimoXls=arq+'.xlsx'; toast('Excel baixado: '+arq+'.xlsx'); return arq+'.xlsx'; }
-    const L=sobre.concat([[]]); abas.forEach(([n,a])=>{ L.push([n]); a.forEach(r=>L.push(r)); L.push([]); });
-    baixa(new Blob(['﻿'+L.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n')],{type:'text/csv'}),arq+'.csv'); window.__rrUltimoXls=arq+'.csv'; toast('Sem internet para o Excel: baixei em .csv ('+arq+'.csv).'); return arq+'.csv'; }
+  /* Excel: o padrão do painel (modulos/planilha.js — logo, cabeçalho azul, filtros, números de verdade, total, pronto para imprimir, aba "Sobre") */
+  async function xls(arq,abas,info){ info=info||{}; if(!window.PainelXls) throw new Error('O gerador de Excel ainda está carregando. Tente de novo em instantes.');
+    const nome=await window.PainelXls.gerar(arq||'Relatorio-RH',abas,Object.assign({tit:'Relatório do RH'},info)); window.__rrUltimoXls=nome; return nome; }
   /* faixa dos filtros ativos (o módulo põe data-act no "Limpar") */
   function barra(o){ const ch=(o.chips||[]).filter(c=>c&&c.v); if(!ch.length) return '';
     return `<div class="rr-on" role="status"><span>Filtros:</span>${ch.map(c=>`<b>${esc(c.t)}: ${esc(c.v)}</b>`).join('')}${o.limpar?`<button class="lnk" data-act="${esc(o.limpar)}">Limpar filtros</button>`:''}<small>o PDF e o Excel saem com estes filtros</small></div>`; }
