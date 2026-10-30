@@ -1,7 +1,7 @@
 /* ===================== RH · ENTREGAS DE UNIFORME (pedido de 27/10) =====================
    Antes: a administradora abria a solicitação no sistema (Focco) e mandava um e-mail para o RH com funcionário, setor,
    data/período, itens e o nº da solicitação. Agora ela registra no painel (tela "Uniformes" do RH, rhunif) e o painel:
-     1) guarda a entrega para o RH conferir e lançar na ficha (escolha da usuária: o RH lança, não entra sozinho na ficha);
+     1) guarda a entrega para o RH CONFERIR (30/10: "Lancei na ficha" virou "Conferido"; st:'lancado' = conferido) (antes: o RH lança, não entra sozinho na ficha);
      2) abre o e-mail já pronto (mesmo texto de antes) para os destinatários guardados em rh/config.unifEmail {para, cc}.
    Dados (regra rh/{resto=**}: só a dona e quem tem o RH — não precisou mudar regra):
      rh/dados/uniformes/{id} {nome,fid,setor,funcao,data,per:'Manhã'|'Tarde',itens:[{t,tam,qtd}],sol,obs,em,por,porNome,
@@ -263,7 +263,7 @@
         ${xs.map(o=>`<label class="rhu-impl ${o.ja?'ja':''}"><input type="checkbox" data-rhu-qimp="${e(o.k)}" ${o.on?'checked':''} ${o.ja?'disabled':''}>
           <span class="rhu-impn"><b>${e(c.titulo(o.nome))}</b><small>${PEC_PLAN.filter(([k])=>o.qt[k]).map(([k,t])=>o.qt[k]+'× '+t).join(', ')||'sem peças na linha'}${o.difConta?` · <em>a conta das peças dá ${brl(o.conta)}</em>`:''}</small></span>
           <span class="rhu-impv">${brl(o.total)} · ${o.n}×<small>${o.nPg} descontada${o.nPg===1?'':'s'} · falta ${brl(o.rest)}${o.ja?' · já trazida':''}</small></span></label>`).join('')}</div>`; }).join('')}</div>
-      <div class="sub" style="margin:0">Cada linha marcada vira uma entrega de terceiro já lançada na ficha, com as parcelas que já foram descontadas (com a data) e as que faltam a partir desta quinzena. As linhas das abas antigas podem já ter continuado em outra aba: confira antes de marcar.</div>
+      <div class="sub" style="margin:0">Cada linha marcada vira uma entrega de terceiro já conferida, com as parcelas que já foram descontadas (com a data) e as que faltam a partir desta quinzena. As linhas das abas antigas podem já ter continuado em outra aba: confira antes de marcar.</div>
       <div class="rhu-ac"><button class="btn sec" data-act="rhu-qimpx">Cancelar</button><button class="btn" data-act="rhu-qimpok" ${on.length&&!U.salvando?'':'disabled'}>Trazer ${on.length} ${on.length===1?'linha':'linhas'}</button></div></div></div></div>`; }
   async function impGrava(c){ const I=U.imp; if(!I) return; const P=c.P, db=P.db(), eu=c.eu(), agora=new Date().toISOString(), qa=qAtual(c); let n=0;
     const pr=Object.assign({},precosDe(c)||{}); let prNovo=false; PEC_PLAN.forEach(([k,t])=>{ if(I.precos[k]>0&&!(pr[pk(t)]&&+pr[pk(t)].v>0)){ pr[pk(t)]={n:t,v:I.precos[k]}; prNovo=true; } });
@@ -376,7 +376,7 @@
         :`<div class="empty">${U.lido?'Nenhuma entrega no período.':'Carregando…'}</div>`}</div>`; }
   function relLinhas(c){ const D=relDados(c), pr=precosDe(c);
     const res=[['Funcionário','Setor','Entregas','Peças'].concat(c.rh?['Desconto (R$)']:[])].concat(D.ps.map(g=>[g.nome,g.setor,g.n,pcTxt(g)].concat(c.rh?[Math.round(g.desc*100)/100]:[])));
-    const det=[['Data','Período','Funcionário','Setor','Peça','Tamanho','Qtd','Nº solicitação','Lançado na ficha','Entregue por'].concat(c.rh?['Desconto da entrega (R$)']:[])];
+    const det=[['Data','Período','Funcionário','Setor','Peça','Tamanho','Qtd','Nº solicitação','Conferido pelo RH','Entregue por'].concat(c.rh?['Desconto da entrega (R$)']:[])];
     D.xs.forEach(x=>{ const d=c.rh?descDe(x,pr):null; itensOk(x).forEach((i,k)=>det.push([br(x.data),x.per||'',c.titulo(x.nome||''),x.setor||'',i.t,i.tam||'',Math.max(1,parseInt(i.qtd,10)||1),x.sol||'',x.st==='lancado'?'sim':'não',x.porNome||''].concat(c.rh?[k===0?(d.v==null?'':d.v):'']:[]))); });
     return {D,res,det}; }
   const relFiltros=c=>{ const r=U.rel; return [r.tipo&&'Quem: '+(r.tipo==='terc'?'terceiros':'funcionários'),r.setor&&'Setor: '+(r.setor==='-'?'sem setor':r.setor),c.rh&&r.desc&&'Desconto: '+(r.desc==='nao'?'não descontados':'descontados'),r.q&&'Busca: '+r.q].filter(Boolean); };
@@ -403,7 +403,7 @@
       { const fs=relFiltros(c); P.texto('Filtros: '+(fs.join(' · ')||'nenhum (tudo)'),{fs:8,c:fs.length?'ink':'mut',b:!!fs.length}); }
       P.secao('Resumo do período');
       const nNao=c.rh?D.ps.filter(g=>pesSit(g)==='nao').length:0;
-      P.kpis([{t:'Pessoas',v:String(D.ps.length),s:'receberam uniforme',c:'pet'},{t:'Entregas',v:String(D.xs.length),s:D.xs.filter(x=>x.st!=='lancado').length+' falta lançar na ficha',c:D.xs.some(x=>x.st!=='lancado')?'warn':'ok'},
+      P.kpis([{t:'Pessoas',v:String(D.ps.length),s:'receberam uniforme',c:'pet'},{t:'Entregas',v:String(D.xs.length),s:D.xs.filter(x=>x.st!=='lancado').length+' falta conferir',c:D.xs.some(x=>x.st!=='lancado')?'warn':'ok'},
         {t:'Peças',v:String(D.pecas),s:'entregues no período',c:'teal'}].concat(c.rh?[{t:'Desconto total',v:brl(D.desc),s:nNao?nNao+' pessoa'+(nNao>1?'s':'')+' sem desconto':'todas descontadas',c:'crit'}]:[]),c.rh?4:3);
       P.secao('Por pessoa',c.rh?'Descontar = decisão do RH':'');
       if(!D.ps.length) P.vazio('Nenhuma entrega no período.');
@@ -412,7 +412,7 @@
         if(c.rh) rows.push(Object.assign(['Total','',D.pecas+' peças',String(D.xs.length),'',brl(D.desc)],{_tot:1}));
         P.tabela(cols,rows); }
       if(D.xs.length){ P.secao('Entrega a entrega','em ordem de pessoa e data');
-        const cols=[{t:'Data',w:15},{t:'Funcionário',w:30},{t:'Peças',w:46},{t:'Solicitação',w:16},{t:'Na ficha',w:12}].concat(c.rh?[{t:'Desconto',w:17,al:'r'}]:[]);
+        const cols=[{t:'Data',w:15},{t:'Funcionário',w:30},{t:'Peças',w:46},{t:'Solicitação',w:16},{t:'Conferido',w:12}].concat(c.rh?[{t:'Desconto',w:17,al:'r'}]:[]);
         const xs=D.ps.flatMap(g=>g.xs);
         const rows=xs.map(x=>{ const d=c.rh?descDe(x,pr):null, r=[br(x.data)+(x.per?' '+x.per.slice(0,1)+'.':''),c.titulo(x.nome||''),itensOk(x).map(i=>(Math.max(1,parseInt(i.qtd,10)||1))+'× '+i.t+(i.tam?' '+i.tam:'')).join(', '),x.sol?'Nº '+x.sol:'—',x.st==='lancado'?'sim':'não']
             .concat(c.rh?[d.tipo==='nao'?'não descontar':d.v==null?'sem preço':brl(d.v)]:[]); r._cor={4:x.st==='lancado'?'ok':'warn'}; if(c.rh&&d.tipo==='nao') r._cor[5]='crit'; return r; });
@@ -437,21 +437,21 @@
     const card=x=>{ const lan=x.st==='lancado', pode=P.dono()||x.por===P.S.uid, ini=c.titulo(x.nome||'').split(' ').filter(Boolean), sig=((ini[0]||'?')[0]+(ini.length>1?ini[ini.length-1][0]:'')).toUpperCase();
       return `<article class="rhu-c ${lan?'ok':''}">
         <div class="rhu-ch"><span class="rhu-av">${e(sig)}</span><div class="rhu-cn"><b>${e(c.titulo(x.nome||''))}</b><small>${e(x.setor||'sem setor')} · ${e(br(x.data))}${x.per?' · '+e(x.per):''}</small></div>
-          ${lan?`<span class="pill ok">Lançado na ficha</span>`:`<span class="pill warn">Falta lançar na ficha</span>`}</div>
+          ${lan?`<span class="pill ok">Conferido</span>`:`<span class="pill warn">Falta conferir</span>`}</div>
         <div class="rhu-cb"><div class="rhu-cm"><span class="rhu-ri">${itensOk(x).map(i=>`<span>${e(itTxt(i))}</span>`).join('')}</span>
             <small>${x.sol?'Solicitação Nº '+e(x.sol):'Sem nº da solicitação'} · entregue por ${e(x.porNome||'—')} · ${e(hm(x.em))}${x.emailEm?' · e-mail aberto':''}${x.obs?' · '+e(x.obs):''}</small></div>
           ${descLinha(c,x)}</div>
-        <div class="rhu-cf">${lan?`<small>Lançado por ${e(x.lancPor||'')} · ${e(hm(x.lancEm))}</small><button class="lnk" data-act="rhu-volta" data-id="${e(x._id)}">Desfazer</button>`
-            :`<button class="btn rhu-sm" data-act="rhu-lanc" data-id="${e(x._id)}">${P.ic?P.ic('check',15,2.4):''}Lancei na ficha</button>`}
+        <div class="rhu-cf">${lan?`<small>Conferido por ${e(x.lancPor==='planilha'?'planilha':x.lancPor||'')} · ${e(hm(x.lancEm))}</small><button class="lnk" data-act="rhu-volta" data-id="${e(x._id)}">Desfazer</button>`
+            :`<button class="btn rhu-sm" data-act="rhu-lanc" data-id="${e(x._id)}">${P.ic?P.ic('check',15,2.4):''}Conferido</button>`}
           <span class="rhu-rsp"></span><button class="lnk" data-act="rhu-mail" data-id="${e(x._id)}">E-mail de novo</button>${pode?`<button class="lnk rhu-del" data-act="rhu-del" data-id="${e(x._id)}">${U.cx===x._id?'Confirmar: apagar':'Apagar'}</button>`:''}</div></article>`; };
-    return c.topo('Entregas de uniforme','Quem entregou registra aqui: o RH confere, lança na ficha e decide o desconto.',`<button class="btn sec" data-act="rhu-prab">Preço das peças</button><button class="btn" data-act="rhu-novo">+ Registrar entrega</button>`)
-      +`<div class="rhu-kp"><div class="${pend.length?'warn':''}"><span>Falta lançar na ficha</span><b>${pend.length}</b></div><div><span>Entregas no mês</span><b>${doMes.length}</b></div><div><span>Peças no mês</span><b>${kMes}</b></div><div><span>Desconto no mês</span><b>${brl(dMes)}</b></div></div>
-      <section class="card rhu-l"><div class="rhu-tb"><div class="seg" role="group" aria-label="Mostrar">${[['conf','Para lançar ('+pend.length+')'],['todas','Todas'],['rel','Relatório'],['desc','Descontos dos terceiros']].map(([a,b])=>`<button class="${U.st===a?'on':''}" aria-pressed="${U.st===a}" data-act="rhu-st" data-v="${a}">${b}</button>`).join('')}</div>
+    return c.topo('Entregas de uniforme','Quem entregou registra aqui: o RH confere a entrega e decide o desconto.',`<button class="btn sec" data-act="rhu-prab">Preço das peças</button><button class="btn" data-act="rhu-novo">+ Registrar entrega</button>`)
+      +`<div class="rhu-kp"><div class="${pend.length?'warn':''}"><span>Falta conferir</span><b>${pend.length}</b></div><div><span>Entregas no mês</span><b>${doMes.length}</b></div><div><span>Peças no mês</span><b>${kMes}</b></div><div><span>Desconto no mês</span><b>${brl(dMes)}</b></div></div>
+      <section class="card rhu-l"><div class="rhu-tb"><div class="seg" role="group" aria-label="Mostrar">${[['conf','Para conferir ('+pend.length+')'],['todas','Todas'],['rel','Relatório'],['desc','Descontos dos terceiros']].map(([a,b])=>`<button class="${U.st===a?'on':''}" aria-pressed="${U.st===a}" data-act="rhu-st" data-v="${a}">${b}</button>`).join('')}</div>
         ${U.st==='desc'?'':`<label class="rhu-bq"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input class="txt" id="${U.st==='rel'?'rhu-rq':'rhu-lq'}" type="search" placeholder="Buscar pessoa, setor ou peça" value="${e(U.st==='rel'?U.rel.q:(U.q||''))}"></label>`}</div>
-        ${U.st==='desc'?descHtml(c):U.st==='rel'?relHtml(c):xs.length?`<div class="rhu-cs">${xs.map(card).join('')}</div>`:`<div class="empty">${!U.lido?'Carregando…':ws.length?'Nada encontrado na busca.':U.st==='conf'?'Nenhuma entrega esperando o RH. Tudo lançado.':'Nenhuma entrega registrada ainda. Toque em "+ Registrar entrega".'}</div>`}</section>`
+        ${U.st==='desc'?descHtml(c):U.st==='rel'?relHtml(c):xs.length?`<div class="rhu-cs">${xs.map(card).join('')}</div>`:`<div class="empty">${!U.lido?'Carregando…':ws.length?'Nada encontrado na busca.':U.st==='conf'?'Nenhuma entrega esperando o RH. Tudo conferido.':'Nenhuma entrega registrada ainda. Toque em "+ Registrar entrega".'}</div>`}</section>`
       +(U.f?form(c):'')+(U.precos?precosForm(c):''); }
   function avisos(c){ const xs=U.xs.filter(x=>x.st!=='lancado'), qv=c&&c.R&&!c.gestor?qAvisos(c):[]; if(!xs.length) return qv;
-    return qv.concat([{nivel:'warn',rotulo:'Uniforme',titulo:xs.length===1?'1 entrega de uniforme para lançar na ficha':xs.length+' entregas de uniforme para lançar na ficha',texto:xs.slice(0,3).map(x=>c.titulo(x.nome||'')).join(', '),go:'rhunif'}]); }
+    return qv.concat([{nivel:'warn',rotulo:'Uniforme',titulo:xs.length===1?'1 entrega de uniforme para conferir':xs.length+' entregas de uniforme para conferir',texto:xs.slice(0,3).map(x=>c.titulo(x.nome||'')).join(', '),go:'rhunif'}]); }
   function novo(c){ U.f={nome:'',fid:'',setor:'',funcao:'',data:c.P.hojeStr(),per:new Date().getHours()<12?'Manhã':'Tarde',itens:[{t:'',tam:'',qtd:1}],sol:'',obs:''}; U.cfg=!lista(cfgMail(c).para).length; c.P.render(); setTimeout(()=>{ const i=document.getElementById('rhu-pn'); i&&i.focus(); },60); }
   const g=i=>{ const x=document.getElementById(i); return x?x.value:null; };
   function le(){ const F=U.f; if(!F) return; [['rhu-pn','nome'],['rhu-st','setor'],['rhu-dt','data'],['rhu-sol','sol'],['rhu-ob','obs']].forEach(([i,k])=>{ const v=g(i); if(v!=null) F[k]=v; });
@@ -510,7 +510,7 @@
       if(a==='rhu-dnao') d={nao:true,v:(x.desc&&x.desc.v!=null&&!x.desc.nao?x.desc.v:(x.desc&&x.desc.v!=null?x.desc.v:null)),por:eu,em:agora}; else if(a==='rhu-dcalc') d=null; else if(a==='rhu-dsim') d=x.desc&&x.desc.v!=null?{nao:false,v:x.desc.v,por:eu,em:agora}:null; else { const v=numBR(g('rhu-dv')); if(v==null||v<0) return P.toast('Digite o valor do desconto (ex.: 25,90).'); d={nao:false,v,por:eu,em:agora}; }
       try{ await db.doc(COL+'/'+x._id).update({desc:d}); x.desc=d; U.dEd=null; P.toast(a==='rhu-dnao'?'Esta entrega não será descontada.':a==='rhu-dsim'?'Esta entrega será descontada.':a==='rhu-dcalc'?'Desconto pelo preço das peças.':'Desconto guardado.'); }catch(e){ P.erro(e); } P.render(); return; }
     if(a==='rhu-mail'){ abreEmail(C,x,preJanela(C)); try{ const up={emailEm:agora,emailN:(x.emailN||0)+1}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); }catch(e){} P.render(); return; }
-    if(a==='rhu-lanc'){ try{ const up={st:'lancado',lancEm:agora,lancPor:eu}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); P.toast('Marcado como lançado na ficha.'); }catch(e){ P.erro(e); } P.render(); return; }
+    if(a==='rhu-lanc'){ try{ const up={st:'lancado',lancEm:agora,lancPor:eu}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); P.toast('Entrega conferida.'); }catch(e){ P.erro(e); } P.render(); return; }
     if(a==='rhu-volta'){ try{ const up={st:'novo',lancEm:null,lancPor:null}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); }catch(e){ P.erro(e); } P.render(); return; }
     if(a==='rhu-del'){ if(U.cx!==x._id){ U.cx=x._id; P.render(); setTimeout(()=>{ if(U.cx===x._id){ U.cx=null; P.render(); } },4000); return; } U.cx=null;
       try{ await db.doc(COL+'/'+x._id).update({removido:true,removidoEm:agora,removidoPor:eu}); U.xs=U.xs.filter(y=>y!==x); P.toast('Entrega apagada.'); }catch(e){ P.erro(e); } P.render(); return; } });

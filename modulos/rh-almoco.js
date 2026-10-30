@@ -95,11 +95,14 @@
   function foraDe(k){ const f=(cfg().fora||{})[k]; return f&&!f.removido?f:null; }
   /* o almoço do dia ainda não terminou? (hoje, antes do fim da janela do refeitório) */
   function almEmCurso(d){ const n=new Date(), h=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); if(d!==h) return false; return n.getHours()*60+n.getMinutes()<=hm(cfg().fim||'14:30'); }
+  /* atestado/falta registrado pelo RH (modulos/rh-atestados.js, 30/10) */
+  const atDe=(p,d)=>{ try{ return window.RHAtest?RHAtest.cobre(p,d):null; }catch(e){ return null; } };
   function situacao(m,d,k){ const aj=((A.aj[m]||{}).aj||{})[d+'_'+k]; const x=(((A.dados[m]||{}).dias||{})[d]||{})[k];
     let r; if(aj&&aj.v==='just') r={v:'just',j:aj,x}; else if(aj&&!aj.removido) r={v:aj.v==='sim'?'sim':'nao',aj,x}; else if(!x) r={v:'aus',x:null}; else r={v:x.a?'sim':'nao',x};
     if(r.v==='nao'&&foraDe(k)) r.v='fora';
     if(r.v==='nao'&&!r.aj&&almEmCurso(d)) r.v='pend'; /* almoço ainda não terminou hoje */
     if(r.v==='nao'&&!r.aj){ const sl=semLeit(d); if(sl) r={v:'just',x:r.x,sl:true,j:{tipo:'Refeitório sem leitura',mot:sl.mot||'O Face ID do refeitório não registrou o almoço neste dia',por:sl.por||''}}; }
+    if(r.v==='nao'&&!r.aj){ const at=atDe({cpf:k},d); if(at) r={v:'just',x:r.x,at,j:{tipo:window.RHAtest?RHAtest.TIPO(at.tipo)[1]:'Atestado',mot:(window.RHAtest?RHAtest.durTxt(at):'')+(at.mot?' · '+at.mot:''),por:at.por||''}}; }
     if(r.v==='nao'){ const au=ausDe(k,d); if(au) r={v:'just',x:r.x,aj:r.aj,aus:au,j:{tipo:'Ausência programada',mot:ausTxt(au)+(au.mot?' · '+au.mot:''),por:au.por||''}}; }
     return r; }
   /* ---------- ausência no almoço (programada): um dia ou regra por dia da semana (rh/config.almoco.ausencias) ---------- */
@@ -128,7 +131,7 @@
         <details><summary>Como exportar do Control iD</summary><ol><li>Relatórios → Acessos → <b>Acessos Gerais</b>.</li><li>Escolha as datas (pode ser o mês todo), Pessoas: Todos, e clique em Listar.</li><li>Exportar → <b>Exportar CSV</b> e arraste o arquivo aqui (ou toque em "Importar do Face ID").</li><li>Importar de novo o mesmo período só atualiza esses dias: não duplica.</li></ol></details></div>
       ${st&&A.vis!=='dia'?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Faltas sem justificativa</span><b class="num">${st.semJust}</b><small>vezes que alguém veio e não almoçou · ${st.just} justificadas · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
-    if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty" style="padding:24px;text-align:center">Nenhum dado do Face ID em ${esc(mesNome(A.mes))}. Importe o CSV do Control iD. Ausências no almoço já podem ser programadas.</div><div style="text-align:center;padding-bottom:16px"><button class="btn sec" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button></div></section>`+vAus(c);
+    if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty"><b>Nenhum dado do Face ID em ${esc(mesNome(A.mes))}</b><span>Importe o CSV "Acessos Gerais" do Control iD (o robô do Face ID também manda sozinho, quando está ligado). As ausências no almoço já podem ser programadas.</span><span class="rh-vzb"><button class="btn sec" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button><label class="btn" for="alm-arq" style="cursor:pointer">${P.ic('baixar',16,2.2)}Importar do Face ID</label></span></div></section>`+vAus(c);
     const abas=`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="dir" aria-pressed="${A.vis==='dir'}">Diretoria</button><button data-act="alm-vis" data-v="pont" aria-pressed="${A.vis==='pont'}">Pontualidade</button></div>`;
     if(A.vis==='pont') return topo+`<section class="card"><div class="alm-f">${abas}</div><div class="alm-f alm-f2">
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
@@ -758,7 +761,8 @@
         const fer=ferias.some(y=>y.funcId===f._id), vi=fer?null:(VI||(VI=prVisto(d))), u=vi&&vi.ult[k]||'', lim2=prMenos(d,14);
         /* sem passar no Face ID há mais de 2 semanas (ou nunca, com 2 semanas de dados): provavelmente saiu e o cadastro não foi atualizado */
         if(vi&&vi.dias>=8&&(!f.admissao||f.admissao<lim2)&&(!u||u<lim2)){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Sumiu',u}); return; }
-        fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:fer?'Férias':'Sem registro'}); });
+        const at=fer?null:atDe({funcId:f._id,cpf:f.cpf},d);
+        fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:fer?'Férias':at?(window.RHAtest?RHAtest.TIPO(at.tipo)[1]:'Atestado'):'Sem registro'}); });
       fs.sort((a,b)=>a.n.localeCompare(b.n,'pt-BR')); }
     const C=cfg(); return {dia:d,exp,lim:limT,alm:[C.ini,C.fim],p:ps,f:fs}; }
   async function publicar(c){ if(!c||!c.P||PR.ocupado) return; const P=c.P, R=c.R; A.ctx=A.ctx||c; if(!(R.lido&&R.lido.func&&R.lido.fer)) return;
@@ -795,7 +799,8 @@
     const pes=(k,f,pp)=>out[k]=out[k]||{k,nome:titulo(f?f.nome:(pp&&pp.n)||'Sem nome'),setor:(f&&f.setor)||'',emp:empCurta((pp&&pp.e)||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX'):'')),funcId:f?f._id:null,cpf:/^\d{11}$/.test(k)?k:'',dias:0,atr:[],sai:[],falt:[]};
     ds.forEach(d=>{ const r=prDia(c,d,maxP); if(!r.exp) return; dExp.push(d); const dia=D.dias[d]||{};
       Object.keys(dia).forEach(k=>{ const x=dia[k]||{}, f=fx[k]||null; const t=(x.t||[]).map(z=>{ const mm=String(z).match(/^(\d{2}:\d{2})(:\d{2})?\s*(.*)$/); return mm?{h:mm[1],d:mm[3]}:null; }).filter(Boolean).sort((a,b)=>a.h.localeCompare(b.h)); if(!t.length) return;
-        const o=pes(k,f,P0[k]); o.dias++; const tu=turnoDe(c,o.setor,d), ini=hm(tu.ini), fim=hm(tu.fim), ch=hm(t[0].h);
+        const o=pes(k,f,P0[k]); o.dias++; if(atDe({funcId:f?f._id:null,cpf:k},d)) return; /* dia com atestado/declaração: não conta atraso nem saída antes */
+        const tu=turnoDe(c,o.setor,d), ini=hm(tu.ini), fim=hm(tu.fim), ch=hm(t[0].h);
         if(ch>ini+tol) o.atr.push({d,h:t[0].h,esp:tu.ini,min:ch-ini});
         const sds=t.filter(z=>ehSaida(z.d)), u=(sds.length?sds[sds.length-1]:t[t.length-1]); const um=hm(u.h);
         if((d<hj||agora>fim+60)&&um<fim-tol&&um>ch) o.sai.push({d,h:u.h,esp:tu.fim,min:fim-um,leitor:ehSaida(u.d)}); });
