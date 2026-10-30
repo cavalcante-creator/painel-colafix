@@ -3,17 +3,22 @@
      (as abas de cada módulo não mudam): Meu dia · Produção (Produção · Análise PCP · Tablet da produção) ·
      Almoxarifado (Almoxarifado · Inventário · Monitor do rancho) · Silos (Silos · Nível dos silos · Celular dos silos) ·
      Manutenção · RH · Visão do gestor · Telas de TV · Sistema (Meu menu · Cópia de segurança). Módulo que não está em grupo vai no fim.
-   RH sozinho (Juliana): 10 telas viram 6 itens, com abas no alto da tela: Início · Pessoas (Funcionários · Pessoas na empresa · Vagas) ·
-     Prazos (Agenda · Férias e prazos) · Documentos (Fichas do mês · Documentos e contratos) · Almoço · Cadastros.
+   RH sozinho: Início ·
+     Pessoas (Funcionários · Admissões e vagas · Terceirizados · Quem está hoje · Uniformes) · Ausências (Férias · Atestados · Almoço) · Prazos (Agenda · Experiência · Troca dos PJ · Exames e NRs) · Documentos · Relatórios · Cadastros (30/10).
    Busca na lateral (a mesma caixa do js/55, `#gxs`): cada perfil com o que é dele — vazia mostra os avisos; digitando acha
      ações, telas, ordens/ranchos/fichas/itens (busca do topo, tpBusca), chamados abertos e pessoas do RH (window.RHBusca). */
 "use strict";
 const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios','tabprod']},{g:'Almoxarifado',ms:['premix','almox','monitor']},{g:'Silos',ms:['silos','silosver','silocel']},
   {id:'manut'},{id:'rh'},{id:'gestor'},{id:'telas'},{g:'Sistema',ic:'ajuste',ms:['meumenu','backup']}];
-const RHG=[{v:'rhinicio'},{g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhpres','Pessoas na empresa'],['rhvagas','Vagas']]},
-  {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhferias','Férias e prazos']]},{g:'Documentos',ic:'folha',vs:[['rhfichas','Fichas do mês'],['rhunif','Uniformes'],['rhdocs','Documentos e contratos']]},
-  {v:'rhalmoco'},{v:'rhfuncoes'}];
-const RH_SUB={rhterc:'rhfunc'};
+/* menu do RH reorganizado (30/10, escolha da usuária): cada item abre direto a tela; Uniformes em Pessoas */
+const RHG=[{v:'rhinicio'},
+  {g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhvagas','Admissões e vagas'],['rhterc','Terceirizados'],['rhpres','Quem está hoje'],['rhunif','Uniformes']]},
+  {g:'Ausências',ic:'relogio',vs:[['rhferias','Férias'],['rhatest','Atestados e faltas'],['rhalmoco','Almoço']]},
+  {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhexp','Experiência'],['rhpj','Troca dos PJ'],['rhqual','Exames e NRs']]},
+  {g:'Documentos',ic:'folha',vs:[['rhdocs','Contratos e documentos'],['rhfichas','Fichas de EPI']]},
+  {g:'Relatórios',ic:'grafico',vs:[['rhrelmes','Relatório do mês'],['rhfech','Fechamento da folha'],['rhind','Indicadores'],['rhpont','Pontualidade'],['rhalmdir','Almoço (diretoria)']]},
+  {v:'rhfuncoes'}];
+const RH_SUB={};
 function sbRhSolo(){ try{ const ms=modsVis(); return ms.length===1&&ms[0].id==='rh'; }catch(e){ return false; } }
 function sbPerfil(){ try{ if(typeof gxSolo==='function'&&gxSolo()) return 'gx'; if(!S.acs||!S.acs.pronto) return ''; if(sbRhSolo()) return 'rh'; if(S.acs.dono) return 'adm'; }catch(e){} return ''; }
 /* ---------------- administradora ---------------- */
@@ -22,7 +27,7 @@ function sbPerfil(){ try{ if(typeof gxSolo==='function'&&gxSolo()) return 'gx'; 
 const ADM_PROD=['prodpainel','programacao','calendario','apconf'], ADM_REL=['prodind','indicadores'];
 const admRelVis=()=>ADM_REL.filter(v=>{ try{ return !!VIEWS[v]&&viewOk(v); }catch(e){ return false; } });
 const admEhRel=()=>S.mod==='producao'&&ADM_REL.includes(S.view);
-{ const _mt=mTabs; mTabs=function(m){ const r=_mt.apply(this,arguments); try{ if(sbPerfil()!=='adm'||!m||m.id!=='producao') return r; if(admEhRel()) return admRelVis(); const xs=ADM_PROD.filter(v=>r.includes(v)); return xs.length?xs:r; }catch(e){ return r; } }; }
+{ const _mt=mTabs; mTabs=function(m){ const r=_mt.apply(this,arguments); try{ if(sbPerfil()==='adm'&&m&&m.id==='rh'){ const g=rhgDe(S.view); if(!g||!g.vs) return []; const xs=g.vs.map(t=>t[0]).filter(v=>r.includes(v)); return xs.length>1?xs:[]; } if(sbPerfil()!=='adm'||!m||m.id!=='producao') return r; if(admEhRel()) return admRelVis(); const xs=ADM_PROD.filter(v=>r.includes(v)); return xs.length?xs:r; }catch(e){ return r; } }; }
 function admNav(){ const nl=$('#navlist'); if(!nl) return; const ms=modsVis(), por={}; ms.forEach(m=>por[m.id]=m); const usados=new Set();
   const rv=admRelVis(); if(por.producao&&rv.length) por.relatorios={id:'relatorios',nome:'Relatórios',ic:'grafico',go:rv[0]};
   const fora=['ajustes','itens','acessos'].includes(S.view), cur=id=>!fora&&(id==='relatorios'?admEhRel():id==='producao'?S.mod==='producao'&&!admEhRel():S.mod===id);
@@ -34,6 +39,11 @@ function admNav(){ const nl=$('#navlist'); if(!nl) return; const ms=modsVis(), p
     h+=`<button class="navbtn gxn-nb gxg-gr" ${alvo(xs[0])} ${ab?'data-aberto="1"':''}>${ic(g.ic||xs[0].ic)}<span>${esc(g.g)}</span></button>`
       +(ab?`<div class="gxg-sub">${xs.map(m=>`<button class="navbtn gxg-si" ${alvo(m)} ${cur(m.id)?'aria-current="page"':''}><span>${esc(m.nome)}</span></button>`).join('')}</div>`:''); });
   ms.filter(m=>!usados.has(m.id)).forEach(m=>{ h+=um(m); });
+  /* RH aberto: os grupos do RH embaixo do item (como no menu do próprio RH) */
+  if(S.mod==='rh'&&!fora){ const k=h.indexOf('data-mod="rh"'); if(k>=0){ const fim=h.indexOf('</button>',k)+9, gAt=rhgDe(S.view);
+    const sub=RHG.map(g=>{ const v=g.vs?((g.vs.find(t=>sbOk(t[0]))||[])[0]):g.v; if(!v||!sbOk(v)) return ''; const nome=g.g||(VIEWS[v]&&VIEWS[v].nome)||v;
+      return `<button class="navbtn gxg-si" data-go="${v}" ${gAt===g?'aria-current="page"':''}><span>${esc(nome)}</span></button>`; }).join('');
+    h=h.slice(0,fim)+`<div class="gxg-sub">${sub}</div>`+h.slice(fim); } }
   nl.innerHTML=h; nl.dataset.sbg='adm'; gxsMonta(nl); }
 /* ---------------- RH ---------------- */
 function rhgDe(v){ v=RH_SUB[v]||v; return RHG.find(g=>g.vs?g.vs.some(t=>t[0]===v):g.v===v)||null; }
@@ -67,6 +77,8 @@ function sbRhAcoes(){ const xs=[];
   if(sbOk('rhunif')) xs.push(['Entregar uniforme','uniforme camiseta calça entrega solicitação e-mail rh',()=>{ window.RHUnifNovo&&window.RHUnifNovo(); }]);
   if(sbOk('rhvagas')) xs.push(['Nova vaga','vaga candidato contratar',()=>{ go('rhvagas'); sbClica({act:'rhv-vnova'},150); }]);
   if(sbOk('rhfichas')) xs.push(['Imprimir as fichas do mês','fichas epi uniforme imprimir',()=>go('rhfichas')]);
+  if(sbOk('rhatest')) xs.push(['Registrar atestado ou falta','atestado falta médico declaração comparecimento ausência',()=>{ go('rhatest'); sbClica({act:'rat-novo'},150); }]);
+  if(sbOk('rhfech')) xs.push(['Fechamento da folha','folha contabilidade fechamento mês excel',()=>go('rhfech')]);
   return xs; }
 function sbPessoas(q,bate,r){ try{ if(!window.RHBusca||!sbOk('rhfunc')) return; RHBusca.pessoas().filter(p=>bate(p.nome+' '+p.setor+' '+p.funcao)).slice(0,6)
   .forEach(p=>r.push({g:'Pessoas',t:p.nome,s:[p.funcao,p.setor,p.status&&p.status!=='Ativo'?p.status:''].filter(Boolean).join(' · '),run:()=>sbClica({act:'rh-pess',id:p.id},0)})); }catch(e){} }
