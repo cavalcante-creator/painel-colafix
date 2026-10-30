@@ -1427,6 +1427,15 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       <div class="rh-convq">${qrSvg(u,180)}<div><p class="sub" style="margin:0 0 8px">Mande pelo WhatsApp ou mostre o QR para a pessoa ler com a câmera do celular.</p><div class="rh-convm">${esc(msgTexto(x)).replace(/\n/g,'<br>')}</div><input class="txt" id="rh-convu" value="${esc(u)}" readonly onfocus="this.select()">
         <div class="sub" style="margin:6px 0 0;font-size:12.5px">Vale até ${new Date(+x.ateMs).toLocaleDateString('pt-BR')}. Quando chegar, aparece em Funcionários › Admissões e no Início.</div></div></div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn sec" data-act="rh-convcop" data-id="${x._id}">Copiar mensagem e link</button><button class="btn" data-act="rh-convwa" data-id="${x._id}">Mandar no WhatsApp</button></div></div></div>`; }
+  /* "Começar admissão" com a ficha do celular (Fichas pelo celular e Vagas › candidato aprovado). extra = função, setor e vínculo da vaga */
+  function fcUsar(id,extra){ const ex=Object.assign({},extra||{}); if(ex.tipo) ex.empresa=ex.tipo==='PJ'?'':'COLAFIX'; Object.keys(ex).forEach(k=>{ if(!ex[k]&&k!=='empresa') delete ex[k]; });
+    const x=R.fcand.find(c=>c._id===id); if(!x) return false; const ja=R.func.find(f=>dig(f.cpf)&&dig(f.cpf)===dig(x.cpf));
+        if(ja&&!confirm(ja.nome+' já está cadastrado com este CPF. Completar o cadastro dele com os dados da ficha?')) return false;
+        const dados={nome:String(x.nome||'').toUpperCase(),cpf:fCPF(x.cpf),nascimento:okIso(x.nascimento)?x.nascimento:'',telefone:x.telefone||'',email:x.email||'',cep:x.cep||'',endereco:fcEndereco(x),camisa:x.camisa||'',calca:x.calca||'',calcado:x.calcado||'',
+          banco:x.banco||'',agencia:x.agencia||'',conta:x.conta||'',pix:x.pix||'',emergencia:[x.emergNome,x.emergTel].filter(Boolean).join(' · '),fichaCand:x._id};
+        if(ja){ const v=Object.assign({},ja,{cpf:fCPF(ja.cpf)}); Object.keys(dados).forEach(k=>{ if(k!=='nome'&&k!=='cpf'&&dados[k]) v[k]=dados[k]; }); Object.keys(ex).forEach(k=>{ if(ex[k]&&!v[k]) v[k]=ex[k]; }); R.f=v; }
+        else R.f=Object.assign({status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr(),obs:x.obs||''},ex,dados);
+        R.fcv=null; R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); P.toast(ex.funcao?'Confira os dados da ficha e salve.':'Confira os dados, escolha a função e o setor e salve.'); return true; }
   function cartaoFichasCel(){ const xs=R.fcand.filter(x=>!x.usada), ab=R.conv.filter(convAberto);
     return `<section class="card rh-fcel"><div class="rh-ch"><h2>Fichas pelo celular</h2><button class="btn sec rh-sm" data-act="rh-convnovo">${P.ic('mais',16,2.4)}Mandar ficha pelo celular</button></div>
       ${xs.length?xs.map(x=>`<div class="rh-dl"><div><b>${esc(x.nome||'')}</b><small>chegou em ${dmIso(x.em)}${x.fotos?' · '+plural(+x.fotos,'foto','fotos'):''}${x.telefone?' · '+esc(x.telefone):''}</small></div><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button class="lnk" data-act="rh-fcver" data-id="${x._id}">Ver</button><button class="btn rh-sm" data-act="rh-fcusar" data-id="${x._id}">Começar admissão</button></div></div>`).join('')
@@ -1669,7 +1678,14 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   const atCtx=()=>({P,R,esc,eu,br,titulo,guardar:guardarArqRH});
   /* tela Vagas (modulos/rh-vagas.js): vagas abertas e candidatos até a admissão */
   const vagCtx=()=>({P,R,esc,eu,br,topo,addDias,guardar:guardarArqRH,funcoes:()=>R.funcoes.map(x=>x.nome).sort((a,b)=>a.localeCompare(b,'pt-BR')),setores:setoresCad,
-    admIni:d=>{ R.f=Object.assign({status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr()},d,{empresa:d.tipo==='PJ'?'':'COLAFIX'}); R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); P.toast('Nova admissão de '+d.nome+': confira os dados e complete o cadastro.'); }});
+    admIni:d=>{ R.f=Object.assign({status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr()},d,{empresa:d.tipo==='PJ'?'':'COLAFIX'}); R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); P.toast('Nova admissão de '+d.nome+': confira os dados e complete o cadastro.'); },
+    /* ficha pelo celular dentro da vaga (30/10): o candidato guarda o token do convite em `conv` */
+    conv:()=>R.conv, fcand:()=>R.fcand,
+    convCriar:async d=>{ const nm=String(d.nome||'').trim().slice(0,60), msg=R.cfg.convMsg||CONV_MSG, t=tokenNovo(), ateMs=Date.now()+FC_VALIDADE*864e5;
+      await P.db().doc(COL.conv+'/'+t).set({nome:nm,msg,docs:docsAdm().filter(n=>!/^ASO\b/i.test(n)),criado:agora(),ateMs,usado:false,porNome:eu(),por:P.S.uid||null,vaga:true});
+      R.convM={fase:'link',t,nome:nm,ateMs,msg,tel:d.tel||''}; return t; },
+    convVer:(t,tel)=>{ const x=R.conv.find(c=>c._id===t); if(!x) return P.toast('Esse link não vale mais. Mande a ficha de novo.'); R.convM={fase:'link',t,nome:x.nome,ateMs:x.ateMs,msg:x.msg,tel:tel||''}; P.render(); },
+    fichaVer:t=>{ R.fcv=t; P.render(); }, fichaUsar:(t,extra)=>fcUsar(t,extra) });
   avRH(()=>window.RHVagas?window.RHVagas.avisos(vagCtx()):[]);
   /* tela Uniformes (modulos/rh-uniformes.js, 27/10): entregas de uniforme para o RH lançar na ficha + e-mail pronto */
   const unifCtx=()=>({P,R,esc,eu,br,topo,titulo,funcaoDe,setores:setoresCad});
@@ -2138,19 +2154,13 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
           if(msg!==(R.cfg.convMsg||CONV_MSG)){ R.cfg.convMsg=msg; P.db().doc('rh/config').set({convMsg:msg,alteradoEm:agora()},{merge:true}).catch(()=>{}); } } finally{ R.salv=false; P.render(); } return; }
       if(a==='rh-convver'){ const x=R.conv.find(c=>c._id===b.dataset.id); if(x) R.convM={fase:'link',t:x._id,nome:x.nome,ateMs:x.ateMs,msg:x.msg}; P.render(); return; }
       if(a==='rh-convcop'){ const x=R.conv.find(c=>c._id===b.dataset.id)||Object.assign({_id:b.dataset.id},R.convM||{}); try{ await navigator.clipboard.writeText(msgWa(x)); P.toast('Mensagem e link copiados.'); }catch(e){ const i=document.getElementById('rh-convu'); if(i){ i.focus(); i.select(); } P.toast('Copie o link selecionado.'); } return; }
-      if(a==='rh-convwa'){ const x=R.conv.find(c=>c._id===b.dataset.id)||Object.assign({_id:b.dataset.id},R.convM||{}); window.open('https://wa.me/?text='+encodeURIComponent(msgWa(x)),'_blank','noopener'); return; }
+      if(a==='rh-convwa'){ const x=R.conv.find(c=>c._id===b.dataset.id)||Object.assign({_id:b.dataset.id},R.convM||{}), w=dig(R.convM&&R.convM.t===x._id&&R.convM.tel||''); window.open('https://wa.me/'+(w.length>=10?(w.length<=11?'55'+w:w):'')+'?text='+encodeURIComponent(msgWa(x)),'_blank','noopener'); return; }
       if(a==='rh-convapag'){ if(!confirm('Cancelar este link? A pessoa não vai mais conseguir mandar a ficha.')) return; await P.db().doc(COL.conv+'/'+b.dataset.id).delete(); P.toast('Link cancelado.'); return; }
       if(a==='rh-fcver'){ R.fcv=b.dataset.id; P.render(); return; }
       if(a==='rh-fcx'){ R.fcv=null; P.render(); return; }
       if(a==='rh-fcapag'){ if(!confirm('Apagar esta ficha e as fotos dela?')) return; const t=b.dataset.id; const sn=await P.db().collection(COL.fcarq).where('c','==',t).limit(40).get();
         for(const d of sn.docs) await P.db().doc(COL.fcarq+'/'+d.id).delete(); await P.db().doc(COL.fcand+'/'+t).delete(); try{ await P.db().doc(COL.conv+'/'+t).delete(); }catch(e){} R.fcv=null; P.toast('Ficha apagada.'); P.render(); return; }
-      if(a==='rh-fcusar'){ const x=R.fcand.find(c=>c._id===b.dataset.id); if(!x) return; const ja=R.func.find(f=>dig(f.cpf)&&dig(f.cpf)===dig(x.cpf));
-        if(ja&&!confirm(ja.nome+' já está cadastrado com este CPF. Completar o cadastro dele com os dados da ficha?')) return;
-        const dados={nome:String(x.nome||'').toUpperCase(),cpf:fCPF(x.cpf),nascimento:okIso(x.nascimento)?x.nascimento:'',telefone:x.telefone||'',email:x.email||'',cep:x.cep||'',endereco:fcEndereco(x),camisa:x.camisa||'',calca:x.calca||'',calcado:x.calcado||'',
-          banco:x.banco||'',agencia:x.agencia||'',conta:x.conta||'',pix:x.pix||'',emergencia:[x.emergNome,x.emergTel].filter(Boolean).join(' · '),fichaCand:x._id};
-        if(ja){ const v=Object.assign({},ja,{cpf:fCPF(ja.cpf)}); Object.keys(dados).forEach(k=>{ if(k!=='nome'&&k!=='cpf'&&dados[k]) v[k]=dados[k]; }); R.f=v; }
-        else R.f=Object.assign({status:'Ativo',tipo:'CLT',admNova:true,admissao:P.hojeStr(),obs:x.obs||''},dados);
-        R.fcv=null; R.pess=null; R.adm=null; P.go('rhfunc'); window.scrollTo(0,0); P.toast('Confira os dados, escolha a função e o setor e salve.'); return; }
+      if(a==='rh-fcusar'){ fcUsar(b.dataset.id); return; }
       /* fichas do mês */
       if(a==='rh-fabrir'){ R.fmes=fichasMesIni(); R.fv='mes'; P.go('rhfichas'); return; }
       if(a==='rh-fgerartela'){ R.fmes=fichasMesIni(); R.fv='gerar'; P.go('rhfichas'); fichasRodar(()=>{ try{ const d=frm.contentWindow.document, i=d.getElementById('input-mes'); if(i&&i.value!==R.fmes){ i.value=R.fmes; i.dispatchEvent(new Event('change')); } }catch(e){} }); return; }

@@ -62,7 +62,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
   await p.click('[data-act="rh-ferx"]').catch(()=>{});
 
   /* 1 · ficha pelo celular */
-  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await H.dorme(200); await p.click('[data-act="rh-fview"][data-v="adm"]'); await H.dorme(300);
+  await p.evaluate(()=>__T.go('rhvagas')); await H.dorme(400); await p.click('[data-act="rh-vgv"][data-v="adm"]'); await H.dorme(400); /* "Admissões" agora fica em Admissões e vagas › Em admissão */
   await p.click('.rh-fcel [data-act="rh-convnovo"]'); await H.dorme(300); await p.fill('#rh-convn','Diego'); await p.fill('#rh-convmsg','Oi, {NOME}! Começa segunda às 7h. Traga a carteira de trabalho.'); await p.click('[data-act="rh-convcriar"]'); await H.dorme(700);
   const link=await p.inputValue('#rh-convu'); const tok=(link.match(/c=([a-z0-9]{20})$/)||[])[1]; const temQr=await p.$$eval('.rh-convq svg',x=>x.length);
   S=await srv(); ok('Ficha pelo celular: o RH cria o link (com QR e WhatsApp) e o convite fica guardado', !!tok&&temQr===1&&S['rh/dados/convites/'+tok]&&S['rh/dados/convites/'+tok].nome==='Diego'&&S['rh/dados/convites/'+tok].msg==='Oi, {NOME}! Começa segunda às 7h. Traga a carteira de trabalho.'&&/Oi, Diego! Começa segunda às 7h/.test(await p.evaluate(()=>document.querySelector('.rh-convm').innerText))&&(S['rh/config']||{}).convMsg&&/ficha\.html\?c=/.test(link), link);
