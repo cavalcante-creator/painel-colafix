@@ -110,7 +110,7 @@
       const colab=[['Nome','CPF','Função','Setor','Data de admissão','Empresa','Status','Tipo']].concat(FU.map(x=>[x.nome,docF(x),x.funcao||'',x.setor||'',DIAS(x.admissao),x.empresa||'',x.status==='Desligado'&&!(okIso(x.desligamento)&&x.desligamento.slice(0,7)>=P.hojeStr().slice(0,7))?'Inativo':'Ativo',x.tipo==='PJ'?'PJ':'CLT']));
       const cab=(p,s,mx)=>{ const h=['Função']; for(let n=1;n<=mx;n++) h.push(p+' '+n,s+' '+n); return h; };
       const linha=(nome,its,k,mx)=>{ const r=[nome]; for(let n=0;n<mx;n++){ const x=its[n]; r.push(x?x.nome:'',x?(x[k]||''):''); } return r; };
-      const epi=[cab('EPI','CA',15)].concat(FC.map(x=>linha(x.nome,x.epis||[],'ca',15)));
+      const epi=[cab('EPI','CA',15)].concat(FC.map(x=>linha(x.nome,x.naoUsaEpi?[]:(x.epis||[]),'ca',15))); /* função "não usa EPI": sem folha de EPI */
       const uni=[cab('Uniforme','Tamanho',9)].concat(FC.map(x=>linha(x.nome,x.uniformes||[],'tam',9)));
       const reg=[['Funcionário','Mês/Ano referência','EPI','CA','Quantidade','Data da retirada','Responsável pela entrega','Confirmação do funcionário','CPF','Observação']].concat(RE.map(x=>[x.funcionario,x.mes?x.mes.slice(5,7)+'/'+x.mes.slice(0,4):'',x.item,x.ca||'',x.qtd,DIAS(x.data),x.responsavel||'',x.confirmacao||'',fCPF(x.cpf),x.obs||'']));
       const modelo=[[C.declUniforme||'',C.declEpi||'']];
