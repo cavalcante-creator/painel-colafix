@@ -298,7 +298,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
 
   /* ---------- Funcionários ---------- */
   /* Funcionários e Terceirizados no mesmo bloco (pedido de 13/10): Terceirizados é uma aba de Funcionários */
-  const fsegH=()=>`<div class="seg" role="group" aria-label="Como ver">${[['lista','Lista'],['setor','Por setor'],['adm','Admissões'],['terc','Terceirizados']].concat(window.RHAtest?[['atest','Atestados e faltas']]:[]).map(([k,l])=>`<button data-act="rh-fview" data-v="${k}" aria-pressed="${(R.fview||'lista')===k}">${l}</button>`).join('')}</div>`;
+  const fsegH=()=>`<div class="seg" role="group" aria-label="Como ver">${(P.S.view==='rhfunc'?[['lista','Lista'],['setor','Por setor']]:[]).map(([k,l])=>`<button data-act="rh-fview" data-v="${k}" aria-pressed="${(R.fview||'lista')===k}">${l}</button>`).join('')}</div>`;
   function vFunc(){ if(R.pess&&!R.f&&!R.fdesl) return vPessoa(); if(R.fview==='terc') return vTerc(true);
     if(R.fview==='atest'&&window.RHAtest) return topo('Funcionários','Atestados, declarações de horas e faltas de cada pessoa.',fsegH())+RHAtest.render(atCtx());
     return vFunc0(); }
@@ -779,8 +779,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   avRH(()=>avisosPrazo().map(a=>({nivel:a.c,rotulo:a.r,titulo:a.t,texto:a.s,go:a.go})));
 
   function vFerias(){ const EY='RH · FÉRIAS E PRAZOS', nf=clts().filter(f=>['crit','warn'].includes(sitFer(f).c)).length, np=pjs().filter(f=>['crit','warn'].includes(pjSit(f).c)).length, ne=emExp().filter(o=>['crit','warn'].includes(o.s.c)).length;
-    const seg=`<div class="seg" role="group" aria-label="Prazos">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['mapa','Mapa do ano'],['exp','Experiência'+(ne?' · '+ne:'')],['pj','Troca dos PJ'+(np?' · '+np:'')],['nr','Exames e NRs'+(qAtencao().length?' · '+qAtencao().length:'')]].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
-    return topo('Férias e prazos',R.pzv==='nr'?'ASO e treinamentos (NRs) de cada funcionário: avisa 30 dias antes de vencer e quando já venceu.':R.pzv==='mapa'?'Férias de todo mundo no ano, por setor: avisa quando duas pessoas do mesmo setor saem juntas.':R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':R.pzv==='exp'?'Contrato de experiência 45 + 45 dias: prorrogue, efetive ou desligue. Avisa '+PZ_AVISO()+' dias antes de cada fim.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
+    const seg=!['ferias','mapa'].includes(R.pzv)?'':`<div class="seg" role="group" aria-label="Férias">${[['ferias','Férias (CLT)'+(nf?' · '+nf:'')],['mapa','Mapa do ano']].map(([k,l])=>`<button data-act="rh-pzv" data-v="${k}" aria-pressed="${R.pzv===k}">${l}</button>`).join('')}</div>`;
+    return topo({ferias:'Férias',mapa:'Férias',exp:'Experiência',pj:'Troca dos PJ',nr:'Exames e NRs'}[R.pzv]||'Férias',R.pzv==='nr'?'ASO e treinamentos (NRs) de cada funcionário: avisa 30 dias antes de vencer e quando já venceu.':R.pzv==='mapa'?'Férias de todo mundo no ano, por setor: avisa quando duas pessoas do mesmo setor saem juntas.':R.pzv==='pj'?'PJ trocam a cada 3 meses, contando da última troca. Avisa '+PZ_AVISO()+' dias antes.':R.pzv==='exp'?'Contrato de experiência 45 + 45 dias: prorrogue, efetive ou desligue. Avisa '+PZ_AVISO()+' dias antes de cada fim.':'Férias dos CLT pela data de admissão. Avisa '+PZ_AVISO()+' dias antes do prazo para conceder e das férias sem aviso.',seg,EY)
       +(!R.lido.func||!R.lido.fer?'<section class="card"><div class="empty">Carregando…</div></section>':R.pzv==='pj'?vPJ():R.pzv==='nr'?vQualif():R.pzv==='exp'?vExp():R.pzv==='mapa'?vMapaFer():vFeriasCLT()); }
   /* Mapa de férias do ano (pedido de 13/10) */
   function vMapaFer(){ const Y=R.mapAno||+P.hojeStr().slice(0,4), tri=R.mapZoom==='tri', iniT=R.mapIni||P.hojeStr().slice(0,8)+'01', ini=tri?iniT:Y+'-01-01', fim=tri?addDias(addMeses(iniT,3),-1):Y+'-12-31', nd=diasEntre(ini,fim)+1, pc=d=>(Math.max(0,Math.min(nd,diasEntre(ini,d)))/nd*100);
@@ -977,7 +977,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     return it.sort((a,b)=>a.data.localeCompare(b.data)||a.t.localeCompare(b.t)); }
   function agendaJanela(){ const hj=P.hojeStr(), ate=addDias(hj,R.agDias), xs=agendaItens();
     return {atras:xs.filter(x=>x.data<hj&&(x.c==='crit'||x.c==='warn')),prox:xs.filter(x=>x.data>=hj&&x.data<=ate)}; }
-  function vAgenda(){ const EY='RH · AGENDA', seg=`<div class="seg" role="group" aria-label="Agenda">${[['agenda','Agenda'],['rel','Relatório do mês'],['ind','Indicadores']].map(([k,l])=>`<button data-act="rh-agv" data-v="${k}" aria-pressed="${R.agv===k}">${l}</button>`).join('')}</div>`;
+  function vAgenda(){ const EY=R.agv==='agenda'?'RH · PRAZOS':'RH · RELATÓRIOS', seg='';
     if(R.agv==='ind') return topo('Indicadores do RH','Pessoas na Colafix nos últimos 12 meses: quadro, entradas e saídas, tempo de casa, experiência e o que está em dia.',seg+(window.RHRel?RHRel.botoes('rh-indpdf','rh-indxls'):''),EY)+`<section class="card rh-rfc">${rfFil()}</section>`+(R.lido.func?vIndicadores():'<section class="card"><div class="empty">Carregando…</div></section>');
     if(R.agv==='rel') return topo('Relatório do mês','Admissões, desligamentos, férias e experiência do mês, pronto para mandar para a contabilidade.',seg,EY)+vRelatorio();
     if(!R.lido.func) return topo('Agenda','',seg,EY)+'<section class="card"><div class="empty">Carregando…</div></section>';
@@ -1055,7 +1055,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     return `<section class="card"><div class="rh-ch" style="flex-wrap:wrap"><div style="display:flex;gap:8px;align-items:center"><button class="btn sec rh-sm" data-act="rh-relmes" data-v="-1">‹</button><h2 style="margin:0">${esc(mesTitulo(m))}</h2>${m<P.hojeStr().slice(0,7)?'<button class="btn sec rh-sm" data-act="rh-relmes" data-v="1">›</button>':''}</div>
         ${window.RHRel?RHRel.botoes('rh-relpdf','rh-relxls'):'<button class="btn rh-sm" data-act="rh-relxls">Baixar Excel</button>'}</div>${rfFil()}
       <div class="rh-kpi" style="margin:4px 0 0">${[[D.quadro.length,'no quadro no fim do mês'],[clt+' / '+(D.quadro.length-clt),'CLT / PJ'],[D.adm.length,D.adm.length===1?'admissão':'admissões'],[D.desl.length,D.desl.length===1?'desligamento':'desligamentos']].map(([n,l])=>`<div><b class="num">${n}</b><span>${l}</span></div>`).join('')}</div></section>`
-      +fechCard(m)+REL_T.map(([k,t,cab,fn])=>`<section class="card"><h2>${t}${D[k].length?' · '+D[k].length:''}</h2>${relTabela(D[k].map(fn),cab)}</section>`).join(''); }
+      +REL_T.map(([k,t,cab,fn])=>`<section class="card"><h2>${t}${D[k].length?' · '+D[k].length:''}</h2>${relTabela(D[k].map(fn),cab)}</section>`).join(''); }
   function relHtml(m){ const D=relDados(m);
     return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório do RH - ${esc(mesTitulo(m))}</title><style>@page{size:A4;margin:16mm}body{font:10.5pt/1.45 "Segoe UI",Arial,sans-serif;color:#111}h1{font-size:16pt;margin:0}h2{font-size:12pt;margin:18px 0 6px;color:#143F54}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #ddd;font-size:9.5pt}th{background:#f2efe7}.sub{color:#666}</style></head><body>
       <h1>Relatório do RH · ${esc(mesTitulo(m))}</h1><div class="sub">${esc(EMP_DOC.COLAFIX.nome)} · gerado em ${br(P.hojeStr())} · ${D.quadro.length} no quadro no fim do mês</div>
@@ -1081,10 +1081,10 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     return {m,D,F,pes,temFace:!!(F&&F.ponto),vd:(F&&F.valorDesc)||0}; }
   function fechCarrega(m){ R.fech=R.fech||{}; if(R.fech[m]&&R.fech[m]!=='carregando'&&R.fech[m].ok&&window.RHAlmoco){ R.fech[m].d=RHAlmoco.fechamento(almCtx(),m)||R.fech[m].d; return; } if(R.fech[m]) return; if(!window.RHAlmoco||!RHAlmoco.carregar){ R.fech[m]={d:null}; return; } R.fech[m]='carregando';
     RHAlmoco.carregar(almCtx(),m).then(ok=>{ R.fech[m]={ok,d:ok?RHAlmoco.fechamento(almCtx(),m):null}; P.rerender(); }).catch(()=>{ R.fech[m]={d:null}; P.rerender(); }); }
-  function fechCard(m){ fechCarrega(m); const X=fechDados(m), R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  function fechCard(m,semT){ fechCarrega(m); const X=fechDados(m), R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
     if(!X) return `<section class="card rh-fech"><div class="rh-ch"><h2>Fechamento para a folha</h2></div><div class="sub" style="margin:0">Juntando o Face ID do mês…</div></section>`;
     const s=k=>X.pes.reduce((a,o)=>a+k(o),0), falt=s(o=>o.p.falt.length), atr=s(o=>o.p.atr.length), sai=s(o=>o.p.sai.length), desc=s(o=>o.a?o.a.desc:0), sj=s(o=>o.a?o.a.sj:0), adv=s(o=>o.adv), susp=s(o=>o.susp), fer=X.pes.filter(o=>o.fer).length; const heh=s(o=>o.he||0);
-    return `<section class="card rh-fech"><div class="rh-ch" style="flex-wrap:wrap;gap:10px"><div><h2 style="margin:0">Fechamento para a folha</h2><div class="sub" style="margin:2px 0 0">Um Excel só com o resumo por pessoa e o detalhe de cada coisa, para mandar para a contabilidade.</div></div>
+    return `<section class="card rh-fech"><div class="rh-ch" style="flex-wrap:wrap;gap:10px">${semT?'<div class="label" style="margin:0">NÚMEROS DO MÊS</div>':'<div><h2 style="margin:0">Fechamento para a folha</h2><div class="sub" style="margin:2px 0 0">Um Excel só com o resumo por pessoa e o detalhe de cada coisa, para mandar para a contabilidade.</div></div>'}
         <button class="btn" data-act="rh-fechxls">${P.ic('baixar',18,2.2)}Baixar fechamento (Excel)</button></div>
       <div class="rh-fk">${[[X.pes.length,'pessoas no mês',''],[falt,'faltas sem registro',falt?'crit':''],[atr,'atrasos',atr?'warn':''],[sai,'saídas antes',''],[sj,'sem almoço sem justif.',sj?'warn':''],[R$(desc),'desconto do almoço',''],[s(o=>o.at.diasAt)+(s(o=>o.at.faltSJ)?' · '+s(o=>o.at.faltSJ):''),'dias de atestado'+(s(o=>o.at.faltSJ)?' · faltas sem justif.':''),s(o=>o.at.faltSJ)?'warn':''],[fer,'com férias no mês',''],[window.HoraExtra?HoraExtra.fh(heh):'0h','hora extra autorizada',''],[adv+(susp?' · '+susp+' d':''),'advertências · dias de suspensão',adv||susp?'warn':'']].map(([n,l,c])=>`<div class="${c}"><b class="num">${n}</b><span>${l}</span></div>`).join('')}</div>
       ${X.temFace?'':'<div class="banner" style="margin:10px 0 0">Sem dados do Face ID neste mês: o fechamento sai sem faltas, atrasos e almoço.</div>'}
@@ -1533,6 +1533,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
 .rh-dg.rh-dvz{grid-template-columns:1fr!important}.rh-dg.rh-dvz .rh-dlist{display:none}#view:has(.rh-mk) .alm-mesnav h2{font-size:30px;line-height:1.15}
 #view:has(.rh-mk) :is(.btn.rh-sm,.btn.rhu-sm){height:36px;padding:0 14px;display:inline-flex;align-items:center;gap:6px}
 #view:has(.rh-mk) .rh-rfc{padding:6px 16px 2px}
+.rh-fmes{display:inline-flex;gap:8px;align-items:center}.rh-fmes b{font-size:15px;min-width:150px;text-align:center}
 </style>`); }catch(e){}
   try{ document.head.insertAdjacentHTML('beforeend',`<style id="rh-v2-css">
   .rh-v2ch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
@@ -1631,8 +1632,39 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   const TELAS={ rhinicio:{nome:'Início',mob:'Início',render:()=>{ const h=vInicio(), i=h.indexOf('Próximos 7 dias'); if(i<0) return h+avCardRH();
       /* fim do bloco dos 7 dias (conta seções abertas dentro dele) → os avisos entram logo depois, na largura toda */
       let k=h.lastIndexOf('<section',i), d=0, j=k; const re=/<\/?section\b/g; re.lastIndex=k; let m; while((m=re.exec(h))){ if(m[0]==='<section') d++; else { d--; if(d===0){ j=h.indexOf('>',m.index)+1; break; } } }
-      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }}, rhagenda:{nome:'Agenda',mob:'Agenda',render:vAgenda}, rhfunc:{nome:'Funcionários',mob:'Funcionários',render:vFunc}, rhpres:{nome:'Pessoas na empresa',mob:'Pessoas',render:vPresRH}, rhterc:{nome:'Terceirizados',mob:'Terceiros',menu:false,render:()=>{ R.fview='terc'; R.pess=null; queueMicrotask(()=>{ if(P.S.view==='rhterc') P.go('rhfunc'); }); return vTerc(true); }}, rhfichas:{nome:'Fichas do mês',mob:'Fichas',render:vFichas}, rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
-    rhdocs:{nome:'Documentos e contratos',mob:'Documentos',render:vDocs}, rhferias:{nome:'Férias e prazos',mob:'Prazos',render:vFerias}, rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'}, rhvagas:{nome:'Vagas',mob:'Vagas',render:()=>window.RHVagas?window.RHVagas.render(vagCtx()):'<section class="card">Carregando…</section>'}, rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros} };
+      return j>k?h.slice(0,j)+avCardRH()+h.slice(j):h+avCardRH(); }},
+    /* MENU DO RH REORGANIZADO (30/10, escolha da usuária): Pessoas · Ausências · Prazos · Documentos · Relatórios.
+       Cada item abre direto a tela; o que era aba dentro de tela virou tela (o estado R.pzv/R.agv/R.fview/A.vis é posto aqui). */
+    rhfunc:{nome:'Funcionários',mob:'Funcionários',render:()=>{ if(!['lista','setor'].includes(R.fview)) R.fview='lista'; return vFunc(); }},
+    rhvagas:{nome:'Admissões e vagas',mob:'Admissões',render:vAdmVagas},
+    rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>{ R.fview='terc'; R.pess=null; return vTerc(true); }},
+    rhpres:{nome:'Quem está hoje',mob:'Hoje',render:vPresRH},
+    rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
+    rhferias:{nome:'Férias',mob:'Férias',render:()=>{ if(!['ferias','mapa'].includes(R.pzv)) R.pzv='ferias'; return vFerias(); }},
+    rhatest:{nome:'Atestados e faltas',mob:'Atestados',render:()=>topo('Atestados e faltas','Atestado, declaração de horas e faltas de cada pessoa. Entra sozinho no fechamento da folha, na presença e no almoço.','','RH · ATESTADOS E FALTAS')+(window.RHAtest?RHAtest.render(Object.assign(atCtx(),{semTitulo:true})):'<section class="card">Carregando…</section>')},
+    rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'},
+    rhagenda:{nome:'Agenda',mob:'Agenda',render:()=>{ R.agv='agenda'; return vAgenda(); }},
+    rhexp:{nome:'Experiência',mob:'Experiência',render:()=>{ R.pzv='exp'; return vFerias(); }},
+    rhpj:{nome:'Troca dos PJ',mob:'PJ',render:()=>{ R.pzv='pj'; return vFerias(); }},
+    rhqual:{nome:'Exames e NRs',mob:'Exames',render:()=>{ R.pzv='nr'; return vFerias(); }},
+    rhdocs:{nome:'Contratos e documentos',mob:'Documentos',render:vDocs},
+    rhfichas:{nome:'Fichas de EPI',mob:'Fichas',render:vFichas},
+    rhrelmes:{nome:'Relatório do mês',mob:'Relatório',render:()=>{ R.agv='rel'; return vAgenda(); }},
+    rhfech:{nome:'Fechamento da folha',mob:'Fechamento',render:vFechTela},
+    rhind:{nome:'Indicadores',mob:'Indicadores',render:()=>{ R.agv='ind'; return vAgenda(); }},
+    rhpont:{nome:'Pontualidade',mob:'Pontualidade',render:()=>window.RHAlmoco?window.RHAlmoco.render(Object.assign(almCtx(),{fixo:'pont'})):'<section class="card">Carregando…</section>'},
+    rhalmdir:{nome:'Almoço (diretoria)',mob:'Diretoria',render:()=>window.RHAlmoco?window.RHAlmoco.render(Object.assign(almCtx(),{fixo:'dir'})):'<section class="card">Carregando…</section>'},
+    rhfuncoes:{nome:'Cadastros',mob:'Cadastros',render:vCadastros} };
+  /* qual tela mostra cada parte que antes era aba */
+  const PZ_TELA={ferias:'rhferias',mapa:'rhferias',exp:'rhexp',pj:'rhpj',nr:'rhqual'};
+  function vAdmVagas(){ R.vgv=R.vgv||'vagas';
+    const seg=`<div class="seg" role="group" aria-label="Admissões e vagas">${[['vagas','Vagas e candidatos'],['adm','Em admissão']].map(([k,l])=>`<button data-act="rh-vgv" data-v="${k}" aria-pressed="${R.vgv===k}">${l}</button>`).join('')}</div>`;
+    if(R.vgv==='adm'){ R.fview='adm'; return topo('Admissões e vagas','Quem está entrando e em que etapa: documentos, contrato e ficha, experiência.',seg+`<button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button>`,'RH · ADMISSÕES E VAGAS')
+      +(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':cartaoFichasCel()+vQuadroAdm()); }
+    return window.RHVagas?window.RHVagas.render(Object.assign(vagCtx(),{topo:(t,sub,ac,ey)=>topo('Admissões e vagas',sub,seg+(ac||''),'RH · ADMISSÕES E VAGAS')})):'<section class="card">Carregando…</section>'; }
+  function vFechTela(){ const m=R.relMes;
+    return topo('Fechamento da folha','Um Excel com o resumo por pessoa e o detalhe de cada coisa, para mandar para a contabilidade.',`<span class="rh-fmes"><button class="btn sec rh-sm" data-act="rh-relmes" data-v="-1" aria-label="Mês anterior">‹</button><b>${esc(mesTitulo(m))}</b>${m<P.hojeStr().slice(0,7)?'<button class="btn sec rh-sm" data-act="rh-relmes" data-v="1" aria-label="Próximo mês">›</button>':''}</span>`,'RH · RELATÓRIOS')
+      +`<section class="card rh-rfc">${rfFil()}</section>`+fechCard(m,true); }
   Object.values(TELAS).forEach(t=>{ const r=t.render; t.render=()=>{ queueMicrotask(navSolo); queueMicrotask(pvAjusta); return '<i class="rh-mk" hidden></i>'+r()+modalConv()+modalFicha()+(window.RHCartao?RHCartao.modal({P,R,esc,baixar}):''); }; });
   /* tela Almoço (modulos/rh-almoco.js): controle do almoço pelo Face ID */
   const almCtx=()=>({P,R,esc,eu,br,fCPF,carregarJs,baixar,guardar:guardarArqRH});
@@ -2267,19 +2299,20 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         d.removido=true; d.removidoEm=agora(); d.removidoPor=eu(); await grava(COL.terc+'/'+x._id,{docs:ds}); return; }
       if(a==='rh-tdver'){ const x=R.terc.find(y=>y._id===R.tdoc), d=x&&tDocs(x).find(y=>y.id===b.dataset.id); if(d&&d.arquivo) await abrirUrl(d.arquivo.url); return; }
       /* agenda e relatório */
-      if(a==='rh-fview'){ R.fview=b.dataset.v; R.pess=null; P.render(); return; }
+      if(a==='rh-fview'){ const v=b.dataset.v; R.pess=null; if(v==='terc') return P.go('rhterc'); if(v==='atest') return P.go('rhatest'); if(v==='adm'){ R.vgv='adm'; return P.go('rhvagas'); } R.fview=v; P.render(); return; }
       if(a==='rh-orgset'){ R.orgSet=b.dataset.v; P.render(); return; }
       if(a==='rh-mapano'){ R.mapAno=(R.mapAno||+P.hojeStr().slice(0,4))+(+b.dataset.v); P.render(); return; }
       if(a==='rh-mapset'){ R.mapSet=b.dataset.v; P.render(); return; }
       if(a==='rh-agv'){ R.agv=b.dataset.v; P.render(); return; }
-      if(a==='rh-agind'){ R.agv='ind'; P.go('rhagenda'); return; }
-      if(a==='rh-agrel'){ R.agv='rel'; R.relMes=P.hojeStr().slice(0,7); P.go('rhagenda'); return; }
+      if(a==='rh-agind'){ P.go('rhind'); return; }
+      if(a==='rh-agrel'){ R.relMes=P.hojeStr().slice(0,7); P.go('rhrelmes'); return; }
+      if(a==='rh-vgv'){ R.vgv=b.dataset.v; P.render(); return; }
       if(a==='rh-agdias'){ R.agDias=+b.dataset.v||30; P.render(); return; }
       if(a==='rh-ics'){ const xs=agendaJanela().prox; if(!xs.length) return; baixar(new Blob([icsTexto(xs)],{type:'text/calendar'}),'Agenda-RH-Colafix.ics'); P.toast(plural(xs.length,'compromisso','compromissos')+' no arquivo. Abra o arquivo para mandar para o Outlook.'); return; }
       if(a==='rh-relmes'){ R.relMes=mesMais(R.relMes,+b.dataset.v); P.render(); return; }
       if(a==='rh-indimp'||a==='rh-indpdf'){ await indPdf(); return; } if(a==='rh-indxls'){ await indXls(); return; }
       if(a==='rh-relimp'||a==='rh-relpdf'){ await relPdfMes(R.relMes); return; }
-      if(a==='rh-atnovo'){ R.fview='atest'; R.pess=null; P.render(); if(window.RHAtest) RHAtest.novo(atCtx(),b.dataset.id); return; }
+      if(a==='rh-atnovo'){ R.pess=null; P.go('rhatest'); if(window.RHAtest) setTimeout(()=>RHAtest.novo(Object.assign(atCtx(),{semTitulo:true}),b.dataset.id),60); return; }
       if(a==='rh-rflimpa'){ R.rf={emp:'',vinc:'',setor:''}; P.render(); return; }
       if(a==='rh-relxls'){ await relExcel(R.relMes); return; }
       /* ficha da pessoa */
@@ -2332,8 +2365,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       if(a==='rh-cargabaixar'){ await cargaBaixar(); return; }
       if(a==='rh-cargaok'){ if(!R.carga||!R.carga.prev) return; const np=R.carga.prev.linhas.filter(o=>o.mud.length).length, nv=R.carga.prev.novos||0; if(!confirm('Gravar '+(nv?plural(nv,'pessoa nova','pessoas novas')+' e ':'')+'as alterações ('+plural(np,'pessoa','pessoas')+' no total)?')) return;
         R.salv=true; P.render(); try{ const r=await cargaAplicar(); R.carga=null; P.toast((r.nn?plural(r.nn,'pessoa cadastrada','pessoas cadastradas')+' · ':'')+plural(r.n,'cadastro atualizado','cadastros atualizados')+(r.nf?' · '+plural(r.nf,'período de férias','períodos de férias')+' marcado(s) como já tirado(s)':'')+'.'); } finally{ R.salv=false; P.render(); } return; }
-      if(a==='rh-pzabrir'){ R.pzv=b.dataset.v||'ferias'; P.go('rhferias'); return; }
-      if(a==='rh-pzv'){ R.pzv=b.dataset.v; P.render(); return; }
+      if(a==='rh-pzabrir'){ R.pzv=b.dataset.v||'ferias'; P.go(PZ_TELA[R.pzv]||'rhferias'); return; }
+      if(a==='rh-pzv'){ R.pzv=b.dataset.v; if(PZ_TELA[R.pzv]&&PZ_TELA[R.pzv]!==P.S.view) P.go(PZ_TELA[R.pzv]); else P.render(); return; }
       if(a==='rh-pzfil'){ R.pzfil=b.dataset.v; P.render(); return; }
       if(a==='rh-fernova'){ R.ffer={funcId:b.dataset.id,inicio:'',dias:''}; R.fajs=null; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); window.scrollTo(0,0); setTimeout(()=>{ const fm=document.querySelector('.rh-v2side .rh-form'); if(fm&&window.innerWidth<=1180) fm.scrollIntoView({block:'start'}); },60); return; }
       if(a==='rh-fajabrir'){ R.fajs={funcId:b.dataset.id,v:{}}; R.ffer=null; R.pzv='ferias'; if(b.dataset.goFer) P.go('rhferias'); else P.render(); setTimeout(()=>{ const el=document.getElementById('rh-fajs'); if(el) el.scrollIntoView({block:'start'}); },60); return; }
@@ -2368,7 +2401,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         if(!xs.length) return; if(!confirm('Marcar '+plural(xs.length,'período vencido','períodos vencidos')+' como férias já tiradas antes de usar o painel?\n\nUse só se essas férias já foram dadas. Os prazos que ainda não venceram continuam aparecendo.')) return;
         for(const [f,p] of xs) await P.db().doc(COL.ferias+'/'+id()).set({funcId:f._id,funcionario:f.nome,aquisitivo:p.ini,aquisitivoFim:p.fim,dias:p.saldo,anterior:true,status:'tirada',em:agora(),por:P.S.uid||null,porNome:eu()});
         P.toast(plural(xs.length,'período registrado','períodos registrados')+' como já tirados.'); return; }
-      if(a==='rh-pjtroca'){ R.fpj={funcId:b.dataset.id,data:P.hojeStr(),obs:''}; R.pzv='pj'; P.render(); window.scrollTo(0,0); return; }
+      if(a==='rh-pjtroca'){ R.fpj={funcId:b.dataset.id,data:P.hojeStr(),obs:''}; R.pzv='pj'; if(P.S.view!=='rhpj') P.go('rhpj'); else P.render(); window.scrollTo(0,0); return; }
       if(a==='rh-pjx'){ R.fpj=null; P.render(); return; }
       if(a==='rh-pjsalvar'){ const g=R.fpj, f=g&&R.func.find(x=>x._id===g.funcId); if(!f) return; const di=document.getElementById('rh-pjd'); if(di) g.data=di.value; const oi=document.getElementById('rh-pjo'); if(oi) g.obs=oi.value.trim();
         if(!okIso(g.data)) return P.toast('Informe a data da troca.'); if(g.data>P.hojeStr()) return P.toast('A data da troca não pode ser no futuro.');

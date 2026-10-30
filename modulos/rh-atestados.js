@@ -65,7 +65,7 @@
         <td class="num">${e(perTxt(x))}<small>${e(durTxt(x))}</small></td><td>${e(x.mot||'—')}</td>
         <td>${x.arq&&x.arq.url?`<a class="lnk" href="${e(x.arq.url)}" target="_blank" rel="noopener">Ver documento</a>`:'<small>sem arquivo</small>'}</td>
         <td class="rat-acs"><button class="lnk" data-act="rat-ed" data-id="${e(x._id)}">Editar</button><button class="lnk rat-del" data-act="rat-del" data-id="${e(x._id)}">${A.cx===x._id?'Confirmar: apagar':'Apagar'}</button></td></tr>`; };
-    return `<section class="card rat"><div class="rat-tb"><div><h2 style="margin:0">Atestados e faltas</h2><div class="sub" style="margin:2px 0 0">Entra sozinho no fechamento da folha, na presença e no almoço.</div></div>
+    return `<section class="card rat"><div class="rat-tb">${c.semTitulo?'<div></div>':'<div><h2 style="margin:0">Atestados e faltas</h2><div class="sub" style="margin:2px 0 0">Entra sozinho no fechamento da folha, na presença e no almoço.</div></div>'}
         <span class="rat-sp"></span>${window.RHRel?RHRel.botoes('rat-pdf','rat-xls'):''}<button class="btn" data-act="rat-novo">${c.P.ic?c.P.ic('mais',16,2.4):''}Registrar</button></div>
       <div class="rr-fil">${sel('per','Período',[['mes','Mês'],['90','Últimos 90 dias'],['ano','Este ano'],['datas','Escolher datas']])}
         ${f.per==='mes'?`<label><span>Mês</span><span class="rat-mes"><button class="btn sec rh-sm" data-act="rat-mes" data-v="-1" aria-label="Mês anterior">‹</button><b>${e(mesNome(m))}</b><button class="btn sec rh-sm" data-act="rat-mes" data-v="1" aria-label="Próximo mês">›</button></span></label>`:''}
