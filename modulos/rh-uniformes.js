@@ -20,6 +20,13 @@
   function assina(c){ if(U.sub) return; U.sub=true; const P=c.P;
     P.inscrever('rh-unif',()=>P.db().collection(COL).orderBy('em','desc').limit(300),s=>{ U.xs=s.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>!x.removido); U.lido=true; P.rerender(); }); }
   const cfgMail=c=>Object.assign({para:'',cc:''},(c.R.cfg&&c.R.cfg.unifEmail)||{});
+  /* 30/10: tamanho da pessoa (cadastro: camisa, calça, calçado) para cada peça */
+  const nrmU=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  function tamPessoa(f,peca){ if(!f) return ''; const n=nrmU(peca);
+    if(/BOTIN|SAPAT|CALCAD|TENIS|BOTA/.test(n)) return String(f.calcado||'').trim();
+    if(/CALCA|BERMUD|SHORT/.test(n)) return String(f.calca||'').trim();
+    if(/CAMIS|POLO|JAQUET|BLUS|MOLETOM|COLETE|MACAC|JALEC|AVENTAL|CASACO|UNIFORME/.test(n)) return String(f.camisa||'').trim();
+    return ''; }
   const itTxt=i=>[String(i.t||'').trim(),String(i.tam||'').trim()].filter(Boolean).join(' ')+' - '+(Math.max(1,parseInt(i.qtd,10)||1))+' un';
   const itensOk=F=>(F.itens||[]).filter(i=>String(i.t||'').trim());
   /* o texto do e-mail, igual ao que a usuária mandava */
@@ -56,12 +63,13 @@
       <div class="rhu-fg"><div class="rhu-col">
         <label class="rhu-w"><span>Funcionário</span><input class="txt" id="rhu-pn" autocomplete="off" value="${e(F.nome||'')}" placeholder="Digite o nome"></label>
         <div id="rhu-sug" class="rhu-sug">${sugHtml(c)}</div>
-        ${F.fid?`<div class="rhu-sel">${c.P.ic('check',14,2.6)} Do cadastro do RH${F.funcao?' · '+e(F.funcao):''} <button class="lnk" data-act="rhu-unpick">trocar</button></div>`:''}
+        ${F.fid?`<div class="rhu-sel">${c.P.ic('check',14,2.6)} Do cadastro do RH${F.funcao?' · '+e(F.funcao):''} <button class="lnk" data-act="rhu-unpick">trocar</button></div>${(()=>{ const fp=(c.R.func||[]).find(x=>x._id===F.fid); if(!fp) return ''; const t=[['camisa','camisa'],['calca','calça'],['calcado','calçado']].filter(([k])=>String(fp[k]||'').trim()).map(([k,l])=>l+' '+e(String(fp[k]).trim()));
+          return `<div class="rhu-tams">${t.length?'Tamanhos: '+t.join(' · '):'Sem tamanhos no cadastro'}${c.rh?` <button class="lnk" data-act="rh-ed" data-go-func="1" data-id="${e(fp._id)}">${t.length?'mudar':'preencher'}</button>`:''}</div>`; })()}`:''}
         <div class="rhu-2"><label><span>Setor</span><input class="txt" id="rhu-st" value="${e(F.setor||'')}" list="rhu-stl"><datalist id="rhu-stl">${(c.setores?c.setores():[]).map(x=>`<option value="${e(x)}">`).join('')}</datalist></label>
           <label><span>Data da entrega</span><input class="txt" type="date" id="rhu-dt" value="${e(F.data||'')}"></label></div>
         <div class="rhu-per" role="group" aria-label="Período">${['Manhã','Tarde'].map(p=>`<button type="button" class="${F.per===p?'on':''}" aria-pressed="${F.per===p}" data-act="rhu-per" data-v="${p}">${p}</button>`).join('')}</div>
         <div class="label" style="margin:6px 0 0">ITENS ENTREGUES</div>
-        ${sug.length?`<div class="rhu-chips"><span>Uniforme da função:</span>${sug.map((u,i)=>`<button type="button" class="rhu-chip" data-act="rhu-addu" data-i="${i}">+ ${e(u.nome)}${u.tam?' '+e(u.tam):''}</button>`).join('')}</div>`:''}
+        ${sug.length?`<div class="rhu-chips"><span>Uniforme da função:</span>${sug.map((u,i)=>{ const tp=tamPessoa((c.R.func||[]).find(x=>x._id===F.fid),u.nome)||u.tam; return `<button type="button" class="rhu-chip" data-act="rhu-addu" data-i="${i}">+ ${e(u.nome)}${tp?' '+e(tp):''}</button>`; }).join('')}</div>`:''}
         <div class="rhu-its">${(F.itens||[]).map((it,i)=>`<div class="rhu-it"><input class="txt" data-rhu-i="${i}" data-k="t" list="rhu-pcl" value="${e(it.t||'')}" placeholder="Peça" aria-label="Peça">
             <input class="txt" data-rhu-i="${i}" data-k="tam" list="rhu-tml" value="${e(it.tam||'')}" placeholder="Tam." aria-label="Tamanho">
             <input class="txt" data-rhu-i="${i}" data-k="qtd" inputmode="numeric" value="${e(String(it.qtd||1))}" aria-label="Quantidade"><span class="rhu-un">un</span>
@@ -488,7 +496,7 @@
         const fc=C.funcaoDe(f); if(fc&&(fc.uniformes||[]).length&&!F.itens.some(i=>String(i.t||'').trim())) F.itens=[]; if(!F.itens.length) F.itens=[{t:'',tam:'',qtd:1}]; } P.render(); return; }
     if(a==='rhu-unpick'&&F){ F.fid=''; F.funcao=''; P.render(); setTimeout(()=>{ const i=document.getElementById('rhu-pn'); i&&(i.focus(),i.select()); },40); return; }
     if(a==='rhu-per'&&F){ F.per=b.dataset.v; P.render(); return; }
-    if(a==='rhu-addu'&&F){ const fc=C.funcaoDe((C.R.func||[]).find(x=>x._id===F.fid)), u=fc&&(fc.uniformes||[])[+b.dataset.i]; if(u){ const vz=F.itens.findIndex(i=>!String(i.t||'').trim()); const it={t:u.nome,tam:u.tam||'',qtd:1}; if(vz>=0) F.itens[vz]=it; else F.itens.push(it); } P.render(); return; }
+    if(a==='rhu-addu'&&F){ const fc=C.funcaoDe((C.R.func||[]).find(x=>x._id===F.fid)), u=fc&&(fc.uniformes||[])[+b.dataset.i]; if(u){ const vz=F.itens.findIndex(i=>!String(i.t||'').trim()); const it={t:u.nome,tam:tamPessoa((C.R.func||[]).find(x=>x._id===F.fid),u.nome)||u.tam||'',qtd:1}; if(vz>=0) F.itens[vz]=it; else F.itens.push(it); } P.render(); return; }
     if(a==='rhu-itmais'&&F){ F.itens.push({t:'',tam:'',qtd:1}); P.render(); setTimeout(()=>{ const xs=document.querySelectorAll('[data-k="t"]'); xs.length&&xs[xs.length-1].focus(); },40); return; }
     if(a==='rhu-itx'&&F){ F.itens.splice(+b.dataset.i,1); if(!F.itens.length) F.itens=[{t:'',tam:'',qtd:1}]; P.render(); return; }
     if(a==='rhu-cfg'){ U.cfg=!U.cfg; P.render(); return; }
@@ -517,6 +525,7 @@
   window.RHUnif={render:c=>{ C=c; return render(c); },gestor,_parc:{qDe,qProx,qAnt,parcInfo:(x)=>parcInfo(C,x),planLer,impAbre:(abas,arq)=>impAbre(C,abas,arq),qDados:Q=>qDados(C,Q),ehTerc:x=>ehTerc(C,x)},avisos:c=>{ C=C||c; try{ assina(c); return avisos(c); }catch(e){ return []; } },novo:()=>{ if(C) novo(C); },texto,_U:U};
   document.head.insertAdjacentHTML('beforeend',`<style id="rhu-css">
 .rhu-fm{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.rhu-tams{font-size:12.5px;color:var(--ink-3,#5B6770);margin-top:-6px}
 .rhu-fg{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px}@media (max-width:760px){.rhu-fg{grid-template-columns:1fr}}
 .rhu-col{display:flex;flex-direction:column;gap:10px;min-width:0}.rhu-fm label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600;min-width:0}
 .rhu-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}

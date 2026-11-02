@@ -132,9 +132,13 @@ service cloud.firestore {
       allow read: if dono() || rhOk() || gestorOk();
       allow write: if dono() || (gestorOk() && !soVer());
     }
-    // Pedidos de melhoria (29/10 · LGPD): têm foto da tela, que pode mostrar dados do RH — só a administradora.
+    // Pedidos de ajuste (29/10 · LGPD; 30/10: todo login pode pedir). Têm foto da tela, que pode mostrar dados do RH:
+    // a administradora lê e mexe em todos; os outros só criam o próprio (aberto) e leem os próprios.
     match /melhorias/{id} {
-      allow read, write: if dono();
+      allow read: if dono() || (liberado() && resource.data.por == request.auth.uid);
+      allow create: if dono() || (liberado() && request.resource.data.por == request.auth.uid
+        && request.resource.data.status == 'aberto' && request.resource.data.texto is string && request.resource.data.texto.size() <= 2000);
+      allow update, delete: if dono();
     }
     // Quadro de pessoas do gestor (27/10: quem fica e quem sai, por linha/setor): só a dona e quem tem a Visão do gestor.
     match /gxquadro/{id} {

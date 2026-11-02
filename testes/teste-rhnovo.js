@@ -30,7 +30,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   ok('Quem só tem RH vê as 6 telas do exemplo na lateral e abre no Início', nav==='Início|Pessoas|Prazos|Documentos|Almoço|Cadastros'&&/(Bom dia|Boa tarde|Boa noite), Paula/.test(v0), nav);
   ok('Início: 9 no quadro (8 CLT, 1 PJ), 1 de férias, 1 afastado, 2 contratos de terceirizados (sem contar desligado e encerrado)', /9\s*no quadro\s*8 CLT · 1 PJ/.test(v0)&&/1\s*de férias agora/.test(v0)&&/1\s*afastado/.test(v0)&&/2 contratos ativos/.test(v0), v0.replace(/\n/g,' ').slice(0,200));
   ok('Início em painel: pessoas por setor, vínculo, tempo de casa e próximos 30 dias; sem as fichas', /Por setor/.test(v0)&&/Quadro/.test(v0)&&/Tempo de casa/.test(v0)&&/Próximos 7 dias/.test(v0)&&/Precisa de você/.test(v0)&&!/assinadas e anexadas/.test(v0), v0.replace(/\n/g,' ').slice(0,300));
-  ok('Avisos: contrato vencido, contrato vencendo e função sem EPI (com quantas pessoas)', /Contrato: LIMPA TUDO LTDA\s*venceu há (1 dia|2 dias)/.test(v0)&&/Contrato: SEGURA VIGILÂNCIA\s*vence em (9|10) dias/.test(v0)&&/Função "Mecânico" sem EPI cadastrado\s*a ficha de 2 pessoas sai sem itens/.test(v0)&&!/ANTIGO/.test(v0), (v0.match(/Avisos[\s\S]{0,400}/)||[''])[0].replace(/\n/g,' | '));
+  ok('Avisos: contrato vencido, contrato vencendo e função sem EPI (com quantas pessoas)', /Contrato: LIMPA TUDO LTDA\s*venceu há (1 dia|2 dias)/.test(v0)&&/Contrato: SEGURA VIGILÂNCIA\s*vence em (9|10) dias/.test(v0)&&/Função "Mecânico" sem EPI cadastrado\s*2 pessoas ficam sem ficha/.test(v0)&&!/ANTIGO/.test(v0), (v0.match(/Avisos[\s\S]{0,400}/)||[''])[0].replace(/\n/g,' | '));
   await p.click('.rh-av:has-text("Mecânico") [data-act="rh-fsemepi"]'); await H.dorme(300);
   const fe=await p.evaluate(()=>({v:__T.S().view,n:(document.querySelector('[data-rh-ff="nome"]')||{}).value}));
   ok('"Resolver" abre a função Mecânico para cadastrar os EPIs', fe.v==='rhfuncoes'&&fe.n==='Mecânico', JSON.stringify(fe));
@@ -39,7 +39,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   await p.evaluate(()=>__T.go('rhinicio')); await p.evaluate(()=>__T.go('rhfichas')); await H.dorme(400);
   const v1=await view(); const sit=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[r.querySelector('b').innerText,r.querySelector('.pill').innerText])));
   ok('Fichas do mês: contagens nos filtros e situação certa de cada um', /Todas · 9/.test(v1)&&/Não geradas · 4/.test(v1)&&/Falta assinar · 2/.test(v1)&&/Assinadas · 3/.test(v1)
-    &&sit['ANA SOUZA']==='Falta assinar'&&/^Assinada · 08\//.test(sit['CARLOS LIMA'])&&sit['JOANA PEREIRA']==='Não gerada'&&sit['PEDRO ALVES']==='Função sem EPI'&&!sit['ZECA ANTIGO'], JSON.stringify(sit));
+    &&sit['ANA SOUZA']==='Falta assinar'&&/^Assinada · 08\//.test(sit['CARLOS LIMA'])&&sit['JOANA PEREIRA']==='Não gerada'&&sit['PEDRO ALVES']==='Função não cadastrada'&&!sit['ZECA ANTIGO'], JSON.stringify(sit));
   await p.click('[data-act="rh-fchip"][data-v="imp"]'); const soImp=await p.evaluate(()=>[...document.querySelectorAll('.rh-tf tbody tr b')].map(b=>b.innerText).join(','));
   await p.click('[data-act="rh-fchip"][data-v="todas"]'); await p.fill('#rh-fq','111.444'); await H.dorme(700); const porCpf=await p.evaluate(()=>[...document.querySelectorAll('.rh-tf tbody tr b')].map(b=>b.innerText).join(','));
   await p.fill('#rh-fq',''); await H.dorme(700);
@@ -66,10 +66,10 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   ok('"Gerar" abre Gerar e imprimir com a ficha só dessa pessoa; ao imprimir fica "Falta assinar"', fr0&&gerou&&so1===1&&s['rh/dados/fichasmes/'+M].impressas.f5&&s['rh/dados/fichasmes/'+M].impressas.f0, 'fichas na prévia: '+so1);
   await p.click('[data-act="rh-fvmes"]'); await H.dorme(300);
   const v2=await view(); ok('Voltando à lista: Bruno "Falta assinar", contagem atualizada', /Falta assinar · 2/.test(v2)&&/Assinadas · 4/.test(v2)&&/Não geradas · 3/.test(v2), (v2.match(/Todas[^\n]*\n?[^\n]*/)||[''])[0]);
-  // gerar as que faltam (3: Joana, Pedro e Rafael; função sem EPI pede confirmação, aceita)
-  await p.click('[data-act="rh-ffaltam"]'); const nfal=await espera(()=>document.querySelectorAll('#preview-wrap .ficha-set').length===3,15000,fr);
+  // gerar as que faltam (30/10: só a Joana; Pedro e Rafael estão com a função "Mecânico" não cadastrada, sem EPI = sem ficha)
+  await p.click('[data-act="rh-ffaltam"]'); const nfal=await espera(()=>document.querySelectorAll('#preview-wrap .ficha-set').length===1,15000,fr);
   const nomes=await fr.evaluate(()=>[...document.querySelectorAll('#preview-wrap .set-label')].map(x=>x.innerText.split(' — ')[0]).join(','));
-  ok('"Gerar as 3 que faltam" gera exatamente quem falta', nfal&&nomes==='JOANA PEREIRA,PEDRO ALVES,RAFAEL NUNES', nomes);
+  ok('"Gerar a que falta" gera só quem tem ficha (a Joana); função não cadastrada fica de fora', nfal&&nomes==='JOANA PEREIRA', nomes);
   const fil=await fr.evaluate(()=>!!document.querySelector('.filtros-tit')&&!!document.querySelector('.acoes-linha #btn-gerar-todos')&&getComputedStyle(document.querySelector('.app-header')).display==='none');
   ok('Gerar e imprimir no visual do exemplo (sem o cabeçalho antigo, filtros e botões embaixo)', fil);
   await p.click('[data-act="rh-fvmes"]'); await H.dorme(300);

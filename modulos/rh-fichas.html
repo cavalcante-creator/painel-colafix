@@ -265,11 +265,7 @@
       height:193mm; max-height:193mm; overflow:hidden;
     }
     #preview-wrap > .ficha-set:last-child > .ficha-page:last-child{page-break-after:auto;}
-    .ficha-page.page-branco .branco-aviso{display:none;}
   }
-  /* 30/10: quem não usa EPI não tem a folha de EPI; no lugar dela, verso em branco (para a frente e verso não desalinhar) */
-  .ficha-page.page-branco{align-items:center; justify-content:center;}
-  .ficha-page.page-branco .branco-aviso{color:#8A8F96; font-size:11pt; text-align:center; border:1.5px dashed #C9CDD2; border-radius:10px; padding:14px 22px;}
 </style>
 <style id="visual-painel">
 /* Visual do painel (pedido de 12/10): só a tela muda; a ficha impressa continua igual. */
@@ -346,7 +342,6 @@
           <option value="UNIFORME">Só uniforme</option>
           <option value="EPI">Só EPI</option>
         </select>
-        <label class="no-print" style="display:flex;gap:6px;align-items:center;font-weight:400;font-size:12.5px;margin-top:6px;cursor:pointer"><input type="checkbox" id="chk-verso-branco"> Frente e verso: verso em branco para quem não usa EPI</label>
       </div>
       <div class="field">
         <label for="select-funcionario">Funcionário</label>
@@ -1086,13 +1081,9 @@
 
   /* 30/10: só quem usa EPI tem a folha de EPI = a função tem pelo menos um EPI cadastrado (função marcada "não usa EPI" vem sem EPI) */
   function usaEpi(colaborador){ var e=DB.epiPorFuncao[norm(colaborador.funcao)]; return !!(e && e.itens && e.itens.length); }
-  var CHAVE_VERSO="colafix.fichas.versoBranco";
-  function versoBranco(){ var c=document.getElementById("chk-verso-branco"); return c ? c.checked : true; }
-  (function(){ var c=document.getElementById("chk-verso-branco"); if(!c) return; var v=null; try{ v=localStorage.getItem(CHAVE_VERSO); }catch(e){}
-    c.checked = v===null ? true : v==="1"; c.addEventListener("change",function(){ try{ localStorage.setItem(CHAVE_VERSO, c.checked?"1":"0"); }catch(e){} }); })();
   /* páginas de uma pessoa no tipo escolhido */
-  function paginasDe(colaborador, tipoFicha){ var e=usaEpi(colaborador);
-    if(tipoFicha==="UNIFORME") return 1; if(tipoFicha==="EPI") return e?1:0; return e||versoBranco()?2:1; }
+  function paginasDe(colaborador, tipoFicha){ if(!usaEpi(colaborador)) return 0; /* quem não usa EPI: sem ficha nenhuma (30/10) */
+    return tipoFicha==="AMBAS" ? 2 : 1; }
 
   function gerarFichaFuncionario(colaborador, mesSel, tipoFicha){
     tipoFicha = tipoFicha || "AMBAS";
@@ -1134,8 +1125,6 @@
     set.appendChild(label);
     if(tipoFicha !== "EPI") set.appendChild(pageUniforme);
     if(tipoFicha !== "UNIFORME" && temEpi) set.appendChild(pageEpi);
-    else if(tipoFicha === "AMBAS" && versoBranco()){ var br=document.createElement("div"); br.className="ficha-page page-branco";
-      br.innerHTML='<div class="branco-aviso">Verso em branco<br><small>'+esc(colaborador.nome)+' não usa EPI (a função não tem EPI cadastrado)</small></div>'; set.appendChild(br); }
     return set;
   }
 
@@ -1216,10 +1205,10 @@
     }
 
     var tipoFicha = getTipoFicha();
-    /* só quem usa EPI tem a folha de EPI: no "Só EPI", quem não usa fica de fora */
+    /* 30/10: quem não usa EPI não tem ficha nenhuma (nem a de uniforme), em qualquer tipo */
     var semEpiPessoas = alvo.filter(function(c){ return !usaEpi(c); });
-    if(tipoFicha === "EPI"){ alvo = alvo.filter(usaEpi);
-      if(!alvo.length){ alert("Ninguém da seleção usa EPI (a função não tem EPI cadastrado em RH → Cadastros › Funções)."); return; } }
+    alvo = alvo.filter(usaEpi);
+    if(!alvo.length){ alert("Ninguém da seleção usa EPI, então não há ficha para gerar (quem não usa EPI não tem ficha; os EPIs de cada função ficam em RH → Cadastros › Funções)."); return; }
 
     // Antes de gerar, avisa quem está com a função sem EPI/uniforme
     // cadastrado na planilha (a ficha sairia vazia).
@@ -1253,7 +1242,7 @@
     cardPreviewInfo.style.display = "block";
     var filtroLabel = descricoesFiltro.length ? " ("+descricoesFiltro.join(" · ")+")" : "";
     var totalPaginas = alvo.reduce(function(a,c){ return a+paginasDe(c,tipoFicha); },0);
-    var notaEpi = semEpiPessoas.length ? (tipoFicha==="EPI" ? " · "+semEpiPessoas.length+" não usa(m) EPI e ficou(aram) de fora" : tipoFicha==="AMBAS" ? " · "+semEpiPessoas.length+" sem folha de EPI (não usa(m) EPI)" : "") : "";
+    var notaEpi = semEpiPessoas.length ? " · "+semEpiPessoas.length+" não usa(m) EPI e fica(m) sem ficha" : "";
     previewCount.innerHTML = "<b>"+alvo.length+"</b> funcionário(s)"+filtroLabel+" — <b>"+totalPaginas+"</b> página(s) A4"+notaEpi;
     btnImprimir.disabled = false;
     btnSalvarPdf.disabled = false;
@@ -1661,7 +1650,7 @@
     },
     /* frente (uniforme) da ficha de uma pessoa, para a prévia ao lado da lista */
     previa: function(nome, mes, qual){ if(!DB.loaded) return null; /* qual "epi": a página do EPI (verso) */
-      var c=DB.colaboradores.find(function(x){ return norm(x.nome)===norm(nome); }); if(!c) return null;
+      var c=DB.colaboradores.find(function(x){ return norm(x.nome)===norm(nome); }); if(!c||!usaEpi(c)) return null; /* quem não usa EPI não tem ficha */
       var p=String(mes||"").split("-"); var ms={ yyyy:parseInt(p[0],10), mm:parseInt(p[1],10) }; if(!ms.yyyy||!ms.mm) return null;
       var set=gerarFichaFuncionario(c, ms, "AMBAS"); var pgs=set.querySelectorAll(".ficha-page"), pg=qual==="epi"?set.querySelector(".page-epi"):pgs[0]; if(!pg) return null; /* quem não usa EPI não tem a página do EPI */
       var css=Array.prototype.map.call(document.querySelectorAll("style"), function(st){ return st.id==="visual-painel"?"":st.textContent; }).join("\n");

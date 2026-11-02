@@ -573,7 +573,7 @@ async function cbPdf(){ if(!window.jspdf){ toast('Gerador de PDF indisponível. 
 /* ---------- o que o leitor digitar ---------- */
 S.cb.buf=''; S.cb.t=0; S.cb.inicio=null;
 document.addEventListener('keydown',ev=>{ if(ev.ctrlKey||ev.altKey||ev.metaKey) return; const agora=performance.now(), gap=agora-S.cb.t; S.cb.t=agora;
-  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(((cod.length>=4&&(/^(CH|RA|EQ|OP)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod)||/(rancho|chamado|equip)=/i.test(cod)))||crPorAdesivo(cod))&&gap<(S.view==='mantotem'?400:120)){ const a=document.activeElement;
+  if(ev.key==='Enter'){ const cod=S.cb.buf; S.cb.buf=''; if(((cod.length>=4&&(/^(CH|RA|EQ|OP|EV)-/i.test(cod)||/^CX[A-Z0-9]{8}$/i.test(cod)||/CRACHA/i.test(cod)||/(rancho|chamado|equip)=/i.test(cod)))||crPorAdesivo(cod))&&gap<(S.view==='mantotem'?400:120)){ const a=document.activeElement;
       if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&typeof a.value==='string'&&a.value.toUpperCase().endsWith(cod.toUpperCase())){ a.value=a.value.slice(0,a.value.length-cod.length); a.dispatchEvent(new Event('input',{bubbles:true})); }
       ev.preventDefault(); ev.stopPropagation(); cbLeu(cod); } return; }
   if(ev.key&&ev.key.length===1){ if(gap>(S.view==='mantotem'?300:80)) S.cb.buf=''; else if(S.cb.buf&&gap<50) ev.stopImmediatePropagation(); /* rajada do leitor: não dispara os atalhos do teclado (N, A, P, F) */ S.cb.buf+=ev.key; if(S.cb.buf.length>40) S.cb.buf=S.cb.buf.slice(-40); } },true);

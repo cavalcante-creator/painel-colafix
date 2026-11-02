@@ -12,10 +12,11 @@ const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios',
   {id:'manut'},{id:'rh'},{id:'gestor'},{id:'telas'},{g:'Sistema',ic:'ajuste',ms:['meumenu','backup']}];
 /* menu do RH reorganizado (30/10, escolha da usuária): cada item abre direto a tela; Uniformes em Pessoas */
 const RHG=[{v:'rhinicio'},
+  {g:'Minha agenda',ic:'check',vs:[['rhtarefas','Tarefas e calendário'],['rhpedidos','Pedidos do pessoal']]}, /* 31/10 */
   {g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhvagas','Admissões e vagas'],['rhterc','Terceirizados'],['rhpres','Quem está hoje'],['rhunif','Uniformes']]},
   {g:'Ausências',ic:'relogio',vs:[['rhferias','Férias'],['rhatest','Atestados e faltas'],['rhalmoco','Almoço']]},
   {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhexp','Experiência'],['rhpj','Troca dos PJ'],['rhqual','Exames e NRs']]},
-  {g:'Documentos',ic:'folha',vs:[['rhdocs','Contratos e documentos'],['rhfichas','Fichas de EPI']]},
+  {g:'Documentos',ic:'folha',vs:[['rhdocs','Contratos e documentos'],['rhfichas','Fichas de EPI'],['rhcom','Comunicados']]},
   {g:'Relatórios',ic:'grafico',vs:[['rhrelmes','Relatório do mês'],['rhfech','Fechamento da folha'],['rhind','Indicadores'],['rhpont','Pontualidade'],['rhalmdir','Almoço (diretoria)']]},
   {v:'rhfuncoes'}];
 const RH_SUB={};

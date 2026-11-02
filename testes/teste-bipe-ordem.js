@@ -1,0 +1,25 @@
+/* 01/11: folha da ordem no computador do coletor — OP-<nº> (ou o link do rancho) começa, pausa e volta a rodar a ordem;
+   motivo da pausa pela folha da máquina; desfazer volta as duas ordens; sem a chave "computador do coletor" nada muda. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+ D['ordens/o3']={num:'7001',linha:'Fixcol',status:'aberta',produto:'Fixcol AC-III',seq:1};
+ D['ordens/o4']={num:'7002',linha:'Fixcol',status:'aberta',produto:'Fixcol Porcelanato',seq:2,rancho:'12345'};
+ const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(3000);
+ const bip=async c=>{ await p.keyboard.type(c,{delay:6}); await p.keyboard.press('Enter'); await H.dorme(1300); };
+ const av=()=>p.evaluate(()=>{ const x=document.getElementById('ev-aviso'); return x?x.className+' | '+x.innerText.replace(/\s+/g,' '):''; });
+ const ord=async id=>(await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs))['ordens/'+id];
+ await p.evaluate(()=>__T.go('inicio')); await H.dorme(500); await bip('OP-7001');
+ ok('Sem a chave "computador do coletor": a folha da ordem não mexe na produção', !((await ord('o3')).prodSeg||[]).length&&!(await av()));
+ await p.evaluate(()=>__T.go('manqr')); await H.dorme(600); await p.click('[data-act="cb-modo"][data-v="bipe"]'); await H.dorme(600);
+ await p.check('[data-act="ev-coletor"]'); await H.dorme(400); await bip('OP-7001'); const s=await p.evaluate(()=>document.getElementById('view').innerText);
+ ok('Liga a chave neste computador; na aba das folhas o bipe da OP só testa', await p.evaluate(()=>localStorage.getItem('colafix.coletorOrdens'))==='1'&&/folha da ordem 7001 → começa, pausa ou volta a rodar/.test(s)&&!((await ord('o3')).prodSeg||[]).length);
+ await p.evaluate(()=>__T.go('inicio')); await H.dorme(500);
+ await bip('OP-7001'); let a=await av(), o3=await ord('o3'); ok('1º bipe da folha: a ordem começa', o3.prodSeg.length===1&&!o3.prodSeg[0].fim&&/Ordem 7001 · Fixcol AC-III começou/.test(a), a);
+ await bip('OP-7001'); a=await av(); o3=await ord('o3'); ok('2º bipe: a ordem pausa', o3.prodSeg[0].fim&&o3.prodSeg[0].pausa==='Pausa'&&/pausada/.test(a), a);
+ await bip('EV-ALM-FIXCOL'); a=await av(); o3=await ord('o3'); ok('Bipou "Almoço" na folha da máquina logo depois: vira o motivo da pausa', o3.prodSeg[0].pausa==='Almoço'&&/Motivo da pausa da ordem 7001: almoço/.test(a), a);
+ await bip('OP-7001'); a=await av(); o3=await ord('o3'); ok('3º bipe: volta a rodar', o3.prodSeg.length===2&&!o3.prodSeg[1].fim&&/voltou a rodar/.test(a), a);
+ await bip('https://colafix.exemplo/painel?rancho=12345'); a=await av(); let o4=await ord('o4'); o3=await ord('o3');
+ ok('Folha de ordem com rancho (QR com o link do rancho): começa a ordem do rancho e encerra a que rodava', (o4.prodSeg||[]).length===1&&!o4.prodSeg[0].fim&&o3.prodSeg[1].fim&&/Ordem 7002 · Fixcol Porcelanato começou · a ordem 7001 que rodava foi encerrada/.test(a), a);
+ await bip('EV-DES'); a=await av(); o4=await ord('o4'); o3=await ord('o3');
+ ok('Desfazer: volta as duas ordens como estavam', !(o4.prodSeg||[]).length&&o3.prodSeg.length===2&&!o3.prodSeg[1].fim&&/Desfeito/.test(a), a);
+ console.log('erros:',B.erros.filter(x=>!/404|cdnjs/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

@@ -1,4 +1,4 @@
-/* Pedir ajuste: botão só da administradora; anota com a tela e o aparelho; lista; copiar para o Claude marca como enviado; feito; apagar. */
+/* Pedir ajuste: botão em todos os logins (30/10); a administradora anota com a tela e o aparelho; lista; copiar para o Claude marca como enviado; feito; apagar. */
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
 (async()=>{ const {d}=seedManut();
   let B=await H.abrir({viewport:{width:1366,height:800}}); let p=B.page; p.on('dialog',x=>x.accept());
@@ -28,8 +28,21 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await p.keyboard.press('Escape'); await H.dorme(200); const fechou=await p.evaluate(()=>!document.getElementById('mlh-pnl'));
   ok('Esc fecha', fechou);
   const e1=B.erros.filter(x=>!/404|cdnjs/.test(x)); await B.browser.close();
-  for(const [u,pw,vp] of [['operador','ope123',{width:1366,height:800}],['tecnico','tec123',{width:390,height:844}]]){ B=await H.abrir({viewport:vp}); p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,u,pw); await H.dorme(2500);
-    const t=await p.evaluate(()=>!!document.getElementById('tp-ajuste')); ok('Outros logins não veem o botão ('+u+')', !t); await B.browser.close(); }
+  /* 30/10: todo login pode pedir ajuste; vê só os próprios; a administradora vê todos com quem pediu */
+  let srvDocs=null;
+  for(const [u,pw,vp] of [['operador','ope123',{width:1366,height:800}],['tecnico','tec123',{width:390,height:844}]]){ B=await H.abrir({viewport:vp}); p=B.page; p.on('dialog',x=>x.accept());
+    if(srvDocs) d.docs=srvDocs; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,u,pw); await H.dorme(2500);
+    const t=await p.evaluate(()=>!!document.getElementById('tp-ajuste')); ok('Login '+u+' tem o botão "Pedir ajuste"', t); if(!t){ await B.browser.close(); continue; }
+    await p.click('#tp-ajuste'); await H.dorme(500); let bx=await p.evaluate(()=>document.querySelector('.mlh-box').innerText);
+    ok('Login '+u+': não vê os pedidos dos outros nem os botões da administradora', !/Segundo pedido|Folha podia/.test(bx)&&!(await p.$('[data-act="mlh-copiar"],[data-act="mlh-del"],[data-act="mlh-feito"],#mlh-quem'))&&/Você ainda não pediu|Meus pedidos/.test(bx), bx.slice(0,160).replace(/\n/g,' | '));
+    await p.fill('#mlh-txt','Pedido do '+u); await p.uncheck('#mlh-foto'); await p.click('[data-act="mlh-salvar"]'); await H.dorme(1200);
+    bx=await p.evaluate(()=>document.querySelector('.mlh-box').innerText); const sv=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); srvDocs=sv;
+    const meu=Object.entries(sv).filter(([k])=>k.startsWith('melhorias/')).map(([k,v])=>v).find(x=>x.texto==='Pedido do '+u);
+    ok('Login '+u+': envia com o próprio nome e vê em "Meus pedidos" como Recebido', !!meu&&meu.status==='aberto'&&!!meu.quem&&!!meu.por&&/Pedido do /.test(bx)&&/Recebido/.test(bx), meu&&JSON.stringify({quem:meu.quem,st:meu.status}));
+    await B.browser.close(); }
+  B=await H.abrir({viewport:{width:1366,height:800}}); p=B.page; d.docs=srvDocs||d.docs; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2500);
+  await p.click('#tp-ajuste'); await H.dorme(800); const bx=await p.evaluate(()=>document.querySelector('.mlh-box').innerText);
+  ok('Administradora vê os pedidos dos outros logins, com quem pediu', /Pedido do operador/.test(bx)&&/Pedido do tecnico/.test(bx)&&/Para fazer · 2/.test(bx), bx.slice(0,300).replace(/\n/g,' | ')); await B.browser.close();
   ok('Nenhum erro de JavaScript', !e1.length, e1.join(' | '));
   const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

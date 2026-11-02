@@ -1,4 +1,5 @@
-/* Pedir ajuste (12/10): só no login da administradora.
+/* Pedir ajuste (12/10; 30/10: em TODOS os logins). Quem não é a administradora anota e vê só os próprios pedidos
+   (Recebido / Enviado ao Claude / Feito); a administradora vê todos, com quem pediu, e copia para o Claude.
    Botão no topo → anota o que mudar; o painel guarda a tela, o aparelho e uma foto da tela.
    Lista dos pedidos com "Copiar para o Claude" (texto pronto para colar na conversa).
    Dados: melhorias/{id} {texto, tela, telaNome, aparelho, largura, foto (jpeg base64, pequena), status 'aberto'|'enviado'|'feito', em, por} */
@@ -11,9 +12,10 @@
   const quando=iso=>{ try{ return P.dm(String(iso).slice(0,10))+' '+P.hora(iso); }catch(e){ return ''; } };
   const carregarJs=src=>new Promise((ok,no)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=no; document.head.appendChild(s); });
 
-  /* botão no topo, só para a dona */
+  const meuNome=()=>(P.S.uid&&P.S.nomes&&P.S.nomes[P.S.uid])||'';
+  /* botão no topo, para todo login (30/10) */
   function botao(){ const sino=document.getElementById('tp-sino'); const ja=document.getElementById('tp-ajuste');
-    if(!P.dono()){ if(ja) ja.remove(); return; }
+    if(!P.S.uid){ if(ja) ja.remove(); return; }
     if(sino&&!ja){ const b=document.createElement('button'); b.className='tp-ib'; b.id='tp-ajuste'; b.title='Pedir ajuste (anotar uma mudança para o Claude)'; b.setAttribute('aria-label','Pedir ajuste');
       b.innerHTML=P.ic('editar',18,2)+'<b id="tp-ajn" hidden></b>'; sino.parentNode.insertBefore(b,sino); contar(); } }
   let contado=false;
@@ -21,8 +23,9 @@
   function marcaN(n){ const b=document.getElementById('tp-ajn'); if(b){ b.hidden=!n; b.textContent=n>49?'50+':n; } }
   let pend=false; new MutationObserver(()=>{ if(!pend){ pend=true; requestAnimationFrame(()=>{ pend=false; botao(); }); } }).observe(document.body,{childList:true,subtree:true});
 
-  async function lerLista(){ try{ const s=await P.db().collection(COL).orderBy('em','desc').limit(150).get(); R.lista=(s.docs||[]).map(d=>Object.assign({_id:d.id},d.data())); }
-    catch(e){ R.lista=[]; P.erro(e); } marcaN(R.lista.filter(x=>x.status==='aberto').length); desenha(); }
+  async function lerLista(){ try{ const q=P.dono()?P.db().collection(COL).orderBy('em','desc').limit(150):P.db().collection(COL).where('por','==',P.S.uid).limit(60); /* os outros: só os próprios (as regras só deixam ler esses) */
+      const s=await q.get(); R.lista=(s.docs||[]).map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>String(b.em||'').localeCompare(String(a.em||''))); }
+    catch(e){ R.lista=[]; if(P.dono()) P.erro(e); } if(P.dono()) marcaN(R.lista.filter(x=>x.status==='aberto').length); desenha(); }
 
   function abrir(){ R.aberto=true; R.texto=''; R.ver=null; R.tela={v:P.S.view, n:telaNome(), a:aparelho(), w:window.innerWidth}; desenha(); lerLista();
     setTimeout(()=>{ const t=document.getElementById('mlh-txt'); if(t) t.focus(); },50); }
@@ -30,8 +33,22 @@
 
   function txtClaude(xs){ return 'Pedidos de ajuste do painel ('+xs.length+'):\n\n'+xs.map((x,i)=>`${i+1}. [${x.telaNome||x.tela||'?'} · ${x.aparelho||''}] ${x.texto}${x.quem?' (pediu: '+x.quem+')':''} — ${quando(x.em)}`).join('\n'); }
 
+  const ST_OUTRO={aberto:['Recebido','warn'],enviado:['Em andamento','teal'],feito:['Feito','ok']};
+  function desenhaOutro(el){ const L=R.lista;
+    el.innerHTML=`<section class="mlh-box" role="dialog" aria-label="Pedir ajuste">
+      <div class="head" style="align-items:baseline;margin:0 0 6px"><h2 style="margin:0">Pedir ajuste</h2><button class="lnk" data-act="mlh-x">Fechar</button></div>
+      <div class="sub" style="margin:0 0 8px">Algo difícil, errado ou faltando no painel? Conte aqui: o pedido vai para a administradora, com a tela em que você está.<br>Tela: <b>${esc(R.tela.n||'—')}</b> · ${esc(R.tela.a)}</div>
+      <textarea class="txt" id="mlh-txt" rows="4" placeholder="O que mudar? Ex.: não acho o botão de concluir no celular">${esc(R.texto)}</textarea>
+      <div class="mlh-l2"><label class="ck"><input type="checkbox" id="mlh-foto" ${R.foto?'checked':''}> Mandar foto da tela</label>
+        <button class="btn" data-act="mlh-salvar" ${R.salv?'disabled':''}>${R.salv?'Enviando…':'Enviar pedido'}</button></div>
+      <div class="mlh-lh"><b>Meus pedidos</b></div>
+      ${L==null?'<div class="empty">Carregando…</div>':L.length?`<div class="mlh-lst">${L.map(x=>{ const st=ST_OUTRO[x.status]||ST_OUTRO.aberto; return `<div class="mlh-it ${x.status}">
+          <div class="mlh-tx"><b>${esc(x.texto)}</b><small>${esc(x.telaNome||x.tela||'')} · ${quando(x.em)}</small></div>
+          <div class="mlh-ac"><span class="pill ${st[1]}">${st[0]}</span></div></div>`; }).join('')}</div>`:'<div class="empty">Você ainda não pediu nenhum ajuste.</div>'}
+    </section>`; }
   function desenha(){ if(!R.aberto) return; let el=document.getElementById('mlh-pnl');
     if(!el){ el=document.createElement('div'); el.id='mlh-pnl'; el.className='mlh-fundo'; document.body.appendChild(el); }
+    if(!P.dono()) return desenhaOutro(el);
     const L=R.lista, ab=L?L.filter(x=>x.status!=='feito'):[], xs=L?(R.fil==='abertos'?ab:L):[], v=R.ver&&L&&L.find(x=>x._id===R.ver);
     el.innerHTML=`<section class="mlh-box" role="dialog" aria-label="Pedir ajuste">
       <div class="head" style="align-items:baseline;margin:0 0 6px"><h2 style="margin:0">Pedir ajuste</h2><button class="lnk" data-act="mlh-x">Fechar</button></div>
@@ -63,15 +80,16 @@
   document.addEventListener('click',async ev=>{
     if(ev.target.closest&&ev.target.closest('#tp-ajuste')){ if(R.aberto) fechar(); else abrir(); return; }
     if(R.aberto&&ev.target.id==='mlh-pnl'){ fechar(); return; }
-    const b=ev.target.closest&&ev.target.closest('[data-act^="mlh-"]'); if(!b||!P.dono()) return; const a=b.dataset.act, id=b.dataset.id;
+    const b=ev.target.closest&&ev.target.closest('[data-act^="mlh-"]'); if(!b||!P.S.uid) return; const a=b.dataset.act, id=b.dataset.id;
+    if(!P.dono()&&!['mlh-x','mlh-salvar'].includes(a)) return; /* quem não é a dona só anota e fecha */
     if(a==='mlh-x'){ fechar(); return; }
     if(a==='mlh-fil'){ R.fil=b.dataset.v; desenha(); return; }
     if(a==='mlh-foto'){ R.ver=R.ver===id?null:id; desenha(); return; }
     if(a==='mlh-salvar'){ const t=(document.getElementById('mlh-txt').value||'').trim(); if(!t) return P.toast('Escreva o que mudar.');
-      const quem=(document.getElementById('mlh-quem').value||'').trim(); R.salv=true; desenha();
+      const qi=document.getElementById('mlh-quem'), quem=P.dono()?((qi&&qi.value)||'').trim():meuNome(); R.salv=true; desenha();
       try{ const f=R.foto?await foto():null; const agora=new Date().toISOString();
         await P.db().collection(COL).add({texto:t,quem:quem||null,tela:R.tela.v||'',telaNome:R.tela.n||'',aparelho:R.tela.a,largura:R.tela.w,foto:f,status:'aberto',em:agora,por:P.S.uid||null});
-        R.texto=''; P.toast('Anotado'+(R.foto&&!f?' (sem foto)':'')+'.'); }
+        R.texto=''; P.toast((P.dono()?'Anotado':'Pedido enviado para a administradora')+(R.foto&&!f?' (sem foto)':'')+'.'); }
       catch(e){ P.erro(e); } R.salv=false; await lerLista(); return; }
     if(a==='mlh-copiar'){ const xs=(R.lista||[]).filter(x=>x.status!=='feito').slice().reverse(); const t=txtClaude(xs);
       try{ await navigator.clipboard.writeText(t); }catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(e2){} ta.remove(); }
