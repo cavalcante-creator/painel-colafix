@@ -17,6 +17,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   const toast=()=>p.evaluate(()=>{ const t=document.getElementById('toast'); return t&&!t.hidden?t.innerText:''; });
   const espera=async(f,ms)=>{ const t0=Date.now(); while(Date.now()-t0<(ms||8000)){ if(await p.evaluate(f).catch(()=>false)) return true; await H.dorme(200); } return false; };
 
+  if(await p.$('[data-act="rh-iavt"]')){ await p.click('[data-act="rh-iavt"]'); await H.dorme(400); } /* 02/11: o Início mostra 4 avisos + "Ver todos" */
   const v0=await view(); const nav=await p.evaluate(()=>[...document.querySelectorAll('#navlist [data-go]')].map(b=>b.innerText.trim()).join('|'));
   ok('Menu ganhou "Férias e prazos"', nav==='Início|Pessoas|Prazos|Documentos|Almoço|Cadastros', nav);
   ok('Início avisa: férias perto do prazo e vencida, troca do PJ perto e atrasada (e não a que está em dia)',

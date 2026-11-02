@@ -21,6 +21,9 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 
   let s=await srv();
   ok('Desligamento marcado para ontem vira "Desligado" sozinho ao abrir', s['rh/dados/funcionarios/f6'].status==='Desligado'&&s['rh/dados/funcionarios/f6'].desligAgendado===false);
+  /* 02/11: o Início mostra 4 avisos ("Ver todos") e os aniversários ficam na aba "Aniversários do mês" da barra "Mais" */
+  if(await p.$('[data-act="rh-iavt"]')){ await p.click('[data-act="rh-iavt"]'); await H.dorme(400); }
+  await p.click('[data-act="rh-itab"][data-v="aniv"]'); await H.dorme(500);
   const v0=await view();
   ok('Início: avisos da experiência (vencendo e vencida) e dos documentos do terceirizado', /Atenção\s*Experiência: ANA SOUZA\s*1ª etapa termina em 9 dias/.test(v0)&&/Vencido\s*Experiência: CARLOS LIMA\s*1ª etapa venceu há 6 dias/.test(v0)&&/Experiência: BRUNO ROCHA\s*experiência termina em 9 dias/.test(v0)
     &&/Vencido\s*Documento: Certidão negativa de débitos · LIMPA TUDO LTDA/.test(v0)&&/Atenção\s*Documento: ASO · LIMPA TUDO LTDA\s*vence em 5 dias/.test(v0)&&!/Seguro de vida/.test(v0)&&!/Experiência: MARIA/.test(v0), v0.replace(/\n/g,' | ').slice(250,900));

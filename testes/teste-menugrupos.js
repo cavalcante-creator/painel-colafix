@@ -25,13 +25,13 @@ const SP=process.env.SHOTS||'/tmp';
  await B.browser.close();
  /* RH */
  B=await H.abrir({viewport:{width:1440,height:900}}); p=B.page; p.on('pageerror',e=>erros.push(e.message)); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'ju','ju1234'); await H.dorme(4500);
- n=await top(); ok('RH: 6 itens (Início, Pessoas, Prazos, Documentos, Almoço, Cadastros)', JSON.stringify(n)===JSON.stringify(['Início','Pessoas','Prazos','Documentos','Almoço','Cadastros']), JSON.stringify(n));
+ n=await top(); ok('RH: 8 itens (menu de 30/10 + Minha agenda de 31/10)', JSON.stringify(n)===JSON.stringify(['Início','Minha agenda','Pessoas','Ausências','Prazos','Documentos','Relatórios','Cadastros']), JSON.stringify(n));
  await p.click('#navlist .gxg-gr:has-text("Pessoas")'); await H.dorme(1000);
  s=await p.evaluate(()=>({v:__T.S().view,sub:[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.innerText.trim()),tabs:[...document.querySelectorAll('#view .gxg-tabs .gxg-tb')].map(b=>b.innerText.trim())}));
- ok('Pessoas: Funcionários · Pessoas na empresa · Vagas (lateral e abas)', s.v==='rhfunc'&&s.sub.join('|')==='Funcionários|Pessoas na empresa|Vagas'&&s.tabs.join('|')==='Funcionários|Pessoas na empresa|Vagas', JSON.stringify(s));
- await p.click('#view .gxg-tabs [data-go="rhvagas"]'); await H.dorme(900); ok('Aba Vagas abre', await p.evaluate(()=>__T.S().view==='rhvagas'));
+ ok('Pessoas: Funcionários · Admissões e vagas · Quem está hoje · Uniformes na lateral (02/11: sem Terceirizados; no computador a barra de abas de cima fica escondida)', s.v==='rhfunc'&&s.sub.join('|')==='Funcionários|Admissões e vagas|Quem está hoje|Uniformes'&&await p.evaluate(()=>{ const t=document.querySelector('#view .gxg-tabs'); return !t||getComputedStyle(t).display==='none'; }), JSON.stringify(s));
+ await p.click('#navlist .gxg-si[data-go="rhvagas"]'); await H.dorme(900); ok('Vagas abre pela lateral', await p.evaluate(()=>__T.S().view==='rhvagas'));
  await p.click('#navlist .gxg-gr:has-text("Prazos")'); await H.dorme(900);
- s=await p.evaluate(()=>[...document.querySelectorAll('#view .gxg-tabs .gxg-tb')].map(b=>b.innerText.trim())); ok('Prazos: Agenda · Férias e prazos', s.join('|')==='Agenda|Férias e prazos', s.join('|'));
+ s=await p.evaluate(()=>[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.innerText.trim())); ok('Prazos: Agenda · Experiência · Troca dos PJ · Exames e NRs', s.join('|')==='Agenda|Experiência|Troca dos PJ|Exames e NRs', s.join('|'));
  await p.click('#gxs-q'); await p.keyboard.type('carla'); await H.dorme(400); s=await p.evaluate(()=>document.getElementById('gxs-res').innerText);
  ok('Busca acha a pessoa pelo nome', /Carla Mendes/.test(s)&&/Operadora/.test(s), s.replace(/\n/g,'|'));
  await p.keyboard.press('Enter'); await H.dorme(1200); s=await p.evaluate(()=>({v:__T.S().view,t:document.getElementById('view').innerText.slice(0,400)}));

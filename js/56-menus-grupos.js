@@ -13,7 +13,7 @@ const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios',
 /* menu do RH reorganizado (30/10, escolha da usuária): cada item abre direto a tela; Uniformes em Pessoas */
 const RHG=[{v:'rhinicio'},
   {g:'Minha agenda',ic:'check',vs:[['rhtarefas','Tarefas e calendário'],['rhpedidos','Pedidos do pessoal']]}, /* 31/10 */
-  {g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhvagas','Admissões e vagas'],['rhterc','Terceirizados'],['rhpres','Quem está hoje'],['rhunif','Uniformes']]},
+  {g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhvagas','Admissões e vagas'],['rhpres','Quem está hoje'],['rhunif','Uniformes']]},
   {g:'Ausências',ic:'relogio',vs:[['rhferias','Férias'],['rhatest','Atestados e faltas'],['rhalmoco','Almoço']]},
   {g:'Prazos',ic:'cal2',vs:[['rhagenda','Agenda'],['rhexp','Experiência'],['rhpj','Troca dos PJ'],['rhqual','Exames e NRs']]},
   {g:'Documentos',ic:'folha',vs:[['rhdocs','Contratos e documentos'],['rhfichas','Fichas de EPI'],['rhcom','Comunicados']]},
@@ -47,6 +47,8 @@ function admNav(){ const nl=$('#navlist'); if(!nl) return; const ms=modsVis(), p
     h=h.slice(0,fim)+`<div class="gxg-sub">${sub}</div>`+h.slice(fim); } }
   nl.innerHTML=h; nl.dataset.sbg='adm'; gxsMonta(nl); }
 /* ---------------- RH ---------------- */
+/* 02/11 (Juliana): "não tem necessidade de aba terceirizados — os que o RH controla são só os PJ": a tela rhterc sai do menu (continua abrindo pelos avisos) */
+if(typeof TELA_SEM_MENU!=='undefined') TELA_SEM_MENU.rhterc=1;
 function rhgDe(v){ v=RH_SUB[v]||v; return RHG.find(g=>g.vs?g.vs.some(t=>t[0]===v):g.v===v)||null; }
 function rhNav(){ const nl=$('#navlist'); if(!nl||nl.dataset.sbg==='rh'&&nl.querySelector('.sbg-rh')) return; const bs={}; nl.querySelectorAll('[data-go]').forEach(b=>{ bs[b.dataset.go]=b; });
   if(!Object.keys(bs).some(v=>v.startsWith('rh'))) return; const curV=RH_SUB[S.view]||S.view, usados=new Set();
@@ -55,10 +57,10 @@ function rhNav(){ const nl=$('#navlist'); if(!nl||nl.dataset.sbg==='rh'&&nl.quer
     const ab=xs.some(t=>t[0]===curV);
     h+=`<button class="navbtn gxg-gr" data-go="${xs[0][0]}" ${ab?'data-aberto="1"':''} ${ab&&curV===xs[0][0]?'aria-current="page"':''}>${ic(g.ic,18)}<span>${esc(g.g)}</span></button>`
       +(ab?`<div class="gxg-sub">${xs.map(([v,t])=>`<button class="navbtn gxg-si" data-go="${v}" ${curV===v?'aria-current="page"':''}><span>${esc(t)}</span></button>`).join('')}</div>`:''); });
-  Object.keys(bs).filter(v=>!usados.has(v)).forEach(v=>{ h+=bs[v].outerHTML; });
+  Object.keys(bs).filter(v=>!usados.has(v)&&!(typeof TELA_SEM_MENU!=='undefined'&&TELA_SEM_MENU[v])).forEach(v=>{ h+=bs[v].outerHTML; });
   nl.innerHTML='<i class="sbg-rh" hidden></i>'+h; nl.dataset.sbg='rh'; gxsMonta(nl); }
 function rhAbas(v){ const g=rhgDe(v); if(!g||!g.vs) return ''; const xs=g.vs.filter(t=>{ try{ return viewOk(t[0]); }catch(e){ return false; } }); if(xs.length<2) return ''; const cur=RH_SUB[v]||v;
-  return `<nav class="gxg-tabs" aria-label="${esc(g.g)}"><span class="gxg-tt">${ic(g.ic,16)}${esc(g.g)}</span>${xs.map(([x,t])=>`<button class="gxg-tb" data-go="${x}" ${x===cur?'aria-current="page"':''}>${esc(t)}</button>`).join('')}</nav>`; }
+  return `<nav class="gxg-tabs gxg-rh" aria-label="${esc(g.g)}"><span class="gxg-tt">${ic(g.ic,16)}${esc(g.g)}</span>${xs.map(([x,t])=>`<button class="gxg-tb" data-go="${x}" ${x===cur?'aria-current="page"':''}>${esc(t)}</button>`).join('')}</nav>`; }
 /* as telas do RH são registradas depois (modulos/): o embrulho com as abas é posto na hora de desenhar */
 { const _r=render; render=function(){ try{ RHG.forEach(g=>(g.vs||[]).forEach(([v])=>{ const f=S.extViews&&S.extViews[v]; if(typeof f==='function'&&!f._sbg){ const w=function(){ const h=f.apply(this,arguments); try{ return sbRhSolo()?rhAbas(v)+h:h; }catch(e){ return h; } }; w._sbg=1; S.extViews[v]=w; } })); }catch(e){} return _r.apply(this,arguments); }; }
 /* ---------------- ligação com a lateral ---------------- */
@@ -110,6 +112,8 @@ document.addEventListener('keydown',ev=>{ const p=sbPerfil(); if(p!=='adm'&&p!==
 document.head.insertAdjacentHTML('beforeend',`<style id="sbg-css">
 body.sbg-adm #navlist .navbtn>span{flex:1;min-width:0}
 .side .navlist{overflow-y:auto;min-height:0;flex:0 1 auto;margin-right:-6px;padding-right:6px;scrollbar-width:thin}
+/* 02/11 (Juliana): no computador a lateral já mostra as abas do grupo; a barra de abas em cima só aparece no celular */
+@media (min-width:861px){.gxg-tabs.gxg-rh{display:none}}
 .side .navlist::-webkit-scrollbar{width:6px}.side .navlist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:3px}
 </style>`);
 

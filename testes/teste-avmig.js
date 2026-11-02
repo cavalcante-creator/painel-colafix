@@ -3,7 +3,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
  D['config/geral']=Object.assign({},D['config/geral']||{},{tvRecados:[{t:'Almoço especial na sexta: churrasco',ate:''}]});
  const B=await H.abrir({viewport:{width:1440,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
- await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(6000);
+ await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(6000); await p.evaluate(()=>{ const b=document.querySelector('[data-act="rh-itab"][data-v="tv"]'); if(b&&b.getAttribute('aria-pressed')!=='true') b.click(); }); await H.dorme(800); /* 02/11: avisos das TVs na aba "Avisos nas TVs" do Início */
  const q=await p.evaluate(async()=>{ const g=await __T.S().db.doc('config/geral').get(); return {cards:[...document.querySelectorAll('.avx-c .avx-tx b')].map(b=>b.innerText),antigos:(g.data().tvRecados||[]).length}; });
  ok('O recado antigo do almoço aparece no quadro de avisos (e sai do sistema antigo)', q.cards.includes('Almoço especial na sexta: churrasco')&&q.antigos===0, JSON.stringify(q));
  await p.click('[data-act="rh-aved"]'); await H.dorme(400); await p.click('[data-act="rh-avtam"][data-v="g"]'); await H.dorme(400);

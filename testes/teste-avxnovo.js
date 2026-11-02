@@ -2,7 +2,7 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
 (async()=>{ const {d}=seedManut(x=>x);
  const B=await H.abrir({viewport:{width:1440,height:1000}}); const p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
- await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1200);
+ await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(1200); await p.evaluate(()=>{ const b=document.querySelector('[data-act="rh-itab"][data-v="tv"]'); if(b&&b.getAttribute('aria-pressed')!=='true') b.click(); }); await H.dorme(800); /* 02/11: avisos das TVs na aba "Avisos nas TVs" do Início */
  ok('Quadro vazio convida a publicar (versão compacta no RH)', await p.evaluate(()=>/Nenhum aviso publicado/.test((document.querySelector('.avx')||{}).innerText||'')));
  await p.click('[data-act="rh-avnovo"]'); await H.dorme(300); await p.fill('#rh-av-t','Troca de cor às 14h'); await p.click('[data-act="rh-avtipo"][data-v="atencao"]'); await H.dorme(200);
  await p.click('[data-act="rh-avln"][data-v="Linha 2"]'); await H.dorme(200); await p.click('[data-act="rh-avper"][data-v="3d"]'); await H.dorme(200);

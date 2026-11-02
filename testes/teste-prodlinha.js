@@ -18,8 +18,11 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
  const c2=await p.evaluate(()=>[...document.querySelectorAll('.pl-card')].map(c=>c.innerText.replace(/\s+/g,' ')));
  ok('Trocar o período (ontem): Linha 1 só com os 400 de ontem', hj.getDate()<=1||c2.some(c=>/^Linha 1 .*400\s*sacos produzidos/.test(c)), JSON.stringify(c2).slice(0,200));
  await p.click('[data-act="pl-per"][data-v="mes"]'); await H.dorme(2000);
- const pop=p.context().waitForEvent('page'); await p.click('[data-act="pl-pdf"]'); const w=await pop; await w.waitForLoadState(); await H.dorme(300);
- const t=await w.evaluate(()=>document.body.innerText); await w.close();
- ok('PDF com o resumo por linha e o detalhe por produto e por dia', /Produção por linha/.test(t)&&/Linha 1\s+1\.200/.test(t)&&/Total\s+1\.500/.test(t)&&/Produto/.test(t)&&/Dia/.test(t), t.slice(0,200).replace(/\n/g,' | '));
+ /* 02/11: PDF no padrão dos relatórios (jsPDF, baixa direto). Com o jsPDF de teste, os textos desenhados são guardados em window.__txt */
+ await p.evaluate(()=>{ window.__txt=[]; const f=CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText=function(t){ window.__txt.push(String(t)); return f.apply(this,arguments); }; });
+ if(process.env.JSPDF_REAL){ const [dl]=await Promise.all([p.waitForEvent('download',{timeout:20000}),p.click('[data-act="pl-pdf"]')]); const f='/tmp/'+dl.suggestedFilename(); await dl.saveAs(f); ok('PDF de verdade: '+f, require('fs').statSync(f).size>5000, require('fs').statSync(f).size); }
+ else { await p.click('[data-act="pl-pdf"]'); await H.dorme(1500);
+ const sv=await p.evaluate(()=>window.__pdfSalvo||[]), t=(await p.evaluate(()=>window.__txt||[])).join(' | ');
+ ok('PDF baixado com o resumo por linha e o detalhe por produto e por dia', sv.some(n=>/^Producao por linha .*\.pdf$/.test(n))&&/Produção por linha/.test(t)&&/TOTAL PRODUZIDO \| 1\.500 sc/.test(t)&&/Linha 1 \| 1\.200/.test(t)&&/Total \| 1\.500/.test(t)&&/Por produto/.test(t)&&/Dia a dia/.test(t), JSON.stringify(sv)+' '+t.slice(0,300)); }
  await p.screenshot({path:'/tmp/prodlinha.png',fullPage:false});
  await browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

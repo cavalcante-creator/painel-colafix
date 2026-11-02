@@ -42,14 +42,39 @@ function vProdLinhas(){ const P=S.pl, [de,ate]=plIntervalo(), C=P.cache[de+'|'+a
         <div><div class="label" style="margin-bottom:6px">Por dia</div>${R.dias.filter(d=>x.dias[d]).length?`<div class="pl-dias">${R.dias.filter(d=>x.dias[d]||R.dias.length<=14).map(d=>{ const v=x.dias[d]||0, m=Math.max(1,...Object.values(x.dias)); return `<div><span>${esc(dm(d))}</span><i><u style="width:${(v/m*100).toFixed(0)}%"></u></i><b>${v?plFmt(v):'—'}</b></div>`; }).join('')}</div>`:'<div class="sub">Nada apontado.</div>'}</div></div></details></section>`; }).join('');
   const tot=`<section class="card pl-tot"><div><span>Total produzido</span><b>${plFmt(R.tot)}</b><small>sacos</small></div><div><span>Programado</span><b>${R.prog?plFmt(R.prog):'—'}</b><small>${R.prog?Math.round(R.tot/R.prog*100)+'% feito':''}</small></div><div><span>Linhas</span><b>${R.xs.length}</b><small>com movimento</small></div><div><span>Tempo parado</span><b>${R.par?plH(R.par):'nenhum'}</b><small>todas as linhas</small></div></section>`;
   return `${head}<section class="card">${chips}</section>${R.xs.length?tot+`<div class="pl-grid">${cards}</div>`:'<div class="empty">Nenhum apontamento nem ordem programada neste período.</div>'}${C.erro?'<div class="sub">Atenção: não consegui buscar todo o período; mostrando só os apontamentos recentes.</div>':''}`; }
-function plPdf(){ const [de,ate]=plIntervalo(), C=S.pl.cache[de+'|'+ate]; if(!C) return; const R=plCalc(de,ate,C), w=window.open('','_blank'); if(!w) return toast('Libere as janelas (pop-up) para baixar o PDF.');
-  const e=s=>String(s==null?'':s).replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x])), per=dataBR(de)+(de!==ate?' a '+dataBR(ate):'');
-  const resumo=`<table><thead><tr><th>Linha</th><th class="r">Produzido</th><th class="r">Programado</th><th class="r">%</th><th class="r">Ordens concl.</th><th class="r">Média/dia</th><th class="r">Parado</th><th>Principal parada</th></tr></thead><tbody>${R.xs.map(x=>`<tr><td><b>${e(x.l)}</b></td><td class="r">${plFmt(x.prod)}</td><td class="r">${x.prog?plFmt(x.prog):'—'}</td><td class="r">${x.pc!=null?Math.round(x.pc)+'%':'—'}</td><td class="r">${x.conc} de ${x.nOrd}</td><td class="r">${plFmt(x.media)}</td><td class="r">${x.par?plH(x.par):'—'}</td><td>${e(x.motP)}</td></tr>`).join('')}<tr class="tt"><td>Total</td><td class="r">${plFmt(R.tot)}</td><td class="r">${R.prog?plFmt(R.prog):'—'}</td><td class="r">${R.prog?Math.round(R.tot/R.prog*100)+'%':'—'}</td><td></td><td></td><td class="r">${R.par?plH(R.par):'—'}</td><td></td></tr></tbody></table>`;
-  const det=R.xs.map(x=>`<div class="lin"><h2>${e(x.l)} · ${plFmt(x.prod)} sacos</h2><div class="g2"><table><thead><tr><th>Produto</th><th class="r">Sacos</th><th class="r">%</th></tr></thead><tbody>${x.itensL.slice(0,15).map(i=>`<tr><td><b>${e(i.cod)}</b> ${e(i.d.slice(0,36))}</td><td class="r">${plFmt(i.q)}</td><td class="r">${x.prod?Math.round(i.q/x.prod*100):0}%</td></tr>`).join('')||'<tr><td colspan="3">Nada apontado.</td></tr>'}</tbody></table>
-    <table><thead><tr><th>Dia</th><th class="r">Sacos</th></tr></thead><tbody>${R.dias.filter(d=>x.dias[d]).map(d=>`<tr><td>${e(dataBR(d))}</td><td class="r">${plFmt(x.dias[d])}</td></tr>`).join('')||'<tr><td colspan="2">—</td></tr>'}</tbody></table></div></div>`).join('');
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Produção por linha · ${e(per)}</title><style>@page{size:A4;margin:14mm}body{font-family:Archivo,'Segoe UI',Arial,sans-serif;color:#1C2B33;font-size:11.5px}h1{margin:0;font-size:21px}h2{font-size:14px;margin:16px 0 6px;padding-bottom:4px;border-bottom:1.5px solid #143F54}.sub{color:#5E6E77;margin:3px 0 12px}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:10px;color:#5E6E77;border-bottom:1px solid #C9D2D9;padding:5px 6px}td{padding:5px 6px;border-bottom:1px solid #EEF1F3}.r{text-align:right}tr.tt td{font-weight:700;border-top:1.5px solid #1C2B33}.g2{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}.lin{page-break-inside:avoid}</style></head><body>
-    <h1>Produção por linha</h1><div class="sub">Colafix · ${e(per)} · pelos apontamentos do painel · gerado em ${new Date().toLocaleString('pt-BR')}</div>${resumo}${det}</body></html>`);
-  w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch(x){} },400); }
+/* 02/11 ("melhorar o layout do PDF da produção por linha"): PDF de verdade no padrão dos relatórios do painel (js/34: faixa com a logo,
+   números em quadros, barras e tabelas, rodapé com página), baixado direto, sem a janela de impressão. Uma folha de resumo e,
+   para cada linha, os números, o que produziu (produtos) e o dia a dia. */
+async function plPdf(){ const [de,ate]=plIntervalo(), C=S.pl.cache[de+'|'+ate]; if(!C) return; const R=plCalc(de,ate,C);
+  try{ await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }catch(e){}
+  let img={}; try{ img=await gpImgs(); }catch(e){}
+  let P; try{ P=gpNovo('Produção por linha',dataBR(de)+(de!==ate?' a '+dataBR(ate):'')+' · pelos apontamentos do painel',img); }catch(e){ toast(e.message||'O gerador de PDF não carregou.'); return; }
+  const pc=(a,b)=>b?Math.round(a/b*100):null, cor=p=>p==null?'cinza':p>=95?'ok':p>=75?'warn':'crit', pT=pc(R.tot,R.prog);
+  P.capa();
+  P.kpis([{t:'Total produzido',v:plFmt(R.tot)+' sc',s:R.xs.filter(x=>x.prod).length+' linha(s) produziram',c:'pet'},
+    {t:'Programado no período',v:R.prog?plFmt(R.prog)+' sc':'—',s:pT!=null?pT+'% do programado feito':'sem ordens programadas',c:cor(pT)},
+    {t:'Ordens concluídas',v:R.xs.reduce((a,x)=>a+x.conc,0)+' de '+R.xs.reduce((a,x)=>a+x.nOrd,0),s:'programadas no período',c:'cinza'},
+    {t:'Tempo parado',v:R.par?plH(R.par):'nenhum',s:'todas as linhas',c:R.par?'warn':'ok'}],4);
+  if(!R.xs.length){ P.vazio('Nenhum apontamento nem ordem programada neste período.'); P.fim('Producao por linha '+de+(de!==ate?' a '+ate:'')+'.pdf'); return; }
+  P.secao('Produzido × programado por linha','barra = produzido · número da direita = produzido de programado');
+  const mx=Math.max(1,...R.xs.map(x=>Math.max(x.prod,x.prog)));
+  P.hbar(R.xs.map(x=>({l:x.l,v:x.prod,c:x.pc==null?'pet':cor(x.pc),txt:plFmt(x.prod)+(x.prog?' de '+plFmt(x.prog)+' · '+Math.round(x.pc)+'%':'')})),{max:mx,lw:34});
+  P.secao('Resumo');
+  P.tabela([{t:'Linha',w:28},{t:'Produzido',w:20,al:'r'},{t:'Programado',w:21,al:'r'},{t:'% feito',w:15,al:'r'},{t:'Ordens',w:17,al:'r'},{t:'Média/dia',w:18,al:'r'},{t:'Parado',w:15,al:'r'},{t:'Principal parada',w:42}],
+    R.xs.map(x=>Object.assign([x.l,plFmt(x.prod),x.prog?plFmt(x.prog):'—',x.pc!=null?Math.round(x.pc)+'%':'—',x.conc+' de '+x.nOrd,plFmt(x.media),x.par?plH(x.par):'—',x.motP||'—'],{_cor:{3:x.pc==null?null:cor(x.pc)}}))
+      .concat([Object.assign(['Total',plFmt(R.tot),R.prog?plFmt(R.prog):'—',pT!=null?pT+'%':'—',R.xs.reduce((a,x)=>a+x.conc,0)+' de '+R.xs.reduce((a,x)=>a+x.nOrd,0),'',R.par?plH(R.par):'—',''],{_tot:1})]));
+  R.xs.forEach(x=>{ P.cabe(95); if(P.y>32){ P.y+=2; P.dc(GPDF.cor.cinza); P.doc.setLineWidth(.5); P.doc.line(P.M,P.y,P.W-P.M,P.y); P.y+=6; } P.secao(x.l,plFmt(x.prod)+' sacos'+(x.prog?' · '+Math.round(x.pc)+'% do programado':''));
+    P.kpis([{t:'Produzido',v:plFmt(x.prod)+' sc',s:x.itensL.length===1?'1 produto':x.itensL.length+' produtos',c:'pet'},{t:'Programado',v:x.prog?plFmt(x.prog)+' sc':'—',s:x.conc+' de '+x.nOrd+' ordens concluídas',c:cor(x.pc)},
+      {t:'Média por dia trabalhado',v:plFmt(x.media)+' sc',s:x.diasT===1?'1 dia trabalhado':x.diasT+' dias trabalhados',c:'cinza'},{t:'Tempo parado',v:x.par?plH(x.par):'nenhum',s:x.motP?'mais: '+x.motP+' ('+plH(x.motMs)+')':'',c:x.par?'warn':'ok'}],4);
+    P.secao('Por produto',x.itensL.length+' produto(s)');
+    if(x.itensL.length) P.tabela([{t:'Código',w:22},{t:'Produto',w:100},{t:'Sacos',w:24,al:'r'},{t:'% da linha',w:20,al:'r'}],x.itensL.map(i=>[i.cod,i.d||'—',plFmt(i.q),(x.prod?Math.round(i.q/x.prod*100):0)+'%']));
+    else P.vazio('Nada apontado nesta linha no período.');
+    const ds=R.dias.filter(d=>x.dias[d]); P.secao('Dia a dia',ds.length+' dia(s) com produção');
+    if(!ds.length){ P.vazio('Nada apontado.'); return; }
+    if(ds.length<=12){ const m=Math.max(1,...ds.map(d=>x.dias[d])); P.hbar(ds.map(d=>({l:dataBR(d).slice(0,5)+' '+['dom','seg','ter','qua','qui','sex','sáb'][new Date(d+'T12:00:00').getDay()],v:x.dias[d],txt:plFmt(x.dias[d])})),{max:m,lw:22}); return; }
+    const rows=[]; for(let i=0;i<ds.length;i+=3) rows.push([].concat(...[0,1,2].map(k=>ds[i+k]?[dataBR(ds[i+k]).slice(0,5),plFmt(x.dias[ds[i+k]])]:['',''])));
+    P.tabela([{t:'Dia',w:16},{t:'Sacos',w:18,al:'r'},{t:'Dia',w:16},{t:'Sacos',w:18,al:'r'},{t:'Dia',w:16},{t:'Sacos',w:18,al:'r'}],rows); });
+  P.fim('Producao por linha '+de+(de!==ate?' a '+ate:'')+'.pdf'); toast('PDF baixado.'); }
 async function plXls(){ const [de,ate]=plIntervalo(), C=S.pl.cache[de+'|'+ate]; if(!C) return; const R=plCalc(de,ate,C);
   try{ await carregarScript(ANL_XLSX); const X=window.XLSX; if(!X) throw new Error('sem planilha'); const wb=X.utils.book_new();
     X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet([['Linha','Produzido (sacos)','Programado','% do programado','Ordens concluídas','Ordens no período','Dias trabalhados','Média por dia','Tempo parado (min)','Principal parada']].concat(R.xs.map(x=>[x.l,Math.round(x.prod),Math.round(x.prog),x.pc!=null?Math.round(x.pc):'',x.conc,x.nOrd,x.diasT,Math.round(x.media),Math.round(x.par/60000),x.motP]))),'Resumo');
