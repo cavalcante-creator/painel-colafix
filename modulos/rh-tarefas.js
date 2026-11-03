@@ -94,7 +94,7 @@
         <section class="rt-bx"><div class="rt-bxh"><h3>Pedidos do pessoal</h3><button class="lnk" data-go="rhpedidos">Ver todos</button></div>
           ${ab.length?`<p class="rt-bxs">${plural(ab.length,'pedido do pessoal em aberto','pedidos do pessoal em aberto')}${atP?` · <b class="rt-red">${plural(atP,'atrasado','atrasados')}</b>`:''}</p>
           ${ab.slice().sort((a,b)=>String(a.prazo||'9').localeCompare(String(b.prazo||'9'))).slice(0,3).map(p=>`<button class="rt-pi" data-act="rt-pedgo" data-id="${e(p._id)}">${av(p.quem,'sm')}<span><b>${e(p.quem)}</b><small>${e(p.tipo||p.oque||'')}</small></span><span class="rt-pdue">${prazoChip(p)}</span></button>`).join('')}`:'<p class="rt-bxs">Nenhum pedido em aberto.</p>'}</section>
-        <section class="rt-bx"><div class="rt-bxh"><h3>Prazos do painel</h3><span class="rt-bxd">${brc(d)}</span></div>
+        <section class="rt-bx"><div class="rt-bxh"><h3>Prazos do painel</h3><span class="rt-bxd">${brc(d)}</span></div><button class="lnk rt-pzall" data-go="rhagenda">Ver todos os prazos (30, 60, 90 dias)</button>
           ${pz.length||pds.length?pz.map(x=>`<div class="rt-pz ${e(x.c)}"><span class="rt-pzi">${SVGI(icTipo(x.tipo))}</span><span class="rt-pzt"><b>${e(x.t)}</b><small>${e(x.s||'')}</small></span>${x.act?`<button class="lnk" ${x.act}>Abrir</button>`:''}</div>`).join('')+
             pds.map(p=>`<div class="rt-pz warn"><span class="rt-pzi">${SVGI(ICT.pedido)}</span><span class="rt-pzt"><b>Pedido de ${e(p.quem)}</b><small>${e(p.oque||p.tipo||'')}</small></span><button class="lnk" data-act="rt-pedgo" data-id="${e(p._id)}">Abrir</button></div>`).join('')
             :'<p class="rt-bxs">Nada do painel neste dia.</p>'}</section></aside>
@@ -302,7 +302,7 @@
 .rt-fts{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.rt-fts summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:14px;margin-bottom:8px}
 .rt-side{display:flex;flex-direction:column;gap:14px}.rt-box{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px 18px}.rt-box h3{margin:0 0 8px;font-size:15.5px}.rt-bs{margin:-4px 0 10px;font-size:13px;color:var(--muted)}
 .rt-calm{background:var(--teal-wash);border-color:transparent}
-.rt-pz{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line-2,var(--line))}.rt-box h3+.rt-pz{border-top:0}
+.rt-pzall{display:block;margin:-2px 0 8px;font-size:13px}.rt-pz{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line-2,var(--line))}.rt-box h3+.rt-pz{border-top:0}
 .rt-pzi{width:32px;height:32px;flex:0 0 32px;border-radius:10px;display:grid;place-items:center;background:var(--teal-wash);color:var(--teal)}.rt-pzi svg{width:17px;height:17px}
 .rt-pz.crit .rt-pzi{background:var(--crit-tint,#FBE9E7);color:var(--crit-ink,#A33A2C)}.rt-pz.warn .rt-pzi{background:#FBF1DE;color:#8A5A10}
 .rt-pzt{flex:1;min-width:0;display:flex;flex-direction:column}.rt-pzt b{font-size:13.5px}.rt-pzt small{font-size:12px;color:var(--muted)}

@@ -10,12 +10,15 @@
    guarda o token em candidatos.conv e abre o link com QR e WhatsApp do candidato; o cartão mostra enviada / chegou / venceu.
    Candidato aprovado com a ficha chegada: "Começar admissão" usa a ficha (ctx.fichaUsar) com função, setor e vínculo da vaga.
    Ao salvar, o item entra na lista uma vez só (poe): antes podia aparecer repetido até recarregar.
+   Marcar entrevista pelo celular (03/11, pedido da Juliana): link de entrevista (convite tipo 'ent' com horarios, local e a vaga). O candidato abre
+   ficha.html, escolhe um horário e responde poucas perguntas (sem documentos). Quando chega, procEnt põe o horário no cartão (entrevista, entResp,
+   etapa → entrevista) e marca a ficha como usada. Sem candidato (botão do topo), o candidato é criado na hora de mandar o link. Campo: candidatos.convEnt.
    Usado pelo rh.js: window.RHVagas.render(ctx) · .avisos(ctx). */
 (function(){
   const COLV='rh/dados/vagasab', COLC='rh/dados/candidatos';
   const ET=[['novo','Novos'],['triagem','Triagem'],['entrevista','Entrevista'],['aprovado','Aprovados']], FIM=[['admitido','Admitido'],['reprovado','Não passou'],['desistiu','Desistiu']];
   const ETN=Object.fromEntries(ET.concat(FIM)), ORIG=['Indicação','Site / redes','Placa na portaria','Agência','Banco de currículos','Outro'];
-  const V={vagas:[],cands:[],lido:false,sub:false,sel:null,vf:null,cf:null,cx:null,st:'abertas',q:''};
+  const V={ent:null,proc:{},lidoC:false,vagas:[],cands:[],lido:false,sub:false,sel:null,vf:null,cf:null,cx:null,st:'abertas',q:''};
   const id=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
   const poe=(xs,o)=>{ const i=xs.findIndex(x=>x._id===o._id); if(i>=0) Object.assign(xs[i],o); else xs.push(o); };
   const nrm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -23,9 +26,40 @@
   function fichaSt(c,x){ if(!x.conv) return null; const fc=(c.fcand?c.fcand():[]).find(f=>f._id===x.conv);
     if(fc) return fc.usada?{k:'usada',t:'Ficha usada na admissão'}:{k:'chegou',t:'Ficha chegou'+(fc.fotos?' · '+fc.fotos+(+fc.fotos>1?' fotos':' foto'):'')};
     const cv=(c.conv?c.conv():[]).find(v=>v._id===x.conv); return cv&&!cv.usado&&+cv.ateMs>Date.now()?{k:'esp',t:'Ficha enviada · esperando'}:{k:'venc',t:'O link da ficha venceu'}; }
+  function entSt(c,x){ if(!x.convEnt) return null; if(x.entResp&&x.entResp.tk===x.convEnt) return {k:'chegou',t:x.entResp.horario?'Escolheu o horário pelo celular':'Respondeu pelo celular · nenhum horário serviu'};
+    const cv=(c.conv?c.conv():[]).find(v=>v._id===x.convEnt); return cv&&!cv.usado&&+cv.ateMs>Date.now()?{k:'esp',t:'Link da entrevista enviado · esperando'}:{k:'venc',t:'O link da entrevista venceu'}; }
+  /* resposta da entrevista que chegou pelo celular → cartão do candidato */
+  async function procEnt(c){ if(!V.lidoC||!c.fcandEnt) return; const P=c.P, db=P.db(), agora=new Date().toISOString(); let mexeu=false;
+    for(const f of c.fcandEnt()){ if(f.usada||V.proc[f._id]) continue; V.proc[f._id]=1; mexeu=true;
+      try{ let x=V.cands.find(y=>y.convEnt===f._id); const cv=(c.conv?c.conv():[]).find(v=>v._id===f._id)||{};
+        const resp={tk:f._id,horario:f.horario||'',experiencia:f.experiencia||'',escolaridade:f.escolaridade||'',cidade:f.cidade||'',bairro:f.bairro||'',nascimento:f.nascimento||'',obs:f.obs||'',em:f.em||agora};
+        if(!x&&cv.vagaId&&V.vagas.some(v=>v._id===cv.vagaId)){ const n='ent-'+f._id; x={_id:n,vagaId:cv.vagaId,nome:f.nome||cv.nome||'Candidato',tel:f.telefone||'',email:'',origem:'',etapa:'novo',hist:[],convEnt:f._id,em:agora,porNome:'Pelo celular'}; const sd=Object.assign({},x); delete sd._id; await db.doc(COLC+'/'+n).set(sd); poe(V.cands,x); }
+        if(x){ const d={entResp:resp}; if(resp.horario) d.entrevista=resp.horario; if(!x.tel&&f.telefone) d.tel=f.telefone; if(f.nome&&f.nome.length>String(x.nome||'').length) d.nome=f.nome;
+          if(resp.horario&&(x.etapa==='novo'||x.etapa==='triagem')){ d.etapa='entrevista'; d.hist=(x.hist||[]).concat([{em:agora,de:x.etapa,para:'entrevista',porNome:'Pelo celular'}]); }
+          await db.doc(COLC+'/'+x._id).update(d); Object.assign(x,d); P.toast((x.nome||'Candidato')+(resp.horario?': entrevista marcada para '+dtx(resp.horario)+'.':' respondeu, mas nenhum horário serviu.')); }
+        await db.doc((c.colFc||'rh/dados/fichascand')+'/'+f._id).set({usada:true,usadaEm:agora,usadaPor:c.eu?c.eu():''},{merge:true});
+        try{ await db.doc('rh/dados/convites/'+f._id).update({usado:true}); }catch(e){}
+      }catch(e){ console.warn('entrevista pelo celular',e); } }
+    if(mexeu) P.rerender(); }
+  const proxUtilH=(c,n,h)=>{ let d=c.P.hojeStr(), k=0; while(k<n){ d=c.addDias(d,1); const w=new Date(d+'T12:00').getDay(); if(w&&w<6) k++; } return d+'T'+h; };
+  function formEnt(c){ const F=V.ent, e=c.esc, cand=F.candId&&V.cands.find(x=>x._id===F.candId), ab=V.vagas.filter(v=>v.status!=='fechada');
+    return `<div class="dbmodal" data-rhv-fundo="1"><div class="dbmbox" role="dialog" aria-modal="true" aria-label="Marcar entrevista pelo celular" style="max-width:640px"><div style="padding:20px 22px">
+      <div class="head" style="align-items:baseline"><h2 style="margin:0">Marcar entrevista pelo celular${cand?' · '+e(cand.nome):''}</h2><button class="lnk" data-act="rhv-entx">Fechar</button></div>
+      <p class="sub" style="margin:6px 0 0">O painel cria um link. A pessoa escolhe um dos horários, responde 4 perguntas rápidas e a entrevista entra sozinha no cartão dela. Sem fotos de documentos.</p>
+      <div class="rhv-fg">${cand?'':`<label><span>Nome</span><input class="txt" id="rhv-en" value="${e(F.nome||'')}" placeholder="Ex.: Bruna Silva"></label>
+        <label><span>Vaga</span><select class="txt" id="rhv-evg">${ab.map(v=>`<option value="${e(v._id)}" ${v._id===F.vagaId?'selected':''}>${e(vagaTit(v))}</option>`).join('')}</select></label>`}
+        <label><span>Telefone / WhatsApp</span><input class="txt" id="rhv-et" inputmode="tel" value="${e(F.tel||'')}"></label>
+        <label><span>Link vale por</span><select class="txt" id="rhv-edi">${[3,5,7,10,15].map(n=>`<option value="${n}" ${+F.dias===n?'selected':''}>${n} dias</option>`).join('')}</select></label>
+        <div class="rhv-w"><span class="rhv-lb">Horários que a pessoa pode escolher</span>${F.hs.map((h,i)=>`<div class="rhv-eh"><input class="txt" type="datetime-local" data-rhv-eh="${i}" value="${e(h)}"><button class="lnk" data-act="rhv-ehx" data-i="${i}" aria-label="Tirar este horário">Tirar</button></div>`).join('')}
+          ${F.hs.length<8?`<button class="lnk" data-act="rhv-eha">+ Outro horário</button>`:''}</div>
+        <label class="rhv-w"><span>Onde vai ser</span><input class="txt" id="rhv-elo" maxlength="120" value="${e(F.local||'')}" placeholder="Ex.: Colafix · Rua …, Cachoeirinha · procurar o RH na portaria"></label>
+        <label class="rhv-w"><span>Mensagem <small>(vai no WhatsApp e no topo do link · {NOME} e {VAGA} viram o nome e a vaga)</small></span><textarea class="txt" id="rhv-emsg" rows="3" maxlength="700">${e(F.msg||'')}</textarea></label></div>
+      <div class="rhv-ac"><button class="btn sec" data-act="rhv-entx">Cancelar</button><button class="btn" data-act="rhv-entok" ${V.salv?'disabled':''}>${V.salv?'Criando…':'Criar link'}</button></div></div></div></div>`; }
+  function leE(){ const F=V.ent; if(!F) return; [['rhv-en','nome'],['rhv-evg','vagaId'],['rhv-et','tel'],['rhv-edi','dias'],['rhv-elo','local'],['rhv-emsg','msg']].forEach(([i,k])=>{ const v=g(i); if(v!=null) F[k]=v; });
+    document.querySelectorAll('[data-rhv-eh]').forEach(n=>{ F.hs[+n.dataset.rhvEh]=n.value; }); }
   function assina(c){ if(V.sub) return; V.sub=true; const P=c.P;
     P.inscrever('rh-vagas',()=>P.db().collection(COLV).limit(300),s=>{ V.vagas=s.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>!x.removido); V.lido=true; P.rerender(); });
-    P.inscrever('rh-cands',()=>P.db().collection(COLC).limit(2000),s=>{ V.cands=s.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>!x.removido); P.rerender(); }); }
+    P.inscrever('rh-cands',()=>P.db().collection(COLC).limit(2000),s=>{ V.cands=s.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>!x.removido); V.lidoC=true; P.rerender(); }); }
   const candsDe=v=>V.cands.filter(x=>x.vagaId===v._id);
   const vagaTit=v=>(v.funcao||'Vaga')+(v.setor?' · '+v.setor:'');
   const fone=t=>String(t||'').replace(/\D/g,'');
@@ -50,18 +84,22 @@
         <label><span>E-mail <small>(opcional)</small></span><input class="txt" id="rhv-ce" value="${e(F.email||'')}"></label>
         <label><span>Como chegou</span><select class="txt" id="rhv-co"><option value="">—</option>${ORIG.map(x=>`<option ${F.origem===x?'selected':''}>${x}</option>`).join('')}</select></label>
         <label><span>Entrevista <small>(dia e hora)</small></span><input class="txt" type="datetime-local" id="rhv-cv" value="${e(F.entrevista||'')}"></label>
+        ${F.entResp?`<div class="rhv-w rhv-er"><b>Respostas pelo celular</b>${[['Horário escolhido',F.entResp.horario?dtx(F.entResp.horario):'Nenhum serviu'],['Onde mora',[F.entResp.bairro,F.entResp.cidade].filter(Boolean).join(' · ')],['Estudou até',F.entResp.escolaridade],['Experiência',F.entResp.experiencia],['Recado',F.entResp.obs]].filter(r=>r[1]).map(r=>`<span><em>${r[0]}</em>${e(r[1])}</span>`).join('')}</div>`:''}
         <label class="rhv-w"><span>Observação</span><textarea class="txt" id="rhv-cb" rows="2" maxlength="600">${e(F.obs||'')}</textarea></label>
         <label class="rhv-w"><span>Currículo <small>(foto ou PDF, opcional)</small>${F.cv&&F.cv.url?` · <a href="${e(F.cv.url)}" target="_blank" rel="noopener">ver o que está guardado</a>`:''}</span><input type="file" id="rhv-cf" accept="image/*,application/pdf,.doc,.docx"></label></div>
       <div class="rhv-ac">${F._id?`<button class="lnk rhv-del" data-act="rhv-cdel" data-id="${e(F._id)}">Apagar candidato</button>`:''}<button class="btn" data-act="rhv-cok" ${V.salv?'disabled':''}>${V.salv?'Salvando…':F._id?'Salvar':'Pôr na vaga'}</button></div></div></div></div>`; }
   function cartao(c,x){ const e=c.esc, w=fone(x.tel), i=ET.findIndex(t=>t[0]===x.etapa), prox=ET[i+1], fs=fichaSt(c,x);
-    const fb=!fs||fs.k==='venc'?`<button class="lnk" data-act="rhv-ficha" data-id="${e(x._id)}">${fs?'Mandar a ficha de novo':'Mandar ficha'}</button>`:fs.k==='esp'?`<button class="lnk" data-act="rhv-fver" data-id="${e(x._id)}">Ver link da ficha</button>`:fs.k==='chegou'?`<button class="lnk" data-act="rhv-fler" data-id="${e(x._id)}">Ver ficha</button>`:'';
-    return `<div class="rhv-cd"><button class="rhv-cn" data-act="rhv-ced" data-id="${e(x._id)}"><b>${e(x.nome)}</b><small>${e(x.origem||'')}${x.entrevista?' · entrevista '+dtx(x.entrevista):''}</small></button>
-      ${x.obs?`<span class="rhv-ob">${e(x.obs.slice(0,90))}</span>`:''}${fs?`<span class="rhv-fs rhv-fs-${fs.k}">${e(fs.t)}</span>`:''}
-      <div class="rhv-bs">${w?`<a class="lnk" href="https://wa.me/${w.length<=11?'55'+w:w}" target="_blank" rel="noopener">WhatsApp</a>`:''}${x.cv&&x.cv.url?`<a class="lnk" href="${e(x.cv.url)}" target="_blank" rel="noopener">Currículo</a>`:''}${fb}
+    const es=entSt(c,x), cedo=x.etapa==='novo'||x.etapa==='triagem'||(x.etapa==='entrevista'&&!x.entrevista);
+    const eb=(!es||es.k==='venc')&&cedo?`<button class="lnk" data-act="rhv-ent" data-id="${e(x._id)}">${es?'Mandar o link da entrevista de novo':'Marcar entrevista pelo celular'}</button>`:es&&es.k==='esp'?`<button class="lnk" data-act="rhv-entver" data-id="${e(x._id)}">Ver link da entrevista</button>`:'';
+    const fb=!fs||fs.k==='venc'?`<button class="lnk" data-act="rhv-ficha" data-id="${e(x._id)}">${fs?'Mandar a ficha de novo':'Mandar ficha de admissão'}</button>`:fs.k==='esp'?`<button class="lnk" data-act="rhv-fver" data-id="${e(x._id)}">Ver link da ficha</button>`:fs.k==='chegou'?`<button class="lnk" data-act="rhv-fler" data-id="${e(x._id)}">Ver ficha</button>`:'';
+    return `<div class="rhv-cd"><button class="rhv-cn" data-act="rhv-ced" data-id="${e(x._id)}"><b>${e(x.nome)}</b><small>${e([x.origem,x.entrevista?'entrevista '+dtx(x.entrevista):''].filter(Boolean).join(' · '))}</small></button>
+      ${x.obs?`<span class="rhv-ob">${e(x.obs.slice(0,90))}</span>`:''}${es&&(es.k!=='venc'||cedo)?`<span class="rhv-fs rhv-fs-${es.k}">${e(es.t)}</span>`:''}${fs?`<span class="rhv-fs rhv-fs-${fs.k}">${e(fs.t)}</span>`:''}
+      <div class="rhv-bs">${w?`<a class="lnk" href="https://wa.me/${w.length<=11?'55'+w:w}" target="_blank" rel="noopener">WhatsApp</a>`:''}${x.cv&&x.cv.url?`<a class="lnk" href="${e(x.cv.url)}" target="_blank" rel="noopener">Currículo</a>`:''}${eb}${fb}
         ${x.etapa==='aprovado'?`<button class="btn" data-act="rhv-adm" data-id="${e(x._id)}">Começar admissão</button>`:prox?`<button class="btn sec" data-act="rhv-et" data-id="${e(x._id)}" data-v="${prox[0]}">${prox[0]==='aprovado'?'Aprovar':'→ '+prox[1]}</button>`:''}
         <button class="lnk" data-act="rhv-et" data-id="${e(x._id)}" data-v="reprovado">Não passou</button><button class="lnk" data-act="rhv-et" data-id="${e(x._id)}" data-v="desistiu">Desistiu</button></div></div>`; }
   function render(c){ assina(c); const e=c.esc, h=c.P.hojeStr();
     if(!V.lido) return `<section class="card"><div class="empty">Carregando as vagas…</div></section>`;
+    setTimeout(()=>procEnt(c),0);
     const ab=V.vagas.filter(v=>v.status!=='fechada'), vis=(V.st==='abertas'?ab:V.vagas.filter(v=>v.status==='fechada')).sort((a,b)=>String(b.abertaEm||b.em).localeCompare(String(a.abertaEm||a.em)));
     const and=V.cands.filter(x=>ET.some(t=>t[0]===x.etapa)), em7=and.filter(x=>x.entrevista&&x.entrevista.slice(0,10)>=h&&x.entrevista.slice(0,10)<=c.addDias(h,7)), adm=V.cands.filter(x=>x.etapa==='admitido'&&(x.admEm||'').slice(0,7)===h.slice(0,7));
     if(V.sel&&!V.vagas.some(v=>v._id===V.sel)) V.sel=null; if(!V.sel&&vis[0]) V.sel=vis[0]._id; const v=V.vagas.find(x=>x._id===V.sel);
@@ -75,20 +113,38 @@
         ${f.some(x=>FIM.some(t=>t[0]===x.etapa))?`<details class="rhv-fim"><summary>Encerrados (${f.filter(x=>FIM.some(t=>t[0]===x.etapa)).length})</summary>${f.filter(x=>FIM.some(t=>t[0]===x.etapa)).map(x=>`<div class="rhv-fr"><b>${e(x.nome)}</b><span>${e(ETN[x.etapa])}${(x.hist||[]).length?' · '+e(c.br(String(x.hist[x.hist.length-1].em).slice(0,10))):''}</span>${x.etapa!=='admitido'?`<button class="lnk" data-act="rhv-et" data-id="${e(x._id)}" data-v="triagem">Voltar para a triagem</button>`:''}<button class="lnk rhv-del" data-act="rhv-cdel" data-id="${e(x._id)}">Apagar</button></div>`).join('')}</details>`:''}</section>`; })()
       :`<section class="card"><div class="empty">${V.st==='abertas'?'Nenhuma vaga aberta. Toque em "+ Nova vaga".':'Nenhuma vaga fechada.'}</div></section>`;
     const k=(n,l,cl)=>`<div class="${cl||''}"><b class="num">${n}</b><span>${l}</span></div>`;
-    return c.topo('Vagas e candidatos','Vagas abertas e cada candidato até a admissão.',`<button class="btn sec" data-act="rh-convnovo">Ficha pelo celular</button><button class="btn" data-act="rhv-vnova">+ Nova vaga</button>`)
+    return c.topo('Vagas e candidatos','Vagas abertas e cada candidato até a admissão.',`<button class="btn sec" data-act="rhv-entnovo">Marcar entrevista pelo celular</button><button class="btn sec" data-act="rh-convnovo">Ficha de admissão pelo celular</button><button class="btn" data-act="rhv-vnova">+ Nova vaga</button>`)
       +`<div class="rh-fk rhv-n">${k(ab.length,'vagas abertas')}${k(and.length,'candidatos em andamento')}${k(em7.length,'entrevistas nos próximos 7 dias',em7.length?'warn':'')}${k(adm.length,'admitidos este mês','')}</div>
       ${(()=>{ const sol=(c.fcand?c.fcand():[]).filter(f=>!f.usada&&!V.cands.some(x=>x.conv===f._id)); return sol.length?`<div class="banner rhv-fb">${sol.length===1?'1 ficha pelo celular chegou':sol.length+' fichas pelo celular chegaram'} e ainda não ${sol.length===1?'virou':'viraram'} admissão: ${sol.slice(0,3).map(f=>`<button class="lnk" data-act="rh-fcver" data-id="${e(f._id)}">${e(f.nome||'sem nome')}</button>`).join(', ')}${sol.length>3?'…':''} <button class="lnk" data-act="rh-vgv" data-v="adm">Ver em Em admissão</button></div>`:''; })()}
-      ${em7.length?`<section class="card rhv-ag"><b>Próximas entrevistas</b>${em7.sort((a,b)=>a.entrevista.localeCompare(b.entrevista)).map(x=>{ const vv=V.vagas.find(y=>y._id===x.vagaId); return `<span><em>${dtx(x.entrevista)}</em> ${e(x.nome)}${vv?' · '+e(vagaTit(vv)):''}</span>`; }).join('')}</section>`:''}
+      ${em7.length?`<section class="card rhv-ag"><b>Próximas entrevistas</b>${em7.sort((a,b)=>a.entrevista.localeCompare(b.entrevista)).map(x=>{ const vv=V.vagas.find(y=>y._id===x.vagaId); const jt=em7.filter(y=>y!==x&&y.entrevista===x.entrevista).length; return `<span><em>${dtx(x.entrevista)}</em> ${e(x.nome)}${vv?' · '+e(vagaTit(vv)):''}${jt?' <b class="rhv-jt">mesmo horário de outra pessoa</b>':''}</span>`; }).join('')}</section>`:''}
       <div class="rhv-g"><section class="card rhv-l"><div class="seg">${[['abertas','Abertas'],['fechadas','Fechadas']].map(([a,b])=>`<button class="${V.st===a?'on':''}" aria-pressed="${V.st===a}" data-act="rhv-st" data-v="${a}">${b}</button>`).join('')}</div>${lst||'<div class="sub" style="margin:10px 0 0">—</div>'}</section>${det}</div>
-      ${V.vf?formVaga(c):''}${V.cf?formCand(c):''}`; }
+      ${V.vf?formVaga(c):''}${V.cf?formCand(c):''}${V.ent?formEnt(c):''}`; }
   function avisos(c){ const h=c.P.hojeStr(); return V.cands.filter(x=>ET.some(t=>t[0]===x.etapa)&&x.entrevista&&x.entrevista.slice(0,10)===h).map(x=>({nivel:'warn',rotulo:'Entrevista hoje',titulo:x.nome+' · '+x.entrevista.slice(11,16),texto:'Vagas e candidatos',go:'rhvagas'})); }
   let C=null; const g=i=>{ const x=document.getElementById(i); return x?x.value:null; };
   function leV(){ const F=V.vf; if(!F) return; [['rhv-fn','funcao'],['rhv-st','setor'],['rhv-qt','qtd'],['rhv-tp','tipo'],['rhv-mo','motivo'],['rhv-sb','substitui'],['rhv-ob','obs']].forEach(([i,k])=>{ const v=g(i); if(v!=null) F[k]=v; }); }
   function leC(){ const F=V.cf; if(!F) return; [['rhv-cn','nome'],['rhv-ct','tel'],['rhv-ce','email'],['rhv-co','origem'],['rhv-cv','entrevista'],['rhv-cb','obs'],['rhv-cvg','vagaId']].forEach(([i,k])=>{ const v=g(i); if(v!=null) F[k]=v; }); }
   document.addEventListener('input',ev=>{ if(ev.target&&ev.target.id==='rhv-q'&&C){ V.q=ev.target.value; const p=ev.target.selectionStart; C.P.render(); const n=document.getElementById('rhv-q'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(e){} } } });
-  document.addEventListener('click',async ev=>{ const fu=ev.target.closest&&ev.target.closest('[data-rhv-fundo]'); if(fu&&ev.target===fu){ V.vf=null; V.cf=null; C&&C.P.render(); return; }
+  document.addEventListener('click',async ev=>{ const fu=ev.target.closest&&ev.target.closest('[data-rhv-fundo]'); if(fu&&ev.target===fu){ V.vf=null; V.cf=null; V.ent=null; C&&C.P.render(); return; }
     const b=ev.target.closest&&ev.target.closest('[data-act^="rhv-"]'); if(!b||!C) return; const a=b.dataset.act, P=C.P, db=P.db(), agora=new Date().toISOString(), eu=C.eu();
-    leV(); leC(); const v=V.vagas.find(x=>x._id===V.sel);
+    leV(); leC(); leE(); const v=V.vagas.find(x=>x._id===V.sel);
+    /* marcar entrevista pelo celular (03/11) */
+    if(a==='rhv-entnovo'||a==='rhv-ent'){ const x=a==='rhv-ent'&&V.cands.find(y=>y._id===b.dataset.id); const vv=x?V.vagas.find(y=>y._id===x.vagaId):v||V.vagas.find(y=>y.status!=='fechada');
+      if(!vv) return P.toast('Abra uma vaga antes de marcar entrevista.');
+      V.ent={candId:x?x._id:'',vagaId:vv._id,nome:x?x.nome:'',tel:x?x.tel||'':'',dias:7,hs:[proxUtilH(C,1,'09:00'),proxUtilH(C,1,'14:00'),proxUtilH(C,2,'09:00')],local:C.entLocal?C.entLocal():'',msg:C.msgEnt?C.msgEnt():''}; P.render(); return; }
+    if(a==='rhv-entx'){ V.ent=null; P.render(); return; }
+    if(a==='rhv-eha'&&V.ent){ const l=V.ent.hs.filter(Boolean).slice(-1)[0]; V.ent.hs.push(l?l.slice(0,11)+(l.slice(11)<'12:00'?'14:00':'09:00'):proxUtilH(C,1,'09:00')); P.render(); return; }
+    if(a==='rhv-ehx'&&V.ent){ V.ent.hs.splice(+b.dataset.i,1); P.render(); return; }
+    if(a==='rhv-entver'){ const x=V.cands.find(y=>y._id===b.dataset.id); if(x) C.convVer&&C.convVer(x.convEnt,x.tel); return; }
+    if(a==='rhv-entok'&&V.ent){ const F=V.ent; if(V.salv) return; const vv=V.vagas.find(y=>y._id===F.vagaId); const cand=F.candId&&V.cands.find(y=>y._id===F.candId);
+      const nm=String(cand?cand.nome:F.nome||'').trim(); if(nm.length<3) return P.toast('Escreva o nome da pessoa.'); if(!vv) return P.toast('Escolha a vaga.');
+      const ag=new Date(Date.now()+30*6e4).toISOString().slice(0,16), hs=[...new Set(F.hs.filter(h=>/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(h)))].sort();
+      if(!hs.length) return P.toast('Coloque pelo menos um horário.'); if(hs.some(h=>new Date(h)<new Date())) return P.toast('Tem horário que já passou. Confira as datas.');
+      V.salv=true; P.render();
+      try{ let cid=F.candId; if(!cand){ cid=id(); const d={vagaId:vv._id,nome:nm,tel:String(F.tel||'').trim(),email:'',origem:'',entrevista:'',obs:'',etapa:'triagem',hist:[{em:agora,de:'',para:'triagem',porNome:eu}],em:agora,porNome:eu}; await db.doc(COLC+'/'+cid).set(d); poe(V.cands,Object.assign({_id:cid},d)); }
+        else if(String(F.tel||'')!==String(cand.tel||'')){ await db.doc(COLC+'/'+cid).update({tel:String(F.tel||'').trim()}); cand.tel=String(F.tel||'').trim(); }
+        const t=await C.convCriar({tipo:'ent',nome:nm,tel:F.tel,horarios:hs,local:String(F.local||'').trim(),msg:F.msg,dias:+F.dias||7,vagaTit:vv.funcao||vagaTit(vv),vagaId:vv._id,candId:cid});
+        await db.doc(COLC+'/'+cid).update({convEnt:t,convEntEm:agora}); const x=V.cands.find(y=>y._id===cid); if(x){ x.convEnt=t; x.convEntEm=agora; } V.sel=vv._id; V.ent=null; }
+      catch(e){ P.erro(e); } V.salv=false; P.render(); return; }
     if(a==='rhv-st'){ V.st=b.dataset.v; V.sel=null; P.render(); return; } if(a==='rhv-sel'){ V.sel=b.dataset.id; V.cx=null; P.render(); return; }
     if(a==='rhv-vnova'){ V.vf={qtd:1,tipo:'CLT',motivo:'aumento'}; P.render(); setTimeout(()=>{ const i=document.getElementById('rhv-fn'); i&&i.focus(); },60); return; }
     if(a==='rhv-ved'&&v){ V.vf=Object.assign({},v); P.render(); return; } if(a==='rhv-vx'){ V.vf=null; P.render(); return; } if(a==='rhv-cx'){ V.cf=null; P.render(); return; }
@@ -129,7 +185,7 @@
       if(a==='rhv-fver') return C.convVer&&C.convVer(x.conv,x.tel); if(a==='rhv-fler') return C.fichaVer&&C.fichaVer(x.conv);
       if(!C.convCriar||V.salv) return; V.salv=true;
       try{ const t=await C.convCriar({nome:x.nome,tel:x.tel}); await db.doc(COLC+'/'+x._id).update({conv:t,convEm:agora}); x.conv=t; x.convEm=agora; }catch(e){ P.erro(e); } V.salv=false; P.render(); return; } });
-  document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&(V.vf||V.cf)&&C){ V.vf=null; V.cf=null; C.P.render(); } });
+  document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&(V.vf||V.cf||V.ent)&&C){ V.vf=null; V.cf=null; V.ent=null; C.P.render(); } });
   window.RHVagas={render:c=>{ C=c; return render(c); },avisos:c=>{ C=C||c; try{ assina(c); return avisos(c); }catch(e){ return []; } },_V:V};
   document.head.insertAdjacentHTML('beforeend',`<style id="rhv-css">
 .rhv-n{margin-bottom:14px}.rhv-g{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}@media(max-width:900px){.rhv-g{grid-template-columns:1fr}}
@@ -146,6 +202,8 @@
 .rhv-fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.rhv-fg label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}.rhv-fg small{font-weight:400;color:var(--muted)}.rhv-w{grid-column:span 2}@media(max-width:600px){.rhv-fg{grid-template-columns:1fr}.rhv-w{grid-column:auto}}
 .rhv-ac{margin-top:14px;display:flex;justify-content:flex-end;align-items:center;gap:12px}.rhv-ac .rhv-del{margin-right:auto}.rhv-del{color:var(--crit-ink,#A33A2C)}
 .rhv-fs{display:inline-block;font-size:12px;font-weight:600;margin-top:6px;padding:2px 8px;border-radius:999px;background:rgba(127,140,150,.15)}.rhv-fs-chegou{background:rgba(47,140,90,.15);color:var(--ok,#2F8C5A)}.rhv-fs-esp{background:rgba(43,106,135,.12);color:var(--teal,#2B6A87)}.rhv-fs-venc{background:rgba(196,120,20,.14);color:var(--warn-ink,#8A5A10)}
+.rhv-lb{display:block;font-size:13px;font-weight:600;margin-bottom:4px}.rhv-eh{display:flex;gap:10px;align-items:center;margin-bottom:6px}.rhv-eh .txt{max-width:260px}
+.rhv-er{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:rgba(47,140,90,.08);font-size:13px}.rhv-er em{font-style:normal;color:var(--muted);margin-right:6px}.rhv-jt{color:var(--warn-ink,#8A5A10);font-weight:600;font-size:12px}
 .rhv-fb{margin:0 0 14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 </style>`);
 })();

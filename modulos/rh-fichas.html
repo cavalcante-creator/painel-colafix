@@ -303,6 +303,29 @@
   @media (max-width:640px){ #card-drive>h2{padding-right:0;margin-bottom:10px}#card-drive>.actions{position:static;margin-bottom:12px!important} .acoes-linha .actions .btn{flex:1 1 140px;justify-content:center} }
 }
 </style>
+<style id="facil-gerar">
+/* 03/11 (Juliana: "essa tela está difícil de mexer"): a tela fica em 3 passos — mês e ficha, para quem, imprimir.
+   Imprimir e Salvar PDF já geram sozinhos; filtros e fichas escaneadas recolhidos. As funções de antes não mudaram. */
+  #card-upload{display:none!important}
+  .fg-st{display:flex;align-items:center;gap:10px;margin:14px 0 0;font-size:13px;color:#6B6558}.fg-st .lnk{background:none;border:0;padding:0;color:#1B5C7A;text-decoration:underline;font:inherit;cursor:pointer}
+  #card-controls>h2{display:none}
+  .fg-pas{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr);gap:18px;align-items:start}
+  @media (max-width:900px){ .fg-pas{grid-template-columns:1fr} }
+  .fg-n{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#1A1A1A;margin-bottom:8px}.fg-n i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#143F54;color:#fff;display:inline-grid;place-items:center;font-size:12px}
+  .fg-seg{display:flex;gap:6px;flex-wrap:wrap}.fg-seg button{flex:1 1 auto;height:46px;padding:0 14px;border:1.5px solid #E5DFD0;border-radius:10px;background:#fff;font:inherit;font-size:14.5px;color:#1A1A1A;cursor:pointer}
+  .fg-seg button[aria-pressed="true"]{border-color:#143F54;background:#143F54;color:#fff;font-weight:600}
+  .fg-pas .field{min-width:0}.fg-pas .field>label{display:none}
+  .fg-fil{margin-top:16px;border-top:1px solid #ECE6D8;padding-top:12px}.fg-fil>summary{cursor:pointer;font-size:14px;font-weight:600;color:#1B5C7A;list-style:none}.fg-fil>summary::-webkit-details-marker{display:none}
+  .fg-fil>summary::before{content:"▸ ";}.fg-fil[open]>summary::before{content:"▾ ";}.fg-fil .filtros-tit{display:none}.fg-fil .controls{margin-top:12px}
+  .fg-ac{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
+  .fg-ac #btn-imprimir{height:52px;padding:0 26px;font-size:16px;background:#143F54;color:#fff;border-color:#143F54}.fg-ac #btn-imprimir:hover{background:#1B5C7A}
+  .fg-ac #btn-gerar-todos{display:none}.fg-ac #btn-gerar{background:#fff;color:#1B5C7A;border-color:#C9D6DD}
+  .fg-ac .preview-count-sombra{flex-basis:100%;font-size:13.5px;color:#4A453C}
+  .fg-ac .btn:disabled{opacity:1}
+  #card-drive.fg-esc>.fg-sum{display:block;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;font-size:16px;font-weight:600;color:#1A1A1A;cursor:pointer}
+  #card-drive.fg-esc>.fg-sum small{font-weight:400;font-size:13px;color:#6B6558;margin-left:6px}#card-drive.fg-esc>h2{display:none}#card-drive.fg-esc.fechado>:not(.fg-sum){display:none!important}#card-drive.fg-esc:not(.fechado)>.fg-sum{margin-bottom:14px}
+  .dica-imp{font-size:12.5px}
+</style>
 </head>
 <body>
 
@@ -1658,6 +1681,49 @@
     }
   };
 
+
+  /* ---- 03/11: tela mais prática (só arrumação; gerar, imprimir e salvar continuam os mesmos) ---- */
+  (function facil(){
+    var cc=document.getElementById("card-controls"); if(!cc) return;
+    var el=function(t,c,h){ var x=document.createElement(t); if(c) x.className=c; if(h!=null) x.innerHTML=h; return x; };
+    var fMes=inputMes.closest(".field"), fTipo=document.getElementById("select-tipo-ficha").closest(".field"), fFunc=selectFuncionario.closest(".field");
+    var pas=el("div","fg-pas");
+    var p1=el("div","",'<div class="fg-n"><i>1</i>Mês da ficha</div>'); p1.appendChild(fMes);
+    var p2=el("div","",'<div class="fg-n"><i>2</i>Qual ficha</div>'); var segT=el("div","fg-seg");
+    var selT=document.getElementById("select-tipo-ficha"); fTipo.style.display="none"; p2.appendChild(segT); p2.appendChild(fTipo);
+    [["AMBAS","Uniforme + EPI"],["UNIFORME","Só uniforme"],["EPI","Só EPI"]].forEach(function(o){ var b=el("button","",o[1]); b.type="button"; b.dataset.v=o[0];
+      b.addEventListener("click",function(){ selT.value=o[0]; selT.dispatchEvent(new Event("change")); marca(); }); segT.appendChild(b); });
+    var p3=el("div","",'<div class="fg-n"><i>3</i>Para quem</div>'); p3.appendChild(fFunc);
+    pas.appendChild(p1); pas.appendChild(p2); pas.appendChild(p3);
+    var ctr=cc.querySelector(".controls"); ctr.parentNode.insertBefore(pas,ctr); ctr.style.display="none";
+    /* filtros recolhidos */
+    var fil=cc.querySelector(".filtros-todos"), tit=cc.querySelector(".filtros-tit"), det=el("details","fg-fil"), sm=el("summary","","Filtrar a lista (vínculo, empresa, setor, função)");
+    det.appendChild(sm); if(tit) det.appendChild(tit); det.appendChild(fil); pas.parentNode.insertBefore(det,pas.nextSibling);
+    var filSel=[selectVinculo,selectEmpresa,selectSetor,selectFuncao].filter(Boolean);
+    function filOn(){ var n=filSel.filter(function(x){ return x.value&&x.value!=="TODOS"; }).length+((chkSomentePendentes&&chkSomentePendentes.checked)?1:0);
+      sm.textContent=n?"Filtrar a lista · "+n+(n>1?" filtros ligados":" filtro ligado"):"Filtrar a lista (vínculo, empresa, setor, função)"; return n; }
+    filSel.concat([chkSomentePendentes]).forEach(function(x){ if(x) x.addEventListener("change",filOn); });
+    /* botões: Imprimir e Salvar PDF já geram; "Só ver na tela" = gerar */
+    var al=cc.querySelector(".acoes-linha"); if(al){ al.classList.add("fg-ac"); var ac=al.querySelector(".actions");
+      btnGerar.textContent="Só ver na tela"; btnImprimir.textContent="Imprimir"; btnSalvarPdf.textContent="Salvar PDF";
+      ac.insertBefore(btnImprimir,ac.firstChild); ac.insertBefore(btnSalvarPdf,btnImprimir.nextSibling); btnImprimir.disabled=false; btnSalvarPdf.disabled=false; }
+    function geraAntes(ev){ if(ev.target!==btnImprimir&&ev.target!==btnSalvarPdf) return; previewWrap.innerHTML=""; gerar(false);
+      if(!previewWrap.querySelector(".ficha-page")){ ev.stopImmediatePropagation(); ev.preventDefault(); btnImprimir.disabled=false; btnSalvarPdf.disabled=false; } else if(ev.target===btnSalvarPdf) salvando=true; }
+    /* Imprimir e Salvar PDF ficam sempre ativos (geram na hora); só ficam desligados enquanto o PDF está sendo salvo */
+    var salvando=false; new MutationObserver(function(){ if(!btnSalvarPdf.disabled){ salvando=false; } if(salvando) return; if(btnImprimir.disabled) btnImprimir.disabled=false; if(btnSalvarPdf.disabled) btnSalvarPdf.disabled=false; })
+      .observe(btnImprimir,{attributes:true,attributeFilter:["disabled"]});
+    new MutationObserver(function(){ if(!btnSalvarPdf.disabled) salvando=false; else if(!salvando) btnSalvarPdf.disabled=false; }).observe(btnSalvarPdf,{attributes:true,attributeFilter:["disabled"]});
+    document.addEventListener("click",geraAntes,true);
+    function marca(){ Array.prototype.forEach.call(segT.children,function(b){ b.setAttribute("aria-pressed",String(b.dataset.v===selT.value)); }); }
+    selT.addEventListener("change",marca); marca(); filOn();
+    /* situação do cadastro numa linha só, embaixo */
+    var st=el("div","fg-st"); st.appendChild(document.getElementById("status-dot")); st.appendChild(document.getElementById("status-text")); var rl=document.getElementById("btn-reload"); rl.className="lnk"; rl.removeAttribute("style"); rl.textContent="Recarregar"; st.appendChild(rl);
+    cc.appendChild(st); var wb=document.getElementById("warnings-box"); if(wb) cc.appendChild(wb);
+    /* fichas escaneadas recolhidas */
+    var cd=document.getElementById("card-drive"); if(cd){ cd.classList.add("fg-esc","fechado"); var sb=el("button","fg-sum",'Fichas escaneadas <small>enviar e procurar · toque para abrir</small>'); sb.type="button";
+      sb.addEventListener("click",function(){ cd.classList.toggle("fechado"); sb.querySelector("small").textContent=cd.classList.contains("fechado")?"enviar e procurar · toque para abrir":"toque para fechar"; }); cd.insertBefore(sb,cd.firstChild); }
+    var pv=document.getElementById("card-preview-info"); if(pv&&cc.nextSibling!==pv) cc.parentNode.insertBefore(pv,cc.nextSibling);
+  })();
   carregarDadosDoServidor();
 
 })();

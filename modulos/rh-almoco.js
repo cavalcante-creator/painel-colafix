@@ -744,6 +744,10 @@
   function prMesma(a,b){ if(fMesma(a,b)) return true; const A1=fNorm(a).split(' ').filter(t=>t.length>2), B1=fNorm(b).split(' ').filter(t=>t.length>2); if(A1.length<2||B1.length<2) return false;
     const tk=(x,y)=>x===y||(x.length>=5&&y.length>=5&&x[0]===y[0]&&prLev(x,y)<=1); if(!tk(A1[0],B1[0])) return false;
     const [cu,lo]=A1.length<=B1.length?[A1,B1]:[B1,A1]; return cu.every(t=>lo.some(u=>tk(t,u))); }
+  /* 03/11 (Juliana): afastado (cadastro afast {ini,fim,mot} ou situação "Afastado") e horário diferente (horEsp {dias,ini,fim,obs}, ex.: aprendiz)
+     não entram como "não veio": viram 'Afastado', 'Folga' (dia em que não trabalha) ou 'Mais tarde' (hoje, antes do horário dela). */
+  const afastDe=(f,d)=>{ const a=f.afast; if(a&&a.ini&&a.ini<=d&&(!a.fim||a.fim>=d)) return a; if(/afast/i.test(f.status||'')) return {mot:(a&&a.mot)||''}; return null; };
+  const jornadaDe=f=>{ const j=f&&f.horEsp; return j&&typeof j==='object'&&(Array.isArray(j.dias)&&j.dias.length||j.ini)?j:null; }; /* f.jornada é o texto do contrato: o horário diferente fica em f.horEsp */
   function prDia(c,d,maxP){ const m=d.slice(0,7), Dm=A.dados[m]||{}, dia=(Dm.dias||{})[d]||{}, P0=Dm.pessoas||{}, P=c.P, R=c.R;
     const fx={}; (R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const tur=((P.S&&P.S.cfg&&P.S.cfg.turnos)||[])[0], ini=hm((tur&&tur.ini)||'07:30'), lim=Math.min(23*60,ini+30), limT=pad(Math.floor(lim/60))+':'+pad(lim%60);
@@ -757,8 +761,12 @@
     const exp=d===P.hojeStr()?(wd>0&&wd<6&&!fer):ps.length>=Math.max(5,.4*maxP);
     const fs=[]; let VI=null; if(exp){ const ferias=(R.fer||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
       const sFil=((R.cfg&&R.cfg.setoresFilial)||[]).map(nrm), fora=f=>f.filial==='FIXCOL'||(f.setor&&sFil.includes(nrm(f.setor)));
-      (R.func||[]).filter(f=>!/deslig|inativ|encerr|demit|rescis|afast/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d&&!/afast/i.test(f.status||''))).filter(f=>(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)&&!fora(f)).forEach(f=>{
+      (R.func||[]).filter(f=>!/deslig|inativ|encerr|demit|rescis/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d)).filter(f=>(!f.desligamento||f.desligamento>=d)&&(!f.admissao||f.admissao<=d)&&!fora(f)).forEach(f=>{
         const k=String(f.cpf||'').replace(/\D/g,'').padStart(11,'0'); if(vistos.has(k)||vistos.has('f:'+f._id)||ps.some(p=>prMesma(p.n,f.nome))) return;
+        const af=afastDe(f,d); if(af){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Afastado',mt:af.mot||'',ate:af.fim||''}); return; }
+        const jo=jornadaDe(f), wdd=new Date(d+'T12:00').getDay();
+        if(jo&&Array.isArray(jo.dias)&&jo.dias.length&&!jo.dias.includes(wdd)){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Folga',mt:'não trabalha neste dia'}); return; }
+        if(jo&&jo.ini&&d===P.hojeStr()&&(new Date().getHours()*60+new Date().getMinutes())<hm(jo.ini)+30){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Mais tarde',mt:'entra às '+jo.ini}); return; }
         const fer=ferias.some(y=>y.funcId===f._id), vi=fer?null:(VI||(VI=prVisto(d))), u=vi&&vi.ult[k]||'', lim2=prMenos(d,14);
         /* sem passar no Face ID há mais de 2 semanas (ou nunca, com 2 semanas de dados): provavelmente saiu e o cadastro não foi atualizado */
         if(vi&&vi.dias>=8&&(!f.admissao||f.admissao<lim2)&&(!u||u<lim2)){ fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:'Sumiu',u}); return; }
@@ -786,7 +794,7 @@
   const PONTO_PAD={ini:'07:30',fim:'17:30',tol:10};
   const pontoCfg=()=>Object.assign({},PONTO_PAD,cfg().ponto||{});
   const hmT=m=>pad(Math.floor(m/60))+':'+pad(m%60);
-  function turnoDe(c,setor,d){ const pc=pontoCfg(), T=((c.P.S&&c.P.S.cfg&&c.P.S.cfg.turnos)||[]).filter(t=>t&&t.ini&&t.fim), wd=new Date(d+'T12:00').getDay();
+  function turnoDe(c,setor,d,f){ const jo=jornadaDe(f); if(jo&&jo.ini&&jo.fim) return {ini:jo.ini,fim:jo.fim,nome:'horário da pessoa'}; const pc=pontoCfg(), T=((c.P.S&&c.P.S.cfg&&c.P.S.cfg.turnos)||[]).filter(t=>t&&t.ini&&t.fim), wd=new Date(d+'T12:00').getDay();
     const doDia=T.filter(t=>!(Array.isArray(t.dias)&&t.dias.length)||t.dias.includes(wd)), s=nrm(setor);
     const daLinha=s&&doDia.find(t=>(t.linhas||[]).some(l=>nrm(l)===s));
     if(daLinha) return {ini:daLinha.ini,fim:daLinha.fim,nome:daLinha.nome||'turno da linha'};
@@ -801,7 +809,7 @@
     ds.forEach(d=>{ const r=prDia(c,d,maxP); if(!r.exp) return; dExp.push(d); const dia=D.dias[d]||{};
       Object.keys(dia).forEach(k=>{ const x=dia[k]||{}, f=fx[k]||null; const t=(x.t||[]).map(z=>{ const mm=String(z).match(/^(\d{2}:\d{2})(:\d{2})?\s*(.*)$/); return mm?{h:mm[1],d:mm[3]}:null; }).filter(Boolean).sort((a,b)=>a.h.localeCompare(b.h)); if(!t.length) return;
         const o=pes(k,f,P0[k]); o.dias++; if(atDe({funcId:f?f._id:null,cpf:k},d)) return; /* dia com atestado/declaração: não conta atraso nem saída antes */
-        const tu=turnoDe(c,o.setor,d), ini=hm(tu.ini), fim=hm(tu.fim), ch=hm(t[0].h);
+        const tu=turnoDe(c,o.setor,d,f), ini=hm(tu.ini), fim=hm(tu.fim), ch=hm(t[0].h);
         if(ch>ini+tol) o.atr.push({d,h:t[0].h,esp:tu.ini,min:ch-ini});
         const sds=t.filter(z=>ehSaida(z.d)), u=(sds.length?sds[sds.length-1]:t[t.length-1]); const um=hm(u.h);
         if((d<hj||agora>fim+60)&&um<fim-tol&&um>ch) o.sai.push({d,h:u.h,esp:tu.fim,min:fim-um,leitor:ehSaida(u.d)}); });

@@ -40,6 +40,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:v
 .lgpd{margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--sunken,#EEF2F5);font-size:14px;line-height:1.45}.lgpd b{display:block;margin-bottom:4px}.lgpd p{margin:6px 0 0}
 .er{color:var(--crit-ink);font-weight:700;margin-top:10px;min-height:1px}
 .recado{border-left:5px solid var(--teal)}.recado small{font-size:11.5px;font-weight:700;letter-spacing:1.5px;color:var(--teal)}.recado p{margin:6px 0 0}
+.hr{padding:12px 0;border-top:1px solid var(--line);font-size:16px;margin:0}.hr:first-of-type{border-top:0}.hr input{width:24px;height:24px}
 .fim{text-align:center;padding:30px 18px}
 .fim .ic{width:76px;height:76px;border-radius:38px;background:#E3F0E8;color:var(--ok);display:grid;place-items:center;margin:0 auto 12px}
 .fim h2{font-size:22px}
@@ -130,11 +131,50 @@ input:focus,select:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:v
         er.textContent=e&&/permission/.test(e.code||'')?'O RH já recebeu uma ficha por este link, ou ele não vale mais. Fale com o RH.':e&&/network|unavailable/.test(e.code||'')?'Sem internet. Confira a conexão e toque em Enviar de novo.':'Não foi possível enviar agora. Tente de novo em instantes.'; } };
   }
 
+  /* 03/11: link de entrevista (convite tipo 'ent'): escolhe um horário e responde poucas perguntas, sem documentos */
+  function telaEnt(cv){ const nome=String(cv.nome||'').trim().split(/\s+/)[0]||'', Nm=nome?nome.charAt(0).toUpperCase()+nome.slice(1).toLowerCase():'';
+    document.title='Entrevista · Colafix'; $('#ola').textContent=Nm?'Olá, '+Nm+'!':'Entrevista na Colafix';
+    $('#sub').textContent=(cv.vagaTit?'Vaga: '+cv.vagaTit+'. ':'')+'Escolha o horário da entrevista. Leva 2 minutos.';
+    const sem=['domingo','segunda','terça','quarta','quinta','sexta','sábado'], agora=Date.now();
+    const hs=(Array.isArray(cv.horarios)?cv.horarios:[]).filter(h=>/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(h)&&new Date(h).getTime()>agora).sort();
+    const fmt=h=>{ const d=new Date(h); return sem[d.getDay()].replace(/^./,c=>c.toUpperCase())+', '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' às '+h.slice(11,16); };
+    const recado=String(cv.msg||'').replace(Nm?/\{NOME\}/g:/,?\s*\{NOME\}/g,Nm).replace(/\{VAGA\}/g,cv.vagaTit||'').trim();
+    const i=(id,l,ex)=>`<div><label for="${id}">${l}</label><input id="${id}" ${ex||''}></div>`;
+    M.innerHTML=`${recado?`<section class="card recado"><small>RECADO DO RH</small><p>${esc(recado).replace(/\n/g,'<br>')}</p></section>`:''}<form id="f" novalidate autocomplete="on">
+      <section class="card"><h2>Escolha o horário</h2><p class="dica">${cv.local?'Local: '+esc(cv.local):'A entrevista é na Colafix.'}</p>
+        ${hs.map((h,k)=>`<label class="ck hr"><input type="radio" name="hr" value="${h}"> <span>${fmt(h)}</span></label>`).join('')}
+        <label class="ck hr"><input type="radio" name="hr" value=""> <span>Nenhum desses horários dá para mim</span></label></section>
+      <section class="card"><h2>Seus dados</h2>${i('nome','Nome completo *','autocomplete="name" maxlength="80" value="'+esc(String(cv.nome||'').trim().split(/\s+/).length>1?cv.nome:'')+'"')}
+        <div class="g2">${i('telefone','Celular (WhatsApp) *','type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="(51) 90000-0000"')}${i('nascimento','Data de nascimento','type="date"')}</div>
+        <div class="g2">${i('bairro','Bairro','maxlength="40"')}${i('cidade','Cidade','autocomplete="address-level2" maxlength="40"')}</div></section>
+      <section class="card"><h2>Conte um pouco</h2>
+        <label for="escolaridade">Estudou até</label><select id="escolaridade"><option value="">—</option>${['Fundamental incompleto','Fundamental completo','Médio incompleto','Médio completo','Técnico','Superior incompleto','Superior completo'].map(t=>`<option>${t}</option>`).join('')}</select>
+        <label for="experiencia">Onde já trabalhou e o que fazia?</label><textarea id="experiencia" rows="4" maxlength="600" placeholder="Ex.: 2 anos de auxiliar de produção na empresa X"></textarea>
+        <label for="obs">Quer avisar alguma coisa ao RH?</label><textarea id="obs" rows="2" maxlength="400" placeholder="Ex.: só posso de tarde"></textarea>
+        <div class="lgpd" role="note"><b>Como usamos os seus dados (LGPD)</b><p>Estes dados servem só para o processo seletivo desta vaga. Ficam no sistema da Colafix e só o RH tem acesso. Não são passados para outras empresas.</p></div>
+        <label class="ck" style="margin-top:14px"><input type="checkbox" id="ok"> <span>Autorizo a Colafix a usar estes dados no processo seletivo.</span></label>
+        <div class="er" id="er" role="alert"></div><button class="go" type="submit">Confirmar</button></section></form>`;
+    $('#telefone').addEventListener('input',e=>{ e.target.value=mascTel(e.target.value); });
+    const f=$('#f'), er=$('#er'); let enviando=false;
+    f.onsubmit=async ev=>{ ev.preventDefault(); if(enviando) return; er.textContent=''; const v=k=>String(($('#'+k)||{}).value||'').trim(), r=f.querySelector('input[name=hr]:checked');
+      if(!r) return er.textContent='Escolha um horário (ou "nenhum dá para mim").';
+      const d={tipo:'ent',horario:r.value,nome:v('nome').replace(/\s+/g,' '),cpf:'',telefone:v('telefone'),nascimento:v('nascimento'),bairro:v('bairro'),cidade:v('cidade'),escolaridade:v('escolaridade'),experiencia:v('experiencia'),obs:v('obs'),fotos:0};
+      if(!r.value&&!d.obs) return er.textContent='Conte no recado qual dia e horário dá para você.', $('#obs').focus();
+      if(d.nome.split(' ').length<2) return er.textContent='Escreva o nome completo.', $('#nome').focus();
+      if(d.telefone.replace(/\D/g,'').length<10) return er.textContent='Coloque o celular com DDD.', $('#telefone').focus();
+      if(!$('#ok').checked) return er.textContent='Marque a autorização antes de confirmar.';
+      const b=f.querySelector('.go'); enviando=true; b.disabled=true; b.textContent='Enviando…'; d.em=new Date().toISOString();
+      try{ await fs.doc('rh/dados/fichascand/'+T).set(d); try{ localStorage.setItem(ENV,'1'); }catch(e){} window.scrollTo(0,0);
+        fimTela(r.value?'Entrevista marcada':'Recebido',r.value?'Te esperamos '+fmt(r.value).replace(/^./,c=>c.toLowerCase())+(cv.local?'. Local: '+cv.local:'')+'. Se não puder ir, avise o RH.':'O RH vai falar com você para combinar outro horário.',true); }
+      catch(e){ console.warn('entrevista',e); enviando=false; b.disabled=false; b.textContent='Confirmar';
+        er.textContent=e&&/permission/.test(e.code||'')?'Este link já foi usado ou não vale mais. Fale com o RH.':e&&/network|unavailable/.test(e.code||'')?'Sem internet. Confira a conexão e toque em Confirmar de novo.':'Não foi possível enviar agora. Tente de novo em instantes.'; } };
+  }
+
   (async()=>{ try{ await firebase.auth().signInAnonymously(); }catch(e){ console.info('ficha sem conta',e&&e.code); }
     try{ const g=await fs.doc('rh/dados/convites/'+T).get(); const cv=g.exists?g.data():null;
       if(!cv||cv.usado) return fimTela('Este link não vale mais','Peça um link novo para o RH da Colafix.');
       if(+cv.ateMs&&+cv.ateMs<Date.now()) return fimTela('Este link venceu','Peça um link novo para o RH da Colafix.');
-      tela(cv); }
+      cv.tipo==='ent'?telaEnt(cv):tela(cv); }
     catch(e){ console.warn('convite',e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo. Se continuar, peça um link novo para o RH.'); } })();
 })();
 </script>

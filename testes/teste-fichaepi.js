@@ -11,7 +11,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const B=await H.abrir({viewport:{width:1366,height:1000}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2800);
  await p.evaluate(()=>__T.go('rhfichas')); await p.click('[data-act="rh-fvgerar"]'); await H.dorme(2500); const fr=p.frames().find(f=>/rh-fichas/.test(f.url()));
  const gera=async tipo=>{ await fr.evaluate(t=>{ const s=document.getElementById('select-tipo-ficha'); s.value=t; s.dispatchEvent(new Event('change')); const f=document.getElementById('select-funcionario'); f.value='__TODOS__'; f.dispatchEvent(new Event('change')); },tipo);
-   await fr.click('#btn-gerar-todos'); await H.dorme(900);
+   await fr.click('#btn-gerar'); await H.dorme(900);
    return fr.evaluate(()=>{ const sets=[...document.querySelectorAll('#preview-wrap .ficha-set')].map(s=>({n:s.querySelector('.set-label').textContent.split(' — ')[0],uni:!!s.querySelector('.page-uniforme'),epi:!!s.querySelector('.page-epi'),br:!!s.querySelector('.page-branco')})); return {sets,cont:document.getElementById('preview-count').innerText}; }); };
  const de=(r,n)=>r.sets.find(s=>s.n===n)||{};
  let r=await gera('AMBAS');

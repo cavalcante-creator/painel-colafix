@@ -25,7 +25,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 
   // férias
   await p.click('.rh-av:has-text("Férias: ANA SOUZA") [data-act="rh-pzabrir"]'); await H.dorme(300);
-  const v1=await view(); const sit=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[r.querySelector('b').innerText,r.querySelector('.pill').innerText])));
+  const v1=await view(); const sit=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[(r.querySelector('.rh-pjn')||r.querySelector('b')).innerText,r.querySelector('.pill').innerText])));
   ok('Férias (CLT): só quem precisa de atenção, com o prazo certo (inclui "passou do dia de avisar")', /^(Conceder em até 9 dias|Passou do dia de avisar)/.test(sit['ANA SOUZA']||'')&&/^Prazo vencido há/.test(sit['CARLOS LIMA'])&&!sit['BRUNO ROCHA']&&!sit['PEDRO ALVES'], JSON.stringify(sit));
   await p.click('[data-act="rh-pzfil"][data-v="todos"]'); const bruno=await p.evaluate(()=>[...document.querySelectorAll('.rh-tf tbody tr')].find(r=>/BRUNO/.test(r.innerText)).innerText);
   ok('"Todos os CLT": quem está em aquisição aparece em dia', /em aquisição/.test(bruno)&&/Em dia/.test(bruno), bruno.replace(/\n/g,' '));
@@ -72,8 +72,8 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   ok('Desmarcar férias guarda como cancelada (não apaga)', Object.values(s).some(x=>x&&x.funcId==='f0'&&x.status==='cancelada'&&x.canceladaPor==='Paula RH'));
 
   // PJ
-  await p.click('[data-act="rh-pzv"][data-v="pj"]'); await H.dorme(200);
-  const pj=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[r.querySelector('b').innerText,r.innerText.replace(/\n/g,' ')])));
+  await p.evaluate(()=>__T.go('rhpj')); await H.dorme(400); /* desde 12/10 a Troca dos PJ é uma tela própria */
+  const pj=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[(r.querySelector('.rh-pjn')||r.querySelector('b')).innerText,r.innerText.replace(/\n/g,' ')])));
   ok('Troca dos PJ: conta da última troca ou, sem troca, da admissão', /última troca/.test(pj['RAFAEL NUNES'])&&/Em dia/.test(pj['RAFAEL NUNES'])&&/admissão/.test(pj['PEDRO ALVES'])&&/Troca em 10 dias/.test(pj['PEDRO ALVES'])&&/Troca atrasada/.test(pj['JOAO PJ']), JSON.stringify(pj).slice(0,240));
   await p.click('tr:has-text("JOAO PJ") [data-act="rh-pjtroca"]'); await H.dorme(200); await p.fill('#rh-pjd',dias(3)); await p.dispatchEvent('#rh-pjd','change'); await p.click('[data-act="rh-pjsalvar"]'); await H.dorme(300); const t4=await toast();
   await p.fill('#rh-pjd',dias(0)); await p.dispatchEvent('#rh-pjd','change'); await p.fill('#rh-pjo','contrato novo'); await p.click('[data-act="rh-pjsalvar"]'); await H.dorme(600); s=await srv(); const jo=s['rh/dados/funcionarios/f5'];

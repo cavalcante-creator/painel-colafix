@@ -21,7 +21,7 @@ const mm=(iso,n)=>{ const d=new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+n
  await p.click('[data-act="rh-mapzoom"][data-v="tri"]'); await H.dorme(500);
  const m2=await p.evaluate(()=>[...document.querySelectorAll('.rh-mh .rh-mt span')].map(s=>s.innerText));
  ok('Mapa: "só quem tem férias ou prazo" (esconde quem não tem nada) e zoom de 3 meses', /Só quem tem férias ou prazo · \d+ de \d+/.test(m1.chip)&&m2.length===3, JSON.stringify({m1,m2}));
- await p.evaluate(()=>{ const b=document.querySelector('[data-act="rh-pzv"][data-v="pj"]'); if(b) b.click(); }); await H.dorme(600);
+ await p.evaluate(()=>__T.go('rhpj')); await H.dorme(600);
  await p.click('[data-act="rh-pjaj"][data-id="p"]'); await H.dorme(400); await p.selectOption('#rh-pjm','6'); await p.click('[data-act="rh-pjajok"][data-id="p"]'); await H.dorme(1000);
  let pj=await p.evaluate(async()=>{ const g=await __T.S().db.doc('rh/dados/funcionarios/p').get(); return g.data(); });
  const tx=await p.evaluate(()=>{ const tr=[...document.querySelectorAll('#view tr')].find(r=>/PEDRO PJ/.test(r.innerText)); return tr?tr.innerText.replace(/\s+/g,' '):''; });
@@ -29,7 +29,7 @@ const mm=(iso,n)=>{ const d=new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+n
  p.once('dialog',dl=>dl.accept()); await p.click('[data-act="rh-pjrm"][data-id="p"][data-i="1"]'); await H.dorme(1000);
  pj=await p.evaluate(async()=>{ const g=await __T.S().db.doc('rh/dados/funcionarios/p').get(); return g.data(); });
  ok('Remover uma troca registrada por engano volta a última troca para a anterior', pj.trocas.length===1&&pj.ultimaTroca==='2026-04-10', JSON.stringify({u:pj.ultimaTroca,n:pj.trocas.length}));
- await p.evaluate(()=>{ const b=document.querySelector('[data-act="rh-pzv"][data-v="nr"]'); if(b) b.click(); }); await H.dorme(600);
+ await p.evaluate(()=>__T.go('rhqual')); await H.dorme(600);
  await p.click('[data-act="rh-qreg"]'); await H.dorme(300); await p.selectOption('#rh-q-pess','a'); await H.dorme(400); await p.click('[data-act="rh-qok"]'); await H.dorme(1200);
  const q=await p.evaluate(async()=>{ const g=await __T.S().db.doc('rh/dados/funcionarios/a').get(); return (g.data().qualif||[]).map(x=>x.tipo); });
  ok('Exames e NRs: "+ Registrar" na própria aba, escolhendo a pessoa, grava o ASO', q.includes('ASO'), q.join(','));

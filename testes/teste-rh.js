@@ -32,9 +32,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  ok('A ficha gerada traz nome, CPF, função, EPI com CA e uniforme', /ANA SOUZA/.test(prev)&&/529\.982\.247-25/.test(prev)&&/Luva de proteção/.test(prev)&&/12345/.test(prev)&&/Camisa/.test(prev), prev.replace(/\n/g,' ').slice(0,180));
  // ficha escaneada
  await fr.evaluate(()=>{ const s=document.getElementById('upload-funcionario'); s.selectedIndex=[...s.options].findIndex(o=>/ANA/.test(o.text)); });
- await fr.setInputFiles('#upload-arquivo','foto-a.png'); await fr.click('#btn-enviar-ficha'); await H.dorme(1500);
+ await fr.evaluate(()=>document.getElementById('card-drive').classList.remove('fechado')); await fr.setInputFiles('#upload-arquivo','foto-a.png'); await fr.click('#btn-enviar-ficha'); await H.dorme(1500);
  const up=await fr.evaluate(()=>document.getElementById('upload-msg').innerText); s=await srv(); const arq=Object.entries(s).find(([k,v])=>k.startsWith('rh/arquivos/lista/'));
- await fr.click('#btn-atualizar-status-mes'); await H.dorme(800); const stm=await fr.evaluate(()=>(document.body.innerText.match(/\d+ de \d+ já têm ficha escaneada[^\n]*/)||[''])[0]);
+ await fr.evaluate(()=>document.getElementById('card-drive').classList.remove('fechado')); await fr.click('#btn-atualizar-status-mes'); await H.dorme(800); const stm=await fr.evaluate(()=>(document.body.innerText.match(/\d+ de \d+ já têm ficha escaneada[^\n]*/)||[''])[0]);
  const orig=fs.readFileSync('foto-a.png').toString('base64'); const back=arq?Object.entries(s).filter(([k])=>k.startsWith('rh/arquivos/partes/'+arq[0].split('/').pop())).map(([k,v])=>v.d).join(''):'';
  ok('Ficha escaneada: salva no painel com nome do funcionário e mês, conta no status do mês e o arquivo volta idêntico', /Salvo em/.test(up)&&arq&&/ANA SOUZA - /.test(arq[1].nome)&&/1 de 1/.test(stm)&&back===orig, (arq&&arq[1].nome)+' · '+stm);
  // abrir arquivo pelo link

@@ -40,7 +40,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.click('[data-act="rc-volta"]'); await H.dorme(300);
  await p.evaluate(()=>__T.go('rhvagas')); await H.dorme(800); await p.click('[data-act="rhv-divulgar"]'); await H.dorme(900); t=await pv();
  ok('Vaga › Divulgar: comunicado da vaga já com função, quantidade, setor e vínculo (sem a observação interna)', await p.evaluate(()=>__T.S().view)==='rhcom'&&/2 VAGAS ABERTAS/.test(t)&&/OPERADOR DE EMPILHADEIRA/.test(t)&&/SETOR\s*Expedição/i.test(t)&&/VÍNCULO\s*CLT/i.test(t)&&/REQUISITOS/.test(t)&&!/substitui o João/i.test(t), t.replace(/\n/g,' | ').slice(0,260));
- await p.click('[data-act="rc-volta"]'); await H.dorme(500); ok('Na lista: atalho "Divulgar uma vaga aberta"', !!(await p.$('[data-act="rc-vaga"]')));
+ await p.click('[data-act="rc-volta"]'); await H.dorme(500); ok('Voltar (veio da vaga) volta para Admissões e vagas', await p.evaluate(()=>__T.S().view)==='rhvagas');
+ await p.evaluate(()=>__T.go('rhcom')); await H.dorme(500); ok('Na lista: atalho "Divulgar uma vaga aberta"', !!(await p.$('[data-act="rc-vaga"]')));
  await p.evaluate(()=>{ window.__clip=''; }); await p.click('[data-act="rc-vaga"]'); await H.dorme(400); await p.click('[data-act="rc-copiar"]'); await H.dorme(300); const c2=await p.evaluate(()=>window.__clip);
  ok('Texto da vaga para o WhatsApp com os requisitos marcados', /\*REQUISITOS\*\n✅ /.test(c2)&&/\*Setor:\* Expedição/.test(c2), c2.slice(0,200));
  await p.click('[data-act="rc-volta"]'); await H.dorme(300);
@@ -54,7 +55,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  await p.evaluate(()=>{ window.__clip=''; }); await p.click('[data-act="rc-copiar"]'); await H.dorme(300); const leg=await p.evaluate(()=>window.__clip);
  ok('Copiar legenda: texto para Instagram/Facebook, com emojis e hashtags (sem * do WhatsApp)', /^📢 ESTAMOS CONTRATANDO!/.test(leg)&&/📍 Local: Cachoeirinha - RS/.test(leg)&&/Oferecemos:\n✅ Refeição na empresa/.test(leg)&&/📲 Candidate-se: Mande seu currículo pelo WhatsApp \(51\) 99999-1234/.test(leg)&&/#vagas #emprego/.test(leg)&&/#cachoeirinha/.test(leg)&&!/\*/.test(leg), leg.slice(0,220));
  await p.click('[data-act="rc-vgmodo"][data-v="int"]'); await H.dorme(600); ok('Na vaga dá para trocar entre Mural interno e Redes sociais', await p.evaluate(()=>RHCom._S.ed.est)==='faixa'&&/VAGAS ABERTAS/.test(await pv()));
- await p.click('[data-act="rc-volta"]'); await H.dorme(300);
+ await p.click('[data-act="rc-volta"]'); await H.dorme(300); await p.evaluate(()=>__T.go('rhcom')); await H.dorme(400); /* 03/11: o Voltar de um comunicado da vaga volta para a vaga */
  /* celular */ await p.setViewportSize({width:390,height:844}); await p.click('[data-act="rc-novo"][data-v="lembrete"]'); await H.dorme(800);
  const m=await p.evaluate(()=>({w:document.documentElement.scrollWidth,pv:document.getElementById('rc-pv').getBoundingClientRect().width,top:document.getElementById('rc-pv').getBoundingClientRect().top<document.querySelector('[data-rc="h.titulo"]').getBoundingClientRect().top}));
  ok('No celular: prévia em cima, sem rolar para o lado', m.w<=390&&m.pv<=360&&m.top, JSON.stringify(m));

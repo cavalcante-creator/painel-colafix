@@ -17,6 +17,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42
 
   /* 8 · perguntas rápidas */
   await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(300);
+  await p.evaluate(()=>{ const b=[...document.querySelectorAll('[data-act="rh-itab"]')].find(x=>/Perguntas/.test(x.innerText)); if(b&&b.getAttribute('aria-pressed')!=='true') b.click(); }); await H.dorme(300); /* 02/11: Perguntas rápidas fica na barra "Mais" do Início */
   await p.click('[data-act="rh-perg"][data-v="aniv"]'); await H.dorme(300); await p.selectOption('#rh-pgm','05'); await H.dorme(300); let t=await p.evaluate(()=>document.querySelector('.rh-perg').innerText);
   const aniv=/Aniversariantes de maio[\s\S]*1 pessoa[\s\S]*10\/05[\s\S]*Ana Souza/.test(t);
   await p.click('[data-act="rh-perg"][data-v="setor"]'); await H.dorme(300); await p.selectOption('#rh-pgs','Linha 2'); await H.dorme(300); const t2=await p.evaluate(()=>document.querySelector('.rh-perg').innerText);

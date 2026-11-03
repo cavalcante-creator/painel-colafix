@@ -31,7 +31,7 @@ const SP=process.env.SHOTS||'/tmp';
  ok('Pessoas: Funcionários · Admissões e vagas · Quem está hoje · Uniformes na lateral (02/11: sem Terceirizados; no computador a barra de abas de cima fica escondida)', s.v==='rhfunc'&&s.sub.join('|')==='Funcionários|Admissões e vagas|Quem está hoje|Uniformes'&&await p.evaluate(()=>{ const t=document.querySelector('#view .gxg-tabs'); return !t||getComputedStyle(t).display==='none'; }), JSON.stringify(s));
  await p.click('#navlist .gxg-si[data-go="rhvagas"]'); await H.dorme(900); ok('Vagas abre pela lateral', await p.evaluate(()=>__T.S().view==='rhvagas'));
  await p.click('#navlist .gxg-gr:has-text("Prazos")'); await H.dorme(900);
- s=await p.evaluate(()=>[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.innerText.trim())); ok('Prazos: Agenda · Experiência · Troca dos PJ · Exames e NRs', s.join('|')==='Agenda|Experiência|Troca dos PJ|Exames e NRs', s.join('|'));
+ s=await p.evaluate(()=>[...document.querySelectorAll('#navlist .gxg-si')].map(b=>b.innerText.trim())); ok('Prazos: Experiência · Troca dos PJ · Exames e NRs (a Agenda foi para Minha agenda em 03/11)', s.join('|')==='Experiência|Troca dos PJ|Exames e NRs', s.join('|'));
  await p.click('#gxs-q'); await p.keyboard.type('carla'); await H.dorme(400); s=await p.evaluate(()=>document.getElementById('gxs-res').innerText);
  ok('Busca acha a pessoa pelo nome', /Carla Mendes/.test(s)&&/Operadora/.test(s), s.replace(/\n/g,'|'));
  await p.keyboard.press('Enter'); await H.dorme(1200); s=await p.evaluate(()=>({v:__T.S().view,t:document.getElementById('view').innerText.slice(0,400)}));

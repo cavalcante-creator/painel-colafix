@@ -163,7 +163,7 @@
         <button class="lnk" data-act="rc-sobe" data-i="${i}" ${i?'':'disabled'} aria-label="Subir">↑</button><button class="lnk" data-act="rc-desce" data-i="${i}" ${i<o.bl.length-1?'':'disabled'} aria-label="Descer">↓</button>
         <button class="lnk" data-act="rc-dupb" data-i="${i}">Duplicar</button><button class="lnk" data-act="rc-tira" data-i="${i}" style="color:var(--crit-ink)">Tirar</button></span></div>
       <div class="rc-g">${(TIPOS[b.tipo]||['',[]])[1].map(([k,l,t])=>campo('b.'+i+'.'+k,b[k],t,l)).join('')}</div></div>`).join('');
-    return c.topo('Comunicados',S.ed._id?'Editando: '+(h.titulo||'sem título'):'Novo comunicado',`<button class="btn sec" data-act="rc-volta">Voltar</button><button class="btn" data-act="rc-salvar" ${S.salv?'disabled':''}>${S.salv?'Salvando…':'Salvar'}</button>`)+`
+    return c.topo('Comunicados',S.ed._id?'Editando: '+(h.titulo||'sem título'):'Novo comunicado',`<button class="btn sec" data-act="rc-volta">${S.volta?S.volta.rot:'Voltar'}</button><button class="btn" data-act="rc-salvar" ${S.salv?'disabled':''}>${S.salv?'Salvando…':'Salvar'}</button>`)+`
     ${o.vg?`<div class="rc-vgt"><span>Vaga: <b>${e(o.vg.funcao||'')}</b></span><div class="seg" role="group"><button data-act="rc-vgmodo" data-v="int" aria-pressed="${o.est!=='social'}">Mural interno</button><button data-act="rc-vgmodo" data-v="soc" aria-pressed="${o.est==='social'}">Redes sociais</button></div></div>`:''}
     <div class="rc-ed"><div class="rc-col">
       <section class="card"><h2 style="margin:0 0 10px">Aparência</h2><div class="rc-g">
@@ -208,9 +208,9 @@
     else S.ed[k[0]]=v;
     if(t.dataset.re) C.P.render(); else atualiza(); });
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rc-"]'); if(!b||!C) return; const a=b.dataset.act, P=C.P, o=S.ed, i=+b.dataset.i;
-    if(a==='rc-novo'){ S.ed=MODELOS[b.dataset.v](); P.render(); window.scrollTo(0,0); return; }
-    if(a==='rc-abrir'){ const x=(S.xs||[]).find(y=>y._id===b.dataset.id); if(x){ S.ed=clone(x); P.render(); window.scrollTo(0,0); } return; }
-    if(a==='rc-volta'){ S.ed=null; P.render(); return; }
+    if(a==='rc-novo'){ S.volta=null; S.ed=MODELOS[b.dataset.v](); P.render(); window.scrollTo(0,0); return; }
+    if(a==='rc-abrir'){ S.volta=null; const x=(S.xs||[]).find(y=>y._id===b.dataset.id); if(x){ S.ed=clone(x); P.render(); window.scrollTo(0,0); } return; }
+    if(a==='rc-volta'){ const vt=S.volta; S.ed=null; S.volta=null; if(vt){ P.go(vt.tela); window.scrollTo(0,0); } else P.render(); return; } /* 03/11: volta para a tela de onde veio (ex.: a vaga) */
     if(a==='rc-vgmodo'&&o.vg){ const soc=b.dataset.v==='soc'; if(soc===(o.est==='social')) return; if(!confirm('Trocar o modelo? O que você mudou neste comunicado será refeito a partir da vaga.')) return;
       const n=soc?vagaSocial(o.vg):vagaModelo(o.vg); n._id=undefined; S.ed=n; P.render(); return; }
     if(a==='rc-vaga'){ const v=vagaAbertas().find(x=>x._id===b.dataset.id); if(v){ S.ed=b.dataset.soc?vagaSocial(v):vagaModelo(v); P.render(); window.scrollTo(0,0); } return; }
@@ -236,7 +236,7 @@
         const u=URL.createObjectURL(bl), l=document.createElement('a'); l.href=u; l.download=nm; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); P.toast('Imagem baixada.'); }
       catch(e){ P.erro(e); } return; } });
 
-  window.RHCom={naoCabe,render,_S:S,html:o=>html(o),txtWa,MODELOS,deVaga:(v,soc)=>{ S.ed=soc?vagaSocial(v):vagaModelo(v); }};
+  window.RHCom={naoCabe,render,_S:S,html:o=>html(o),txtWa,MODELOS,deVaga:(v,soc,volta)=>{ S.ed=soc?vagaSocial(v):vagaModelo(v); S.volta=volta||{tela:'rhvagas',rot:'Voltar para a vaga'}; }};
   document.head.insertAdjacentHTML('beforeend',`<style id="rc-css">
 /* editor */
 .rc-mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}

@@ -33,12 +33,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  ok('RH conecta a conta Microsoft (login oficial com PKCE) e a tela mostra a conta e a pasta', /Conecte sua conta Microsoft/.test(b0)&&autorizacoes===1&&/OneDrive de rh@empresa\.com\.br/.test(b1)&&/Fichas EPI e Uniforme/.test(b1), b1.replace(/\n/g,' '));
  let fr=p.frames().find(f=>/rh-fichas/.test(f.url())); await H.dorme(1500);
  await fr.evaluate(()=>{ const s=document.getElementById('upload-funcionario'); s.selectedIndex=[...s.options].findIndex(o=>/ANA/.test(o.text)); });
- await fr.setInputFiles('#upload-arquivo','foto-a.png'); await fr.click('#btn-enviar-ficha'); await H.dorme(1500);
+ await fr.evaluate(()=>document.getElementById('card-drive').classList.remove('fechado')); await fr.setInputFiles('#upload-arquivo','foto-a.png'); await fr.click('#btn-enviar-ficha'); await H.dorme(1500);
  const up=await fr.evaluate(()=>document.getElementById('upload-msg').innerHTML); const k=Object.keys(drive)[0]||'';
  const painelArq=await p.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('__srv')).docs).filter(x=>x.startsWith('rh/arquivos/')).length);
  const mes=new Date().toISOString().slice(0,7);
  ok('Ficha escaneada vai para o OneDrive na pasta do mês, com o mesmo conteúdo, e o painel não guarda cópia', new RegExp('^Fichas EPI e Uniforme/'+mes+' [A-ZÇ][a-zç]+/ANA SOUZA - ').test(k)&&drive[k]&&drive[k].b.equals(fs.readFileSync('foto-a.png'))&&painelArq===0&&/sharepoint\.com/.test(up), k);
- await fr.click('#btn-atualizar-status-mes'); await H.dorme(800); const stm=await fr.evaluate(()=>(document.body.innerText.match(/\d+ de \d+ já têm ficha escaneada[^\n]*/)||[''])[0]);
+ await fr.evaluate(()=>document.getElementById('card-drive').classList.remove('fechado')); await fr.click('#btn-atualizar-status-mes'); await H.dorme(800); const stm=await fr.evaluate(()=>(document.body.innerText.match(/\d+ de \d+ já têm ficha escaneada[^\n]*/)||[''])[0]);
  await fr.fill('#busca-drive-input, input[id*="busca"]','ana').catch(()=>{}); await fr.click('#btn-buscar-drive').catch(()=>{}); await H.dorme(800);
  const busca=await fr.evaluate(()=>(document.querySelector('.drive-result')||{}).innerText||'');
  ok('Status do mês e busca leem do OneDrive', /1 de 1/.test(stm)&&/ANA SOUZA/.test(busca), stm+' · '+busca);
@@ -48,6 +48,6 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  fr=p.frames().find(f=>/rh-fichas/.test(f.url())); const prev=await fr.evaluate(()=>document.getElementById('preview-wrap').innerText.length);
  ok('A prévia gerada continua lá depois de o painel redesenhar a tela', prev>200, 'tamanho da prévia: '+prev);
  await p.click('[data-act="od-sair"]'); await H.dorme(500); const b2=await p.evaluate(()=>(document.querySelector('.banner')||{}).innerText||'');
- await fr.setInputFiles('#upload-arquivo','foto-b.png'); await fr.click('#btn-enviar-ficha'); await H.dorme(1200); const up2=await fr.evaluate(()=>document.getElementById('upload-msg').innerText);
+ await fr.evaluate(()=>document.getElementById('card-drive').classList.remove('fechado')); await fr.setInputFiles('#upload-arquivo','foto-b.png'); await fr.click('#btn-enviar-ficha'); await H.dorme(1200); const up2=await fr.evaluate(()=>document.getElementById('upload-msg').innerText);
  ok('Desconectado: pede para conectar e o envio é recusado com aviso claro', /Conectar ao OneDrive/.test(b2)&&/Conecte o OneDrive/.test(up2)&&Object.keys(drive).length===1, up2);
  console.log('erros:',B.erros.filter(x=>!/404|cdnjs|401/.test(x))); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
