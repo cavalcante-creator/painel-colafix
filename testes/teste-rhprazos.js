@@ -48,7 +48,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   ok('"Já tirou" registra o período como tirado antes do painel e o vencido some', ant&&ant.dias===30&&!/vencido/i.test(car), car);
 
   // modelo de aviso de férias com campo perguntado
-  await p.evaluate(()=>__T.go('rhdocs')); await p.click('[data-act="rh-dnovo"]'); await p.fill('#rh-dnome','Aviso de férias'); await p.selectOption('#rh-dvale','CLT');
+  await p.evaluate(()=>__T.go('rhdocs')); await p.click('[data-act="rh-dv"][data-v="modelos"]'); await p.click('[data-act="rh-dnovo"]'); await p.fill('#rh-dnome','Aviso de férias'); await p.selectOption('#rh-dvale','CLT');
   await p.click('#rh-ed'); await p.keyboard.type('Comunicamos a '); await p.click('[data-act="rh-dtk"][data-k="NOME"]'); await p.keyboard.type(' as férias de '); await p.click('[data-act="rh-dtk"][data-k="FERIAS_INICIO"]');
   await p.keyboard.type(' a '); await p.click('[data-act="rh-dtk"][data-k="FERIAS_FIM"]'); await p.keyboard.type(', volta em '); await p.click('[data-act="rh-dtk"][data-k="FERIAS_RETORNO"]'); await p.keyboard.type(', período '); await p.click('[data-act="rh-dtk"][data-k="PERIODO_AQUISITIVO"]');
   await p.keyboard.type('. Aviso dado em '); resposta='Data do aviso'; await p.click('[data-act="rh-dfmt"][data-v="pergunta"]'); await H.dorme(200); await p.keyboard.type('. Obs.: {?Observação do RH}');

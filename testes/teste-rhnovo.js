@@ -84,7 +84,7 @@ function H_mes(){ const x=new Date(); return x.getFullYear()+'-'+String(x.getMon
   ok('"Abrir Linha 2" volta para a lista só daquele setor', l2==='DIEGO MARTINS,CARLOS LIMA', l2);
 
   // ---- documentos e contratos
-  await p.evaluate(()=>__T.go('rhdocs')); await p.click('[data-act="rh-dnovo"]'); await p.fill('#rh-dnome','Contrato de trabalho · CLT'); await p.selectOption('#rh-dvale','CLT');
+  await p.evaluate(()=>__T.go('rhdocs')); await p.click('[data-act="rh-dv"][data-v="modelos"]'); await p.click('[data-act="rh-dnovo"]'); await p.fill('#rh-dnome','Contrato de trabalho · CLT'); await p.selectOption('#rh-dvale','CLT');
   await p.click('#rh-ed'); await p.keyboard.type('Contrato de '); await p.click('[data-act="rh-dtk"][data-k="NOME"]'); await p.keyboard.type(', CPF {CPF}, função '); await p.click('[data-act="rh-dtk"][data-k="FUNCAO"]');
   await p.keyboard.type('. Salário '); await p.click('[data-act="rh-dtk"][data-k="SALARIO"]'); await p.keyboard.type(' ('); await p.click('[data-act="rh-dtk"][data-k="SALARIO_EXTENSO"]'); await p.keyboard.type('), jornada '); await p.click('[data-act="rh-dtk"][data-k="JORNADA"]'); await p.keyboard.type('. Empresa '); await p.click('[data-act="rh-dtk"][data-k="EMPRESA"]');
   await p.click('[data-act="rh-dsalvar"]'); await H.dorme(600); s=await srv(); const md=Object.values(s).find(x=>x&&x.nome==='Contrato de trabalho · CLT');

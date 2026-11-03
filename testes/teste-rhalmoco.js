@@ -70,7 +70,7 @@ const csv='/tmp/claude-almoco-teste.csv'; fs.writeFileSync(csv,Buffer.from(linha
  p.once('dialog',dg=>dg.accept('volta')); await p.click('[data-act="alm-aj"][data-k="11111111111"][data-v="sim"]'); await H.dorme(800);
  await p.click('[data-act="alm-vis"][data-v="mes"]'); await H.dorme(400); const t3=await p.evaluate(()=>document.querySelector('.alm-t').innerText);
  ok('Mês (fechamento): grade por pessoa com total de almoços', /Ana Teste[\s\S]*✓/.test(t3)&&/Bruno Teste/.test(t3), t3.replace(/\n/g,' | ').slice(0,240));
- await p.click('[data-act="alm-vis"][data-v="dir"]'); await H.dorme(500); const t4=await p.evaluate(()=>document.getElementById('view').innerText);
+ await p.evaluate(()=>__T.go('rhalmdir')); await H.dorme(800); const t4=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Diretoria: gráfico por dia, por empresa, por dia da semana e custo', /Almoços por dia/.test(t4)&&/Por empresa/.test(t4)&&/Média por dia da semana/.test(t4)&&/Custo e descontos/.test(t4), t4.slice(-300).replace(/\n/g,' | '));
  await p.fill('#alm-valor','18,50'); await p.fill('#alm-vdesc','10,00'); await p.click('[data-act="alm-valor"]'); await H.dorme(600); const t5=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Custo do mês = almoços × valor da refeição (4 × R$ 18,50 = R$ 74,00)', /Custo do mês\s*R\$\s?74,00/i.test(t5), (t5.match(/Custo do mês.{0,80}/is)||[''])[0].replace(/\n/g,' | '));

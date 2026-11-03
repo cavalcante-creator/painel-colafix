@@ -45,7 +45,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
   ok('Quem saiu este mês continua nas fichas do mês; quem saiu antes, não', fichas.includes('CARLOS LIMA')&&!fichas.includes('ZECA ANTIGO')&&dados.includes('CARLOS LIMA:Ativo')&&dados.includes('ZECA ANTIGO:Inativo'), JSON.stringify(dados));
 
   // desligamento pelo documento (aviso trabalhado: data no futuro)
-  await p.evaluate(()=>__T.go('rhdocs')); await p.click('[data-act="rh-dnovo"]'); await p.fill('#rh-dnome','Aviso de demissão trabalhado'); await H.dorme(100);
+  await p.evaluate(()=>__T.go('rhdocs')); await p.click('[data-act="rh-dv"][data-v="modelos"]'); await p.click('[data-act="rh-dnovo"]'); await p.fill('#rh-dnome','Aviso de demissão trabalhado'); await H.dorme(100);
   await p.click('#rh-ed'); await p.keyboard.type('Comunicamos a '); await p.click('[data-act="rh-dtk"][data-k="NOME"]'); await p.keyboard.type(' o aviso. Último dia: {?Último dia de trabalho}.');
   const ck=await p.isChecked('#rh-ddesl').catch(()=>null);
   await p.click('[data-act="rh-dsalvar"]'); await H.dorme(600); s=await srv(); const md=Object.values(s).find(x=>x&&x.nome==='Aviso de demissão trabalhado');
