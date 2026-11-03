@@ -1052,8 +1052,10 @@
       // coluna — aproveitado para dar mais espaço em branco pra anotar a
       // quantidade à mão.
       var blankSpacer = itensExibir.length <= 6 ? "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" : "&nbsp;&nbsp;&nbsp;&nbsp;";
-      var rows = "";
+      var rows = "", nLinhas = 0;
       for(var dia=1; dia<=totalDias; dia++){
+        if(opts.tipo==="epi" && !diaUtilFicha(opts.mesSel.yyyy, opts.mesSel.mm, dia)) continue; /* 03/11: folha do EPI sem sábado, domingo e feriado */
+        nLinhas++;
         var dataStr = String(dia).padStart(2,"0")+"/"+String(opts.mesSel.mm).padStart(2,"0");
         var cells = itensExibir.map(function(it){
           // A coluna "Outro item" fica totalmente em branco, para o RH
@@ -1075,7 +1077,7 @@
 
       // Altura de cada linha conforme a quantidade de dias do mes,
       // para que meses de 31 dias tambem caibam em uma A4.
-      var alturaLinha = totalDias >= 31 ? 3.8 : (totalDias >= 30 ? 3.95 : 4.2);
+      var alturaLinha = opts.tipo==="epi" ? Math.min(5.6, Math.round(117.8/Math.max(1,nLinhas)*100)/100) : (totalDias >= 31 ? 3.8 : (totalDias >= 30 ? 3.95 : 4.2)); /* EPI: só dias úteis, linhas mais altas na mesma altura de tabela */
       tableHTML =
         '<div class="fp-table-wrap"><table class="'+tableClass+'" style="--row-h:'+alturaLinha+'mm">' +
           colgroup +
@@ -1089,6 +1091,10 @@
     return topbar + infogrid + declaracao + tableHTML + footer;
   }
 
+  /* dia útil = segunda a sexta e não é feriado do calendário do painel (Cadastros › Feriados + nacionais) */
+  function diaUtilFicha(a, m, d){ var wd=new Date(a, m-1, d, 12).getDay(); if(wd===0||wd===6) return false;
+    try{ var P=window.parent&&window.parent.Painel; if(P&&P.feriadoDe&&P.feriadoDe(a+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"))) return false; }catch(e){}
+    return true; }
   function getMesSelecionado(){
     var v = inputMes.value; // "YYYY-MM"
     if(!v) return null;
