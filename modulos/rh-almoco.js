@@ -670,6 +670,7 @@
     Object.keys(R.res).forEach(pg=>R.res[pg].linhas.forEach(l=>{ o[l.nome]=l.s; })); Object.keys(R.man).forEach(n=>o[n]=R.man[n]); return o; }
   async function ffLer(c,d,files){ const F=folhaEst(c,d), R=ffEst(d), FT=window.RHAlmFoto; if(!FT) return; R.lendo=true; R.erros=[]; c.P.render();
     for(const f of files){ try{ const r=await FT.ler(f,dec=>{ const vs=(F.emit&&F.emit.vs)||{}; return dec.dia===d&&vs[dec.ver]?vs[dec.ver][dec.pg]:null; });
+        if(r.pg>=4){ R.erros.push(f.name+': esta é a folha do café. Confira em Ausências › Folha do café.'); continue; }
         if(r.dia!==d){ R.erros.push(f.name+': esta foto é da folha de '+c.br(r.dia)+'. Abra esse dia para conferir.'); continue; }
         if(r.semLista){ R.erros.push(f.name+': esta folha é de uma impressão antiga. Fotografe a folha da última impressão.'); continue; }
         R.res[r.pg]=r; }catch(e){ console.warn('[almoço foto]',e); R.erros.push((f.name?f.name+': ':'')+((e&&e.message)||e)); } }

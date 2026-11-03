@@ -156,7 +156,7 @@
     frEl(); if(!R._prevT) R._prevT=setTimeout(()=>{ R._prevT=null; if(P.S.view==='rhfichas') P.rerender(); },700); return null; }
 
   /* ---------- pedaços de tela ---------- */
-  const TELA_EY={rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhcom:'DOCUMENTOS',rhtarefas:'MINHA AGENDA',rhpedidos:'MINHA AGENDA',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhvagas:'VAGAS E CANDIDATOS',rhunif:'UNIFORMES',rhfuncoes:'CADASTROS'};
+  const TELA_EY={rhcafe:'AUSÊNCIAS',rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhcom:'DOCUMENTOS',rhtarefas:'MINHA AGENDA',rhpedidos:'MINHA AGENDA',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhvagas:'VAGAS E CANDIDATOS',rhunif:'UNIFORMES',rhfuncoes:'CADASTROS'};
 const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('RH'+((P.S&&TELA_EY[P.S.view])?' · '+TELA_EY[P.S.view]:''))}</div><h1>${t}</h1>${s?`<div class="sub">${s}</div>`:''}</div>${acoes?`<div class="rh-acoes">${acoes}</div>`:''}</div>`;
   const opts=(xs,v)=>xs.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
   const unicos=k=>[...new Set(R.func.map(x=>x[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -1797,6 +1797,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     rhvagas:{nome:'Admissões e vagas',mob:'Admissões',render:vAdmVagas},
     rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>{ R.fview='terc'; R.pess=null; return vTerc(true); }},
     rhpres:{nome:'Quem está hoje',mob:'Hoje',render:vPresRH},
+    rhcafe:{nome:'Folha do café',mob:'Café',render:()=>window.RHCafe?window.RHCafe.render({P,R,esc,eu,topo,carregarJs,guardar:guardarArqRH,almCtx}):'<section class="card">Carregando…</section>'},
     rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
     rhferias:{nome:'Férias',mob:'Férias',render:()=>{ if(!['ferias','mapa'].includes(R.pzv)) R.pzv='ferias'; return vFerias(); }},
     rhatest:{nome:'Atestados e faltas',mob:'Atestados',render:()=>topo('Atestados e faltas','Atestado, declaração de horas e faltas de cada pessoa. Entra sozinho no fechamento da folha, na presença e no almoço.','','RH · ATESTADOS E FALTAS')+(window.RHAtest?RHAtest.render(Object.assign(atCtx(),{semTitulo:true})):'<section class="card">Carregando…</section>')},
@@ -2199,7 +2200,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   /* quem só tem o RH vê as telas do RH na barra lateral (como no exemplo), no lugar da lista de módulos */
   window.RHBusca={pessoas:()=>(R.func||[]).filter(f=>f&&f.nome&&!f.removido).map(f=>({id:f._id,nome:f.nome,setor:f.setor||'',funcao:f.funcao||'',status:f.status||''}))}; /* busca da lateral (js/56) */
   function navSolo(){ const ms=P.modsVis?P.modsVis():[], solo=ms.length===1&&ms[0]==='rh'&&!!TELAS[P.S.view]; document.body.classList.toggle('rh-solo',solo); if(!solo) return;
-    const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhpres:'fabrica',rhfichas:'folha',rhcom:'editar',rhtarefas:'check',rhpedidos:'check',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhvagas:'mais',rhunif:'folha',rhfuncoes:'ajuste'};
+    const nl=document.getElementById('navlist'); if(!nl) return; const NIC={rhcafe:'relogio',rhinicio:'grid',rhagenda:'cal2',rhfunc:'equipe',rhpres:'fabrica',rhfichas:'folha',rhcom:'editar',rhtarefas:'check',rhpedidos:'check',rhdocs:'editar',rhferias:'calendario',rhalmoco:'relogio',rhvagas:'mais',rhunif:'folha',rhfuncoes:'ajuste'};
     const h=Object.keys(TELAS).filter(v=>P.viewOk(v)&&TELAS[v].menu!==false).map(v=>`<button class="navbtn" data-go="${v}" ${P.S.view===v?'aria-current="page"':''}>${NIC[v]?P.ic(NIC[v],18):''}${esc(TELAS[v].nome)}</button>`).join('');
     if(nl.dataset.rh!==h){ nl.dataset.rh=h; nl.innerHTML=h; } const lb=nl.previousElementSibling; if(lb&&lb.classList.contains('modulo')) lb.textContent='RH'; }
   { const nl=document.getElementById('navlist'); if(nl&&window.MutationObserver) new MutationObserver(()=>{ if(document.body.classList.contains('rh-solo')&&!nl.querySelector('[data-go^="rh"]')){ nl.dataset.rh=''; navSolo(); } }).observe(nl,{childList:true}); }

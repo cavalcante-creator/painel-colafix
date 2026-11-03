@@ -22,13 +22,13 @@
   function pagsDe(L,mk){ const rows=L.map(x=>({nome:x.nome,cz:mk(x)||''})); const ps=[]; for(let i=0;i<rows.length;i+=G.por) ps.push(rows.slice(i,i+G.por));
     if(!ps.length) ps.push([]); const ult=ps[ps.length-1]; const vaz=Math.min(4,G.por-ult.length); for(let i=0;i<vaz;i++) ult.push({nome:'',cz:''}); return ps; }
   /* 03/11: sem as duas colunas vazias (a referência da tinta passou a ser o papel em branco à direita da tabela) e com as marcas opcionais (semMarcas) */
-  function paginas(ps,d,ver,titulo,semMarcas){ const brB=d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4), mm=v=>v+'mm';
+  function paginas(ps,d,ver,titulo,semMarcas,o){ o=o||{}; const brB=d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4), mm=v=>v+'mm';
     const cel=(x,y,w,cls,txt)=>`<div class="c ${cls}" style="left:${mm(x)};top:${mm(y)};width:${mm(w)}">${txt||''}</div>`;
     return ps.map((rows,pi)=>{ let h=semMarcas?'':G.mc.map(([x,y])=>`<i class="mk" style="left:${mm(x-G.mk/2)};top:${mm(y-G.mk/2)}"></i>`).join('');
-      if(!semMarcas) codBits(d,pi,ver).forEach((b,i)=>{ h+=`<i class="cd ${b?'b':''}" style="left:${mm(G.cx+i*G.cc)};top:${mm(G.cy-G.cc/2)}"></i>`; });
+      if(!semMarcas) codBits(d,pi+(o.pgBase||0),ver).forEach((b,i)=>{ h+=`<i class="cd ${b?'b':''}" style="left:${mm(G.cx+i*G.cc)};top:${mm(G.cy-G.cc/2)}"></i>`; });
       h+=`<div class="id" style="left:${mm(semMarcas?colX(2)-45:G.cx+G.nb*G.cc+4)};top:${mm(G.cy-2.2)}">Folha ${pi+1} de ${ps.length} · ${brB}</div>`;
-      h+=cel(colX(0),G.y0,G.cw[0],'th nm',e(titulo))+cel(colX(1),G.y0,G.cw[1],'th','Assinatura');
-      rows.forEach((r,i)=>{ const y=G.y0+G.rh*(i+1), z=r.cz?' cz':''; h+=cel(colX(0),y,G.cw[0],'nm'+z,e(r.nome))+cel(colX(1),y,G.cw[1],'as'+z,r.cz?e(r.cz):''); });
+      h+=o.cafe?cel(colX(0),G.y0,G.cw[0]+G.cw[1],'th tt',e(titulo)):cel(colX(0),G.y0,G.cw[0],'th nm',e(titulo))+cel(colX(1),G.y0,G.cw[1],'th','Assinatura');
+      rows.forEach((r,i)=>{ const y=G.y0+G.rh*(i+1), z=r.cz?' cz':''; if(r.cab){ h+=cel(colX(0),y,G.cw[0],'hd','Nome')+cel(colX(1),y,G.cw[1],'hd','Assinatura'); return; } if(r.grupo){ h+=cel(colX(0),y,G.cw[0]+G.cw[1],'gr',e(r.grupo)); return; } h+=cel(colX(0),y,G.cw[0],'nm'+z,e(r.nome))+cel(colX(1),y,G.cw[1],'as'+z,r.cz?e(r.cz):''); });
       if(!semMarcas) h+=`<div class="rod" style="left:${mm(G.x0)};top:${mm(289.5)}">Para conferir pela foto: fotografe a folha inteira, de frente, com as 4 marcas pretas aparecendo.</div>`;
       return `<section class="pg">${h}</section>`; }).join(''); }
   const CSS=`@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0}body{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -36,7 +36,7 @@
     .pg i{position:absolute;display:block}.mk{width:7mm;height:7mm;background:#000}.cd{width:2.8mm;height:2.8mm;background:#fff}.cd.b{background:#000}
     .id{position:absolute;font-size:9pt;font-weight:700;white-space:nowrap}.rod{position:absolute;font-size:7.5pt;color:#444;white-space:nowrap}
     .c{position:absolute;box-sizing:border-box;height:5.5mm;border:0.6pt solid #000;margin:-0.3pt 0 0 -0.3pt;padding:0 3px;font-size:11pt;font-weight:700;line-height:5.2mm;white-space:nowrap;overflow:hidden}
-    .c.th{background:#BFBFBF;font-style:italic;text-align:center}.c.nm{text-align:left}.c.th.nm{text-align:center}.c.as{text-align:center;font-weight:400;font-style:italic;font-size:10pt}.c.cz{background:#BFBFBF}`;
+    .c.th{background:#BFBFBF;font-style:italic;text-align:center}.c.nm{text-align:left}.c.th.nm{text-align:center}.c.as{text-align:center;font-weight:400;font-style:italic;font-size:10pt}.c.cz{background:#BFBFBF}.c.tt{background:#D9E2D0;font-style:normal;text-align:center}.c.hd{background:#E7E6E6;text-align:center}.c.gr{background:#D9E2D0;text-align:left}`;
 
   /* ---------- leitura da foto ---------- */
   async function imagem(file){ const url=URL.createObjectURL(file); try{ const im=new Image(); await new Promise((ok,no)=>{ im.onload=ok; im.onerror=()=>no(new Error('Não consegui abrir a foto.')); im.src=url; });
