@@ -26,12 +26,13 @@
     for(let i=0;i<4;i++) rows.push({nome:'',cz:''});
     const ps=[]; let pg=[{cab:true}]; rows.forEach((r,i)=>{ const resta=PAG-pg.length; if(resta<=0||(r.grupo&&resta<=1)){ ps.push(pg); pg=[{cab:true}]; } pg.push(r); }); if(pg.length>1) ps.push(pg);
     if(ps.length>4){ return ps.slice(0,4); } return ps; }
+  const marcas=()=>{ try{ return localStorage.getItem('colafix.alm.marcas')!=='0'; }catch(e){ return true; } };
   function titulo(c,d){ const F=est(c,d), ns=nomes(linhas(c)).filter(n=>!(F.tirar||{})[n]); return 'CAFÉ - '+br(d)+' - '+(ns.length-ns.filter(n=>F.nv[n]).length); }
   function imprimir(c,d){ const FT=window.RHAlmFoto; if(!FT) return c.P.toast('Carregando… tente de novo em um instante.'); const F=est(c,d);
     if(!nomes(linhas(c)).length) return c.P.toast('Cadastre a lista do café primeiro (Editar a lista).');
     const w=window.open('','_blank'); if(!w) return c.P.toast('Libere as janelas (pop-up) para imprimir.');
     const nv=((F.emit&&F.emit.n)||0)+1, ver=nv%4, ps=paginas(c,d);
-    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>CAFÉ - ${br(d)}</title><style>${FT.CSS}</style></head><body>${FT.paginas(ps,d,ver,titulo(c,d),false,{cafe:true,pgBase:BASE})}</body></html>`); w.document.close();
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>CAFÉ - ${br(d)}</title><style>${FT.CSS}</style></head><body>${FT.paginas(ps,d,ver,titulo(c,d),!marcas(),{cafe:true,pgBase:BASE})}</body></html>`); w.document.close();
     setTimeout(()=>{ try{ w.focus(); w.print(); }catch(x){} },350);
     const pm={}; ps.forEach((r,i)=>{ pm[i]=r.map(x=>x.nome?{nome:x.nome,cz:x.cz||''}:x.grupo?{grupo:x.grupo}:x.cab?{cab:true}:{nome:'',cz:''}); }); const vs=Object.assign({},(F.emit&&F.emit.vs)||{}); vs[ver]=pm;
     F.emit={em:new Date().toISOString(),por:c.eu?c.eu():'',n:nv,mudou:false,ver,vs}; salvar(c,d); c.P.render(); }
@@ -85,30 +86,38 @@
         +(F.emit?`<div class="alm-fe ${F.emit.mudou?'mud':''}">${F.emit.mudou?'<b>Marcação alterada depois de emitida</b> — imprima de novo para a folha ficar certa. ':''}Emitida em ${esc(new Date(F.emit.em).toLocaleDateString('pt-BR'))} às ${esc(new Date(F.emit.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))}${F.emit.por?' por '+esc(F.emit.por):''}${F.emit.n>1?' ('+F.emit.n+' vezes)':''}. Pode mudar as marcações e imprimir de novo.</div>`:'')
         +`<div class="alm-fz"><span><b>${LV.length}</b> na folha · <b>${n}</b> marcado${n===1?'':'s'} · <b>${LV.length-n}</b> para assinar${tir.length?' · '+tir.length+' tirado'+(tir.length>1?'s':'')+' da folha':''}</span><button class="btn" data-act="cf-imp">${F.emit?'Imprimir de novo':'Imprimir folha'}</button></div>`; }
     return `<section class="card alm-folha cf-l"><div class="alm-fh"><div><b>Folha de assinatura do café · ${esc(brD)}</b><span>A folha sai normal, para todos assinarem; só quem estiver marcado sai em cinza.</span></div>
-      <div class="alm-fa">${!F.carregando&&F.resp==='sem'&&!temDia?'<button class="lnk" data-act="cf-volta">Voltar à pergunta do Face ID</button>':''}</div></div>${corpo}</section>`; }
+      <div class="alm-fa">${!F.carregando&&F.resp==='sem'&&!temDia?'<button class="lnk" data-act="cf-volta">Voltar à pergunta do Face ID</button>':''}<button class="btn sec" data-act="${C.ed?'cf-edx':'cf-ed'}">${C.ed?'Fechar a lista fixa':'Lista fixa ('+nomes(linhas(c)).length+')'}</button></div></div>
+      ${C.ed?editor(c):''}${nomes(linhas(c)).length?corpo:'<div class="alm-fq"><b>Ainda não tem a lista do café</b><span>Toque em “Lista fixa” para colar os nomes ou importar a planilha do café (os títulos em MAIÚSCULAS viram os grupos).</span></div>'}</section>`; }
   function busca(c,d){ const esc=c.esc, q=fN(C.fbusca||''); if(q.length<2) return ''; const F=est(c,d), {L}=pessoas(c,d); F.tirar=F.tirar||{};
     const xs=L.filter(x=>fN(x.nome).includes(q)).slice(0,10); if(!xs.length) return '<div class="sub" style="margin-top:6px">Ninguém da lista com esse nome.</div>';
     return `<div class="alm-fbr">${xs.map(x=>{ const tir=F.tirar[x.nome], m=F.nv[x.nome], st=tir?'Tirado desta folha':m||(x.passou?'Passou no Face ID':x.fid?'Não passou no Face ID':'Normal (assina)');
       return `<div class="alm-fbl ${tir?'tir':m?'on':''}"><div><b>${esc(x.nome)}</b><small>${esc(st)}</small></div><div class="alm-fa">${tir?`<button class="btn sec" data-act="cf-dev" data-n="${esc(x.nome)}">Devolver à folha</button>`
         :`${m?`<button class="btn sec" data-act="cf-nvx" data-n="${esc(x.nome)}">Desfazer</button>`:`<button class="btn sec" data-act="cf-nvset" data-n="${esc(x.nome)}">Não veio</button>`}<button class="lnk" data-act="cf-tirar" data-n="${esc(x.nome)}">Tirar desta folha</button>`}</div></div>`; }).join('')}</div>`; }
   /* ---------- tela ---------- */
-  function render(c){ C.ctx=c; const esc=c.esc, P=c.P; if(!C.dia) C.dia=hoje(); const d=C.dia, F=est(c,d), ls=linhas(c), G=grupos(ls), ns=nomes(ls);
+  function prev(c,d){ const esc=c.esc, F=est(c,d), G=grupos(linhas(c)), ns=nomes(linhas(c)).filter(n=>!(F.tirar||{})[n]), n=ns.filter(x=>F.nv[x]).length;
+    return `<div class="alm-pvh"><b>Como vai sair</b><span>${ns.length} na folha · ${n} em cinza · <b>${ns.length-n}</b> para assinar</span></div>
+      <div class="alm-pvt cf-pv"><table><thead><tr><th colspan="2">${esc(titulo(c,d))}</th></tr><tr class="hd"><th>Nome</th><th>Assinatura</th></tr></thead><tbody>${G.map(g=>{ const xs=g.ns.filter(n=>!(F.tirar||{})[n]); return xs.length?`${g.g?`<tr class="gr"><td colspan="2">${esc(g.g)}</td></tr>`:''}${xs.map(n=>`<tr class="${F.nv[n]?'cz':''}"><td>${esc(n)}</td><td>${F.nv[n]?esc(F.nv[n]):''}</td></tr>`).join('')}`:''; }).join('')}</tbody></table></div>
+      <label class="ck alm-fmk"><input type="checkbox" id="alm-fmk" ${marcas()?'checked':''}> Imprimir com as marcas pretas nos cantos <small>(só servem para "Conferir pela foto")</small></label>
+      <button class="btn alm-pvb" data-act="cf-imp" ${ns.length?'':'disabled'}>${F.emit?'Imprimir de novo':'Imprimir folha'}</button>`; }
+  /* faixa + janela, iguais às da folha do almoço (pedido de 03/11: "mesmo layout e igual ao almoço"); entra na tela do Almoço */
+  function painel(c,d){ C.ctx=c; if(d) C.dia=d; if(!C.dia) C.dia=hoje(); d=C.dia; const esc=c.esc, F=est(c,d), {L,temDia}=pessoas(c,d), LV=L.filter(x=>!(F.tirar||{})[x.nome]), n=LV.filter(x=>F.nv[x.nome]).length;
     try{ if(window.RHAlmoco&&window.RHAlmoco.carregar&&c.almCtx) window.RHAlmoco.carregar(c.almCtx(),d.slice(0,7)); }catch(e){}
-    const tirN=ns.filter(n=>(F.tirar||{})[n]).length, nvN=ns.filter(n=>F.nv[n]&&!(F.tirar||{})[n]).length;
+    const st=F.carregando?'carregando…':!L.length?'falta montar a lista fixa':!temDia&&F.resp!=='sem'?'falta conferir o Face ID do dia':F.emit?(F.emit.mudou?'alterada depois de emitida — imprima de novo':'emitida às '+new Date(F.emit.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})):'ainda não emitida';
+    const bar=`<section class="card alm-fbar cf-bar"><div><b>Folha de assinatura do café · ${esc(br(d))}</b><span>${LV.length} na folha · ${n} marcado${n===1?'':'s'} · <b>${LV.length-n}</b> para assinar · <em class="${F.emit&&F.emit.mudou?'mud':''}">${esc(st)}</em>${F.foto&&F.foto.n?` · <em>conferida pela foto: ${F.foto.n.sim} assinaram</em>`:''}</span></div><div class="alm-fa">${F.emit&&F.emit.vs?`<label class="btn sec">Conferir pela foto<input type="file" accept="image/*" multiple hidden data-cf-foto="1"></label>`:''}<button class="btn" data-act="cf-abre">Abrir a folha do café</button></div></section>`;
+    if(!C.ab) return bar;
+    return bar+`<div class="alm-fm" role="dialog" aria-modal="true" aria-label="Folha de assinatura do café"><div class="alm-fmb"><div class="alm-fmh"><div><div class="eyebrow">RH · CAFÉ</div><h2>Folha de assinatura do café · ${esc(br(d))}</h2></div><button class="btn sec" data-act="cf-fecha">Fechar</button></div>
+      <div class="alm-fmg"><div class="alm-fml">${foto(c,d)}${conf(c,d)}</div><aside class="alm-fmr">${prev(c,d)}</aside></div></div></div>`; }
+  /* tela antiga "Folha do café" (fora do menu): só o dia e a mesma faixa */
+  function render(c){ C.ctx=c; if(!C.dia) C.dia=hoje(); const d=C.dia;
     const nav=`<span class="cf-nav"><button class="btn sec rh-sm" data-act="cf-dia" data-v="-1" aria-label="Dia anterior">‹</button><input class="txt" type="date" id="cf-dia" value="${d}"><button class="btn sec rh-sm" data-act="cf-dia" data-v="1" aria-label="Próximo dia">›</button>${d!==hoje()?'<button class="lnk" data-act="cf-hoje">hoje</button>':''}</span>`;
-    const head=c.topo('Folha do café',`${dsem(d)}, ${br(d)} · ${ns.length-tirN} na folha${nvN?' · '+nvN+' marcados':''} · <b>${ns.length-tirN-nvN}</b> para assinar`,nav+`<button class="btn sec" data-act="cf-ed">Editar a lista</button><button class="btn" data-act="cf-imp" ${ns.length?'':'disabled'}>${F.emit?'Imprimir de novo':'Imprimir folha'}</button>`);
-    if(C.ed) return head+editor(c);
-    if(!ns.length) return head+`<section class="card"><div class="empty"><b>Ainda não tem a lista do café</b><span>Cole os nomes ou importe a planilha do café (uma aba por dia; os títulos em MAIÚSCULAS viram os grupos).</span><span><button class="btn" data-act="cf-ed">Montar a lista</button></span></div></section>`;
-    const prev=`<div class="cf-pv"><div class="cf-pvh"><b>Como vai sair</b><span>com as marcas pretas para conferir pela foto</span></div><table><thead><tr><th colspan="2">${esc(titulo(c,d))}</th></tr><tr class="hd"><th>Nome</th><th>Assinatura</th></tr></thead><tbody>${G.map(g=>{ const xs=g.ns.filter(n=>!(F.tirar||{})[n]); return xs.length||!g.ns.length?`${g.g?`<tr class="gr"><td colspan="2">${esc(g.g)}</td></tr>`:''}${xs.map(n=>`<tr class="${F.nv[n]?'cz':''}"><td>${esc(n)}</td><td>${F.nv[n]?esc(F.nv[n]):''}</td></tr>`).join('')}`:''; }).join('')}</tbody></table></div>`;
-    return head+`<div class="cf-gr">${conf(c,d)}
-      <div class="cf-r">${foto(c,d)}<section class="card">${prev}</section></div></div>`; }
+    return c.topo('Folha do café',`${dsem(d)}, ${br(d)} · fica também em Almoço › Por dia`,nav)+painel(c,d); }
   function foto(c,d){ const esc=c.esc, F=est(c,d), R=ffE(d);
     const inp=l=>`<label class="btn ${l?'sec':''}">${l||'Tirar ou escolher a foto'}<input type="file" accept="image/*" multiple hidden data-cf-foto="1"></label>`;
     const cab=`<h2>Conferir pela foto da folha assinada</h2><div class="sub" style="margin:0 0 10px">Uma foto por folha, de frente, com as 4 marcas pretas aparecendo. O painel vê em quais linhas tem assinatura${faceCafe(d)?' e compara com quem passou no refeitório de manhã (Face ID)':''}.</div>`;
-    if(!F.emit||!F.emit.vs) return `<section class="card cf-ff">${cab}<div class="cf-info">Imprima a folha por aqui primeiro: ela sai com as marcas que a foto precisa.</div></section>`;
-    if(R.lendo) return `<section class="card cf-ff">${cab}<div class="cf-info">Lendo a foto…</div></section>`;
+    if(!F.emit||!F.emit.vs) return `<section class="alm-ff cf-ff">${cab}<div class="cf-info">Imprima a folha por aqui primeiro: ela sai com as marcas que a foto precisa.</div></section>`;
+    if(R.lendo) return `<section class="alm-ff cf-ff">${cab}<div class="cf-info">Lendo a foto…</div></section>`;
     const err=R.erros.length?`<div class="cf-err">${R.erros.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`:'';
-    const a=ass(c,d), ns=Object.keys(a); if(!ns.length) return `<section class="card cf-ff">${cab}${err}${inp()}</section>`;
+    const a=ass(c,d), ns=Object.keys(a); if(!ns.length) return `<section class="alm-ff cf-ff">${cab}${err}${inp()}</section>`;
     const fc=faceCafe(d), passou=n=>{ if(!fc) return null; const xs=fc.filter(x=>mesma(n,x.n)); return xs.length?xs.some(x=>x.c):null; }; /* null = não está no Face ID do dia (terceiro, motorista…): não compara */
     const g={sim:[],nao:[],duv:[]}; ns.forEach(n=>{ if(g[a[n]]) g[a[n]].push(n); });
     const semFace=fc?g.sim.filter(n=>passou(n)===false):[], semAss=fc?g.nao.filter(n=>passou(n)===true):[];
@@ -118,7 +127,7 @@
     const pend=tot&&lidas.length&&lidas.length<tot?`<div class="cf-info">Falta a foto da ${Array.from({length:tot},(_,i)=>i).filter(i=>!R.res[i]).map(i=>'folha '+(i+1)).join(', ')}.</div>`:'';
     const salvo=F.foto&&!lidas.length&&!Object.keys(R.man).length?`<div class="cf-info">Conferida em ${esc(new Date(F.foto.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))}${F.foto.por?' por '+esc(F.foto.por):''}.${(F.foto.fotos||[]).map((u,i)=>u?` <a href="${esc(u)}" target="_blank" rel="noopener">Ver foto ${i+1}</a>`:'').join('')}</div>`:'';
     const vistas=lidas.map(p=>`<figure><img src="${R.res[p].vista}" alt="Foto da folha ${p+1}"><figcaption>Folha ${p+1}: verde = assinou · vermelho = em branco · laranja = conferir</figcaption></figure>`).join('');
-    return `<section class="card cf-ff">${cab}${err}${salvo}${pend}<div class="cf-k"><span><b>${g.sim.length}</b> assinaram</span><span><b>${g.nao.length}</b> em branco</span>${g.duv.length?`<span class="w"><b>${g.duv.length}</b> para conferir</span>`:''}</div>
+    return `<section class="alm-ff cf-ff">${cab}${err}${salvo}${pend}<div class="cf-k"><span><b>${g.sim.length}</b> assinaram</span><span><b>${g.nao.length}</b> em branco</span>${g.duv.length?`<span class="w"><b>${g.duv.length}</b> para conferir</span>`:''}</div>
       ${bl('Assinaram, mas não passaram no refeitório de manhã',semFace,'Estavam na empresa pelo Face ID. Pode ser que o leitor do refeitório não pegou.')}${bl('Passaram no refeitório de manhã, mas a linha está em branco',semAss,'Confira na folha: pode ter esquecido de assinar.')}
       ${bl('Traço fraco · confira na folha',g.duv,'Toque no nome: assinou ↔ em branco.')}${bl('Em branco',g.nao.filter(n=>!semAss.includes(n)),'')}
       <details class="cf-d"><summary>Assinaram (${g.sim.length})</summary><div>${g.sim.map(chip).join('')}</div></details>${vistas?`<div class="cf-v">${vistas}</div>`:''}
@@ -137,6 +146,7 @@
     if(a==='cf-dia'){ C.dia=maisDia(d,+b.dataset.v); c.P.render(); return; }
     if(a==='cf-hoje'){ C.dia=hoje(); c.P.render(); return; }
     if(a==='cf-imp'){ imprimir(c,d); return; }
+    if(a==='cf-abre'){ C.ab=true; c.P.render(); return; } if(a==='cf-fecha'){ C.ab=false; c.P.render(); return; }
     if(a==='cf-ed'){ C.ed={txt:linhas(c).join('\n')}; c.P.render(); return; }
     if(a==='cf-edx'){ C.ed=null; C.abas=null; C.wb=null; c.P.render(); return; }
     if(a==='cf-eds'){ const ta=document.getElementById('cf-ta'); if(ta) C.ed.txt=ta.value; const ls=C.ed.txt.split('\n').map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
@@ -149,6 +159,7 @@
       if(F.emit) F.emit.mudou=true; salvar(c,d); c.P.render(); const i=document.getElementById('cf-fbusca'); if(i&&C.fbusca){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } return; }
     if(a==='cf-tg'){ const n=b.dataset.n, cur=ass(c,d)[n]; ffE(d).man[n]=cur==='sim'?'nao':'sim'; c.P.render(); return; }
     if(a==='cf-ffsalva'){ b.disabled=true; await salvarFoto(c,d); return; } });
+  document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&C.ab&&C.ctx){ C.ab=false; C.ctx.P.render(); } });
   document.addEventListener('change',ev=>{ const t=ev.target, c=C.ctx; if(!t||!c) return; const d=C.dia;
     if(t.id==='cf-dia'&&/^\d{4}-\d\d-\d\d$/.test(t.value)){ C.dia=t.value; c.P.render(); return; }
     if(t.dataset&&t.dataset.cfNv!=null){ const F=est(c,d); if(t.checked) F.nv[t.dataset.cfNv]=t.dataset.mot||'Não veio'; else delete F.nv[t.dataset.cfNv]; if(F.emit) F.emit.mudou=true; salvar(c,d); c.P.render(); return; }
@@ -160,7 +171,7 @@
   document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='cf-fbusca'&&C.ctx){ C.fbusca=t.value; const r=document.getElementById('cf-fres'); if(r) r.innerHTML=busca(C.ctx,C.dia); return; } if(!t||t.id!=='cf-ta'||!C.ed) return; C.ed.txt=t.value; const G=grupos(t.value.split('\n')), el=document.getElementById('cf-edn'); if(el) el.textContent=G.filter(g=>g.g).length+' grupos · '+G.reduce((a,g)=>a+g.ns.length,0)+' nomes'; });
   const css=document.createElement('style'); css.textContent=`
   .cf-nav{display:inline-flex;gap:6px;align-items:center}.cf-nav input{width:auto;height:38px}
-  .cf-gr{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:16px;align-items:start}.cf-gr .card{margin:0 0 16px}.cf-l .alm-fks{max-height:none}.cf-l h2,.cf-ff h2,.cf-ed h2{margin:0 0 4px;font-size:17px}
+  .cf-gr{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:16px;align-items:start}.cf-gr .card{margin:0 0 16px}.cf-bar{margin-top:12px}.alm-fml .cf-ff{margin-bottom:12px}.alm-fml .cf-ed{box-shadow:none;padding:0;margin:10px 0}.cf-l .alm-fks{max-height:none}.cf-l h2,.cf-ff h2,.cf-ed h2{margin:0 0 4px;font-size:17px}
   .cf-ls{display:flex;flex-direction:column}.cf-g{font-size:11.5px;font-weight:600;letter-spacing:.08em;color:var(--muted);padding:12px 0 4px;border-bottom:1px solid var(--line)}
   .cf-p{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}.cf-p span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cf-p small{color:var(--muted);font-size:12.5px}.cf-p.nv span{color:var(--muted);text-decoration:line-through}
   .cf-em{font-size:13px;color:var(--muted);margin:0 0 8px}.cf-em.mud{color:var(--crit);}
@@ -174,5 +185,5 @@
   .cf-a{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.cf-edb{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}.cf-aba{display:flex;gap:6px;align-items:center;font-size:13.5px}.cf-aba select{width:auto}
   .cf-ta{width:100%;font-family:inherit;font-size:14px;line-height:1.5;min-height:360px}.cf-edr{display:flex;gap:8px;align-items:center;margin-top:10px}
   @media (max-width:900px){ .cf-gr{grid-template-columns:minmax(0,1fr)} }`; document.head.appendChild(css);
-  window.RHCafe={render,_C:C,_grupos:grupos,_mesma:mesma,_pessoas:pessoas};
+  window.RHCafe={render,painel,_C:C,_grupos:grupos,_mesma:mesma,_pessoas:pessoas};
 })();

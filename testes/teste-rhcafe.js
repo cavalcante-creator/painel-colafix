@@ -12,8 +12,10 @@ const TXT=['ADM / EXPEDIÇÃO',...G1,'PROD/ALMOX/MANUT',...G2,'MOTORISTAS',...MO
   D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ANA ALVES'},'22222222222':{n:'BRUNO BORGES'},'33333333333':{n:'CARLA COSTA'}},dias:{[hj]:{'11111111111':{p:1,c:'07:20',t:['07:10:00 Portaria','07:20:00 REFEITÓRIO']},'22222222222':{p:1,t:['07:12:00 Portaria']}}},imp:[]};
   const B=await H.abrir({viewport:{width:1440,height:1100}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
   await p.evaluate(()=>__T.go('rhcafe')); await H.dorme(1000);
-  ok('Folha do café sem lista: pede para montar a lista', /Ainda não tem a lista do café/.test(await p.evaluate(()=>document.getElementById('view').innerText)));
-  await p.click('#view [data-act="cf-ed"]'); await H.dorme(300); await p.fill('#cf-ta',TXT); await H.dorme(200);
+  ok('Faixa do café igual à do almoço (falta montar a lista)', /Folha de assinatura do café .*falta montar a lista fixa/s.test(await p.evaluate(()=>document.querySelector('.cf-bar').innerText)));
+  await p.click('[data-act="cf-abre"]'); await H.dorme(500);
+  ok('Janela da folha do café (como a do almoço): sem lista, pede para montar', await p.evaluate(()=>!!document.querySelector('.alm-fm .alm-fml .cf-l')&&!!document.querySelector('.alm-fm .alm-fmr #alm-fmk')&&/Ainda não tem a lista do café/.test(document.querySelector('.alm-fm').innerText)));
+  await p.click('.alm-fm [data-act="cf-ed"]'); await H.dorme(300); await p.fill('#cf-ta',TXT); await H.dorme(200);
   const cont=await p.evaluate(()=>document.getElementById('cf-edn').innerText);
   await p.click('[data-act="cf-eds"]'); await H.dorme(800);
   const cfg=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/config'].cafe);
@@ -60,12 +62,14 @@ const TXT=['ADM / EXPEDIÇÃO',...G1,'PROD/ALMOX/MANUT',...G2,'MOTORISTAS',...MO
   ok('"Guardar conferência" grava quem assinou e as fotos', fo&&fo.n.sim===alvo.size&&fo.fotos.filter(Boolean).length===2, JSON.stringify(fo&&{n:fo.n,fotos:fo.fotos.length}));
   await p.click('[data-act="cf-nvx"][data-n="'+G2[2]+'"]'); await H.dorme(600);
   ok('Mudou depois de imprimir: avisa para imprimir de novo', /Marcação alterada depois de emitida/.test(await p.evaluate(()=>document.querySelector('.cf-l').innerText)));
-  await p.click('[data-act="cf-dia"][data-v="-1"]'); await H.dorme(800);
+  await p.click('[data-act="cf-fecha"]'); await H.dorme(300); await p.click('[data-act="cf-dia"][data-v="-1"]'); await H.dorme(800); await p.click('[data-act="cf-abre"]'); await H.dorme(500);
   const q1=await p.evaluate(()=>document.querySelector('.cf-l').innerText.replace(/\s+/g,' '));
   await p.click('[data-act="cf-sem"]'); await H.dorme(600); const q2=await p.evaluate(()=>document.querySelector('.cf-l').innerText.replace(/\s+/g,' '));
   ok('Dia sem Face ID: pergunta se o CSV foi importado; "Emitir sem conferir" segue', /CSV do Face ID de .* já foi importado/.test(q1)&&/Importar o CSV agora/.test(q1)&&!/já foi importado/.test(q2)&&/Imprimir folha/.test(q2), q1.slice(0,200)+' || '+q2.slice(0,200));
   /* a foto do café na tela do almoço é recusada */
+  await p.click('[data-act="cf-fecha"]'); await H.dorme(400);
   await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(600); await p.evaluate(x=>{ const a=window.RHAlmoco._A; a.vis='dia'; a.dia=x; a.folhaAb=true; },hj); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(1200);
+  ok('Almoço › Por dia tem também a faixa da folha do café', await p.evaluate(()=>!!document.querySelector('.alm-v2r .cf-bar [data-act="cf-abre"]')));
   const pop2=p.context().waitForEvent('page'); await p.click('[data-act="alm-folha"]'); const w2=await pop2; await w2.waitForLoadState(); await w2.close(); await H.dorme(800);
   await p.setInputFiles('.alm-ff [data-alm-ffoto]',[f1]); for(let i=0;i<40;i++){ await H.dorme(400); if(await p.evaluate(()=>/folha do café/.test((document.querySelector('.alm-ff')||{}).innerText||''))) break; }
   ok('Foto da folha do café mandada no Almoço: avisa que é a folha do café', await p.evaluate(()=>/folha do café/.test((document.querySelector('.alm-ff')||{}).innerText||'')));
