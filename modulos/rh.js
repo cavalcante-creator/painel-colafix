@@ -1803,7 +1803,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     rhvagas:{nome:'Admissões e vagas',mob:'Admissões',render:vAdmVagas},
     rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>{ R.fview='terc'; R.pess=null; return vTerc(true); }},
     rhpres:{nome:'Quem está hoje',mob:'Hoje',render:vPresRH},
-    rhcafe:{nome:'Folha do café',mob:'Café',render:()=>window.RHCafe?window.RHCafe.render({P,R,esc,eu,topo,carregarJs,guardar:guardarArqRH,almCtx}):'<section class="card">Carregando…</section>'},
+    rhcafe:{nome:'Folha do café',mob:'Café',render:()=>{ setTimeout(()=>P.go('rhalmoco'),0); return '<section class="card">Abrindo Almoço/café…</section>'; }},
     rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
     rhferias:{nome:'Férias',mob:'Férias',render:()=>{ if(!['ferias','mapa'].includes(R.pzv)) R.pzv='ferias'; return vFerias(); }},
     rhatest:{nome:'Atestados e faltas',mob:'Atestados',render:()=>topo('Atestados e faltas','Atestado, declaração de horas e faltas de cada pessoa. Entra sozinho no fechamento da folha, na presença e no almoço.','','RH · ATESTADOS E FALTAS')+(window.RHAtest?RHAtest.render(Object.assign(atCtx(),{semTitulo:true})):'<section class="card">Carregando…</section>')},
