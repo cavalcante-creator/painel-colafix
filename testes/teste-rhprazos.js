@@ -25,7 +25,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
 
   // férias
   await p.click('.rh-av:has-text("Férias: ANA SOUZA") [data-act="rh-pzabrir"]'); await H.dorme(300);
-  const v1=await view(); const sit=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr')].map(r=>[(r.querySelector('.rh-pjn')||r.querySelector('b')).innerText,r.querySelector('.pill').innerText])));
+  const v1=await view(); const sit=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.rh-tf tbody tr:not([hidden])')].map(r=>[(r.querySelector('.rh-pjn')||r.querySelector('b')).innerText,r.querySelector('.pill').innerText])));
   ok('Férias (CLT): só quem precisa de atenção, com o prazo certo (inclui "passou do dia de avisar")', /^(Conceder em até 9 dias|Passou do dia de avisar)/.test(sit['ANA SOUZA']||'')&&/^Prazo vencido há/.test(sit['CARLOS LIMA'])&&!sit['BRUNO ROCHA']&&!sit['PEDRO ALVES'], JSON.stringify(sit));
   await p.click('[data-act="rh-pzfil"][data-v="todos"]'); const bruno=await p.evaluate(()=>[...document.querySelectorAll('.rh-tf tbody tr')].find(r=>/BRUNO/.test(r.innerText)).innerText);
   ok('"Todos os CLT": quem está em aquisição aparece em dia', /em aquisição/.test(bruno)&&/Em dia/.test(bruno), bruno.replace(/\n/g,' '));

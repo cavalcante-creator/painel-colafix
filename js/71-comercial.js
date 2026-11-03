@@ -46,7 +46,7 @@ function cmDesc(c){ const it=(((S.anl.base||{}).itens||{}).l||{})[c]||{}; return
 function cmLnDe(c){ const it=(((S.anl.base||{}).itens||{}).l||{})[c]||{}; return cmLinha({linhas:anlLinhasDe(c,it)}); }
 function cmFiltrando(){ const f=S.cm.f; return !!(f.ln||f.fam||f.emb||f.q); }
 function cmOk(c,d){ const f=S.cm.f; if(!cmFiltrando()) return true; d=d||cmDesc(c);
-  if(f.ln&&cmLnDe(c)!==f.ln) return false; if(f.fam&&eswFam(d)!==f.fam) return false; if(f.emb&&eswEmb(d)!==f.emb) return false;
+  if(f.ln&&cmLnDe(c)!==f.ln) return false; if(f.fam&&eswFam(d,c)!==f.fam) return false; if(f.emb&&eswEmb(d)!==f.emb) return false;
   if(f.q){ const t=anlNorm(c+' '+d); if(!anlNorm(f.q).split(/\s+/).filter(Boolean).every(w=>t.includes(w))) return false; } return true; }
 /* exportação (RE…, ou "EXPORTAÇÃO" na descrição): não tem previsão do comercial — fica fora do erro da previsão, mas conta como produção (peso) */
 function cmExp(c,d){ return /^RE\d/.test(c)||/EXPORTA/i.test(d||cmDesc(c)); }
@@ -133,10 +133,10 @@ function cmFrases(X){ const a=X.s1, b=X.s2, c=X.s3, d=X.s4, ref=X.F.fechado?'':'
 function cmBarra(cp){ const f=S.cm.f, B=S.anl.base||{}, pm=((B.prev||{}).mes||{})[cp]||{}, V=(B.vendas||{}).mensal||{};
   const cods=[...new Set(Object.keys(pm).concat(Object.keys(V).filter(c=>V[c][cp])))].filter(c=>!cmInt(c)&&!/ENSACAD|PREMIX|NIVELAD/i.test(cmDesc(c)));
   const lns=[...new Set(cods.map(cmLnDe))], LO=linhasOrd(); lns.sort((a,b)=>{ const i=x=>{ const k=LO.indexOf(x); return k<0?99:k; }; return i(a)-i(b)||a.localeCompare(b); });
-  const fams=[...new Set(cods.map(c=>eswFam(cmDesc(c))))].sort(), embs=[...new Set(cods.map(c=>eswEmb(cmDesc(c))))].sort();
-  const sel=(k,rot,ops)=>`<label class="cm-fl${f[k]?' on':''}"><span>${rot}</span><select class="txt" data-cmf="${k}"><option value="">Todas</option>${ops.map(o=>`<option ${f[k]===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  const famT=new Set(cods.map(c=>eswFam(cmDesc(c),c))), fams=ESW_FAMO.filter(k=>famT.has(k)), embs=[...new Set(cods.map(c=>eswEmb(cmDesc(c))))].sort();
+  const sel=(k,rot,ops,nm)=>`<label class="cm-fl${f[k]?' on':''}"><span>${rot}</span><select class="txt" data-cmf="${k}"><option value="">Todas</option>${ops.map(o=>`<option value="${esc(o)}" ${f[k]===o?'selected':''}>${esc(nm?nm(o):o)}</option>`).join('')}</select></label>`;
   return `<section class="card cm-fb"><label class="srch cm-busca">${ic('lupa',16,2)}<input class="txt" id="cm-q" value="${esc(f.q)}" placeholder="Buscar código ou produto (Enter)" autocomplete="off"></label>
-    ${sel('ln','Linha',lns)}${sel('fam','Família',fams)}${sel('emb','Embalagem',embs)}
+    ${sel('ln','Linha',lns)}${sel('fam','Família',fams,eswFamN)}${sel('emb','Embalagem',embs)}
     ${cmFiltrando()?`<button class="lnk" data-act="cm-limpar">Limpar filtros</button>`:''}</section>`; }
 function vAnlCom(){ const A=S.cm; const ms=cmMeses(); if(!A.cp||!ms.includes(A.cp)) A.cp=ms[0]||hojeStr().slice(0,7);
   let head=`<div class="head"><div><div class="eyebrow">ANÁLISE PCP · ${esc(cmMesNome(A.cp).toUpperCase())}</div><h1>Produção × Comercial</h1>

@@ -928,14 +928,16 @@ function anlAptDados(dias){ const V=S.anl.base.vendas||{}, D=V.diario||{}; const
   const an=anuladas(), porCod={}; const lin=(c)=>porCod[c]=porCod[c]||{c,painel:0,sis:0,dia:{}};
   S.entregas.forEach(e=>{ if(e.anula||an.has(e._id)||!e.em) return; const d=hojeStr(new Date(e.em)); if(d<ini||d>fim) return; const o=ordById(e.ordem)||(S.ritOrdX||{})[e.ordem]; if(!o){ if(typeof ritFaltaOrdem==='function') ritFaltaOrdem(e.ordem); return; } const x=lin(codigoDe(o)); const q=+e.qtd||0; x.painel+=q; (x.dia[d]=x.dia[d]||[0,0])[0]+=q; });
   for(const c in D) for(const d in D[c]){ if(d<ini||d>fim) continue; const q=D[c][d][0]||0; if(!q) continue; const x=lin(c); x.sis+=q; (x.dia[d]=x.dia[d]||[0,0])[1]+=q; }
-  const rows=Object.values(porCod).map(x=>Object.assign(x,{dif:x.painel-x.sis})).filter(x=>x.painel||x.sis).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif));
+  const rows=Object.values(porCod).map(x=>Object.assign(x,{dif:x.painel-x.sis})).filter(x=>(x.painel||x.sis)&&!anlAptFora(x.c)).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif));
   return {ini,fim,rows}; }
+/* 03/11: Painel × sistema só com material de linha (sem premix, ensacado e nivelador) */
+function anlAptFora(c){ const d=(((S.anl.base.itens||{}).l||{})[c]||{}).d||((itemDe(c)||{}).descricao)||''; return /^M\d/.test(c)||/PREMIX|ENSACAD|NIVELAD/i.test(d); }
 function vAnlApt(R){ const A=S.anl, dd=A.aptDias||7; const X=anlAptDados(dd); const I=(S.anl.base.itens||{}).l||{};
   const tol=r=>Math.abs(r.dif)<=Math.max(1,0.02*Math.max(r.painel,r.sis));
   let rows=X.rows; if(A.aptSo!==false) rows=rows.filter(r=>!tol(r));
   const tp=X.rows.reduce((a,r)=>a+r.painel,0), ts=X.rows.reduce((a,r)=>a+r.sis,0);
   const ds=[]; for(let d=X.ini;d<=X.fim;d=addDias(d,1)) if(anlUtil(d)) ds.push(d);
-  return `${anlHead('Painel × sistema','Compara o que foi lançado como entrega no painel com a produção apontada no Focco (EPP do Extrato), por item. Serve para achar o que ficou sem apontar no sistema, ou apontado a mais.',`<div class="seg">${[7,14,30].map(v=>`<button data-act="anl-aptd" data-v="${v}" aria-pressed="${dd===v}">${v} dias</button>`).join('')}</div>`)}
+  return `${anlHead('Painel × sistema','Compara o que foi lançado como entrega no painel com a produção apontada no Focco (EPP do Extrato), por item. Só material de linha: premix, ensacado e nivelador ficam de fora. Serve para achar o que ficou sem apontar no sistema, ou apontado a mais.',`<div class="seg">${[7,14,30].map(v=>`<button data-act="anl-aptd" data-v="${v}" aria-pressed="${dd===v}">${v} dias</button>`).join('')}</div>`)}
   <div class="resumo"><div><div class="k">Período</div><div class="v num">${dm(X.ini)} a ${dm(X.fim)}</div><small class="sub" style="margin:0;font-size:12px">até o último dia do Extrato</small></div>
    <div><div class="k">Lançado no painel</div><div class="v num">${anlN(tp)}</div></div><div><div class="k">Apontado no sistema</div><div class="v num">${anlN(ts)}</div></div>
    <div><div class="k">Itens com diferença</div><div class="v num ${X.rows.filter(r=>!tol(r)).length?'warn':'ok'}">${X.rows.filter(r=>!tol(r)).length}</div><small class="sub" style="margin:0;font-size:12px">tolerância de 2%</small></div></div>

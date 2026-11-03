@@ -16,7 +16,11 @@ const ESW_SIT=[['acao','Pede ação'],['hoje','Agir hoje'],['semana','Esta seman
 const eswF1=v=>(Math.round(v*10)/10).toFixed(1).replace('.',',');
 const eswSemTxt=v=>{ const a=Math.abs(v); return eswF1(a)+' semana'+(Math.round(a*10)/10>=2?'s':''); };
 /* ---------- classificação de cada linha da tabela ---------- */
-function eswFam(d){ const s=String(d||'').toUpperCase(); const m=s.match(/\bAC\s*-?\s*(III|II|I|[123])\b/); if(m) return 'AC'+({I:'1',II:'2',III:'3'}[m[1]]||m[1]); if(/\bPIC\b/.test(s)) return 'PIC'; return 'Outros'; }
+/* 03/11: família pelo começo do código (RA acrílico, RS siliconizado, RF flexível, RE exportação, IP imper, CL cola), senão pela descrição */
+const ESW_FAMC={RA:'RA · Rejunte acrílico',RS:'RS · Rejunte siliconizado',RF:'RF · Rejunte flexível',RE:'RE · Exportação',IP:'IP · Impermeabilizante',CL:'CL · Cola'};
+const ESW_FAMO=['AC1','AC2','AC3','PIC','RA','RS','RF','RE','IP','CL','Outros'];
+const eswFamN=k=>ESW_FAMC[k]||k;
+function eswFam(d,c){ const p=String(c||'').toUpperCase().slice(0,2); if(ESW_FAMC[p]) return p; const s=String(d||'').toUpperCase(); const m=s.match(/\bAC\s*-?\s*(III|II|I|[123])\b/); if(m) return 'AC'+({I:'1',II:'2',III:'3'}[m[1]]||m[1]); if(/\bPIC\b/.test(s)) return 'PIC'; return 'Outros'; }
 function eswEmb(d){ const s=String(d||'').toUpperCase(); if(/PL[AÁ]STIC/.test(s)) return 'Plástica'; if(/PAPEL/.test(s)) return 'Papel'; return 'Outra'; }
 function eswGrupo(r){ if(r.int) return 'calma'; const rup=r.rup!==null&&r.rup!==undefined&&r.dem&&!r.enc;
   if(r.sit2==='ZERADO'||r.sit2==='ENC_FALTA'||(rup&&r.rup<=1)) return 'hoje'; if(rup&&r.rup<=7) return 'semana'; return 'calma'; }
@@ -25,7 +29,7 @@ function eswSemanas(){ const h=hojeStr(), cp=h.slice(0,7), ini=cp+'-01', y=+cp.s
   return {cp,ini,prox,dt:tot,du:ate,s:4*ate/tot,n:Math.max(1,Math.min(4,Math.ceil(4*ate/tot-1e-9)))}; }
 function eswCalc(r,W){ if(r._esw) return r._esw; const meta=r.pvm>0?r.pvm/4:0; const tinha=r.pvT==null?0:r.pvT, feito=r.pvF||0;
   const o={meta,tinha,feito,pos:meta?(tinha+feito)/meta-W.s:null,cobre:meta?Math.max(0,r.tot)/meta:null,pedS:meta&&r.dc>0?r.dc/meta:null,
-    acima:!r.int&&r.dc>0&&r.dc>Math.max(0,r.tot),faltaAt:Math.max(0,(r.dc||0)-Math.max(0,r.tot)),fam:eswFam(r.d),emb:eswEmb(r.d),g:eswGrupo(r)};
+    acima:!r.int&&r.dc>0&&r.dc>Math.max(0,r.tot),faltaAt:Math.max(0,(r.dc||0)-Math.max(0,r.tot)),fam:eswFam(r.d,r.c),emb:eswEmb(r.d),g:eswGrupo(r)};
   o.dev=meta?meta*W.s:null; o.tem=tinha+feito; o.difS=meta?o.tem-o.dev:null; r.sem=o.pos==null?99:o.pos;
   r._esw=o; return o; }
 /* coluna "Até hoje na semana" e cor da linha pela semana (pedido de 26/10 16:50) */
@@ -82,13 +86,13 @@ function eswTopo(W,Rz,va){ const at=((S.anl.base.itens||{}).atual)||{}, sa=at.SA
   const nv=(va||[]).length;
   return `<div class="head esw-hd"><div><div class="eyebrow">ANÁLISE PCP · ${m.toUpperCase()}, ${W.n}ª SEMANA</div><h1>O que precisa produzir</h1><div class="sub">Atualizado ${sa?dm(sa.slice(0,10))+(sa.length>10?' às '+sa.slice(11,16):''):'—'}${pos}</div></div>
     <button class="btn sec esw-rb" data-act="esw-res" aria-expanded="${!!S.esw.res}">${ic('grafico',16,2)}Resumo, Curva S, PDF e Excel${nv?`<span class="esw-rbn" title="Venderam mais que o previsto">${nv}</span>`:''}</button></div>`; }
-function eswFiltros(all,n,tot){ const E=S.esw, F=S.anl.es||{}; const famO=['AC1','AC2','AC3','PIC'].concat(all.some(r=>eswFam(r.d)==='Outros')?['Outros']:[]), embO=['Papel','Plástica'].concat(all.some(r=>eswEmb(r.d)==='Outra')?['Outra']:[]);
+function eswFiltros(all,n,tot){ const E=S.esw, F=S.anl.es||{}; const famT=new Set(all.map(r=>eswFam(r.d,r.c))), famO=ESW_FAMO.filter(k=>famT.has(k)||(k.startsWith('AC')||k==='PIC')), embO=['Papel','Plástica'].concat(all.some(r=>eswEmb(r.d)==='Outra')?['Outra']:[]);
   const sel=(k,rot,ops,def)=>`<label class="esw-sl ${E[k]!==def?'on':''}"><span>${rot}</span><select data-esw="${k}">${ops.map(([v,l])=>`<option value="${esc(v)}" ${E[k]===v?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
   const L=[['','Todas as linhas']].concat(linhasOrd().map(l=>[l,l]));
   const muda=E.sit!=='acao'||E.fam||E.emb||E.tipo||F.linha||F.q||(F.vis&&F.vis!=='principal')||F.cob||F.dp;
   return `<section class="card esw-fil"><div class="seg esw-ln" role="group" aria-label="Linha">${L.map(([v,l])=>`<button data-act="esw-ln" data-v="${esc(v)}" aria-pressed="${(F.linha||'')===v}">${esc(l)}</button>`).join('')}</div>
     <label class="srch esw-q">${ic('lupa',16,2)}<input class="txt" id="anl-esq" value="${esc(F.q||'')}" placeholder="Procurar código ou produto" autocomplete="off" aria-label="Procurar código ou produto"></label>
-    ${sel('sit','Situação',ESW_SIT,'acao')}${sel('fam','Família',[['','Todas']].concat(famO.map(x=>[x,x])),'')}${sel('emb','Embalagem',[['','Todas']].concat(embO.map(x=>[x,x])),'')}${sel('tipo','Tipo',[['','Todos'],['est','Estoque'],['enc','Sob encomenda']],'')}
+    ${sel('sit','Situação',ESW_SIT,'acao')}${sel('fam','Família',[['','Todas']].concat(famO.map(x=>[x,eswFamN(x)])),'')}${sel('emb','Embalagem',[['','Todas']].concat(embO.map(x=>[x,x])),'')}${sel('tipo','Tipo',[['','Todos'],['est','Estoque'],['enc','Sob encomenda']],'')}
     <button class="esw-mf ${E.mais?'on':''}" data-act="esw-mais" aria-expanded="${E.mais}">Mais filtros</button>
     <span class="esw-n num">${n} de ${tot} itens${muda?` · <button class="lnk" data-act="esw-limpar">Limpar</button>`:''}</span></section>`; }
 function eswResumo(esc,W){ const xs=esc.map(r=>({r,o:eswCalc(r,W)})), cp=xs.filter(x=>x.o.meta>0);
