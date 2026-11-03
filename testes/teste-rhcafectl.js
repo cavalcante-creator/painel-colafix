@@ -48,4 +48,11 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
   ok('Fechamento do café só com quem está na folha; almoço com todos', fe3&&!fe3.cafe['33333333333']&&fe3.cafe['11111111111']&&fe3.alm['33333333333'], JSON.stringify(fe3&&{c:Object.keys(fe3.cafe),a:Object.keys(fe3.alm)}));
   await p.click('.alm-ref [data-v="alm"]').catch(()=>{}); await H.dorme(600);
   ok('Almoço com a lista do café continua mostrando a Carla', /CARLA|Carla/i.test(await p.evaluate(()=>document.getElementById('view').innerText)));
+  /* almoço também: com a lista do almoço (Ana e Carla), o Bruno sai do almoço */
+  await p.evaluate(async()=>{ const db=window.Painel.db(); const g=await db.doc('rh/config').get(); const x=g.data()||{}; await db.doc('rh/config').set(Object.assign({},x,{almoco:Object.assign({},x.almoco||{},{listaFolha:['Ana Souza','Carla Dias']})})); });
+  await H.dorme(800); await abre(); await p.click('.alm-ref [data-v="alm"]').catch(()=>{}); await H.dorme(800);
+  const fe4=await p.evaluate(m=>window.RHAlmoco.fechamento(window.RHAlmoco._A.ctx,m),m);
+  ok('Almoço com lista: só Ana e Carla no almoço; café segue a lista do café', fe4&&Object.keys(fe4.alm).sort().join()==='11111111111,33333333333'&&Object.keys(fe4.cafe).sort().join()==='11111111111,22222222222', JSON.stringify(fe4&&{a:Object.keys(fe4.alm),c:Object.keys(fe4.cafe)}));
+  const t4=await p.evaluate(()=>document.querySelector('.alm-dt').innerText.replace(/\s+/g,' '));
+  ok('Almoço por dia com lista: 1 almoçou (Ana), Carla sem justificativa', /1 almo/.test(t4)&&/1 sem justificativa/.test(t4), t4);
   console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
