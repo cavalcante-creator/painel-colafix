@@ -11,6 +11,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const chs=async()=>Object.entries(await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs)).filter(([k])=>k.startsWith('chamados/')).map(([k,v])=>v);
  /* tela das folhas */
  await p.evaluate(()=>__T.go('manqr')); await H.dorme(800); await p.click('[data-act="cb-modo"][data-v="bipe"]'); await H.dorme(800);
+ await p.click('[data-act="evb-lay"][data-v="folha"]'); await p.click('[data-act="evb-fmt"][data-v="qr"]'); await H.dorme(500);
  let s=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Tela "Folhas do coletor": lista as linhas e máquinas e mostra a folha com os 10 QR', /Folhas do coletor/.test(s)&&/Quais folhas/.test(s)&&/Misturador/.test(s)&&(await p.$$('.ev-folha .ev-cod')).length>=10&&/Problema elétrico[\s\S]*Desfazer/.test(s));
  const c0=(await chs()).length; await bip('EV-ELE-LINHA1'); s=await p.evaluate(()=>document.getElementById('view').innerText);

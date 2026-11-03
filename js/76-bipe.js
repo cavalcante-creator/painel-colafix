@@ -160,3 +160,89 @@ document.head.insertAdjacentHTML('beforeend',`<style id="ev-css">
 .ev-qr svg{width:92px;height:92px;display:block}.ev-cod small{display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:#777}.ev-cod b{display:block;font-size:16px}.ev-cod em{display:block;font-style:normal;font-size:12px;color:#666}
 @media (max-width:900px){ .ev-grid{grid-template-columns:minmax(0,1fr)} .ev-cods{grid-template-columns:minmax(0,1fr)} }
 </style>`);
+
+/* ===================== ADESIVOS COM CÓDIGO DE BARRAS (03/11, pedido: "dificuldade na adesão do computador dos chamados;
+   adesivos com os problemas que já abrem direto, em código de barras para bipar") =====================
+   Na aba "Folhas do coletor": Código (Código de barras · QR) e Imprimir como (Adesivos, um por problema · Folha A4 com o quadro),
+   lembrados no aparelho. Adesivos: A4 com 10 etiquetas de 93 × 53 mm (linhas de corte), escolhendo quais itens imprimir.
+   Barras Code 128 (pdfCode128 do js/08) com o MESMO texto do QR (EV-<EVT>-<LINHA>[-<MAQ>]), só que o código da máquina
+   vai curto (o menor começo do código dela que não se repete na linha, mín. 4) para as barras ficarem largas.
+   evLer passa a aceitar o código da máquina pelo começo (só se for um só). */
+const EVB_PREF=k=>{ try{ return localStorage.getItem('colafix.ev.'+k)||''; }catch(e){ return ''; } };
+S.ev.fmt=EVB_PREF('fmt')||'barras'; S.ev.lay=EVB_PREF('lay')||'adesivo'; S.ev.tipos=null;
+function evbTipos(){ if(!S.ev.tipos){ S.ev.tipos={}; EV_TIPOS.forEach(t=>S.ev.tipos[t[0]]=true); S.ev.tipos.DES=true; } return S.ev.tipos; }
+function evEquipCurto(e,l){ const k=evEquipKey(e), outros=(typeof mxEquips==='function'?mxEquips(l):[]).filter(x=>x!==e&&x.id!==e.id).map(evEquipKey);
+  for(let n=4;n<k.length;n++){ const p=k.slice(0,n); if(!outros.some(o=>o.startsWith(p))) return p; } return k; }
+function evCodB(k,l,e){ return k==='DES'?'EV-DES':'EV-'+k+(l?'-'+cbSlug(l):'')+(e?'-'+evEquipCurto(e,l):''); }
+{ const _el=evLer; evLer=function(cod){ const r=_el(cod); if(!r||!r.erro||!/máquina deste código/.test(r.erro)) return r;
+    const m=String(cod||'').toUpperCase().match(/^EV-([A-Z]{3})-([A-Z0-9]+)-([A-Z0-9]{4,})$/); if(!m) return r;
+    const l=linhasOrd().find(x=>cbSlug(x)===m[2]); const es=(typeof mxEquips==='function'?mxEquips(l):[]).filter(x=>evEquipKey(x).startsWith(m[3]));
+    return es.length===1?{k:m[1],t:evTipo(m[1]),l,e:es[0]}:r; }; }
+/* barras em SVG para a prévia (mesma tabela do PDF) */
+function evBarSvg(txt,h){ const L=c128Larg(txt), mods=[...L].reduce((a,c)=>a+(+c),0)+20; let x=10, d='', barra=true;
+  for(const c of L){ const n=+c; if(barra) d+=`M${x} 0h${n}v${h}h-${n}z`; x+=n; barra=!barra; }
+  return `<svg class="evb-svg" viewBox="0 0 ${mods} ${h}" preserveAspectRatio="none" role="img" aria-label="Código de barras ${esc(txt)}"><rect width="${mods}" height="${h}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`; }
+function evbItens(F){ const T=evbTipos(), out=[]; F.forEach(f=>EV_TIPOS.forEach(t=>{ if(T[t[0]]) out.push({f,t,cod:S.ev.fmt==='barras'?evCodB(t[0],f.l,f.e):evCod(t[0],f.l,f.e)}); }));
+  if(T.DES) out.push({f:null,t:['DES','Errou?','Desfazer','des','Desfaz o último bipe de ordem'],cod:'EV-DES'}); return out; }
+function evbAdesHtml(it){ const f=it.f, onde=f?(f.e?f.e.nome+' · '+f.l:f.l):'Qualquer linha', t=it.t;
+  return `<div class="evb-ad ${t[3]}"><div class="evb-top">${esc(onde)}</div><div class="evb-mid">${S.ev.fmt==='barras'?'':`<span class="ev-qr">${manQrSvg(it.cod,84)}</span>`}<div><b>${esc(t[2])}</b><small>${esc(t[4])}</small></div></div>${S.ev.fmt==='barras'?`<div class="evb-bar">${evBarSvg(it.cod,46)}</div>`:''}<div class="evb-cod">${esc(it.cod)} · bipe com o coletor</div></div>`; }
+{ const _fh=evFolhaHtml; evFolhaHtml=function(f){ if(S.ev.fmt!=='barras') return _fh(f); const nome=f.e?f.e.nome:f.l;
+    return `<article class="ev-folha"><header><span>FOLHA DO COLETOR</span><h3>${esc(nome)}</h3>${f.e?`<small>${esc(f.l)}</small>`:''}</header><div class="ev-cods">${EV_TIPOS.map(t=>`<div class="ev-cod evb-c ${t[3]}"><div><small>${esc(t[1])}</small><b>${esc(t[2])}</b><em>${esc(t[4])}</em></div><div class="evb-bar">${evBarSvg(evCodB(t[0],f.l,f.e),40)}</div><div class="evb-cod">${esc(evCodB(t[0],f.l,f.e))}</div></div>`).join('')}
+      <div class="ev-cod evb-c des"><div><small>Errou?</small><b>Desfazer</b><em>Desfaz o último bipe de ordem</em></div><div class="evb-bar">${evBarSvg('EV-DES',40)}</div><div class="evb-cod">EV-DES</div></div></div></article>`; }; }
+{ const _vq=vManQr; vManQr=function(){ let h=_vq(); if(S.cb.modo!=='bipe') return h;
+    const fmt=S.ev.fmt, lay=S.ev.lay, T=evbTipos();
+    const opc=`<div class="card evb-op"><div class="evb-orow"><span class="evb-ol">Código</span><div class="seg" role="group" aria-label="Tipo de código"><button data-act="evb-fmt" data-v="barras" aria-pressed="${fmt==='barras'}">Código de barras</button><button data-act="evb-fmt" data-v="qr" aria-pressed="${fmt==='qr'}">QR</button></div>
+      <span class="evb-ol">Imprimir como</span><div class="seg" role="group" aria-label="Como imprimir"><button data-act="evb-lay" data-v="adesivo" aria-pressed="${lay==='adesivo'}">Adesivos · um por problema</button><button data-act="evb-lay" data-v="folha" aria-pressed="${lay==='folha'}">Folha A4 com o quadro</button></div></div>
+      ${lay==='adesivo'?`<div class="evb-orow"><span class="evb-ol">Quais adesivos</span><div class="evb-tps">${EV_TIPOS.map(t=>`<label class="evb-tp ${t[3]}"><input type="checkbox" data-evb-tp="${t[0]}" ${T[t[0]]?'checked':''}>${esc(t[2])}</label>`).join('')}<label class="evb-tp des"><input type="checkbox" data-evb-tp="DES" ${T.DES?'checked':''}>Desfazer</label></div></div>
+      <p class="sub" style="margin:6px 0 0">10 adesivos de 9,3 × 5,3 cm por folha A4 (folha adesiva). Cole cada um perto da máquina ou no quadro da linha: o operador só bipa o problema, sem mexer no computador.${fmt==='barras'?' O coletor precisa estar ligado a um computador com o painel aberto.':''}</p>`:''}</div>`;
+    h=h.replace('<div class="ev-grid">',opc+'<div class="ev-grid">');
+    h=h.replace(/Uma folha por linha ou máquina, com um QR para cada item do quadro\./,lay==='adesivo'?'Adesivos com os problemas da linha ou da máquina: bipou, já registra (abre o chamado ou pausa a ordem).':'Uma folha por linha ou máquina, com um código para cada item do quadro.');
+    h=h.replace('bipe qualquer QR das folhas abaixo','bipe qualquer código das folhas ou dos adesivos abaixo');
+    if(lay==='adesivo'){ const F=evFolhas().filter(f=>evSelec()[evFid(f)]), its=evbItens(F);
+      h=h.replace(/(<button class="btn" data-act="ev-pdf"[^>]*>[\s\S]*?Baixar PDF · )\d+ (folhas?)/,(x,a)=>a+its.length+' '+(its.length===1?'adesivo':'adesivos')+' · '+Math.max(1,Math.ceil(its.length/10))+' '+(Math.ceil(its.length/10)>1?'folhas':'folha'));
+      h=h.replace(/data-act="ev-pdf" (disabled)?/,'data-act="ev-pdf" '+(its.length?'':'disabled'));
+      h=h.replace(/<div class="ev-prev">[\s\S]*$/,'')+`<div class="ev-prev"><div class="evb-ads">${its.slice(0,8).map(evbAdesHtml).join('')}</div>${its.length>8?`<p class="sub">…e mais ${its.length-8} no PDF.</p>`:''}${its.length?'':'<div class="empty">Marque uma linha e pelo menos um adesivo.</div>'}</div></div>`; }
+    return h; }; }
+document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="evb-"]'); if(!b) return; const a=b.dataset.act, v=b.dataset.v;
+  if(a==='evb-fmt'){ S.ev.fmt=v; try{ localStorage.setItem('colafix.ev.fmt',v); }catch(e){} render(); }
+  if(a==='evb-lay'){ S.ev.lay=v; try{ localStorage.setItem('colafix.ev.lay',v); }catch(e){} render(); } });
+document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!t.dataset||!t.dataset.evbTp) return; evbTipos()[t.dataset.evbTp]=t.checked; render(); });
+{ const _pdf=evPdf; evPdf=async function(){ if(S.ev.fmt!=='barras'&&S.ev.lay!=='adesivo') return _pdf(); if(!window.jspdf){ toast('Gerador de PDF indisponível. Recarregue a página.'); return; }
+    const sel=evSelec(), F=evFolhas().filter(f=>sel[evFid(f)]); if(!F.length) return; const cor={crit:[192,57,43],warn:[196,120,20],ok:[47,140,90],neu:[91,103,112],des:[120,120,120]};
+    const pdf=new window.jspdf.jsPDF('p','mm','a4'), W=210, bar=S.ev.fmt==='barras';
+    if(S.ev.lay==='adesivo'){ const its=evbItens(F); if(!its.length) return; const aw=93, ah=53, mx=(W-2*aw)/2, my=(297-5*ah)/2;
+      its.forEach((it,i)=>{ const j=i%10; if(i&&!j) pdf.addPage(); const x=mx+(j%2)*aw, y=my+Math.floor(j/2)*ah, t=it.t, cc=cor[t[3]]||cor.neu, f=it.f, onde=f?(f.e?f.e.nome+' · '+f.l:f.l):'Qualquer linha';
+        pdf.setDrawColor(190); pdf.setLineWidth(.2); pdf.setLineDashPattern&&pdf.setLineDashPattern([1.2,1.2],0); pdf.rect(x,y,aw,ah); pdf.setLineDashPattern&&pdf.setLineDashPattern([],0);
+        pdf.setFillColor(cc[0],cc[1],cc[2]); pdf.rect(x+3,y+3,aw-6,8,'F'); pdf.setFont('helvetica','bold'); pdf.setFontSize(10); pdf.setTextColor(255,255,255);
+        pdf.text(pdf.splitTextToSize(String(onde).toUpperCase(),aw-10)[0],x+5,y+8.6);
+        if(bar){ pdf.setTextColor(0,0,0); pdf.setFontSize(17); pdf.text(pdf.splitTextToSize(t[2],aw-10)[0],x+5,y+19);
+          pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(90,90,90); pdf.text(t[4],x+5,y+24);
+          pdfCode128(pdf,it.cod,x+3,y+26.5,aw-6,17); pdf.setFontSize(7.5); pdf.setTextColor(60,60,60); pdf.text(it.cod+'  ·  bipe com o coletor',x+aw/2,y+48,{align:'center'}); }
+        else { desenharQR(pdf,it.cod,x+5,y+14,34); pdf.setTextColor(0,0,0); pdf.setFontSize(15); pdf.text(pdf.splitTextToSize(t[2],aw-46),x+43,y+24);
+          pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(90,90,90); pdf.text(pdf.splitTextToSize(t[4],aw-46),x+43,y+38); pdf.setFontSize(7); pdf.text(it.cod,x+43,y+46); } });
+      await manBaixar(pdf,'Adesivos_do_coletor.pdf','PDF com '+its.length+(its.length===1?' adesivo':' adesivos')+' ('+Math.ceil(its.length/10)+(Math.ceil(its.length/10)===1?' folha':' folhas')+' A4). Imprima em folha adesiva e recorte nas linhas.'); return; }
+    /* folha A4 com o quadro, em código de barras */
+    const mx=12, cw=(W-2*mx)/2, top=40, rh=50.5;
+    F.forEach((f,i)=>{ if(i) pdf.addPage(); const nome=f.e?f.e.nome:f.l;
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(31,56,100); pdf.text('COLAFIX · FOLHA DO COLETOR',mx,16);
+      pdf.setFontSize(26); pdf.setTextColor(0,0,0); pdf.text(String(nome).toUpperCase()+(f.e?'  ·  '+f.l:''),mx,28);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(90,90,90); pdf.text('Bipe com o coletor o código do que aconteceu. O aviso aparece no computador do painel.',mx,35);
+      const itens=EV_TIPOS.map(t=>({cod:evCodB(t[0],f.l,f.e),a:t[1],b:t[2],k:t[3]})).concat([{cod:'EV-DES',a:'Errou?',b:'Desfazer',k:'des'}]);
+      itens.forEach((it,j)=>{ const x=mx+(j%2)*cw, y=top+Math.floor(j/2)*rh, cc=cor[it.k]||cor.neu;
+        pdf.setDrawColor(200); pdf.setLineWidth(.3); pdf.roundedRect(x+1.5,y+1.5,cw-3,rh-3,3,3); pdf.setFillColor(cc[0],cc[1],cc[2]); pdf.rect(x+1.5,y+1.5,3,rh-3,'F');
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(cc[0],cc[1],cc[2]); pdf.text(String(it.a).toUpperCase(),x+8,y+9);
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(14); pdf.setTextColor(0,0,0); pdf.text(it.b,x+8,y+16);
+        pdfCode128(pdf,it.cod,x+6,y+20,cw-12,19); pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(60,60,60); pdf.text(it.cod,x+cw/2,y+44,{align:'center'}); }); });
+    await manBaixar(pdf,'Folhas_do_coletor.pdf','PDF com '+F.length+(F.length===1?' folha':' folhas')+'. Imprima e plastifique.'); }; }
+document.head.insertAdjacentHTML('beforeend',`<style id="evb-css">
+.evb-op{padding:14px 18px;margin:0 0 4px}.evb-orow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}.evb-orow+.evb-orow{margin-top:12px}.evb-ol{font-size:13px;font-weight:600;color:var(--muted)}
+.evb-tps{display:flex;flex-wrap:wrap;gap:6px}.evb-tp{display:inline-flex;gap:6px;align-items:center;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line);font-size:13px;cursor:pointer;background:var(--surface)}
+.evb-tp.crit{border-color:#e7b4ae}.evb-tp.warn{border-color:#ecd0a6}.evb-tp.ok{border-color:#b6d9c4}.evb-tp input{margin:0}
+.evb-ads{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.evb-ad{background:#fff;color:#111;border:1.5px dashed #c8c8c8;border-radius:6px;padding:8px;aspect-ratio:93/53;display:flex;flex-direction:column;gap:4px}
+.evb-top{color:#fff;font-weight:700;font-size:12px;letter-spacing:.3px;padding:4px 8px;border-radius:3px;background:#5B6770;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evb-ad.crit .evb-top{background:#C0392B}.evb-ad.warn .evb-top{background:#C47814}.evb-ad.ok .evb-top{background:#2F8C5A}.evb-ad.des .evb-top{background:#888}
+.evb-mid{display:flex;gap:10px;align-items:center}.evb-mid b{display:block;font-size:19px;line-height:1.15}.evb-mid small{display:block;color:#666;font-size:12px}
+.evb-bar{flex:1;min-height:0}.evb-svg{width:100%;height:100%;min-height:40px;display:block}.evb-cod{font:11px ui-monospace,monospace;color:#444;text-align:center}
+.ev-cod.evb-c{flex-direction:column;align-items:stretch;gap:6px}.ev-cod.evb-c .evb-svg{height:44px}
+</style>`);
