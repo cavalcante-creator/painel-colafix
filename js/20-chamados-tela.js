@@ -10,7 +10,15 @@ const cqCausas=()=>((S.cfg||{}).manCausas&&S.cfg.manCausas.length?S.cfg.manCausa
 function cqTecLista(){ const xs=cqAbertos(); try{ if(typeof poOn==='function'&&poOn()) return xs; if(typeof ofOn==='function'&&ofOn()) return xs; if(typeof ttSoChamados==='function'&&ttSoChamados()&&S.uid) return xs.filter(c=>c.por===S.uid); }catch(e){} return xs; }
 function cqVazioTec(){ const tod=cqAbertos(), aqui=cqTecLista(); if(tod.length&&aqui.length<tod.length){ const n=tod.length-aqui.length; return '<div class="cq-vz">Nenhum chamado aberto <b>neste computador</b>.<br><small>'+n+(n>1?' chamados abertos em outros lugares são atendidos':' chamado aberto em outro lugar é atendido')+' no posto da linha ou no computador da manutenção.</small></div>'; } return '<div class="cq-vz">Nenhum chamado aberto. Tudo funcionando.</div>'; }
 const cqAbertos=()=>(S.chamados||[]).filter(c=>!manIgnorar(c)&&!manFechada(c)&&c.status!=='Concluída');
-function cqEstado(l){ const xs=cqAbertos().filter(c=>c.linha===l);
+/* 03/11 (pedido "aqui nos chamados é só do perfil dos chamados, para não misturar com os do pessoal da manutenção"):
+   nos computadores de chamados/posto/Nexus, a situação das linhas só conta os chamados abertos na linha
+   (posto, computador de chamados, bipe do coletor, QR da linha, tela da linha, checklist). Abertos à mão na manutenção ('painel'),
+   tarefas do gestor e preventivas não aparecem ali. No painel da manutenção continua tudo. */
+const CQ_ORIG_LINHA=['posto','tablet','coletor','qr','qr-equip','tela-linha','checklist'];
+const cqDaLinha=c=>CQ_ORIG_LINHA.includes(c&&c.origem)&&!c.tarefa&&!c.prevId;
+function cqSoLinha(){ try{ return (typeof poOn==='function'&&poOn())||(typeof ttSoChamados==='function'&&ttSoChamados()); }catch(e){ return false; } }
+const cqAbLinha=()=>cqSoLinha()?cqAbertos().filter(cqDaLinha):cqAbertos();
+function cqEstado(l){ const xs=cqAbLinha().filter(c=>c.linha===l);
   const par=xs.find(c=>c.impacto==='parou'&&!(c.exec&&c.exec.tecnico)), exe=xs.find(c=>c.exec&&c.exec.tecnico), ag=xs.find(c=>!(c.exec&&c.exec.tecnico));
   if(par) return {c:'crit',t:'Máquina parada · aguardando técnico',s:'OS '+manNum(par.numero)+' · '+(par.equip||'')+' · aberto às '+hm(par.criado||par.quando)};
   if(exe) return {c:'info',t:'Em conserto',s:tecNomes(exe)+(exe.exec.inicio?' desde '+String(exe.exec.inicio).slice(11,16):'')+' · '+(exe.equip||'')};

@@ -102,7 +102,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('"Liberar e fechar chamado": o operador fecha o chamado e libera a máquina', c3.st==='Concluída'&&c3.lib==='Ana Souza'&&c3.op===true&&/Máquina liberada/.test(s.txt), JSON.stringify(c3));
  { await p.keyboard.press('Enter'); await H.dorme(500);
    await p.evaluate(()=>{ const db=__T.S().db, t=new Date(Date.now()-30*6e4).toISOString(), lib=new Date(Date.now()-5*6e4).toISOString();
-     return db.doc('chamados/os-00777').set({numero:777,linha:'Linha 2',defeito:'Elétrico',impacto:'parou',status:'Em execução',criado:t,quando:t.slice(0,16),nome:'Teste',exec:{tecnico:'Bruno Lima',inicio:t.slice(0,16)},liberadoEm:lib,liberadoPor:'Alguém',hist:[]}); }); await H.dorme(1200);
+     return db.doc('chamados/os-00777').set({numero:777,origem:'posto',linha:'Linha 2',defeito:'Elétrico',impacto:'parou',status:'Em execução',criado:t,quando:t.slice(0,16),nome:'Teste',exec:{tecnico:'Bruno Lima',inicio:t.slice(0,16)},liberadoEm:lib,liberadoPor:'Alguém',hist:[]}); }); await H.dorme(1200);
    const esp=await p.evaluate(()=>{ const e=[...document.querySelectorAll('.cq-ln')].find(x=>/Linha 2/.test(x.textContent)); return e?e.innerText.replace(/\n/g,' | '):''; });
    await bip('000123'); await p.keyboard.press('4'); await H.dorme(700); const tem=!!(await p.$('[data-act="po-lib"][data-n="777"]'));
    ok('Chamado "sendo arrumado" que já tinha liberação pela metade aparece para liberar no posto', /Sendo arrumada/.test(esp)&&tem, esp+' · botão:'+tem);

@@ -61,11 +61,11 @@ const poMsg=()=>S.tt.msg?`<div class="cq-msg" role="alert">${esc(S.tt.msg)}</div
 function poRod(txt,act,lab){ return `<div class="cq-rod"><span>${txt}</span><button class="cq-sec" data-act="${act||'po-volta'}">${lab||'Voltar (Esc)'}</button></div>`; }
 function poParAberta(l){ return (S.paradas||[]).find(p=>p.linha===l&&!p.fim&&!p.anulada)||null; }
 function poEstLinha(l){ const par=poParAberta(l);
-  const exe=cqAbertos().filter(c=>c.linha===l&&c.exec&&c.exec.tecnico)[0];
+  const exe=cqAbLinha().filter(c=>c.linha===l&&c.exec&&c.exec.tecnico)[0];
   if(exe){ const ini=exe.exec.inicio?String(exe.exec.inicio).slice(11,16):'';
     return {c:'arr',t:'Sendo arrumada · '+tecNomes(exe)+(ini?' desde '+ini:''),s:par?('Parada desde '+hora(par.inicio)+' · '+(par.motivo==='A definir'?'motivo a definir':par.motivo)+' · há '+ltvMin(Date.now()-new Date(par.inicio))):'Chamado '+manNum(exe.numero)+(exe.equip?' · '+exe.equip:'')+' · linha não parada',ch:par?'Chamado '+manNum(exe.numero)+' em atendimento':''}; }
   if(par) return {c:'crit',t:'Parada desde '+hora(par.inicio)+' · '+(par.motivo==='A definir'?'motivo a definir':par.motivo),s:'há '+ltvMin(Date.now()-new Date(par.inicio))+(par.porNome?' · '+par.porNome:'')};
-  const ab=cqAbertos().filter(c=>c.linha===l).sort((a,b)=>String(a.criado).localeCompare(String(b.criado)))[0];
+  const ab=cqAbLinha().filter(c=>c.linha===l).sort((a,b)=>String(a.criado).localeCompare(String(b.criado)))[0];
   const chTxt=ab?('Chamado '+manNum(ab.numero)+' aberto às '+hm(ab.criado||ab.quando)+' · '+(ab.exec&&ab.exec.tecnico?'em atendimento com '+tecNomes(ab):'aguardando manutenção')):'';
   const o=ordemRodando(l); if(o){ ttEntDaOrdem(o._id); return {c:ab&&ab.impacto==='parou'&&!(ab.exec&&ab.exec.tecnico)?'crit':'ok',t:'Produzindo · ordem '+o.num,s:String(o.produto||'').replace(/^\S+\s+-\s+/,'')+' · '+fQ(entregueDe(o))+' de '+fQ(+o.total||0)+' '+ttUn(o),ch:chTxt}; }
   return {c:ab?(ab.impacto==='parou'&&!(ab.exec&&ab.exec.tecnico)?'crit':'warn'):'ok',t:'Sem ordem programada agora',s:ab?'':'nenhum chamado aberto',ch:chTxt}; }
