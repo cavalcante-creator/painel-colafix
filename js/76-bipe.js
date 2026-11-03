@@ -46,7 +46,7 @@ document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.clo
 const evNome=(l,e)=>e?e.nome+' · '+l:l;
 async function evExecuta(x){ const {k,l,e}=x, nm=evNome(l,e), titulo=x.t?x.t[2]:'';
   if(k==='ELE'||k==='MEC'){ const def=k==='ELE'?'Elétrico / painel':'Mecânico';
-    const ja=(S.chamados||[]).find(c=>c.linha===l&&(!e||c.equipId===e.id||c.equip===e.nome)&&!manIgnorar(c)&&!manFechada(c)&&c.status!=='Concluída');
+    const ja=(S.chamados||[]).find(c=>c.linha===l&&(!e||c.equipId===e.id||c.equip===e.nome)&&!manIgnorar(c)&&!manFechada(c)&&c.status!=='Concluída'&&(typeof cqDaLinha!=='function'||cqDaLinha(c))); /* 03/11: preventiva e tarefa do gestor não impedem o chamado do bipe */
     if(ja) return evAvisar('warn',nm,'Já tem chamado aberto: OS '+manNum(ja.numero)+' · '+(ja.defeito||''),'Não abri outro');
     if(S.man.salv&&Date.now()-(S.man._salvDesde||0)>30000) S.man.salv=false;
     manNovo(l); Object.assign(S.man.f,{linha:l,quando:manAgoraLocal(),defeito:def,impacto:'parou',nome:EV_QUEM,equip:e?e.nome:'',equipId:e?e.id:'',origem:'coletor'}); S.man.novo=false; S.man.cur=null; S.man._salvDesde=Date.now();

@@ -3,6 +3,8 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs; const ag=new Date(Date.now()-3600e3).toISOString();
  D['ordens/o1']={num:'5001',linha:'Linha 2',status:'aberta',produto:'Argamassa AC-I',qtd:100};
+ D['chamados/prev1']={numero:'90',linha:'Linha 1',status:'Aberta',criado:ag,defeito:'PREVENTIVA: Filtros de manga',impacto:'nao',origem:'preventiva',prevId:'rot-x',equip:''};
+ D['chamados/tar1']={numero:'91',linha:'Linha 1',status:'Aberta',criado:ag,defeito:'Trocar lâmpada',impacto:'nao',origem:'gestor',tarefa:true,equip:''};
  D['ordens/o2']={num:'5002',linha:'Linha 1',status:'aberta',produto:'Rejunte',qtd:50,prodSeg:[{ini:ag,por:'Ana'}]};
  const B=await H.abrir({viewport:{width:1440,height:900}}); const p=B.page; p.on('dialog',x=>x.accept()); await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(3000);
  const bip=async c=>{ await p.keyboard.type(c,{delay:6}); await p.keyboard.press('Enter'); await H.dorme(1300); };
