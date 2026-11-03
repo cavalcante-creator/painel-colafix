@@ -5,8 +5,8 @@
    window.RHAlmFoto: G (medidas em mm), paginas(...) (HTML das folhas), ler(file, pags) (leitura da foto). */
 (function(){
   /* medidas da folha A4 em mm (impressão com margem zero) */
-  const G={W:210,H:297,mk:7,mc:[[12,12],[198,12],[198,285],[12,285]],x0:25,cw:[66,70,12,12],y0:22,rh:5.5,por:45,cx:27,cy:12,cc:2.8,nb:26};
-  const colX=i=>G.x0+G.cw.slice(0,i).reduce((a,b)=>a+b,0);
+  const G={W:210,H:297,mk:7,mc:[[12,12],[198,12],[198,285],[12,285]],x0:25,cw:[66,94],cwAnt:[66,70,12,12],ANT:'2026-11-03',y0:22,rh:5.5,por:45,cx:27,cy:12,cc:2.8,nb:26};
+  const colX=(i,cw)=>G.x0+(cw||G.cw).slice(0,i).reduce((a,b)=>a+b,0);
   /* ---------- código da folha: guarda(1) + dia(13) + folha(3) + versão(2) + conferência(6) + guarda(0) ---------- */
   const D0=Date.UTC(2026,0,1);
   const diaN=d=>Math.round((Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))-D0)/864e5);
@@ -21,14 +21,15 @@
   const e=s=>String(s==null?'':s).replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
   function pagsDe(L,mk){ const rows=L.map(x=>({nome:x.nome,cz:mk(x)||''})); const ps=[]; for(let i=0;i<rows.length;i+=G.por) ps.push(rows.slice(i,i+G.por));
     if(!ps.length) ps.push([]); const ult=ps[ps.length-1]; const vaz=Math.min(4,G.por-ult.length); for(let i=0;i<vaz;i++) ult.push({nome:'',cz:''}); return ps; }
-  function paginas(ps,d,ver,titulo){ const brB=d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4), mm=v=>v+'mm';
+  /* 03/11: sem as duas colunas vazias (a referência da tinta passou a ser o papel em branco à direita da tabela) e com as marcas opcionais (semMarcas) */
+  function paginas(ps,d,ver,titulo,semMarcas){ const brB=d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4), mm=v=>v+'mm';
     const cel=(x,y,w,cls,txt)=>`<div class="c ${cls}" style="left:${mm(x)};top:${mm(y)};width:${mm(w)}">${txt||''}</div>`;
-    return ps.map((rows,pi)=>{ let h=G.mc.map(([x,y])=>`<i class="mk" style="left:${mm(x-G.mk/2)};top:${mm(y-G.mk/2)}"></i>`).join('');
-      codBits(d,pi,ver).forEach((b,i)=>{ h+=`<i class="cd ${b?'b':''}" style="left:${mm(G.cx+i*G.cc)};top:${mm(G.cy-G.cc/2)}"></i>`; });
-      h+=`<div class="id" style="left:${mm(G.cx+G.nb*G.cc+4)};top:${mm(G.cy-2.2)}">Folha ${pi+1} de ${ps.length} · ${brB}</div>`;
-      h+=cel(colX(0),G.y0,G.cw[0],'th nm',e(titulo))+cel(colX(1),G.y0,G.cw[1],'th','Assinatura')+cel(colX(2),G.y0,G.cw[2],'th','')+cel(colX(3),G.y0,G.cw[3],'th','');
-      rows.forEach((r,i)=>{ const y=G.y0+G.rh*(i+1), z=r.cz?' cz':''; h+=cel(colX(0),y,G.cw[0],'nm'+z,e(r.nome))+cel(colX(1),y,G.cw[1],'as'+z,r.cz?e(r.cz):'')+cel(colX(2),y,G.cw[2],z,'')+cel(colX(3),y,G.cw[3],z,''); });
-      h+=`<div class="rod" style="left:${mm(G.x0)};top:${mm(289.5)}">Para conferir pela foto: fotografe a folha inteira, de frente, com as 4 marcas pretas aparecendo.</div>`;
+    return ps.map((rows,pi)=>{ let h=semMarcas?'':G.mc.map(([x,y])=>`<i class="mk" style="left:${mm(x-G.mk/2)};top:${mm(y-G.mk/2)}"></i>`).join('');
+      if(!semMarcas) codBits(d,pi,ver).forEach((b,i)=>{ h+=`<i class="cd ${b?'b':''}" style="left:${mm(G.cx+i*G.cc)};top:${mm(G.cy-G.cc/2)}"></i>`; });
+      h+=`<div class="id" style="left:${mm(semMarcas?colX(2)-45:G.cx+G.nb*G.cc+4)};top:${mm(G.cy-2.2)}">Folha ${pi+1} de ${ps.length} · ${brB}</div>`;
+      h+=cel(colX(0),G.y0,G.cw[0],'th nm',e(titulo))+cel(colX(1),G.y0,G.cw[1],'th','Assinatura');
+      rows.forEach((r,i)=>{ const y=G.y0+G.rh*(i+1), z=r.cz?' cz':''; h+=cel(colX(0),y,G.cw[0],'nm'+z,e(r.nome))+cel(colX(1),y,G.cw[1],'as'+z,r.cz?e(r.cz):''); });
+      if(!semMarcas) h+=`<div class="rod" style="left:${mm(G.x0)};top:${mm(289.5)}">Para conferir pela foto: fotografe a folha inteira, de frente, com as 4 marcas pretas aparecendo.</div>`;
       return `<section class="pg">${h}</section>`; }).join(''); }
   const CSS=`@page{size:A4 portrait;margin:0}html,body{margin:0;padding:0}body{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .pg{position:relative;width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page;background:#fff}.pg:last-child{page-break-after:auto;break-after:auto}
@@ -81,13 +82,14 @@
       const bits=Array.from({length:G.nb},(_,i)=>media(S,G.cx+i*G.cc+G.cc/2,G.cy,.6)<lim?1:0), dec=decBits(bits); if(dec) ok={H,S,dec}; }
     if(!ok) throw new Error('Achei a folha, mas não consegui ler o código dela (os quadradinhos ao lado da marca de cima). Confira se é uma folha impressa pelo painel e tire a foto mais perto.');
     const {S,dec,H}=ok, rows=(typeof pags==='function'?pags(dec):(pags&&pags[dec.pg]))||null, out=[];
-    if(rows){ const ax=colX(1)+1.4, bx=colX(2)-1.4, ex0=colX(2)+1.2, ex1=colX(4)-1.2;
+    const ant=dec.dia<G.ANT, cw=ant?G.cwAnt:G.cw, cx=i=>colX(i,cw); /* folha impressa antes de 03/11: 4 colunas */
+    if(rows){ const ax=cx(1)+1.4, bx=cx(2)-1.4, ex0=cx(2)+(ant?1.2:3), ex1=ant?cx(4)-1.2:cx(2)+15;
       rows.forEach((r,i)=>{ if(!r.nome) return; const y=G.y0+G.rh*(i+1), y0=y+1.15, y1=y+G.rh-1.15; if(r.cz){ out.push({nome:r.nome,i,s:'cz'}); return; }
-        const t=tinta(S,ax,y0,bx,y1), ru=Math.min(tinta(S,ex0,y0,colX(3)-1.2,y1),tinta(S,colX(3)+1.2,y0,ex1,y1)), lim=Math.max(.012,ru*3+.006); out.push({nome:r.nome,i,t:+t.toFixed(4),u:+ru.toFixed(4),s:t>=lim?'sim':t>=Math.max(.004,ru*1.5+.002)?'duv':'nao'}); }); }
+        const t=tinta(S,ax,y0,bx,y1), ru=ant?Math.min(tinta(S,ex0,y0,cx(3)-1.2,y1),tinta(S,cx(3)+1.2,y0,ex1,y1)):tinta(S,ex0,y0,ex1,y1), lim=Math.max(.012,ru*3+.006); out.push({nome:r.nome,i,t:+t.toFixed(4),u:+ru.toFixed(4),s:t>=lim?'sim':t>=Math.max(.004,ru*1.5+.002)?'duv':'nao'}); }); }
     /* foto pequena com as linhas marcadas (verde assinou, vermelho em branco, laranja conferir) e a foto para guardar */
     const k=Math.min(1,1000/Math.max(w,h)), vw=document.createElement('canvas'); vw.width=Math.round(w*k); vw.height=Math.round(h*k); const x=vw.getContext('2d'); x.drawImage(cv,0,0,vw.width,vw.height);
     const cor={sim:'rgba(47,140,90,.38)',nao:'rgba(200,50,40,.30)',duv:'rgba(230,140,20,.45)',cz:'rgba(120,120,120,.18)'};
-    out.forEach(o=>{ const y=G.y0+G.rh*(o.i+1), pts=[[colX(1),y],[colX(2),y],[colX(2),y+G.rh],[colX(1),y+G.rh]].map(([a,b])=>H(a,b)); x.fillStyle=cor[o.s]; x.beginPath(); pts.forEach(([u,v],j)=>j?x.lineTo(u*k,v*k):x.moveTo(u*k,v*k)); x.closePath(); x.fill(); });
+    out.forEach(o=>{ const y=G.y0+G.rh*(o.i+1), pts=[[cx(1),y],[cx(2),y],[cx(2),y+G.rh],[cx(1),y+G.rh]].map(([a,b])=>H(a,b)); x.fillStyle=cor[o.s]; x.beginPath(); pts.forEach(([u,v],j)=>j?x.lineTo(u*k,v*k):x.moveTo(u*k,v*k)); x.closePath(); x.fill(); });
     const sv=document.createElement('canvas'), ks=Math.min(1,1600/Math.max(w,h)); sv.width=Math.round(w*ks); sv.height=Math.round(h*ks); sv.getContext('2d').drawImage(cv,0,0,sv.width,sv.height);
     const blob=await new Promise(res=>sv.toBlob(res,'image/jpeg',.72));
     return {dia:dec.dia,pg:dec.pg,ver:dec.ver,linhas:out,semLista:!rows,vista:vw.toDataURL('image/jpeg',.7),blob}; }
