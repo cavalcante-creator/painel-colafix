@@ -1,5 +1,5 @@
 /* 03/11 "na folha do EPI pode tirar os sábados, domingos e feriados?": a folha do EPI só tem os dias úteis do mês
-   (sem sábado, domingo e feriado do calendário do painel); a de uniforme continua com todos os dias. Dados inventados. */
+   (sem sábado, domingo e feriado do calendário do painel); a de uniforme também (pedido de 03/11, 08:21). Dados inventados. */
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs; d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Paula RH'}; D['perfis/uRH']={nome:'Paula RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[]};
  D['rh/config']={fichasDesde:'2000-01'}; D['rh/dados/funcoes/f1']={nome:'Mecânico',epis:[{nome:'Luva',ca:'111'}],uniformes:[{nome:'Camisa',tam:'G'}]};
@@ -13,5 +13,5 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Folha do EPI de novembro/2026: sem sábados e domingos', dias.epi.length>0&&!dias.epi.some(x=>fds.includes(x.slice(0,2))), dias.epi.join(' '));
  ok('Sem o feriado de Finados (02/11)', !dias.epi.includes('02/11')&&dias.epi.includes('03/11'), dias.epi.slice(0,3).join(' '));
  ok('Linhas mais altas (mesma altura de tabela)', parseFloat(dias.h)>4.2, dias.h);
- ok('Folha de uniforme continua com os 30 dias', dias.uni.length===30, String(dias.uni.length));
+ ok('Folha de uniforme também só com os dias úteis (os mesmos do EPI)', dias.uni.join()===dias.epi.join(), dias.uni.join(' '));
  console.log('erros:',B.erros.filter(x=>!/404|cdnjs|fonts/.test(x)).slice(0,3)); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error(e); process.exit(1); });
