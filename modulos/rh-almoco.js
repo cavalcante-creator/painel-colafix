@@ -134,7 +134,10 @@
     const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>{ if(/^cafe:/.test(x)===RC()) ks.add(x.split('_')[1]); });
     return [...ks].map(k=>{ const p=P0[k]||{}, f=fx[k]; return {k,nome:f?titulo(f.nome):(p.n||'(sem nome)'),emp:p.e||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX INDUSTRIA E COMERCIO LTDA'):''),setor:f?(f.setor||''):'',cad:!!f,grupo:p.g||''}; })
       .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))&&(!A.setor||(A.setor==='-'?!p.setor:p.setor===A.setor))) /* a busca por nome filtra na própria tela (almBusca), sem redesenhar */
+      .filter((p,i,a)=>{ if(!RC()) return true; if(!a._ks) a._ks={v:cafeKs(m)}; const ks=a._ks.v; return !ks||ks.has(p.k); }) /* 03/11: no café, só quem está na folha do café */
       .sort((a,b)=>a.nome.localeCompare(b.nome)); }
+  /* CPFs das pessoas da lista fixa do café (ligadas pelo cadastro ou pelo Face ID); null = lista vazia (não filtra) */
+  function cafeKs(m){ const sv=FK; FK='cafe'; try{ if(!listaFolha().length) return null; const d=(A.dia&&A.dia.slice(0,7)===m)?A.dia:m+'-28'; return new Set(folhaPessoas0(A.ctx,d).L.map(x=>x.k).filter(Boolean)); } finally{ FK=sv; } }
   const empCurta=e=>!e?'Sem empresa':/COLAFIX/i.test(e)?'Colafix':titulo(e);
 
   /* ---------- tela ---------- */

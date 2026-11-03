@@ -38,5 +38,14 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
   /* fechamento para a folha */
   await p.evaluate(()=>__T.go('rhfech')); await H.dorme(2000);
   ok('Fechamento para a folha mostra o café', await p.evaluate(()=>/desconto do café/.test((document.querySelector('.rh-fech')||{}).innerText||'')));
-  await p.click('.alm-ref [data-v="alm"]').catch(()=>{});
+  /* 03/11: com a lista do café, só quem está na folha do café conta no café */
+  await p.evaluate(async()=>{ const db=window.Painel.db(); const g=await db.doc('rh/config').get(); const x=g.data()||{}; await db.doc('rh/config').set(Object.assign({},x,{cafe:Object.assign({},x.cafe||{},{lista:['Ana Souza','Bruno Lima']})})); });
+  await H.dorme(800); await abre(); await p.click('.alm-ref [data-v="cafe"]').catch(()=>{}); await H.dorme(800);
+  const t2=await p.evaluate(()=>document.getElementById('view').innerText);
+  const t2d=await p.evaluate(()=>document.querySelector('.alm-dt').innerText.replace(/\s+/g,' '));
+  ok('Café com lista: Carla (fora da folha do café) não aparece', !/CARLA|Carla/i.test(t2.split('Folha')[0]||t2)&&/2 tomaram café/.test(t2d)&&/0 sem justificativa/.test(t2d), t2d);
+  const fe3=await p.evaluate(m=>window.RHAlmoco.fechamento(window.RHAlmoco._A.ctx,m),m);
+  ok('Fechamento do café só com quem está na folha; almoço com todos', fe3&&!fe3.cafe['33333333333']&&fe3.cafe['11111111111']&&fe3.alm['33333333333'], JSON.stringify(fe3&&{c:Object.keys(fe3.cafe),a:Object.keys(fe3.alm)}));
+  await p.click('.alm-ref [data-v="alm"]').catch(()=>{}); await H.dorme(600);
+  ok('Almoço com a lista do café continua mostrando a Carla', /CARLA|Carla/i.test(await p.evaluate(()=>document.getElementById('view').innerText)));
   console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
