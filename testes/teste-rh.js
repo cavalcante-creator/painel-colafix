@@ -43,7 +43,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const f
  ok('Link do arquivo abre o painel na tela das fichas com o botão "Abrir arquivo"', ban.v==='rhfichas'&&ban.b, JSON.stringify(ban));
  // importar planilha (pessoa nova, já cadastrada, CPF inválido)
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(300); fs.writeFileSync('/tmp/func.csv','Nome;CPF;Vínculo;Empresa (PJ);CNPJ (PJ);Função;Setor;Admissão\nCarlos Lima;111.444.777-35;CLT;;;Operador de Produção;Linha 2;05/02/2023\nRepetida;529.982.247-25;;;;;;\nInvalido;000.000.000-00;CLT;;;X;Y;\nPedro PJ;;PJ;Nexus;11.222.333/0001-81;Eletricista;Manutenção;01/08/2024\nPJ Sem CNPJ;;PJ;Zenith;;X;Y;');
- await p.click('[data-act="rh-carga"]'); await H.dorme(300); await p.setInputFiles('#rh-cargaf','/tmp/func.csv'); await H.dorme(1200);
+ await p.click('.rh-fmais summary'); await p.click('[data-act="rh-carga"]'); await H.dorme(300); await p.setInputFiles('#rh-cargaf','/tmp/func.csv'); await H.dorme(1200);
  const prv=await p.evaluate(()=>document.querySelector('.rh-form').innerText);
  p.on('dialog',x=>x.accept()); await p.click('[data-act="rh-cargaok"]'); await H.dorme(1500); const ti=await toast(); s=await srv(); const fsx=Object.entries(s).filter(([k])=>k.startsWith('rh/dados/funcionarios/')).map(([k,v])=>v);
  const car=fsx.find(x=>x.nome==='CARLOS LIMA'), pj=fsx.find(x=>x.nome==='PEDRO PJ');

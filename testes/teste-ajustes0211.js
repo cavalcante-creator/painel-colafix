@@ -46,6 +46,19 @@ function banco(){ const {d}=seedManut(); const D=d.docs; d.users['juliana@painel
   ok('Funcionários: o dono não aparece mais com "Férias vencidas"', !/FRANCISCO DONO[^\n]*\n[^\n]*\n[^\n]*\n[^\n]*Férias vencidas/.test(s));
   await p.evaluate(()=>__T.go('rhferias')); await H.dorme(800); await p.click('[data-act="rh-comfer"][data-id="fx"]'); await H.dorme(800); fx=await srv('rh/dados/funcionarios/fx'); s=await view();
   ok('"voltar" põe de volta no controle', fx.semFerias===false&&/FRANCISCO DONO/.test(s));
+  /* 9 · Funcionários: topo e filtros compactos (pedido das 20:53) */
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(900);
+  s=await p.evaluate(()=>{ const l=document.querySelector('.rh-v2ls'), m=document.querySelector('.rh-fmais'), fs=document.querySelector('.rh-ffs'); return {topo:l?Math.round(l.getBoundingClientRect().top):9999,mais:m?m.innerText:'',fsVis:fs?!fs.hidden:null,h1:(document.querySelector('#view h1')||{}).innerText||''}; });
+  ok('Funcionários: lista começa mais alto (topo numa linha, filtros dentro da lista; antes ~470 px)', s.topo<360&&/Funcionários\s*\d+ em atividade/.test(s.h1)&&s.fsVis===false, JSON.stringify(s));
+  await p.click('.rh-fmais summary'); await H.dorme(300);
+  s=await p.evaluate(()=>[...document.querySelectorAll('.rh-fmaisp button')].filter(b=>b.offsetParent).map(b=>b.innerText.trim()));
+  ok('"Mais" tem Importar planilha, Baixar Excel e Baixar PDF', s.join('|')==='Importar planilha|Baixar Excel|Baixar PDF', s.join('|'));
+  await p.click('#view h1'); await H.dorme(200);
+  await p.click('[data-act="rh-ffil"]'); await H.dorme(500); await p.selectOption('[data-rh-fil="setor"]','Linha 1'); await H.dorme(700);
+  s=await p.evaluate(()=>({n:document.querySelectorAll('.rh-v2r').length,b:(document.querySelector('[data-act="rh-ffil"]')||{}).innerText||'',vis:!document.querySelector('.rh-ffs').hidden}));
+  ok('"Filtros" abre situação/setor/empresa; filtrar pelo setor mostra o número no botão', s.n===1&&/Filtros\s*1/.test(s.b)&&s.vis, JSON.stringify(s));
+  await p.click('[data-act="rh-ffilx"]'); await H.dorme(600); s=await p.evaluate(()=>document.querySelectorAll('.rh-v2r').length);
+  ok('"limpar" volta a mostrar todos', s>=4, s);
   /* 7 · Gerar contrato */
   await p.evaluate(()=>__T.go('rhdocs')); await H.dorme(700); await p.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Gerar contrato').click()); await H.dorme(800);
   s=await p.evaluate(()=>[...document.querySelectorAll('.rh-v2dp')].map(b=>{ const r=b.getBoundingClientRect(), xs=[...b.children].map(c=>c.getBoundingClientRect()); return {h:r.height,cabe:xs.every(c=>c.top>=r.top-0.5&&c.bottom<=r.bottom+0.5),linhas:b.children.length}; }));

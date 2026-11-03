@@ -327,7 +327,10 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const fseg=fsegH();
     if(R.fview==='setor'||R.fview==='adm') return topo('Funcionários',R.fview==='adm'?'Quem está entrando e em que etapa: documentos, contrato e ficha, experiência.':'Quem é quem: as pessoas de cada setor.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button>`)
       +(R.fdesl?formDesl():'')+(R.adm&&!R.f?vAdm():'')+(R.f?formFunc():'')+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':R.fview==='adm'?cartaoFichasCel()+vQuadroAdm():vOrg());
-    return topo('Funcionários','Cadastro, situação e o que cada um usa.',fseg+`<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button><button class="btn sec" data-act="rh-carga">${P.ic('baixar',18,2)}Importar planilha</button><button class="btn sec" data-act="rh-fxls">Excel</button><button class="btn sec" data-act="rh-fpdf">Baixar PDF</button>`)
+    /* 02/11 (Juliana: "os filtros e o inicial ocupam muito espaço"): topo numa linha só, Importar/Excel/PDF no "Mais", filtros dentro da lista */
+    const nAt=R.func.filter(x=>x.status!=='Desligado').length;
+    const mais=`<details class="rh-fmais"><summary class="btn sec">Mais ${P.ic('seta',14,2)}</summary><div class="rh-fmaisp"><button class="lnk" data-act="rh-carga">${P.ic('baixar',16,2)}Importar planilha</button><button class="lnk" data-act="rh-fxls">Baixar Excel</button><button class="lnk" data-act="rh-fpdf">Baixar PDF</button></div></details>`;
+    return `<div class="head rh-fhead"><div><div class="eyebrow">RH · FUNCIONÁRIOS</div><h1>Funcionários <small class="rh-fcnt">${nAt} em atividade</small></h1></div><div class="rh-acoes">${fseg}<button class="btn sec" data-act="rh-deslnovo">Novo desligamento</button><button class="btn" data-act="rh-admnova">${P.ic('mais',18,2.4)}Nova admissão</button>${mais}</div></div>`
       +(R.carga?vCarga():'')+(R.adm&&!R.f?vAdm():'')+(R.fdesl?formDesl():'')+(R.f?formFunc():'')
       +vFuncLista(xs); }
   function formFunc(){ const f=R.f, fs=R.funcoes.map(x=>x.nome).sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -1505,17 +1508,18 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   function vFuncLista(xs0){ const F=R.filtro, ch=R.fuchip||'todos', xs=xs0.filter(f=>fchipOk(f,ch));
     if(!xs.some(f=>f._id===R.fusel)) R.fusel=xs[0]?xs[0]._id:null;
     const sel=R.func.find(f=>f._id===R.fusel);
-    const chips=`<div class="rh-v2ch" role="group" aria-label="Filtros rápidos">${FCHIPS.map(([k,l])=>`<button data-act="rh-fuchip" data-v="${k}" aria-pressed="${ch===k}">${l} <b>${xs0.filter(f=>fchipOk(f,k)).length}</b></button>`).join('')}</div>`;
+    const chips=`<div class="rh-v2ch rh-fch" role="group" aria-label="Filtros rápidos">${FCHIPS.map(([k,l])=>`<button data-act="rh-fuchip" data-v="${k}" aria-pressed="${ch===k}">${l} <b>${xs0.filter(f=>fchipOk(f,k)).length}</b></button>`).join('')}</div>`;
+    const nFil=[F.st!=='ativos',!!F.setor,!!F.emp].filter(Boolean).length, abF=R.ffilAb||nFil>0;
     const linha=f=>{ const pd=pendF(f), s=f._id===R.fusel;
       return `<button class="rh-v2r${s?' sel':''}" data-act="rh-fusel" data-id="${f._id}" aria-pressed="${s}"><span class="rh-v2p"><span class="rh-v2av">${esc(iniciais(f.nome).toUpperCase())}</span><span class="rh-v2n"><b class="rh-nm2">${esc(f.nome)}</b><small>${esc([f.funcao||'sem função',f.tipo==='PJ'?'PJ · '+empNome(f.empresa):'CLT'].join(' · '))}</small></span></span>
         <span class="rh-v2c">${esc(f.setor||'—')}</span><span class="rh-v2c num">${esc(casaCurto(f.admissao))}</span>
         <span class="rh-v2t">${f.status!=='Ativo'?`<span class="pill ${corSt(f.status)}">${esc(f.status)}</span>`:''}${pd.slice(0,2).map(p=>`<span class="pill ${p.c==='info'?'neu':p.c}">${esc(p.t)}</span>`).join('')}${pd.length>2?`<small>+${pd.length-2}</small>`:''}</span></button>`; };
-    return chips+`<div class="rh-v2">
-      <section class="card rh-v2l" aria-label="Lista de funcionários"><div class="rh-fil rh-v2f"><input class="txt" id="rh-q" type="search" placeholder="Buscar nome, CPF, CNPJ ou função" value="${esc(F.q)}">
-        <select class="txt" data-rh-fil="st" aria-label="Situação"><option value="ativos" ${F.st==='ativos'?'selected':''}>Em atividade</option>${ST.map(s=>`<option ${F.st===s?'selected':''}>${s}</option>`).join('')}<option value="todos" ${F.st==='todos'?'selected':''}>Todos</option></select>
+    return `<div class="rh-v2">
+      <section class="card rh-v2l" aria-label="Lista de funcionários"><div class="rh-fil rh-v2f rh-ff"><div class="rh-ffl"><input class="txt" id="rh-q" type="search" placeholder="Buscar nome, CPF, CNPJ ou função" value="${esc(F.q)}"><button class="btn sec rh-ffb" data-act="rh-ffil" aria-expanded="${abF}">${P.ic('ajuste',16,2)}Filtros${nFil?` <b>${nFil}</b>`:''}</button></div>
+        ${chips}<div class="rh-ffs"${abF?'':' hidden'}><select class="txt" data-rh-fil="st" aria-label="Situação"><option value="ativos" ${F.st==='ativos'?'selected':''}>Em atividade</option>${ST.map(s=>`<option ${F.st===s?'selected':''}>${s}</option>`).join('')}<option value="todos" ${F.st==='todos'?'selected':''}>Todos</option></select>
         <select class="txt" data-rh-fil="setor" aria-label="Setor"><option value="">Todos os setores</option>${opts(unicos('setor'),F.setor)}</select>
-        <select class="txt" data-rh-fil="emp" aria-label="Empresa"><option value="">Todas as empresas</option>${unicos('empresa').map(e=>`<option value="${esc(e)}" ${F.emp===e?'selected':''}>${esc(empNome(e))}</option>`).join('')}</select></div>
-        ${!R.lido.func?'<div class="empty">Carregando…</div>':xs.length?`<div class="rh-v2h"><span>PESSOA</span><span>SETOR</span><span>NA CASA</span><span>PENDÊNCIAS</span></div><div class="rh-v2ls">${xs.map(linha).join('')}</div>
+        <select class="txt" data-rh-fil="emp" aria-label="Empresa"><option value="">Todas as empresas</option>${unicos('empresa').map(e=>`<option value="${esc(e)}" ${F.emp===e?'selected':''}>${esc(empNome(e))}</option>`).join('')}</select>${nFil?`<button class="lnk" data-act="rh-ffilx">limpar</button>`:''}</div></div>
+        ${!R.lido.func?'<div class="empty">Carregando…</div>':xs.length?`<div class="rh-v2h"><span>Pessoa</span><span>Setor</span><span>Na casa</span><span>Pendências</span></div><div class="rh-v2ls">${xs.map(linha).join('')}</div>
         <div class="sub rh-v2rod">${xs.length} de ${R.func.length} funcionário(s)</div>`:'<div class="empty">Nenhum funcionário com esses filtros.</div>'}</section>
       <aside class="card rh-v2d" aria-label="Ficha da pessoa">${sel?fichaLado(sel):'<div class="empty">Escolha uma pessoa na lista.</div>'}</aside></div>`; }
   function fichaLado(f){ const ab=R.fab||'resumo', pd=pendF(f), sf=f.tipo!=='PJ'?sitFer(f):null, e=expInfo(f), pj=f.tipo==='PJ'?pjSit(f):null, fc=R.funcoes.find(x=>norm(x.nome)===norm(f.funcao)), m=fichasMesIni(), fs=fSit(f,m);
@@ -1576,7 +1580,14 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   .rh-v2ch button[aria-pressed="true"]{background:var(--teal-strong);border-color:var(--teal-strong);color:#fff}.rh-v2ch button[aria-pressed="true"] b{color:#fff}
   .rh-v2{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(380px,1fr);gap:16px;align-items:start}
   .rh-v2>.card{margin:0}.card.rh-v2l{padding:0;overflow:hidden}
-  .rh-fil.rh-v2f{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px;margin:0;border-bottom:1px solid var(--line)}.rh-v2f #rh-q{flex:1 1 220px;min-width:0}.rh-v2f select{flex:0 1 auto;width:auto}
+  .rh-fil.rh-v2f{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px;margin:0;border-bottom:1px solid var(--line)}
+  .rh-fhead{align-items:center!important;margin-bottom:2px}.rh-fhead h1{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.rh-fcnt{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0}
+  .rh-fmais{position:relative}.rh-fmais>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer}.rh-fmais>summary::-webkit-details-marker{display:none}.rh-fmais>summary svg{transform:rotate(90deg)}
+  .rh-fmaisp{position:absolute;right:0;top:calc(100% + 6px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(16,32,40,.14);padding:6px;display:flex;flex-direction:column;min-width:210px}
+  .rh-fmaisp .lnk{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;text-align:left;color:var(--ink);font-size:14px}.rh-fmaisp .lnk:hover{background:var(--teal-wash)}
+  .rh-ff{flex-direction:column;gap:10px!important;padding:12px 14px!important}.rh-ffl{display:flex;gap:8px;width:100%}.rh-ffl #rh-q{flex:1;min-width:0;height:40px}.rh-ffb{height:40px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.rh-ffb b{background:var(--teal-strong);color:#fff;border-radius:999px;font-size:11.5px;padding:1px 7px}
+  .rh-ff .rh-fch{margin:0;gap:6px}.rh-ff .rh-fch button{height:32px;padding:0 12px;font-size:13.5px}
+  .rh-ffs{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.rh-ffs[hidden]{display:none}.rh-ffs select{height:38px;width:auto;min-width:150px}.rh-v2f #rh-q{flex:1 1 220px;min-width:0}.rh-v2f select{flex:0 1 auto;width:auto}
   .rh-v2h,.rh-v2r{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1.5fr);gap:12px;align-items:center;padding:0 16px}
   .rh-v2h{min-height:36px;font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line);background:var(--sunken)}
   .rh-v2ls{max-height:calc(100vh - 290px);overflow:auto}
@@ -1833,6 +1844,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   /* ---------- Avisos nas TVs (publicados pelo RH; ficam em config/feriados.avisos, que o RH grava e as TVs leem) ---------- */
   R.avs=[]; R.avf=null;
   try{ R.iniTab=localStorage.getItem('colafix.rh.iniTab')||''; }catch(e){ R.iniTab=''; }
+  /* "Mais" de Funcionários: fecha ao escolher ou ao tocar fora */
+  document.addEventListener('click',ev=>{ document.querySelectorAll('details.rh-fmais[open]').forEach(d=>{ if(!d.contains(ev.target)||ev.target.closest('.rh-fmaisp button')) d.open=false; }); },true);
   setInterval(()=>{ try{ if(P.db&&P.db()&&!R._avSub&&P.S.uid){ R._avSub=P.db().doc('config/feriados').onSnapshot(d=>{ const x=(d&&d.exists&&d.data())||{}; R.avs=x.avisos||[]; R.avAuto=x.avisosAuto||[]; R.avAnivOff=!!x.avAnivOff; R.avLido=true; P.rerender(); avAnivSync(); },()=>{ R._avSub=null; }); } }catch(e){} },1500);
   /* parabéns automáticos: aniversariantes de hoje e dos próximos 3 dias viram avisos (só no dia) na faixa das TVs */
   function avAnivLista(){ const h=P.hojeStr(), out=[];
@@ -2382,6 +2395,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       if(a==='rh-dgpick'){ R.dg.funcId=b.dataset.id; R.dg.extra={}; R.dg.feriasId=''; R.dg.reg=null; R.dg.over={}; R.dg.edHtml=null; R.dg.edOn=false; P.render(); return; }
       if(a==='rh-dgmod'){ R.dg.modeloId=b.dataset.id; R.dg.reg=null; R.dg.over={}; R.dg.edHtml=null; R.dg.edOn=false; P.render(); return; }
       if(a==='rh-fusel'){ if(window.innerWidth<900){ R.pess=b.dataset.id; R.f=null; P.render(); window.scrollTo(0,0); return; } R.fusel=b.dataset.id; R.fab='resumo'; P.render(); return; }
+      if(a==='rh-ffil'){ R.ffilAb=!(R.ffilAb||[R.filtro.st!=='ativos',!!R.filtro.setor,!!R.filtro.emp].some(Boolean)); P.render(); return; }
+      if(a==='rh-ffilx'){ R.filtro.st='ativos'; R.filtro.setor=''; R.filtro.emp=''; R.ffilAb=false; P.render(); return; }
       if(a==='rh-fuchip'){ R.fuchip=b.dataset.v; P.render(); return; }
       if(a==='rh-fab'){ R.fab=b.dataset.v; P.render(); return; }
       if(a==='rh-v2oc'){ R.fusel=b.dataset.id; R.fab='hist'; R.foc={funcId:b.dataset.id,data:P.hojeStr(),tipo:'Advertência verbal'}; P.render(); setTimeout(()=>{ const n=document.getElementById('rh-ocm'); if(n){ n.scrollIntoView({block:'center'}); n.focus(); } },60); return; }

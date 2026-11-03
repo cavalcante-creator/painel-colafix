@@ -84,7 +84,7 @@ const br=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4), M=dias(0).slice(0,7
   ok('Várias pessoas: avisa quem está sem o dado do modelo (salário) e não deixa gerar', /Complete antes:[\s\S]*ANA SOUZA \(salário\)/.test(prob.t)&&!/MARIA COSTA \(/.test(prob.t)&&prob.d, prob.t);
 
   // planilha de carga inicial
-  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await p.click('[data-act="rh-carga"]'); await H.dorme(300);
+  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(200); await p.click('[data-act="rh-pessx"]').catch(()=>{}); await p.click('.rh-fmais summary'); await p.click('[data-act="rh-carga"]'); await H.dorme(300);
   const pl=await baixa('[data-act="rh-cargabaixar"]');
   ok('Importar planilha: baixa a planilha com todos os ativos (sem a biblioteca do Excel, em CSV)', pl&&/^Carga-RH-Colafix\.(xlsx|csv)$/.test(pl.nome)&&(pl.nome.endsWith('.xlsx')||(/"Código \(não mexer\)"/.test(pl.txt)&&/ANA SOUZA/.test(pl.txt)&&!/ZECA SAIU/.test(pl.txt))), pl&&pl.nome);
   const linhas=pl.txt.replace(/^﻿/,'').split('\r\n').map(l=>l.split(';').map(c=>c.replace(/^"|"$/g,'').replace(/""/g,'"')));
