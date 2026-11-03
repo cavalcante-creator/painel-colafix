@@ -55,4 +55,27 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
   ok('Almoço com lista: só Ana e Carla no almoço; café segue a lista do café', fe4&&Object.keys(fe4.alm).sort().join()==='11111111111,33333333333'&&Object.keys(fe4.cafe).sort().join()==='11111111111,22222222222', JSON.stringify(fe4&&{a:Object.keys(fe4.alm),c:Object.keys(fe4.cafe)}));
   const t4=await p.evaluate(()=>document.querySelector('.alm-dt').innerText.replace(/\s+/g,' '));
   ok('Almoço por dia com lista: 1 almoçou (Ana), Carla sem justificativa', /1 almo/.test(t4)&&/1 sem justificativa/.test(t4), t4);
+  /* 03/11: aba embaixo com quem passou no Face ID e não está na lista, com filtros */
+  const fx=await p.evaluate(()=>{ const d=document.querySelector('.alm-fx'); return d?{t:d.querySelector('summary').innerText,ns:[...d.querySelectorAll('.alm-fxn')].map(x=>x.textContent)}:null; });
+  ok('Aba “Passaram no Face ID e não estão na lista” com o Bruno', fx&&/\(1\)/.test(fx.t)&&fx.ns.join()==='Bruno Lima', JSON.stringify(fx));
+  await p.click('.alm-fx>summary'); await H.dorme(300);
+  await p.fill('#alm-fxq','carla'); await H.dorme(200);
+  const v1=await p.evaluate(()=>[...document.querySelectorAll('.alm-fxr')].filter(x=>!x.hidden).length);
+  await p.fill('#alm-fxq','bru'); await p.click('.alm-fx [data-act="alm-fxs"][data-v="nao"]'); await H.dorme(200);
+  const v2=await p.evaluate(()=>[...document.querySelectorAll('.alm-fxr')].filter(x=>!x.hidden).length);
+  await p.click('.alm-fx [data-act="alm-fxs"][data-v="sim"]'); await H.dorme(200);
+  const v3=await p.evaluate(()=>[...document.querySelectorAll('.alm-fxr')].filter(x=>!x.hidden).length);
+  ok('Filtros da aba: busca e situação', v1===0&&v2===0&&v3===1, [v1,v2,v3].join());
+  await p.click('.alm-fxr [data-act="alm-fxadd"]'); await H.dorme(1200);
+  const lf=await p.evaluate(async()=>((await window.Painel.db().doc('rh/config').get()).data().almoco||{}).listaFolha);
+  const fe5=await p.evaluate(m=>window.RHAlmoco.fechamento(window.RHAlmoco._A.ctx,m),m);
+  ok('“Pôr na lista” acrescenta na lista do almoço e passa a contar', lf&&lf.includes('Bruno Lima')&&!!fe5.alm['22222222222'], JSON.stringify(lf));
+  await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800);
+  const k2=await p.evaluate(()=>({k:(document.querySelector('.alm-fxk')||{}).textContent||'',ab:!!document.querySelector('.alm-fx [data-act="alm-fxadd"]')}));
+  ok('Alto da tela diz quantos estão na folha para assinar', /3 na folha para assinar/.test(k2.k), JSON.stringify(k2));
+  await p.evaluate(async()=>{ const db=window.Painel.db(); const g=await db.doc('rh/config').get(); const x=g.data()||{}; await db.doc('rh/config').set(Object.assign({},x,{almoco:Object.assign({},x.almoco||{},{listaFolha:(x.almoco.listaFolha||[]).concat(['Motorista - Zeca Prado'])})})); });
+  await H.dorme(800); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800);
+  const z=await p.evaluate(()=>({k:(document.querySelector('.alm-fxk')||{}).textContent||'',s:(document.querySelector('.alm-fx2')||{}).textContent||''}));
+  ok('Nome da lista sem Face ID aparece embaixo e explica a diferença', /4 na folha para assinar/.test(z.k)&&/1 da folha sem Face ID/.test(z.k)&&/Zeca/.test(z.s)&&/não está ligado/.test(z.s), JSON.stringify(z).slice(0,300));
+  if(process.env.SHOT){ await p.evaluate(()=>{ document.querySelectorAll('.alm-fx').forEach(d=>d.open=true); document.querySelector('.alm-fx').scrollIntoView(); }); await p.screenshot({path:'/tmp/sh/fx.png'}); }
   console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

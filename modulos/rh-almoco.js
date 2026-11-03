@@ -130,11 +130,11 @@
   function ausTxt(a){ const br=x=>x?x.slice(8)+'/'+x.slice(5,7)+'/'+x.slice(0,4):''; if(a.tipo==='dia') return 'Só no dia '+br(a.data);
     const ds=(a.dias||[]).slice().sort().map(i=>SEMN[i]); const t=ds.length>1?ds.slice(0,-1).join(', ')+' e '+ds[ds.length-1]:ds[0]||'';
     return 'Toda '+t+(a.de?' · desde '+br(a.de):'')+(a.ate?' · até '+br(a.ate):''); }
-  function pessoasDoMes(m){ const c=A.ctx, D=A.dados[m]||{}, P0=D.pessoas||{}, fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
+  function pessoasDoMes(m,semLista){ const c=A.ctx, D=A.dados[m]||{}, P0=D.pessoas||{}, fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>{ if(/^cafe:/.test(x)===RC()) ks.add(x.split('_')[1]); });
     return [...ks].map(k=>{ const p=P0[k]||{}, f=fx[k]; return {k,nome:f?titulo(f.nome):(p.n||'(sem nome)'),emp:p.e||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX INDUSTRIA E COMERCIO LTDA'):''),setor:f?(f.setor||''):'',cad:!!f,grupo:p.g||''}; })
       .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))&&(!A.setor||(A.setor==='-'?!p.setor:p.setor===A.setor))) /* a busca por nome filtra na própria tela (almBusca), sem redesenhar */
-      .filter((p,i,a)=>{ if(!a._ks) a._ks={v:cafeKs(m)}; const ks=a._ks.v; return !ks||ks.has(p.k); }) /* 03/11: só quem está na lista da folha (café ou almoço) */
+      .filter((p,i,a)=>{ if(semLista) return true; if(!a._ks) a._ks={v:cafeKs(m)}; const ks=a._ks.v; return !ks||ks.has(p.k); }) /* 03/11: só quem está na lista da folha (café ou almoço) */
       .sort((a,b)=>a.nome.localeCompare(b.nome)); }
   /* CPFs das pessoas da lista fixa do café (ligadas pelo cadastro ou pelo Face ID); null = lista vazia (não filtra) */
   function cafeKs(m){ const sv=FK; FK=RC()?'cafe':'alm'; try{ if(!listaFolha().length) return null; const d=(A.dia&&A.dia.slice(0,7)===m)?A.dia:m+'-28'; return new Set(folhaPessoas0(A.ctx,d).L.map(x=>x.k).filter(Boolean)); } finally{ FK=sv; } }
@@ -319,7 +319,7 @@
       +(!A.sit?`<details class="alm-bl aus"><summary class="label">AUSÊNCIAS PROGRAMADAS <b>(${ausAtivas().length})</b></summary>${ausLista(c,null)}</details>`:'');
     /* RH revisado (opção 2): o dia em destaque — tira dos dias, números do dia e três colunas */
     const pres=L.filter(x=>x.s.v!=='aus'&&x.s.v!=='fora').length, pc=pres?Math.round(sim.length/pres*100):0, R$=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-    const kpi=`<div class="alm-v2k"><div><span>Almoçaram${emCurso?' até agora':''}</span><b class="num">${sim.length} <small>de ${pres}</small></b><i class="alm-v2b"><em style="width:${pc}%"></em></i></div>
+    const kpi=`<div class="alm-v2k"><div><span>Almoçaram${emCurso?' até agora':''}</span><b class="num">${sim.length} <small>de ${pres} na empresa</small></b>${(()=>{ if(!cafeKs(m)) return ''; const LS=listaDia(c,d); return `<small class="alm-fxk">${LS.total-LS.marc} na folha para assinar${LS.ausentes.length?` · ${LS.ausentes.length} da folha sem Face ID hoje (veja embaixo)`:''}</small>`; })()}<i class="alm-v2b"><em style="width:${pc}%"></em></i></div>
       <div class="${nao.length?'w':''}"><span>Sem justificativa</span><b class="num">${nao.length}</b><small>${emCurso?pend.length+' ainda não almoçaram · até '+esc(cfg().fim||'14:30'):nao.length?'vão para o desconto':'tudo certo neste dia'}</small></div>
       <div><span>Justificados</span><b class="num">${jus.length}</b><small>${jus.length?esc([...new Set(jus.map(x=>(x.s.j&&x.s.j.tipo)||'Justificado'))].slice(0,3).join(' · ')):'nenhum'}${fora.length?' · '+fora.length+' não almoçam aqui':''}</small></div>
       <div><span>Almoços no mês</span><b class="num">${st?st.tot.toLocaleString('pt-BR'):0}</b><small>${st&&st.valor?'custo '+R$(st.custo)+(st.vdesc?' · descontos '+R$(st.descontos):''):'informe o valor da refeição em Cadastros › Configurações'}</small></div></div>`;
@@ -327,7 +327,50 @@
     const col1=(pend.length?blPend:'')+(pend.length?(nao.length?blNao:''):blNao)+blJus;
     return `${tira}${RC()?'':avisoParcial(c,m,d)+avisoSemRef(c,m,d)}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram${emCurso?' até agora':''}</span>${emCurso?`<span class="pill">${pend.length} ainda não almoçaram · almoço até ${esc(cfg().fim||'14:30')}</span>`:''}${nao.length||!emCurso?`<span class="pill warn">${nao.length} sem justificativa</span>`:''}${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>${kpi}
       ${emCurso?`<div class="alm-emcurso">Almoço em andamento: quem ainda não passou no refeitório só vira “sem justificativa” depois das ${esc(cfg().fim||'14:30')}.</div>`:''}
-      <div class="alm-v2g"><div class="alm-v2c">${col1}</div><div class="alm-v2c">${blSim2}</div><div class="alm-v2c alm-v2r">${folhasPaineis(c,d)}${blMais.replace('<details class="alm-bl aus">','<details class="alm-bl aus" open>')}</div></div>`; }
+      <div class="alm-v2g"><div class="alm-v2c">${col1}</div><div class="alm-v2c">${blSim2}</div><div class="alm-v2c alm-v2r">${folhasPaineis(c,d)}${blMais.replace('<details class="alm-bl aus">','<details class="alm-bl aus" open>')}</div></div>${foraLista(c,m,d)}`; }
+  /* ---------- 03/11: quem passou no Face ID no dia e não está na lista da folha (não conta no almoço/café) ---------- */
+  function foraLista(c,m,d){ const ks=cafeKs(m); if(!ks) return ''; const esc=c.esc, dia=((A.dados[m]||{}).dias||{})[d]||{};
+    const L=pessoasDoMes(m,true).filter(p=>dia[p.k]&&!ks.has(p.k)).map(p=>Object.assign({x:dia[p.k]},p,{nome:titulo(String(p.nome).toLowerCase())}));
+    A.fx=A.fx||{q:'',e:'',s:''}; const F=A.fx, emps=[...new Set(L.map(p=>empCurta(p.emp)||'Sem empresa'))].sort();
+    if(F.e&&!emps.includes(F.e)) F.e='';
+    const hr=x=>{ const t=(x.t||[]).map(v=>String(v).slice(0,5)).sort(); return t.length?t[0]+(t.length>1?' – '+t[t.length-1]:''):''; };
+    const rows=L.map(p=>{ const r=p.x[RFL()], e=empCurta(p.emp)||'Sem empresa', b=nrm(p.nome+' '+e+' '+(p.setor||'')+' '+p.k);
+      return `<div class="alm-l alm-fxr" data-fxb="${esc(b)}" data-fxe="${esc(e)}" data-fxs="${r?'sim':'nao'}"><div><b class="alm-fxn">${esc(p.nome)}</b><small>${esc([e,p.setor].filter(Boolean).join(' · '))}${p.cad?'':' · sem cadastro no RH'}</small></div>
+        <div class="alm-r">${r?`<span class="pill ok">almoçou ${esc(r)}</span>`:'<span class="pill">não almoçou</span>'}${hr(p.x)?`<small>na empresa ${esc(hr(p.x))}</small>`:''}<button class="btn sec rh-sm" data-act="alm-fxadd" data-n="${esc(p.nome)}">Pôr na lista</button></div></div>`; }).join('');
+    const nSim=L.filter(p=>p.x[RFL()]).length;
+    const LS=listaDia(c,d), semFid=LS.ausentes, nT=LS.total;
+    const sfH=semFid.length?`<details class="alm-bl alm-fx alm-fx2" ${A.fx2Ab?'open':''}><summary class="label" data-act="alm-fx2ab">NA LISTA DA FOLHA E NÃO PASSARAM NO FACE ID HOJE <b>(${semFid.length})</b> <small>· ${nT} na folha · ${LS.marc} marcados “não veio” · ${nT-LS.marc} para assinar</small></summary>
+      <div class="sub" style="margin:4px 0 10px">Estão na folha para assinar, mas não contam no “de N” do alto (que é quem passou no Face ID hoje). Se não vieram, marque “não veio” na folha; se o nome não está ligado ao Face ID, toque no nome na lista fixa para ligar.</div>
+      <div class="alm-fxl">${semFid.map(x=>`<div class="alm-l"><div><b>${esc(x.nome)}</b><small>${x.motivo}</small></div></div>`).join('')}</div></details>`:'';
+    return `<details class="alm-bl alm-fx" ${A.fxAb?'open':''}><summary class="label" data-act="alm-fxab">PASSARAM NO FACE ID E NÃO ESTÃO NA LISTA DA FOLHA <b>(${L.length})</b>${L.length?` <small>· ${nSim} almoçaram · ${L.length-nSim} não almoçaram</small>`:''}</summary>
+      <div class="sub" style="margin:4px 0 10px">Essas pessoas não contam nos números do dia, no fechamento nem no desconto. Para contar, toque em “Pôr na lista”.</div>
+      ${L.length?`<div class="alm-fxf"><input class="txt" id="alm-fxq" type="search" placeholder="Procurar por nome, empresa, setor ou CPF" value="${esc(F.q)}" aria-label="Procurar">
+        <select class="txt" id="alm-fxe" aria-label="Empresa"><option value="">Todas as empresas</option>${emps.map(e=>`<option ${F.e===e?'selected':''}>${esc(e)}</option>`).join('')}</select>
+        <div class="seg" role="group" aria-label="Situação">${[['','Todos'],['sim','Almoçaram'],['nao','Não almoçaram']].map(([v,t])=>`<button data-act="alm-fxs" data-v="${v}" aria-pressed="${F.s===v}">${t}</button>`).join('')}</div>
+        <span class="sub" id="alm-fxn"></span></div><div class="alm-fxl">${rows}</div>`:'<div class="sub">Ninguém fora da lista neste dia.</div>'}</details>${sfH}`; }
+  /* quem está na lista da folha (do almoço ou do café, conforme a escolha) e não passou no Face ID no dia */
+  function listaDia(c,d){ const sv=FK; fkUsa(RC()?'cafe':'alm'); try{ const F=folhaEst(c,d), L=folhaPessoas0(c,d).L.filter(x=>!(F.tirar||{})[x.nome]);
+      const marc=L.filter(x=>F.nv[x.nome]).length;
+      const aus=L.filter(x=>!x.passou&&!F.nv[x.nome]).map(x=>({nome:x.nome,motivo:x.ferias?'de férias':!x.k?'não está ligado a ninguém do Face ID (terceiro, motorista ou nome diferente)':!x.fid?'sem passagem no Face ID neste mês':'não passou no Face ID hoje'}));
+      return {total:L.length,marc,ausentes:aus}; } finally{ fkUsa(sv); } }
+  function fxFiltra(){ const F=A.fx||{}, ws=nrm(F.q).split(/\s+/).filter(Boolean), dq=String(F.q||'').replace(/\D/g,''); let n=0, t=0;
+    document.querySelectorAll('#view .alm-fxr').forEach(el=>{ const b=el.dataset.fxb||''; const ok=(!ws.length||ws.every(w=>b.includes(w))||(dq.length>=3&&b.includes(dq)))&&(!F.e||el.dataset.fxe===F.e)&&(!F.s||el.dataset.fxs===F.s); el.hidden=!ok; t++; if(ok) n++; });
+    const q=document.getElementById('alm-fxn'); if(q) q.textContent=(F.q||F.e||F.s)?n+' de '+t:''; }
+  document.addEventListener('input',ev=>{ const t=ev.target; if(t.id==='alm-fxq'){ A.fx=A.fx||{}; A.fx.q=t.value; fxFiltra(); } });
+  document.addEventListener('change',ev=>{ const t=ev.target; if(t.id==='alm-fxe'){ A.fx=A.fx||{}; A.fx.e=t.value; fxFiltra(); } });
+  document.addEventListener('click',async ev=>{ const b=ev.target.closest('[data-act^="alm-fx"]'); if(!b||!A.ctx) return; const c=A.ctx, P=c.P, a=b.dataset.act;
+    if(a==='alm-fxab'){ ev.preventDefault(); A.fxAb=!A.fxAb; b.parentElement.open=A.fxAb; return; }
+    if(a==='alm-fx2ab'){ ev.preventDefault(); A.fx2Ab=!A.fx2Ab; b.parentElement.open=A.fx2Ab; return; }
+    if(a==='alm-fxs'){ A.fx=A.fx||{}; A.fx.s=b.dataset.v; b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); fxFiltra(); return; }
+    if(a==='alm-fxadd'){ const nm=b.dataset.n, cafe=RC(); b.disabled=true;
+      try{ const cfg0=(c.R.cfg||{}), cur=cafe?((cfg0.cafe||{}).lista||listaCafe()):(((cfg0.almoco||{}).listaFolha)||[]), ns=[...cur];
+        if(!ns.some(x=>fMesma(semPref(x),nm))) ns.push(nm);
+        if(cafe){ const cf=Object.assign({},cfg0.cafe||{},{lista:ns,em:new Date().toISOString(),por:c.eu?c.eu():''}); await P.db().doc('rh/config').set({cafe:cf},{merge:true}); c.R.cfg=c.R.cfg||{}; c.R.cfg.cafe=cf; }
+        else { const al=Object.assign({},cfg0.almoco||{},{listaFolha:ns}); await P.db().doc('rh/config').set({almoco:al},{merge:true}); c.R.cfg=c.R.cfg||{}; c.R.cfg.almoco=al; }
+        if(A.folha) A.folha.rasc=null; P.toast(nm+' entrou na lista da folha '+(cafe?'do café':'do almoço')+'.'); P.render(); }
+      catch(e){ b.disabled=false; P.toast('Não foi possível pôr na lista: '+((e&&e.message)||e)); } return; } });
+  { const v0=document.getElementById('view'); if(v0) new MutationObserver(()=>{ if(document.querySelector('#view .alm-fxr')&&A.fx&&(A.fx.q||A.fx.e||A.fx.s)) fxFiltra(); }).observe(v0,{childList:true}); }
+  try{ document.head.insertAdjacentHTML('beforeend','<style id="alm-fx-css">.alm-fx{margin-top:14px}.alm-fx>summary{cursor:pointer;list-style:none;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}.alm-fx>summary::before{content:"▸";margin-right:4px}.alm-fx[open]>summary::before{content:"▾"}.alm-fxf{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.alm-fxf #alm-fxq{flex:1 1 260px;min-width:200px}.alm-fxf select{width:auto}.alm-fxl{columns:2 520px;column-gap:18px}.alm-fxl .alm-l{break-inside:avoid}.alm-fxr[hidden]{display:none}</style>'); }catch(e){}
   /* ---------- justificativa (janela) ---------- */
   function vJust(c){ const J=A.jus; if(!J) return ''; const esc=c.esc, aj=((A.aj[J.d.slice(0,7)]||{}).aj||{})[ajK(J.d,J.k)], cur=aj&&aj.v==='just'?aj:null; const tipos=cfg().just||JUST_PADRAO;
     if(J.tipo===undefined){ J.tipo=cur?cur.tipo:''; J.mot=cur?cur.mot||'':''; }
