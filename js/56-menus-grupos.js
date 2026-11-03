@@ -14,7 +14,7 @@ const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios',
 const RHG=[{v:'rhinicio'},
   {g:'Minha agenda',ic:'check',vs:[['rhtarefas','Tarefas e calendário'],['rhpedidos','Pedidos do pessoal'],['rhagenda','Todos os prazos']]}, /* 31/10; 03/11: a Agenda saiu de Prazos e veio para cá (pedido da Juliana) */
   {g:'Pessoas',ic:'equipe',vs:[['rhfunc','Funcionários'],['rhvagas','Admissões e vagas'],['rhpres','Quem está hoje'],['rhunif','Uniformes']]},
-  {g:'Ausências',ic:'relogio',vs:[['rhferias','Férias'],['rhatest','Atestados e faltas'],['rhalmoco','Almoço']]},
+  {g:'Ausências',ic:'relogio',vs:[['rhferias','Férias'],['rhatest','Atestados e faltas'],['rhalmoco','Almoço/café']]},
   {g:'Prazos',ic:'cal2',vs:[['rhexp','Experiência'],['rhpj','Troca dos PJ'],['rhqual','Exames e NRs']]},
   {g:'Documentos',ic:'folha',vs:[['rhdocs','Contratos e documentos'],['rhfichas','Fichas de EPI'],['rhcom','Comunicados']]},
   {g:'Relatórios',ic:'grafico',vs:[['rhrelmes','Relatório do mês'],['rhfech','Fechamento da folha'],['rhind','Indicadores'],['rhpont','Pontualidade'],['rhalmdir','Almoço (diretoria)']]},

@@ -1807,7 +1807,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
     rhferias:{nome:'Férias',mob:'Férias',render:()=>{ if(!['ferias','mapa'].includes(R.pzv)) R.pzv='ferias'; return vFerias(); }},
     rhatest:{nome:'Atestados e faltas',mob:'Atestados',render:()=>topo('Atestados e faltas','Atestado, declaração de horas e faltas de cada pessoa. Entra sozinho no fechamento da folha, na presença e no almoço.','','RH · ATESTADOS E FALTAS')+(window.RHAtest?RHAtest.render(Object.assign(atCtx(),{semTitulo:true})):'<section class="card">Carregando…</section>')},
-    rhalmoco:{nome:'Almoço',mob:'Almoço',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'},
+    rhalmoco:{nome:'Almoço/café',mob:'Almoço/café',render:()=>window.RHAlmoco?window.RHAlmoco.render(almCtx()):'<section class="card">Carregando…</section>'},
     rhagenda:{nome:'Todos os prazos',mob:'Prazos',render:()=>{ R.agv='agenda'; return vAgenda(); }},
     rhexp:{nome:'Experiência',mob:'Experiência',render:()=>{ R.pzv='exp'; return vFerias(); }},
     rhpj:{nome:'Troca dos PJ',mob:'PJ',render:()=>{ R.pzv='pj'; return vFerias(); }},
