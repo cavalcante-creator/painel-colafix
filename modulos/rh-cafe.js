@@ -17,16 +17,16 @@
   const linhas=c=>{ const x=(c.R.cfg&&c.R.cfg.cafe&&c.R.cfg.cafe.linhas)||[]; return Array.isArray(x)?x:[]; };
   const grupos=ls=>{ const G=[]; let g=null; ls.forEach(l=>{ const t=String(l||'').trim(); if(!t) return; if(ehGrupo(t)){ g={g:t,ns:[]}; G.push(g); } else { if(!g){ g={g:'',ns:[]}; G.push(g); } g.ns.push(t); } }); return G.filter(x=>x.ns.length||x.g); };
   const nomes=ls=>grupos(ls).flatMap(g=>g.ns);
-  function est(c,d){ let F=C.doc[d]; if(F) return F; F=C.doc[d]={nv:{},emit:null,foto:null,carregando:true};
-    c.P.db().doc('rh/dados/cafefolha/'+d).get().then(g=>{ const x=g&&g.exists?g.data():{}; F.nv=x.nv||{}; F.emit=x.emit||null; F.foto=x.foto||null; F.carregando=false; c.P.render(); }).catch(()=>{ F.carregando=false; c.P.render(); });
+  function est(c,d){ let F=C.doc[d]; if(F) return F; F=C.doc[d]={nv:{},tirar:{},resp:null,emit:null,foto:null,carregando:true};
+    c.P.db().doc('rh/dados/cafefolha/'+d).get().then(g=>{ const x=g&&g.exists?g.data():{}; F.nv=x.nv||{}; F.tirar=x.tirar||{}; F.resp=x.resp||null; F.emit=x.emit||null; F.foto=x.foto||null; F.carregando=false; c.P.render(); }).catch(()=>{ F.carregando=false; c.P.render(); });
     return F; }
-  async function salvar(c,d){ const F=C.doc[d]; try{ await c.P.db().doc('rh/dados/cafefolha/'+d).set({dia:d,nv:F.nv||{},emit:F.emit||null,foto:F.foto||null,em:new Date().toISOString()}); }catch(e){ c.P.toast('Não foi possível guardar: '+((e&&e.message)||e)); } }
+  async function salvar(c,d){ const F=C.doc[d]; try{ await c.P.db().doc('rh/dados/cafefolha/'+d).set({dia:d,nv:F.nv||{},tirar:F.tirar||{},resp:F.resp||null,emit:F.emit||null,foto:F.foto||null,em:new Date().toISOString()}); }catch(e){ c.P.toast('Não foi possível guardar: '+((e&&e.message)||e)); } }
   /* páginas: cada página começa com "Nome | Assinatura"; título de grupo não fica sozinho no pé da página */
-  function paginas(c,d){ const F=est(c,d), G=grupos(linhas(c)), rows=[]; G.forEach(g=>{ if(g.g) rows.push({grupo:g.g}); g.ns.forEach(n=>rows.push({nome:n,cz:F.nv[n]||''})); });
+  function paginas(c,d){ const F=est(c,d), G=grupos(linhas(c)), rows=[]; G.forEach(g=>{ if(g.g) rows.push({grupo:g.g}); g.ns.filter(n=>!(F.tirar||{})[n]).forEach(n=>rows.push({nome:n,cz:F.nv[n]||''})); });
     for(let i=0;i<4;i++) rows.push({nome:'',cz:''});
     const ps=[]; let pg=[{cab:true}]; rows.forEach((r,i)=>{ const resta=PAG-pg.length; if(resta<=0||(r.grupo&&resta<=1)){ ps.push(pg); pg=[{cab:true}]; } pg.push(r); }); if(pg.length>1) ps.push(pg);
     if(ps.length>4){ return ps.slice(0,4); } return ps; }
-  function titulo(c,d){ const F=est(c,d), ns=nomes(linhas(c)); return 'CAFÉ - '+br(d)+' - '+(ns.length-ns.filter(n=>F.nv[n]).length); }
+  function titulo(c,d){ const F=est(c,d), ns=nomes(linhas(c)).filter(n=>!(F.tirar||{})[n]); return 'CAFÉ - '+br(d)+' - '+(ns.length-ns.filter(n=>F.nv[n]).length); }
   function imprimir(c,d){ const FT=window.RHAlmFoto; if(!FT) return c.P.toast('Carregando… tente de novo em um instante.'); const F=est(c,d);
     if(!nomes(linhas(c)).length) return c.P.toast('Cadastre a lista do café primeiro (Editar a lista).');
     const w=window.open('','_blank'); if(!w) return c.P.toast('Libere as janelas (pop-up) para imprimir.');
@@ -56,18 +56,51 @@
     const P0=D.pessoas||{}, out=[]; Object.keys(D.dias[d]).forEach(k=>{ const x=D.dias[d][k]; out.push({n:(P0[k]||{}).n||'',c:!!(x&&x.c)}); }); return out; }
   function mesma(a,b){ const A=norm(semPref(a)).split(' ').filter(w=>w.length>1&&!['DA','DE','DO','DAS','DOS'].includes(w)), B=norm(b).split(' ').filter(w=>w.length>1&&!['DA','DE','DO','DAS','DOS'].includes(w));
     if(!A.length||!B.length||A[0]!==B[0]) return false; const [p,q]=A.length<=B.length?[A,B]:[B,A]; return p.every(w=>q.includes(w)); }
+  /* ---------- conferência pelo Face ID antes de imprimir (igual à folha do almoço, pedido de 03/11) ---------- */
+  const fN=s=>norm(s).toLowerCase();
+  function pessoas(c,d){ const A=window.RHAlmoco&&window.RHAlmoco._A, m=d.slice(0,7), D=(A&&A.dados&&A.dados[m])||{}, dia=(D.dias||{})[d]||null, P0=D.pessoas||{};
+    const func=(c.R.func||[]).filter(f=>!/deslig|inativ/i.test(f.status||'')||(f.desligamento&&f.desligamento>=d));
+    const fer=(c.R.fer||[]).filter(x=>x.inicio&&x.inicio<=d&&(x.fim||x.inicio)>=d&&!/cancel/i.test(x.status||''));
+    const um=xs=>xs.length===1?xs[0]:null;
+    const L=[]; grupos(linhas(c)).forEach(g=>g.ns.forEach(n=>{ const base=semPref(n);
+      const f=um(func.filter(x=>mesma(base,x.nome))); let k=f?String(f.cpf||'').replace(/\D/g,''):''; if(k) k=k.padStart(11,'0');
+      if(!k||!P0[k]){ const kk=um(Object.keys(P0).filter(x=>mesma(base,P0[x].n||''))); if(kk) k=kk; }
+      L.push({nome:n,g:g.g,k,f,fid:!!(k&&P0[k]),passou:!!(k&&dia&&dia[k]),ferias:!!(f&&(fer.some(y=>y.funcId===f._id)||/f[eé]rias/i.test(f.status||'')))}); }));
+    return {L,temDia:!!dia}; }
+  function conf(c,d){ const esc=c.esc, F=est(c,d), {L,temDia}=pessoas(c,d), brD=br(d); F.tirar=F.tirar||{};
+    const LV=L.filter(x=>!F.tirar[x.nome]), n=LV.filter(x=>F.nv[x.nome]).length;
+    const ck=(x,mot)=>`<label class="alm-fk ${F.nv[x.nome]?'on':''}"><input type="checkbox" data-cf-nv="${esc(x.nome)}" data-mot="${mot}" ${F.nv[x.nome]?'checked':''}> <span>${esc(x.nome)}</span>${F.nv[x.nome]?`<em>${esc(F.nv[x.nome])}</em>`:''}</label>`;
+    let corpo='';
+    if(F.carregando) corpo='<div class="sub">Carregando…</div>';
+    else if(!temDia&&F.resp!=='sem') corpo=`<div class="alm-fq"><b>O CSV do Face ID de ${esc(brD)} já foi importado?</b><span>Ainda não aparece nenhum registro do Face ID neste dia. Com ele, o painel mostra quem está na lista e não passou na catraca, para você confirmar quem não veio.</span>
+        <div class="alm-fa"><label class="btn">Importar o CSV agora<input type="file" accept=".csv,.txt" hidden data-cf-csv="1"></label><button class="btn sec" data-act="cf-sem">Emitir sem conferir pelo Face ID</button></div></div>`;
+    else { const nao=LV.filter(x=>x.fid&&!x.passou&&!x.ferias), fer=LV.filter(x=>x.ferias), tir=L.filter(x=>F.tirar[x.nome]);
+      corpo=(temDia?`<div class="alm-fg"><b>Na lista, mas não passaram no Face ID em ${esc(brD)} (${nao.length})</b><span>Marque quem realmente não veio. Quem você não marcar fica normal na folha, para assinar.</span>
+          ${nao.length?`<div class="alm-fks">${nao.map(x=>ck(x,'Não veio')).join('')}</div>`:'<div class="sub">Todos da lista que têm Face ID passaram na catraca.</div>'}</div>`:'')
+        +(fer.length?`<div class="alm-fg"><b>De férias em ${esc(brD)} (${fer.length})</b><span>Marque para sair “Férias” na folha.</span><div class="alm-fks">${fer.map(x=>ck(x,'Férias')).join('')}</div></div>`:'')
+        +`<div class="alm-fg"><b>Procurar pessoa na lista</b><span>Digite parte do nome para marcar “não veio” ou tirar a pessoa só da folha deste dia. Terceiros e motoristas sem Face ID são marcados por aqui.</span>
+          <input class="txt alm-fbusca" id="cf-fbusca" placeholder="Ex.: Paulo, Terceiro, Motorista…" autocomplete="off" value="${esc(C.fbusca||'')}"><div id="cf-fres">${busca(c,d)}</div></div>`
+        +(()=>{ const ja=new Set(nao.concat(fer).map(x=>x.nome)), man=LV.filter(x=>F.nv[x.nome]&&!ja.has(x.nome)); return man.length?`<div class="alm-fg"><b>Marcados por você (${man.length})</b><span>Marcados pela busca.</span><div class="alm-fks">${man.map(x=>`<div class="alm-fk on"><span>${esc(x.nome)}</span><em>${esc(F.nv[x.nome])}</em><button class="lnk" data-act="cf-nvx" data-n="${esc(x.nome)}">Desfazer</button></div>`).join('')}</div></div>`:''; })()
+        +(tir.length?`<div class="alm-fg"><b>Tirados da folha deste dia (${tir.length})</b><span>Não saem na impressão de ${esc(brD)}. A lista fixa não muda.</span><div class="alm-fks">${tir.map(x=>`<div class="alm-fk"><span>${esc(x.nome)}</span><button class="lnk" data-act="cf-dev" data-n="${esc(x.nome)}" style="margin-left:auto">Devolver</button></div>`).join('')}</div></div>`:'')
+        +(F.emit?`<div class="alm-fe ${F.emit.mudou?'mud':''}">${F.emit.mudou?'<b>Marcação alterada depois de emitida</b> — imprima de novo para a folha ficar certa. ':''}Emitida em ${esc(new Date(F.emit.em).toLocaleDateString('pt-BR'))} às ${esc(new Date(F.emit.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))}${F.emit.por?' por '+esc(F.emit.por):''}${F.emit.n>1?' ('+F.emit.n+' vezes)':''}. Pode mudar as marcações e imprimir de novo.</div>`:'')
+        +`<div class="alm-fz"><span><b>${LV.length}</b> na folha · <b>${n}</b> marcado${n===1?'':'s'} · <b>${LV.length-n}</b> para assinar${tir.length?' · '+tir.length+' tirado'+(tir.length>1?'s':'')+' da folha':''}</span><button class="btn" data-act="cf-imp">${F.emit?'Imprimir de novo':'Imprimir folha'}</button></div>`; }
+    return `<section class="card alm-folha cf-l"><div class="alm-fh"><div><b>Folha de assinatura do café · ${esc(brD)}</b><span>A folha sai normal, para todos assinarem; só quem estiver marcado sai em cinza.</span></div>
+      <div class="alm-fa">${!F.carregando&&F.resp==='sem'&&!temDia?'<button class="lnk" data-act="cf-volta">Voltar à pergunta do Face ID</button>':''}</div></div>${corpo}</section>`; }
+  function busca(c,d){ const esc=c.esc, q=fN(C.fbusca||''); if(q.length<2) return ''; const F=est(c,d), {L}=pessoas(c,d); F.tirar=F.tirar||{};
+    const xs=L.filter(x=>fN(x.nome).includes(q)).slice(0,10); if(!xs.length) return '<div class="sub" style="margin-top:6px">Ninguém da lista com esse nome.</div>';
+    return `<div class="alm-fbr">${xs.map(x=>{ const tir=F.tirar[x.nome], m=F.nv[x.nome], st=tir?'Tirado desta folha':m||(x.passou?'Passou no Face ID':x.fid?'Não passou no Face ID':'Normal (assina)');
+      return `<div class="alm-fbl ${tir?'tir':m?'on':''}"><div><b>${esc(x.nome)}</b><small>${esc(st)}</small></div><div class="alm-fa">${tir?`<button class="btn sec" data-act="cf-dev" data-n="${esc(x.nome)}">Devolver à folha</button>`
+        :`${m?`<button class="btn sec" data-act="cf-nvx" data-n="${esc(x.nome)}">Desfazer</button>`:`<button class="btn sec" data-act="cf-nvset" data-n="${esc(x.nome)}">Não veio</button>`}<button class="lnk" data-act="cf-tirar" data-n="${esc(x.nome)}">Tirar desta folha</button>`}</div></div>`; }).join('')}</div>`; }
   /* ---------- tela ---------- */
   function render(c){ C.ctx=c; const esc=c.esc, P=c.P; if(!C.dia) C.dia=hoje(); const d=C.dia, F=est(c,d), ls=linhas(c), G=grupos(ls), ns=nomes(ls);
     try{ if(window.RHAlmoco&&window.RHAlmoco.carregar&&c.almCtx) window.RHAlmoco.carregar(c.almCtx(),d.slice(0,7)); }catch(e){}
-    const nvN=ns.filter(n=>F.nv[n]).length;
+    const tirN=ns.filter(n=>(F.tirar||{})[n]).length, nvN=ns.filter(n=>F.nv[n]&&!(F.tirar||{})[n]).length;
     const nav=`<span class="cf-nav"><button class="btn sec rh-sm" data-act="cf-dia" data-v="-1" aria-label="Dia anterior">‹</button><input class="txt" type="date" id="cf-dia" value="${d}"><button class="btn sec rh-sm" data-act="cf-dia" data-v="1" aria-label="Próximo dia">›</button>${d!==hoje()?'<button class="lnk" data-act="cf-hoje">hoje</button>':''}</span>`;
-    const head=c.topo('Folha do café',`${dsem(d)}, ${br(d)} · ${ns.length} na lista${nvN?' · '+nvN+' não vieram':''} · <b>${ns.length-nvN}</b> para assinar`,nav+`<button class="btn sec" data-act="cf-ed">Editar a lista</button><button class="btn" data-act="cf-imp" ${ns.length?'':'disabled'}>${F.emit?'Imprimir de novo':'Imprimir folha'}</button>`);
+    const head=c.topo('Folha do café',`${dsem(d)}, ${br(d)} · ${ns.length-tirN} na folha${nvN?' · '+nvN+' marcados':''} · <b>${ns.length-tirN-nvN}</b> para assinar`,nav+`<button class="btn sec" data-act="cf-ed">Editar a lista</button><button class="btn" data-act="cf-imp" ${ns.length?'':'disabled'}>${F.emit?'Imprimir de novo':'Imprimir folha'}</button>`);
     if(C.ed) return head+editor(c);
     if(!ns.length) return head+`<section class="card"><div class="empty"><b>Ainda não tem a lista do café</b><span>Cole os nomes ou importe a planilha do café (uma aba por dia; os títulos em MAIÚSCULAS viram os grupos).</span><span><button class="btn" data-act="cf-ed">Montar a lista</button></span></div></section>`;
-    const emit=F.emit?`<div class="cf-em ${F.emit.mudou?'mud':''}">${F.emit.mudou?'<b>Marcação mudou depois de impressa</b> — imprima de novo.':'Impressa em '+esc(new Date(F.emit.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+(F.emit.por?' por '+esc(F.emit.por):'')+'.'}</div>`:'';
-    const lista=G.map(g=>`${g.g?`<div class="cf-g">${esc(g.g)}</div>`:''}${g.ns.map(n=>`<label class="cf-p${F.nv[n]?' nv':''}"><span>${esc(n)}</span><input type="checkbox" data-cf-nv="${esc(n)}" ${F.nv[n]?'checked':''}> <small>Não veio</small></label>`).join('')}`).join('');
-    const prev=`<div class="cf-pv"><div class="cf-pvh"><b>Como vai sair</b><span>com as marcas pretas para conferir pela foto</span></div><table><thead><tr><th colspan="2">${esc(titulo(c,d))}</th></tr><tr class="hd"><th>Nome</th><th>Assinatura</th></tr></thead><tbody>${G.map(g=>`${g.g?`<tr class="gr"><td colspan="2">${esc(g.g)}</td></tr>`:''}${g.ns.map(n=>`<tr class="${F.nv[n]?'cz':''}"><td>${esc(n)}</td><td>${F.nv[n]?esc(F.nv[n]):''}</td></tr>`).join('')}`).join('')}</tbody></table></div>`;
-    return head+`<div class="cf-gr"><section class="card cf-l"><h2>Quem não veio hoje?</h2><div class="sub" style="margin:0 0 8px">Marque antes de imprimir: sai em cinza com "Não veio" e o número do título desconta.</div>${emit}<div class="cf-ls">${lista}</div></section>
+    const prev=`<div class="cf-pv"><div class="cf-pvh"><b>Como vai sair</b><span>com as marcas pretas para conferir pela foto</span></div><table><thead><tr><th colspan="2">${esc(titulo(c,d))}</th></tr><tr class="hd"><th>Nome</th><th>Assinatura</th></tr></thead><tbody>${G.map(g=>{ const xs=g.ns.filter(n=>!(F.tirar||{})[n]); return xs.length||!g.ns.length?`${g.g?`<tr class="gr"><td colspan="2">${esc(g.g)}</td></tr>`:''}${xs.map(n=>`<tr class="${F.nv[n]?'cz':''}"><td>${esc(n)}</td><td>${F.nv[n]?esc(F.nv[n]):''}</td></tr>`).join('')}`:''; }).join('')}</tbody></table></div>`;
+    return head+`<div class="cf-gr">${conf(c,d)}
       <div class="cf-r">${foto(c,d)}<section class="card">${prev}</section></div></div>`; }
   function foto(c,d){ const esc=c.esc, F=est(c,d), R=ffE(d);
     const inp=l=>`<label class="btn ${l?'sec':''}">${l||'Tirar ou escolher a foto'}<input type="file" accept="image/*" multiple hidden data-cf-foto="1"></label>`;
@@ -110,18 +143,24 @@
       if(!grupos(ls).some(g=>g.ns.length)) return c.P.toast('A lista está sem nomes.'); C.salv=true; c.P.render();
       try{ await c.P.db().doc('rh/config').set({cafe:{linhas:ls,em:new Date().toISOString(),por:c.eu?c.eu():''}},{merge:true}); if(c.R.cfg) c.R.cfg.cafe={linhas:ls}; C.ed=null; C.abas=null; C.wb=null; c.P.toast('Lista do café salva: '+nomes(ls).length+' nomes.'); }
       catch(e){ c.P.toast('Não foi possível salvar: '+((e&&e.message)||e)); } C.salv=false; c.P.render(); return; }
+    if(a==='cf-sem'||a==='cf-volta'){ const F=est(c,d); F.resp=a==='cf-sem'?'sem':null; salvar(c,d); c.P.render(); return; }
+    if(['cf-nvset','cf-nvx','cf-tirar','cf-dev'].includes(a)){ const F=est(c,d), nm=b.dataset.n; F.tirar=F.tirar||{};
+      if(a==='cf-nvset') F.nv[nm]='Não veio'; if(a==='cf-nvx') delete F.nv[nm]; if(a==='cf-tirar'){ F.tirar[nm]=true; delete F.nv[nm]; } if(a==='cf-dev') delete F.tirar[nm];
+      if(F.emit) F.emit.mudou=true; salvar(c,d); c.P.render(); const i=document.getElementById('cf-fbusca'); if(i&&C.fbusca){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } return; }
     if(a==='cf-tg'){ const n=b.dataset.n, cur=ass(c,d)[n]; ffE(d).man[n]=cur==='sim'?'nao':'sim'; c.P.render(); return; }
     if(a==='cf-ffsalva'){ b.disabled=true; await salvarFoto(c,d); return; } });
   document.addEventListener('change',ev=>{ const t=ev.target, c=C.ctx; if(!t||!c) return; const d=C.dia;
     if(t.id==='cf-dia'&&/^\d{4}-\d\d-\d\d$/.test(t.value)){ C.dia=t.value; c.P.render(); return; }
-    if(t.dataset&&t.dataset.cfNv!=null){ const F=est(c,d); if(t.checked) F.nv[t.dataset.cfNv]='Não veio'; else delete F.nv[t.dataset.cfNv]; if(F.emit) F.emit.mudou=true; salvar(c,d); c.P.render(); return; }
+    if(t.dataset&&t.dataset.cfNv!=null){ const F=est(c,d); if(t.checked) F.nv[t.dataset.cfNv]=t.dataset.mot||'Não veio'; else delete F.nv[t.dataset.cfNv]; if(F.emit) F.emit.mudou=true; salvar(c,d); c.P.render(); return; }
     if(t.dataset&&t.dataset.cfFoto){ const fs=[...(t.files||[])]; t.value=''; if(fs.length) lerFotos(c,d,fs); return; }
+    if(t.dataset&&t.dataset.cfCsv){ const f=t.files&&t.files[0]; t.value=''; if(!f) return; if(!window.RHAlmoco||!RHAlmoco.importar) return c.P.toast('Abra o Almoço uma vez e tente de novo.');
+      RHAlmoco.importar(c.almCtx?c.almCtx():null,f).then(()=>c.P.render()); return; }
     if(t.dataset&&t.dataset.cfXls){ const f=t.files&&t.files[0]; t.value=''; if(f) lerXls(c,f); return; }
     if(t.id==='cf-aba'&&C.wb){ C.aba=+t.value; C.ed.txt=abaLinhas(C.aba).join('\n'); c.P.render(); return; } });
-  document.addEventListener('input',ev=>{ const t=ev.target; if(!t||t.id!=='cf-ta'||!C.ed) return; C.ed.txt=t.value; const G=grupos(t.value.split('\n')), el=document.getElementById('cf-edn'); if(el) el.textContent=G.filter(g=>g.g).length+' grupos · '+G.reduce((a,g)=>a+g.ns.length,0)+' nomes'; });
+  document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='cf-fbusca'&&C.ctx){ C.fbusca=t.value; const r=document.getElementById('cf-fres'); if(r) r.innerHTML=busca(C.ctx,C.dia); return; } if(!t||t.id!=='cf-ta'||!C.ed) return; C.ed.txt=t.value; const G=grupos(t.value.split('\n')), el=document.getElementById('cf-edn'); if(el) el.textContent=G.filter(g=>g.g).length+' grupos · '+G.reduce((a,g)=>a+g.ns.length,0)+' nomes'; });
   const css=document.createElement('style'); css.textContent=`
   .cf-nav{display:inline-flex;gap:6px;align-items:center}.cf-nav input{width:auto;height:38px}
-  .cf-gr{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:16px;align-items:start}.cf-gr .card{margin:0 0 16px}.cf-l h2,.cf-ff h2,.cf-ed h2{margin:0 0 4px;font-size:17px}
+  .cf-gr{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:16px;align-items:start}.cf-gr .card{margin:0 0 16px}.cf-l .alm-fks{max-height:none}.cf-l h2,.cf-ff h2,.cf-ed h2{margin:0 0 4px;font-size:17px}
   .cf-ls{display:flex;flex-direction:column}.cf-g{font-size:11.5px;font-weight:600;letter-spacing:.08em;color:var(--muted);padding:12px 0 4px;border-bottom:1px solid var(--line)}
   .cf-p{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}.cf-p span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cf-p small{color:var(--muted);font-size:12.5px}.cf-p.nv span{color:var(--muted);text-decoration:line-through}
   .cf-em{font-size:13px;color:var(--muted);margin:0 0 8px}.cf-em.mud{color:var(--crit);}
@@ -135,5 +174,5 @@
   .cf-a{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.cf-edb{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}.cf-aba{display:flex;gap:6px;align-items:center;font-size:13.5px}.cf-aba select{width:auto}
   .cf-ta{width:100%;font-family:inherit;font-size:14px;line-height:1.5;min-height:360px}.cf-edr{display:flex;gap:8px;align-items:center;margin-top:10px}
   @media (max-width:900px){ .cf-gr{grid-template-columns:minmax(0,1fr)} }`; document.head.appendChild(css);
-  window.RHCafe={render,_C:C,_grupos:grupos,_mesma:mesma};
+  window.RHCafe={render,_C:C,_grupos:grupos,_mesma:mesma,_pessoas:pessoas};
 })();

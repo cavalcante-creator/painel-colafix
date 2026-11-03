@@ -899,5 +899,5 @@
   .alm-pt{width:100%}.alm-pt td{vertical-align:middle}.alm-pdet td{background:var(--teal-wash)}.alm-pdg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.alm-pdg>div{display:flex;flex-direction:column;gap:3px;font-size:13px}.alm-pdg small{color:var(--muted)}
   @media (max-width:900px){ .alm-pk,.alm-pdg{grid-template-columns:repeat(2,minmax(0,1fr))} }
   </style>`); }catch(e){}
-  window.RHAlmoco={_folhaDoc:(c,d)=>folhaDoc(c||A.ctx,d||A.dia),publicar,carregar,fechamento,_prDia:prDia,ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,_A:A};
+  window.RHAlmoco={_folhaDoc:(c,d)=>folhaDoc(c||A.ctx,d||A.dia),publicar,carregar,fechamento,_prDia:prDia,ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,importar:(c,f)=>{ if(c&&!A.ctx) A.ctx=c; return importar(f); },_A:A};
 })();
