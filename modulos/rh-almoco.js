@@ -21,7 +21,24 @@
   const diasDoMes=m=>{ const [a,b]=m.split('-').map(Number), n=new Date(a,b,0).getDate(); return Array.from({length:n},(_,i)=>m+'-'+pad(i+1)); };
   const semana=d=>['dom','seg','ter','qua','qui','sex','sáb'][new Date(d+'T12:00').getDay()];
   const titulo=s=>String(s||'').toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
-  function cfg(){ const c=(A.ctx&&A.ctx.R.cfg&&A.ctx.R.cfg.almoco)||{}; return Object.assign({},PADRAO,c); }
+  /* 03/11: almoço e café controlados igual. A.ref = 'alm' | 'cafe'. No café, cfg() devolve os valores, justificativas,
+     "não toma café na empresa", ausências e "sem leitura" próprios do café (chaves …Cafe em rh/config.almoco); o fim da janela é cafeAte. */
+  const JUST_CAFE=['Tomou café fora (autorizado)','Chegou depois do café','Serviço externo','Consulta ou atestado','Outro'];
+  const RC=()=>A.ref==='cafe', RFL=()=>RC()?'c':'a', RK=k=>RC()?({fora:'foraCafe',ausencias:'ausenciasCafe',semLeitura:'semLeituraCafe',valor:'valorCafe',valorDesc:'valorDescCafe',just:'justCafe'})[k]||k:k;
+  const ajK=(d,k)=>(RC()?'cafe:':'')+d+'_'+k;
+  function refCom(r,fn){ const sv=A.ref; A.ref=r; try{ return fn(); } finally{ A.ref=sv; } }
+  function cfgBase(){ const c=(A.ctx&&A.ctx.R.cfg&&A.ctx.R.cfg.almoco)||{}; return Object.assign({},PADRAO,c); }
+  function cfg(){ const b=cfgBase(); if(!RC()) return b; return Object.assign({},b,{fim:b.cafeAte||'09:30',ini:'05:00',fora:b.foraCafe||{},ausencias:b.ausenciasCafe||[],semLeitura:b.semLeituraCafe||{},valor:b.valorCafe,valorDesc:b.valorDescCafe,just:b.justCafe||JUST_CAFE}); }
+  function cfgGrava(c,up){ const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}); Object.keys(up).forEach(k=>al[RK(k)]=up[k]); return c.P.db().doc('rh/config').set({almoco:al},{merge:true}).then(()=>{ if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; }); }
+  const cfgLe=(c,k)=>(((c.R.cfg&&c.R.cfg.almoco)||{})[RK(k)]);
+  /* troca as palavras do almoço pelas do café no que a tela mostra (fora da folha de assinatura, que já tem as suas) */
+  function fxCafe(h){ if(!RC()||typeof h!=='string') return h; const keep=[]; h=h.replace(/<!--nofx-->[\s\S]*?<!--\/nofx-->/g,m=>{ keep.push(m); return '\u0001'+(keep.length-1)+'\u0002'; }).replace(/Almoço\/café/g,'\u0003');
+    const T=[[/ALMOÇARAM/g,'TOMARAM CAFÉ'],[/Almoçaram/g,'Tomaram café'],[/almoçaram/g,'tomaram café'],[/ALMOÇOU/g,'TOMOU CAFÉ'],[/Almoçou/g,'Tomou café'],[/almoçou/g,'tomou café'],[/NÃO ALMOÇAM/g,'NÃO TOMAM CAFÉ'],[/ALMOÇAM/g,'TOMAM CAFÉ'],[/almoçam/g,'tomam café'],[/Almoça/g,'Toma café'],[/almoça/g,'toma café'],[/almoçar/g,'tomar café'],[/ALMOÇOS/g,'CAFÉS'],[/Almoços/g,'Cafés'],[/almoços/g,'cafés'],[/ALMOÇO/g,'CAFÉ'],[/Almoço/g,'Café'],[/almoço/g,'café'],[/Valor da refeição/g,'Valor do café'],[/valor da refeição/g,'valor do café'],[/da refeição/g,'do café'],[/ refeições/g,' cafés']];
+    T.forEach(([a,b])=>{ h=h.replace(a,b); }); return h.replace(/\u0003/g,'Almoço/café').replace(/\u0001(\d+)\u0002/g,(_,i)=>keep[+i]); }
+  const fxDeep=v=>!RC()?v:typeof v==='string'?fxCafe(v):Array.isArray(v)?Object.assign(v.map(fxDeep),Object.fromEntries(Object.entries(v).filter(([k])=>isNaN(k)))):v&&typeof v==='object'&&Object.getPrototypeOf(v)===Object.prototype?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,fxDeep(x)])):v;
+  function fxDoc(doc){ if(!RC()||!doc||doc.__fx) return doc; doc.__fx=true; ['text','splitTextToSize','getTextWidth'].forEach(f=>{ const o=doc[f]; if(typeof o==='function') doc[f]=function(t,...r){ return o.call(this,fxDeep(t),...r); }; }); return doc; }
+  const arqRef=n=>RC()?n.replace(/^Almoco/,'Cafe').replace(/^Refeitorio/,'Cafe'):n;
+  function cfgOld(){ const c=(A.ctx&&A.ctx.R.cfg&&A.ctx.R.cfg.almoco)||{}; return Object.assign({},PADRAO,c); }
   /* robô do Face ID (robo-faceid.js, num computador da fábrica): status em rh/dados/robo/faceid */
   function roboTxt(c){ if(!A.roboSub){ A.roboSub=true; try{ c.P.db().doc('rh/dados/robo/faceid').onSnapshot(g=>{ A.robo=g.exists?g.data():null; c.P.rerender(); },()=>{}); }catch(e){} }
     const R=A.robo; if(!R||!R.ultima) return ''; const min=(Date.now()-new Date(R.ultima).getTime())/60000, h=new Date(R.ultima).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}), dia=new Date(R.ultima).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
@@ -40,7 +57,7 @@
       if(q){ if(ch==='"'){ if(txt[i+1]==='"'){ cel+='"'; i++; } else q=false; } else cel+=ch; continue; }
       if(ch==='"') q=true; else if(ch===','||ch===';'){ row.push(cel); cel=''; } else if(ch==='\n'){ row.push(cel); L.push(row); row=[]; cel=''; } else if(ch!=='\r') cel+=ch; }
     if(cel||row.length){ row.push(cel); L.push(row); } return L.filter(r=>r.some(x=>x.trim())); }
-  function interpretar(txt){ const L=lerCsv(txt); if(!L.length) throw new Error('Arquivo vazio.');
+  function interpretar(txt){ const L=lerCsv(txt); if(!L.length) throw new Error('Arquivo vazio.'); const cfg=cfgBase;
     const cab=L[0].map(nrm), col=re=>cab.findIndex(h=>re.test(h));
     const iH=col(/^HORA$|DATA E HORA/), iN=col(/NOME/), iC=col(/^CPF$/), iE=col(/^EMPRESA$/), iG=col(/^GRUPO/), iAu=col(/AUTORIZA/), iD=col(/DISPOSITIVO/);
     if(iH<0||iC<0||iD<0) throw new Error('Este arquivo não parece o relatório de acessos do Control iD (faltam as colunas Hora, CPF ou Dispositivo).');
@@ -55,7 +72,7 @@
     Object.values(out).forEach(o=>Object.values(o).forEach(x=>{ if(x.t) x.t.sort(); }));
     if(!lidos) throw new Error('Nenhum acesso autorizado no arquivo.'); return {dias:out,pessoas:pes,lidos,de,ate}; }
   /* reimportar JUNTA as passagens com as que já estavam no dia (um arquivo parcial não apaga o almoço já lido) e refaz almoço/café */
-  function juntaDia(antes,novo){ if(!antes) return novo; const C=cfg(), dRef=nrm(C.disp), ini=hm(C.ini), fim=hm(C.fim), cafe=hm(C.cafeAte), out={};
+  function juntaDia(antes,novo){ if(!antes) return novo; const C=cfgBase(), dRef=nrm(C.disp), ini=hm(C.ini), fim=hm(C.fim), cafe=hm(C.cafeAte), out={};
     new Set(Object.keys(antes).concat(Object.keys(novo))).forEach(k=>{ const a=antes[k]||{}, b=novo[k]||{}, t=[...new Set((a.t||[]).concat(b.t||[]))].sort(); const x={p:1};
       if(t.length){ x.t=t; t.forEach(z=>{ const mm=z.match(/^(\d{2}:\d{2})(:\d{2})?\s+(.*)$/); if(!mm) return; const hh=mm[1], mi=hm(hh); if(nrm(mm[3])===dRef){ if(mi>=ini&&mi<=fim){ if(!x.a||hh<x.a) x.a=hh; } else if(mi<cafe){ if(!x.c||hh<x.c) x.c=hh; } } }); }
       else { if(a.a||b.a) x.a=[a.a,b.a].filter(Boolean).sort()[0]; if(a.c||b.c) x.c=[a.c,b.c].filter(Boolean).sort()[0]; }
@@ -97,11 +114,11 @@
   function almEmCurso(d){ const n=new Date(), h=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); if(d!==h) return false; return n.getHours()*60+n.getMinutes()<=hm(cfg().fim||'14:30'); }
   /* atestado/falta registrado pelo RH (modulos/rh-atestados.js, 30/10) */
   const atDe=(p,d)=>{ try{ return window.RHAtest?RHAtest.cobre(p,d):null; }catch(e){ return null; } };
-  function situacao(m,d,k){ const aj=((A.aj[m]||{}).aj||{})[d+'_'+k]; const x=(((A.dados[m]||{}).dias||{})[d]||{})[k];
-    let r; if(aj&&aj.v==='just') r={v:'just',j:aj,x}; else if(aj&&!aj.removido) r={v:aj.v==='sim'?'sim':'nao',aj,x}; else if(!x) r={v:'aus',x:null}; else r={v:x.a?'sim':'nao',x};
+  function situacao(m,d,k){ const aj=((A.aj[m]||{}).aj||{})[ajK(d,k)]; const x=(((A.dados[m]||{}).dias||{})[d]||{})[k];
+    let r; if(aj&&aj.v==='just') r={v:'just',j:aj,x}; else if(aj&&!aj.removido) r={v:aj.v==='sim'?'sim':'nao',aj,x}; else if(!x) r={v:'aus',x:null}; else r={v:x[RFL()]?'sim':'nao',x};
     if(r.v==='nao'&&foraDe(k)) r.v='fora';
     if(r.v==='nao'&&!r.aj&&almEmCurso(d)) r.v='pend'; /* almoço ainda não terminou hoje */
-    if(r.v==='nao'&&!r.aj){ const sl=semLeit(d); if(sl) r={v:'just',x:r.x,sl:true,j:{tipo:'Refeitório sem leitura',mot:sl.mot||'O Face ID do refeitório não registrou o almoço neste dia',por:sl.por||''}}; }
+    if(r.v==='nao'&&!r.aj){ const sl=semLeit(d); if(sl) r={v:'just',x:r.x,sl:true,j:{tipo:'Refeitório sem leitura',mot:sl.mot||(RC()?'O Face ID do refeitório não registrou o café neste dia':'O Face ID do refeitório não registrou o almoço neste dia'),por:sl.por||''}}; }
     if(r.v==='nao'&&!r.aj){ const at=atDe({cpf:k},d); if(at) r={v:'just',x:r.x,at,j:{tipo:window.RHAtest?RHAtest.TIPO(at.tipo)[1]:'Atestado',mot:(window.RHAtest?RHAtest.durTxt(at):'')+(at.mot?' · '+at.mot:''),por:at.por||''}}; }
     if(r.v==='nao'){ const au=ausDe(k,d); if(au) r={v:'just',x:r.x,aj:r.aj,aus:au,j:{tipo:'Ausência programada',mot:ausTxt(au)+(au.mot?' · '+au.mot:''),por:au.por||''}}; }
     return r; }
@@ -114,21 +131,24 @@
     const ds=(a.dias||[]).slice().sort().map(i=>SEMN[i]); const t=ds.length>1?ds.slice(0,-1).join(', ')+' e '+ds[ds.length-1]:ds[0]||'';
     return 'Toda '+t+(a.de?' · desde '+br(a.de):'')+(a.ate?' · até '+br(a.ate):''); }
   function pessoasDoMes(m){ const c=A.ctx, D=A.dados[m]||{}, P0=D.pessoas||{}, fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
-    const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>ks.add(x.split('_')[1]));
+    const ks=new Set(Object.keys(P0)); Object.keys((A.aj[m]||{}).aj||{}).forEach(x=>{ if(/^cafe:/.test(x)===RC()) ks.add(x.split('_')[1]); });
     return [...ks].map(k=>{ const p=P0[k]||{}, f=fx[k]; return {k,nome:f?titulo(f.nome):(p.n||'(sem nome)'),emp:p.e||(f?(f.tipo==='PJ'?(f.empresa||'PJ'):'COLAFIX INDUSTRIA E COMERCIO LTDA'):''),setor:f?(f.setor||''):'',cad:!!f,grupo:p.g||''}; })
       .filter(p=>(!A.emp||(A.emp==='-'?!p.emp:p.emp===A.emp))&&(!A.setor||(A.setor==='-'?!p.setor:p.setor===A.setor))) /* a busca por nome filtra na própria tela (almBusca), sem redesenhar */
       .sort((a,b)=>a.nome.localeCompare(b.nome)); }
   const empCurta=e=>!e?'Sem empresa':/COLAFIX/i.test(e)?'Colafix':titulo(e);
 
   /* ---------- tela ---------- */
-  function render(c){ A.ctx=c; const P=c.P, esc=c.esc, h=P.hojeStr(); if(!A.mes) A.mes=h.slice(0,7); assinar(A.mes); assinar(mesAnt(A.mes));
+  function render(c){ A.ctx=c; if(c.fixo==='pont') return refCom('alm',()=>render0(c));
+    const h0=render0(c), seg=`<div class="seg alm-ref" role="group" aria-label="Refeição"><button data-act="alm-ref" data-v="alm" aria-pressed="${!RC()}">Almoço</button><button data-act="alm-ref" data-v="cafe" aria-pressed="${RC()}">Café</button></div>`;
+    return fxCafe(h0).replace('<label class="btn" style="cursor:pointer">',seg+'<label class="btn" style="cursor:pointer">'); }
+  function render0(c){ A.ctx=c; const P=c.P, esc=c.esc, h=P.hojeStr(); if(!A.mes) A.mes=h.slice(0,7); assinar(A.mes); assinar(mesAnt(A.mes));
     if(c.fixo) A.vis=c.fixo; else if(A.vis==='pont'||A.vis==='dir') A.vis='dia'; /* 30/10: Pontualidade e Diretoria são telas próprias */
     const D=A.dados[A.mes]; const ds=Object.keys((D&&D.dias)||{}).sort(); if(!A.dia||A.dia.slice(0,7)!==A.mes) A.dia=ds.length?ds[ds.length-1]:(A.mes===h.slice(0,7)?h:A.mes+'-01');
     const C=cfg(), ps=D?pessoasDoMes(A.mes):[], setores=[...new Set((c.R.func||[]).map(f=>f.setor).filter(Boolean))].sort(), emps=[...new Set(Object.values((D&&D.pessoas)||{}).map(p=>p.e))].sort();
     const ultImp=D&&D.imp&&D.imp.length?D.imp[D.imp.length-1]:null, st=D&&ds.length?stats(A.mes):null;
     const topo=`<section class="card alm-top"><div class="alm-h"><div class="alm-mesnav"><button class="btn sec" data-act="alm-mes" data-v="-1" aria-label="Mês anterior">‹</button><div><div class="eyebrow">${c.fixo?'RH · RELATÓRIOS':'RH · AUSÊNCIAS'}</div><h2>${c.fixo==='pont'?'Pontualidade':c.fixo==='dir'?'Almoço · diretoria':'Almoço/café'} · ${esc(mesNome(A.mes))}</h2></div><button class="btn sec" data-act="alm-mes" data-v="1" aria-label="Próximo mês">›</button></div>
       <label class="btn" style="cursor:pointer">${A.lendo?'Lendo…':P.ic('baixar',18,2.2)+'Importar do Face ID'}<input type="file" accept=".csv,text/csv" id="alm-arq" hidden ${A.lendo?'disabled':''}></label></div>
-      <div class="sub alm-reg">${A.vis==='pont'?'Chegada, saída e faltas de cada pessoa pelo Face ID. ':`Almoçou quem passou no <b>${esc(C.disp)}</b> entre ${esc(C.ini)} e ${esc(C.fim)}. `}${roboTxt(c)}${ultImp?'Dados de '+esc(c.br(ultImp.de))+' a '+esc(c.br(ultImp.ate))+' · importado por '+esc(ultImp.por||'')+' em '+esc(new Date(ultImp.em).toLocaleDateString('pt-BR')):ds.length?'Dados de '+esc(c.br(ds[0]))+' a '+esc(c.br(ds[ds.length-1]))+'.':'Ainda não há dados deste mês.'}
+      <div class="sub alm-reg">${A.vis==='pont'?'Chegada, saída e faltas de cada pessoa pelo Face ID. ':(RC()?`Tomou café quem passou no <b>${esc(C.disp)}</b> antes das ${esc(C.fim)}. `:`Almoçou quem passou no <b>${esc(C.disp)}</b> entre ${esc(C.ini)} e ${esc(C.fim)}. `)}${roboTxt(c)}${ultImp?'Dados de '+esc(c.br(ultImp.de))+' a '+esc(c.br(ultImp.ate))+' · importado por '+esc(ultImp.por||'')+' em '+esc(new Date(ultImp.em).toLocaleDateString('pt-BR')):ds.length?'Dados de '+esc(c.br(ds[0]))+' a '+esc(c.br(ds[ds.length-1]))+'.':'Ainda não há dados deste mês.'}
         <details><summary>Como exportar do Control iD</summary><ol><li>Relatórios → Acessos → <b>Acessos Gerais</b>.</li><li>Escolha as datas (pode ser o mês todo), Pessoas: Todos, e clique em Listar.</li><li>Exportar → <b>Exportar CSV</b> e arraste o arquivo aqui (ou toque em "Importar do Face ID").</li><li>Importar de novo o mesmo período só atualiza esses dias: não duplica.</li></ol></details></div>
       ${st&&A.vis!=='dia'&&A.vis!=='pont'?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Faltas sem justificativa</span><b class="num">${st.semJust}</b><small>vezes que alguém veio e não almoçou · ${st.just} justificadas · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
@@ -156,7 +176,7 @@
     const tot=pd.reduce((s,x)=>s+x.alm,0), media=exp.length?Math.round(exp.reduce((s,x)=>s+x.alm,0)/exp.length):0, ades=exp.length?Math.round(exp.reduce((s,x)=>s+x.alm,0)/Math.max(1,exp.reduce((s,x)=>s+x.pres,0))*100):0;
     const quem=ps.filter(p=>ds.some(d=>situacao(m,d,p.k).v==='sim')); const porEmp={}; quem.forEach(p=>{ const e=empCurta(p.emp); const x=(porEmp[e]=porEmp[e]||{e,alm:0,pessoas:0}); x.pessoas++; x.alm+=ds.filter(d=>situacao(m,d,p.k).v==='sim').length; });
     const SEM=['seg','ter','qua','qui','sex','sáb']; const porSem=SEM.map(w=>{ const xs=exp.filter(x=>semana(x.d)===w); return {w,m:xs.length?Math.round(xs.reduce((s,x)=>s+x.alm,0)/xs.length):0,n:xs.length}; }).filter(x=>x.n);
-    const ajN=Object.values((A.aj[m]||{}).aj||{}).filter(x=>x.v!=='just').length, C=cfg(), valor=+C.valor||0;
+    const ajN=Object.entries((A.aj[m]||{}).aj||{}).filter(([kk,x])=>x.v!=='just'&&/^cafe:/.test(kk)===RC()).length, C=cfg(), valor=+C.valor||0;
     const ant=m===mesAnt(m)?null:(A.dados[mesAnt(m)]&&Object.keys(A.dados[mesAnt(m)].dias||{}).length?statsBase(mesAnt(m)):null);
     const ult=D.imp&&D.imp.length?D.imp[D.imp.length-1]:null;
     return {m,pd,exp,dExp:exp.length,tot,media,ades,pessoas:quem.length,semCad:quem.filter(p=>!p.cad).length,porEmp:Object.values(porEmp).sort((a,b)=>b.alm-a.alm),porSem,ajN,valor,custo:valor?tot*valor:0,vdesc:+cfg().valorDesc||0,descontos:(+cfg().valorDesc||0)*pd.reduce((s,x)=>s+x.sj,0),ant,
@@ -185,7 +205,7 @@
     try{ if(!window.jspdf) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       if(!P.pdf) throw new Error('o painel ainda está carregando, tente de novo');
       const img=await P.pdf.imgs(), C=P.pdf.cor, C2=cfg(), R$=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}), br=c.br;
-      const D=P.pdf.novo('Almoço · '+mesNome(st.m),'Refeitório pelo Face ID · dados de '+br(st.de)+' a '+br(st.ate),img), doc=D.doc, M=D.M;
+      const D=P.pdf.novo(fxCafe('Almoço · '+mesNome(st.m)),'Refeitório pelo Face ID · dados de '+br(st.de)+' a '+br(st.ate),img), doc=fxDoc(D.doc), M=D.M;
       D.capa();
       /* números */
       const pc=st.ades, corA=pc>=85?'ok':pc>=70?'warn':'crit';
@@ -236,7 +256,7 @@
       /* conferência */
       D.cabe(26); D.y+=8; D.dc(C.mut); doc.setLineWidth(.3); const lw=(D.cw-16)/2; doc.line(M,D.y,M+lw,D.y); doc.line(M+lw+16,D.y,M+D.cw,D.y);
       doc.setFont('helvetica','normal'); doc.setFontSize(8); D.tc(C.mut); doc.text('Conferido por (RH)',M,D.y+4.5); doc.text('Data',M+lw+16,D.y+4.5);
-      doc.setProperties({title:'Almoço '+mesNome(st.m)}); D.fim('Almoco-'+st.m+'.pdf'); P.toast('Relatório em PDF baixado.'); }
+      doc.setProperties({title:'Almoço '+mesNome(st.m)}); D.fim(arqRef('Almoco-')+st.m+'.pdf'); P.toast('Relatório em PDF baixado.'); }
     catch(e){ console.warn('[almoço] pdf',e); P.toast('Não consegui gerar o PDF: '+((e&&e.message)||e)); }
     finally{ A.pdf=false; P.rerender(); } }
   /* ---------- apresentação (PowerPoint) ---------- */
@@ -248,7 +268,7 @@
     throw new Error('o gerador de PowerPoint não carregou (internet ou bloqueio da rede). Tente de novo ou use o Relatório em PDF.'); }
   async function gerarPpt(){ const c=A.ctx, P=c.P, st=stats(A.mes); if(!st) return; A.ppt=true; P.rerender();
     try{ if(!window.PptxGenJS) await pptCarrega();
-      const pp=new PptxGenJS(); pp.layout='LAYOUT_WIDE'; pp.title='Refeitório · '+mesNome(st.m); pp.company='Colafix';
+      const pp=new PptxGenJS(); if(RC()){ const ad=pp.addSlide.bind(pp); pp.addSlide=(...a)=>{ const sl=ad(...a); ['addText','addTable','addChart','addNotes'].forEach(f=>{ const o=sl[f]; if(typeof o==='function') sl[f]=(...b)=>o.apply(sl,fxDeep(b)); }); return sl; }; } pp.layout='LAYOUT_WIDE'; pp.title='Refeitório · '+mesNome(st.m); pp.company='Colafix';
       const T='1B5C7A', INK='1A1A1A', MU='6B6558', BG='F5F1E8', LT='C7DCE6', F='Segoe UI';
       const lg0=document.querySelector('.brand img'), logo=lg0&&/^data:image\//.test(lg0.src||'')?lg0:null, lw=1.6, lh=logo&&logo.naturalWidth?lw*logo.naturalHeight/logo.naturalWidth:0.45;
       const base=(tit,sub)=>{ const s=pp.addSlide(); s.background={color:'FFFFFF'}; s.addShape(pp.ShapeType.rect,{x:0,y:0,w:13.33,h:0.12,fill:{color:T}});
@@ -279,7 +299,7 @@
       { const s=base('Observações',''); const ob=[st.cafe+' passagens no refeitório antes das '+cfg().cafeAte+' (café da manhã), fora da conta do almoço.',st.ajN?st.ajN+' '+(st.ajN===1?'dia foi corrigido':'dias foram corrigidos')+' à mão pelo RH.':'Nenhuma correção à mão no mês.',
           st.semCad?st.semCad+' pessoas que almoçaram ainda não estão no cadastro do RH (prestadores e terceirizados).':'Todas as pessoas que almoçaram estão no cadastro do RH.',st.semJust+' dias sem almoço e sem justificativa; '+st.just+' justificados; '+st.fora+' '+(st.fora===1?'pessoa não almoça':'pessoas não almoçam')+' na empresa (fora da conta da adesão).','Período dos dados: '+c.br(st.de)+' a '+c.br(st.ate)+'.'];
         s.addText(ob.map(t=>({text:t,options:{bullet:true,breakLine:true}})),{x:0.8,y:1.6,w:11.5,h:4.5,fontFace:F,fontSize:20,color:INK,paraSpaceAfter:12,valign:'top'}); }
-      await pp.writeFile({fileName:'Refeitorio-'+st.m+'.pptx'}); P.toast('Apresentação baixada.'); }
+      await pp.writeFile({fileName:arqRef('Refeitorio-')+st.m+'.pptx'}); P.toast('Apresentação baixada.'); }
     catch(e){ console.warn('[almoço] ppt',e); P.toast('Não consegui gerar a apresentação: '+((e&&e.message)||e)); }
     finally{ A.ppt=false; P.rerender(); } }
   function vDia(c,ds,ps,st){ const esc=c.esc, m=A.mes, d=A.dia;
@@ -287,7 +307,7 @@
     const tira=`<div class="alm-dias">${ds.map(x=>{ const ss=ps.map(p=>situacao(m,x,p.k).v), n=ss.filter(v=>v==='sim').length, sj=ss.filter(v=>v==='nao').length; return `<button data-act="alm-dia" data-v="${x}" aria-pressed="${x===d}" title="${n} almoçaram · ${sj} sem justificativa"><small>${semana(x)}</small><b>${x.slice(8)}</b><span>${n}</span>${sj?`<em>${sj}</em>`:''}</button>`; }).join('')}</div>`;
     const info=x=>[empCurta(x.emp),x.setor].filter(Boolean).join(' · ')+(x.cad?'':' · sem cadastro no RH');
     const lin=(x,extra,bt)=>`<div class="alm-l" data-b="${esc(almChave(x))}"><div><button class="lnk alm-nm" data-act="alm-pes" data-k="${x.k}">${esc(x.nome)}</button><small>${esc(info(x))}</small>${extra||''}</div>
-      <div class="alm-r">${x.s.x&&x.s.x.a?`<span class="num">${esc(x.s.x.a)}</span>`:''}${x.s.x&&x.s.x.c?`<small>café ${esc(x.s.x.c)}</small>`:''}${x.s.aj?`<small title="${esc(x.s.aj.mot||'')}">corrigido por ${esc(x.s.aj.por||'')}</small>`:''}${bt}</div></div>`;
+      <div class="alm-r">${x.s.x&&x.s.x[RFL()]?`<span class="num">${esc(x.s.x[RFL()])}</span>`:''}<!--nofx-->${RC()?(x.s.x&&x.s.x.a?`<small>almoço ${esc(x.s.x.a)}</small>`:''):(x.s.x&&x.s.x.c?`<small>café ${esc(x.s.x.c)}</small>`:'')}<!--/nofx-->${x.s.aj?`<small title="${esc(x.s.aj.mot||'')}">corrigido por ${esc(x.s.aj.por||'')}</small>`:''}${bt}</div></div>`;
     const jtx=x=>`<span class="alm-jt">${esc(x.s.j.tipo||'Justificado')}${x.s.j.mot?' · '+esc(x.s.j.mot):''}<small> · ${esc(x.s.j.por||'')}</small></span>`;
     const bloco=(cls,tit,xs,mk,vazio)=>!A.sit||A.sit===cls?`<div class="alm-bl ${cls}"><div class="label">${tit} <b>(${xs.length})</b></div>${xs.map(mk).join('')||`<div class="sub">${vazio}</div>`}</div>`:'';
     const blPend=pend.length?bloco('pend','AINDA NÃO ALMOÇARAM · ALMOÇO ATÉ '+esc(cfg().fim||'14:30'),pend,x=>lin(x,'',`<button class="lnk" data-act="alm-jus" data-k="${x.k}" data-d="${d}">justificar</button>`),''):'';
@@ -302,11 +322,11 @@
       <div><span>Almoços no mês</span><b class="num">${st?st.tot.toLocaleString('pt-BR'):0}</b><small>${st&&st.valor?'custo '+R$(st.custo)+(st.vdesc?' · descontos '+R$(st.descontos):''):'informe o valor da refeição em Cadastros › Configurações'}</small></div></div>`;
     const blSim2=!A.sit||A.sit==='sim'?`<div class="alm-bl sim alm-v2s"><div class="label">ALMOÇARAM <b>(${sim.length})</b></div>${sim.map(x=>lin(x,'',`<button class="lnk" data-act="alm-aj" data-k="${x.k}" data-v="nao">não almoçou</button>`)).join('')||'<div class="sub">Ninguém.</div>'}</div>`:'';
     const col1=(pend.length?blPend:'')+(pend.length?(nao.length?blNao:''):blNao)+blJus;
-    return `${tira}${avisoParcial(c,m,d)}${avisoSemRef(c,m,d)}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram${emCurso?' até agora':''}</span>${emCurso?`<span class="pill">${pend.length} ainda não almoçaram · almoço até ${esc(cfg().fim||'14:30')}</span>`:''}${nao.length||!emCurso?`<span class="pill warn">${nao.length} sem justificativa</span>`:''}${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>${kpi}
+    return `${tira}${RC()?'':avisoParcial(c,m,d)+avisoSemRef(c,m,d)}<div class="alm-dt"><h3>${esc(c.br(d))} · ${semana(d)}</h3><span class="pill ok">${sim.length} almoçaram${emCurso?' até agora':''}</span>${emCurso?`<span class="pill">${pend.length} ainda não almoçaram · almoço até ${esc(cfg().fim||'14:30')}</span>`:''}${nao.length||!emCurso?`<span class="pill warn">${nao.length} sem justificativa</span>`:''}${jus.length?`<span class="pill">${jus.length} justificados</span>`:''}${fora.length?`<span class="pill">${fora.length} não almoçam aqui</span>`:''}</div>${kpi}
       ${emCurso?`<div class="alm-emcurso">Almoço em andamento: quem ainda não passou no refeitório só vira “sem justificativa” depois das ${esc(cfg().fim||'14:30')}.</div>`:''}
       <div class="alm-v2g"><div class="alm-v2c">${col1}</div><div class="alm-v2c">${blSim2}</div><div class="alm-v2c alm-v2r">${folhasPaineis(c,d)}${blMais.replace('<details class="alm-bl aus">','<details class="alm-bl aus" open>')}</div></div>`; }
   /* ---------- justificativa (janela) ---------- */
-  function vJust(c){ const J=A.jus; if(!J) return ''; const esc=c.esc, aj=((A.aj[J.d.slice(0,7)]||{}).aj||{})[J.d+'_'+J.k], cur=aj&&aj.v==='just'?aj:null; const tipos=cfg().just||JUST_PADRAO;
+  function vJust(c){ const J=A.jus; if(!J) return ''; const esc=c.esc, aj=((A.aj[J.d.slice(0,7)]||{}).aj||{})[ajK(J.d,J.k)], cur=aj&&aj.v==='just'?aj:null; const tipos=cfg().just||JUST_PADRAO;
     if(J.tipo===undefined){ J.tipo=cur?cur.tipo:''; J.mot=cur?cur.mot||'':''; }
     const nome=(pessoasDoMes(A.mes).find(p=>p.k===J.k)||{}).nome||'';
     return `<div class="rh-modal" data-act="alm-jusx-fundo"><div class="rh-mbox" role="dialog" aria-modal="true" aria-label="Justificar" style="max-width:520px"><div class="rh-ch"><h2>Justificar · ${esc(nome)}</h2><button class="lnk" data-act="alm-jusx">Fechar</button></div>
@@ -316,14 +336,14 @@
       ${J.erro?`<p class="err" style="color:var(--crit-ink)">${esc(J.erro)}</p>`:''}
       <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap">${cur?'<button class="lnk" data-act="alm-jrem" style="color:var(--crit-ink)">Tirar a justificativa</button>':'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="alm-jusx">Cancelar</button><button class="btn" data-act="alm-jsalvar">Salvar</button></div></div></div></div>`; }
   async function gravaAj(k,d,it){ const c=A.ctx, P=c.P, m=d.slice(0,7), ref=P.db().doc('rh/dados/almocoaj/'+m), cur=A.aj[m]||{mes:m,aj:{},log:[]};
-    const aj=Object.assign({},cur.aj||{}); if(it) aj[d+'_'+k]=it; else delete aj[d+'_'+k];
-    const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k,por:c.eu(),em:new Date().toISOString()},it||{v:'removido'})]).slice(-500);
+    const aj=Object.assign({},cur.aj||{}); if(it) aj[ajK(d,k)]=it; else delete aj[ajK(d,k)];
+    const log=(cur.log||[]).concat([Object.assign({chave:ajK(d,k),ref:RFL(),por:c.eu(),em:new Date().toISOString()},it||{v:'removido'})]).slice(-500);
     await ref.set({mes:m,aj,log}); A.aj[m]=Object.assign({},cur,{aj,log}); }
   async function marcarFora(k,on){ const c=A.ctx, P=c.P; let mot='';
-    if(on){ mot=prompt('Por que não almoça na empresa? (ex.: almoça em casa, traz marmita e come fora, outro turno)'); if(mot===null) return; }
-    const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}), fora=Object.assign({},al.fora||{});
+    if(on){ mot=prompt(RC()?'Por que não toma café na empresa? (ex.: toma café em casa, chega depois do café, outro turno)':'Por que não almoça na empresa? (ex.: almoça em casa, traz marmita e come fora, outro turno)'); if(mot===null) return; }
+    const al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}), fora=Object.assign({},al[RK('fora')]||{});
     fora[k]=on?{mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()}:Object.assign({},fora[k]||{},{removido:true,remPor:c.eu(),remEm:new Date().toISOString()});
-    al.fora=fora; try{ await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; P.toast(on?'Marcado: não almoça na empresa. Não aparece mais como falta.':'Volta a contar no almoço.'); P.rerender(); }catch(e){ P.erro(e); } }
+    al[RK('fora')]=fora; try{ await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; P.toast(fxCafe(on?'Marcado: não almoça na empresa. Não aparece mais como falta.':'Volta a contar no almoço.')); P.rerender(); }catch(e){ P.erro(e); } }
   function nomeDe(k){ const f=(A.ctx.R.func||[]).find(x=>String(x.cpf||'').replace(/\D/g,'').padStart(11,'0')===k); if(f) return titulo(f.nome);
     for(const m of Object.keys(A.dados)){ const p=((A.dados[m]||{}).pessoas||{})[k]; if(p&&p.n) return titulo(p.n); } return ''; }
   function ausLista(c,k){ const esc=c.esc, L=ausAtivas().filter(a=>!k||a.cpf===k).sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
@@ -345,7 +365,7 @@
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn sec" data-act="alm-ausx">Cancelar</button><button class="btn" data-act="alm-aussalvar">Salvar</button></div></div></div>`; }
   function lerAus(){ const U=A.aus, v=id=>{ const e=document.getElementById(id); return e?String(e.value||'').trim():null; };
     const k=v('alm-auk'); if(k!==null) U.k=k; const d=v('alm-aud'); if(d!==null) U.data=d; const de=v('alm-aude'); if(de!==null) U.de=de; const at=v('alm-auate'); if(at!==null) U.ate=at; const mt=v('alm-aumot'); if(mt!==null) U.mot=mt; }
-  async function gravaAus(lista){ const c=A.ctx, P=c.P, al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}); al.ausencias=lista.slice(-300);
+  async function gravaAus(lista){ const c=A.ctx, P=c.P, al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}); al[RK('ausencias')]=lista.slice(-300);
     await P.db().doc('rh/config').set({almoco:al},{merge:true}); if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; }
   async function salvarAus(){ const c=A.ctx, P=c.P, U=A.aus; lerAus(); U.erro='';
     if(!U.k) U.erro='Escolha a pessoa.'; else if(U.tipo==='dia'&&!/^\d{4}-\d\d-\d\d$/.test(U.data||'')) U.erro='Escolha o dia.';
@@ -385,9 +405,9 @@
     return `<div class="sub" style="margin:4px 0 10px">✓ almoçou · ✗ sem almoço e sem justificativa · J justificado · – não almoça na empresa · em branco: não veio. Clique num dia ✗ para justificar ou corrigir. Totais: ${Object.entries(porEmp).map(([e,n])=>`<b>${esc(e)}</b> ${n}`).join(' · ')}</div>
       <div class="alm-tw"><table class="alm-t"><thead><tr><th class="alm-n">Pessoa</th>${ds.map(d=>`<th><small>${semana(d)}</small>${d.slice(8)}</th>`).join('')}<th>Almoços</th><th>Sem just.</th><th>Justif.</th><th>Dias na empresa</th></tr></thead>
       <tbody>${G.map(g=>`<tr data-b="${esc(almChave(g.p))}"><td class="alm-n"><button class="lnk alm-nm" data-act="alm-pes" data-k="${g.p.k}">${esc(g.p.nome)}</button><small>${esc(empCurta(g.p.emp))}${g.p.setor?' · '+esc(g.p.setor):''}</small></td>${g.v.map((s,i)=>`<td class="alm-c ${s.v}${s.aj?' aj':''}" data-act="alm-cel" data-k="${g.p.k}" data-d="${ds[i]}" title="${s.j?'Justificado: '+esc((s.j.tipo||'')+(s.j.mot?' · '+s.j.mot:'')):s.aj?'Ajustado: '+esc(s.aj.mot||''):s.x&&s.x.a?'Refeitório '+esc(s.x.a):''}">${s.v==='sim'?'✓':s.v==='nao'?'✗':s.v==='just'?'J':s.v==='fora'?'–':''}</td>`).join('')}<td class="num"><b>${g.tot}</b></td><td class="num">${g.sj||''}</td><td class="num">${g.jj||''}</td><td class="num">${g.pres}</td></tr>`).join('')}</tbody></table></div>`; }
-  async function ajustar(k,d,v){ const c=A.ctx, P=c.P, m=d.slice(0,7); const mot=prompt(v==='sim'?'Motivo (ex.: almoçou sem passar o rosto):':'Motivo (ex.: passou no refeitório mas não almoçou):'); if(mot===null) return;
+  async function ajustar(k,d,v){ const c=A.ctx, P=c.P, m=d.slice(0,7); const mot=prompt(fxCafe(v==='sim'?'Motivo (ex.: almoçou sem passar o rosto):':'Motivo (ex.: passou no refeitório mas não almoçou):')); if(mot===null) return;
     const ref=P.db().doc('rh/dados/almocoaj/'+m); const cur=A.aj[m]||{mes:m,aj:{},log:[]}; const it={v,mot:String(mot).trim().slice(0,120),por:c.eu(),em:new Date().toISOString()};
-    const aj=Object.assign({},cur.aj||{}); aj[d+'_'+k]=it; const log=(cur.log||[]).concat([Object.assign({chave:d+'_'+k},it)]).slice(-500);
+    const aj=Object.assign({},cur.aj||{}); aj[ajK(d,k)]=it; const log=(cur.log||[]).concat([Object.assign({chave:ajK(d,k),ref:RFL()},it)]).slice(-500);
     try{ await ref.set({mes:m,aj,log}); P.toast('Ajuste guardado.'); }catch(e){ P.erro(e); } }
   /* ---------- relatórios no padrão (30/10): os filtros da tela (empresa, setor, situação e busca) valem no PDF e no Excel ---------- */
   function qOk(p){ const ws=nrm(A.q).split(/\s+/).filter(Boolean), dq=String(A.q||'').replace(/\D/g,''), b=almChave(p); return !ws.length||ws.every(w=>b.includes(w))||(dq.length>=3&&b.slice(-11).includes(dq)); }
@@ -395,30 +415,31 @@
   const almFiltros=()=>[A.emp&&'Empresa: '+(A.emp==='-'?'sem empresa':empCurta(A.emp)),A.setor&&'Setor: '+(A.setor==='-'?'sem setor':A.setor),A.sit&&'Situação: '+(SIT_NOME[A.sit]||A.sit),A.q&&'Busca: '+A.q].filter(Boolean);
   async function mesPdf(){ const c=A.ctx, P=c.P, D=A.dados[A.mes]; if(!D) return; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes)).filter(g=>qOk(g.p)), vd=+cfg().valorDesc||0, R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
     const s=k=>G.reduce((a,g)=>a+g[k],0); if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou.');
-    try{ await RHRel.pdf({tit:'Almoço · fechamento de '+mesNome(A.mes),sub:'Refeitório pelo Face ID · '+(ds.length?c.br(ds[0])+' a '+c.br(ds[ds.length-1]):'sem dados'),filtros:almFiltros(),arq:'Almoco-fechamento-'+A.mes,
+    try{ await RHRel.pdf(fxDeep({tit:'Almoço · fechamento de '+mesNome(A.mes),sub:'Refeitório pelo Face ID · '+(ds.length?c.br(ds[0])+' a '+c.br(ds[ds.length-1]):'sem dados'),filtros:almFiltros(),arq:arqRef('Almoco-fechamento-')+A.mes,
       kpis:[{t:'Pessoas',v:String(G.length),s:'na lista',c:'pet'},{t:'Almoços',v:s('tot').toLocaleString('pt-BR'),s:ds.length+' dias com Face ID',c:'teal'},{t:'Sem justificativa',v:String(s('sj')),s:vd?'desconto '+R$(s('sj')*vd):'veio e não almoçou',c:s('sj')?'crit':'ok'},{t:'Justificados',v:String(s('jj')),s:'médico, saiu cedo, ausência…',c:'cinza'}],
       partes:[{secao:'Por pessoa',nota:'dias na empresa = dias com passagem no Face ID',cols:[{t:'Nome',w:52},{t:'Empresa',w:24},{t:'Setor',w:24},{t:'Na empresa',w:16,al:'r'},{t:'Almoços',w:15,al:'r'},{t:'Sem just.',w:15,al:'r'},{t:'Justif.',w:13,al:'r'}].concat(vd?[{t:'Desconto',w:20,al:'r'}]:[]),
         rows:G.map(g=>{ const r=[g.p.nome,empCurta(g.p.emp),g.p.setor||'—',String(g.pres),String(g.tot),String(g.sj),String(g.jj)].concat(vd?[g.sj?R$(g.sj*vd):'—']:[]); if(g.sj) r._cor={5:'crit'}; return r; })
-          .concat(G.length?[Object.assign(['Total','','',String(s('pres')),String(s('tot')),String(s('sj')),String(s('jj'))].concat(vd?[R$(s('sj')*vd)]:[]),{_tot:1})]:[]),vazio:'Ninguém com estes filtros.'}],assina:'Conferido por (RH)'}); }catch(e){ P.toast(String(e&&e.message||e)); } }
+          .concat(G.length?[Object.assign(['Total','','',String(s('pres')),String(s('tot')),String(s('sj')),String(s('jj'))].concat(vd?[R$(s('sj')*vd)]:[]),{_tot:1})]:[]),vazio:'Ninguém com estes filtros.'}],assina:'Conferido por (RH)'})); }catch(e){ P.toast(String(e&&e.message||e)); } }
   async function excel(){ const c=A.ctx, D=A.dados[A.mes]; const ds=Object.keys(D.dias||{}).sort(), G=grade(ds,pessoasDoMes(A.mes)).filter(g=>qOk(g.p));
     const cab=['Nome','CPF','Empresa','Setor'].concat(ds.map(d=>d.slice(8)+'/'+d.slice(5,7)),['Almoços','Sem justificativa','Justificados','Dias na empresa'].concat(+cfg().valorDesc?['Desconto (R$)']:[]));
     const L=[cab].concat(G.map(g=>[g.p.nome,c.fCPF(g.p.k),empCurta(g.p.emp),g.p.setor].concat(g.v.map(s=>s.v==='sim'?1:s.v==='nao'?0:s.v==='just'?'J':s.v==='fora'?'F':''),[g.tot,g.sj,g.jj,g.pres].concat(+cfg().valorDesc?[Math.round(g.sj*(+cfg().valorDesc)*100)/100]:[]))));
-    if(window.RHRel) return RHRel.xls('Almoco-'+A.mes,[['Almoço '+A.mes,L]],{tit:'Almoço · '+mesNome(A.mes),sub:'1 = almoçou · 0 = sem almoço e sem justificativa · J = justificado · F = não almoça na empresa',filtros:almFiltros()});
+    if(window.RHRel) return RHRel.xls(arqRef('Almoco-')+A.mes,fxDeep([['Almoço '+A.mes,L]]),fxDeep({tit:'Almoço · '+mesNome(A.mes),sub:'1 = almoçou · 0 = sem almoço e sem justificativa · J = justificado · F = não almoça na empresa',filtros:almFiltros()}));
     if(!window.XLSX) await c.carregarJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
-    const ws=XLSX.utils.aoa_to_sheet(L); ws['!cols']=cab.map((_,i)=>({wch:i===0?32:i<4?16:i>=cab.length-2?14:6})); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Almoço '+A.mes);
-    c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'Almoco-'+A.mes+'.xlsx'); }
+    const ws=XLSX.utils.aoa_to_sheet(fxDeep(L)); ws['!cols']=cab.map((_,i)=>({wch:i===0?32:i<4?16:i>=cab.length-2?14:6})); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,fxCafe('Almoço '+A.mes));
+    c.baixar(new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),arqRef('Almoco-')+A.mes+'.xlsx'); }
   function imprimir(){ const t=document.querySelector('.alm-tw'); if(!t) return; const w=window.open('','_blank'); if(!w) return;
-    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Almoço ${mesNome(A.mes)}</title><style>body{font:11px Arial,sans-serif;margin:12mm}h1{font-size:16px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:2px 3px;text-align:center}td:first-child,th:first-child{text-align:left}small{display:block;color:#666;font-size:9px}@page{size:A4 landscape;margin:8mm}</style></head><body><h1>Almoço · ${mesNome(A.mes)}</h1>${t.innerHTML}</body></html>`);
+    w.document.write(fxCafe(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Almoço ${mesNome(A.mes)}</title><style>body{font:11px Arial,sans-serif;margin:12mm}h1{font-size:16px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:2px 3px;text-align:center}td:first-child,th:first-child{text-align:left}small{display:block;color:#666;font-size:9px}@page{size:A4 landscape;margin:8mm}</style></head><body><h1>Almoço · ${mesNome(A.mes)}</h1>${t.innerHTML}</body></html>`));
     w.document.close(); setTimeout(()=>{ w.print(); },300); }
 
   /* ---------- eventos ---------- */
   document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="alm-"]'); if(!b||!A.ctx) return; const a=b.dataset.act, P=A.ctx.P;
     if(a==='alm-mes'){ const [y,m]=A.mes.split('-').map(Number), d=new Date(y,m-1+(+b.dataset.v),1); A.mes=d.getFullYear()+'-'+pad(d.getMonth()+1); A.dia=''; P.rerender(); return; }
+    if(a==='alm-ref'){ A.ref=b.dataset.v==='cafe'?'cafe':'alm'; A.pes=null; A.jus=null; P.render(); return; }
     if(a==='alm-vis'){ A.vis=b.dataset.v; P.rerender(); return; }
     if(a==='alm-dia'){ A.dia=b.dataset.v; P.rerender(); return; }
-    if(a==='alm-semleit'){ const d=b.dataset.d, on=b.dataset.v==='1', c=A.ctx, al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}), sl=Object.assign({},al.semLeitura||{});
+    if(a==='alm-semleit'){ const d=b.dataset.d, on=b.dataset.v==='1', c=A.ctx, al=Object.assign({},(c.R.cfg&&c.R.cfg.almoco)||{}), sl=Object.assign({},al[RK('semLeitura')]||{});
       if(on) sl[d]={por:c.eu(),em:new Date().toISOString(),mot:'O Face ID do refeitório não registrou o almoço neste dia'}; else if(sl[d]) sl[d]=Object.assign({},sl[d],{removido:true,removidoPor:c.eu(),removidoEm:new Date().toISOString()});
-      al.semLeitura=sl; P.db().doc('rh/config').set({almoco:al},{merge:true}).then(()=>{ if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; P.toast(on?'Dia marcado como refeitório sem leitura.':'Marcação desfeita.'); P.rerender(); }).catch(e=>{ console.warn('[almoço] sem leitura',e); P.toast('Não foi possível salvar.'); }); return; }
+      al[RK('semLeitura')]=sl; P.db().doc('rh/config').set({almoco:al},{merge:true}).then(()=>{ if(c.R.cfg) c.R.cfg.almoco=al; else c.R.cfg={almoco:al}; P.toast(on?'Dia marcado como refeitório sem leitura.':'Marcação desfeita.'); P.rerender(); }).catch(e=>{ console.warn('[almoço] sem leitura',e); P.toast('Não foi possível salvar.'); }); return; }
     if(a==='alm-aj'){ ajustar(b.dataset.k,A.dia,b.dataset.v); return; }
     if(a==='alm-cel'){ const s=situacao(A.mes,b.dataset.d,b.dataset.k); if(s.v==='nao'||s.v==='just'){ A.jus={k:b.dataset.k,d:b.dataset.d}; P.rerender(); return; } if(s.v==='aus'&&!s.aj) return; ajustar(b.dataset.k,b.dataset.d,s.v==='sim'?'nao':'sim'); return; }
     if(a==='alm-xls'){ excel().catch(e=>P.erro(e)); return; }
@@ -443,7 +464,7 @@
     if(a==='alm-ppt'){ gerarPpt(); return; }
     if(a==='alm-pdf'){ gerarPdf(); return; }
     if(a==='alm-valor'){ const lv=id=>parseFloat(String((document.getElementById(id)||{}).value||'').replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0; const v=lv('alm-valor'), vd=lv('alm-vdesc'), up={valor:v,valorDesc:vd};
-      P.db().doc('rh/config').set({almoco:Object.assign({},(A.ctx.R.cfg&&A.ctx.R.cfg.almoco)||{},up)},{merge:true}).then(()=>{ if(A.ctx.R.cfg){ A.ctx.R.cfg.almoco=Object.assign({},A.ctx.R.cfg.almoco||{},up); } P.toast('Valores guardados: refeição '+(v?v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'—')+' · desconto por falta '+(vd?vd.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'—')+'.'); P.rerender(); }).catch(e=>P.erro(e)); return; } });
+      cfgGrava(A.ctx,up).then(()=>{ P.toast('Valores guardados: '+(RC()?'café ':'refeição ')+(v?v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'—')+' · desconto por falta '+(vd?vd.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'—')+'.'); P.rerender(); }).catch(e=>P.erro(e)); return; } });
   document.addEventListener('input',ev=>{ const t=ev.target; if(A.aus&&t&&/^alm-au/.test(t.id||'')) lerAus(); });
   document.addEventListener('change',ev=>{ const t=ev.target; if(!A.ctx) return;
     if(A.aus&&/^alm-au/.test(t.id||'')){ lerAus(); return; }
@@ -530,7 +551,8 @@
   const listaFolha=()=>{ if(fkCafe()) return listaCafe(); const l=cfg().listaFolha; return Array.isArray(l)&&l.length?l:LISTA_BASE; };
   const folhaCol=()=>'rh/dados/'+(fkCafe()?'cafefolha':'almocofolha')+'/';
   const semPref=n=>String(n||'').replace(/^\s*(terceiros?|motorista)\s*-\s*/i,'');
-  function folhaPessoas(c,d){ const m=d.slice(0,7), Dm=A.dados[m]||{}, dia=(Dm.dias||{})[d]||null, P0=Dm.pessoas||{};
+  function folhaPessoas(c,d){ return refCom(fkCafe()?'cafe':'alm',()=>folhaPessoas0(c,d)); }
+  function folhaPessoas0(c,d){ const m=d.slice(0,7), Dm=A.dados[m]||{}, dia=(Dm.dias||{})[d]||null, P0=Dm.pessoas||{};
     const fx={}; (c.R.func||[]).forEach(f=>{ const k=String(f.cpf||'').replace(/\D/g,''); if(k) fx[k.padStart(11,'0')]=f; });
     /* a folha tem SÓ quem está na lista fixa (pedido de 22/10); Face ID e cadastro só servem para ligar o CPF a esses nomes */
     const L=[]; const add=(nome,k,f,ord)=>{ const j=L.find(x=>fMesma(semPref(x.nome),semPref(nome))||(k&&x.k===k)); if(j){ if(k&&!j.k) j.k=k; if(f&&!j.f) j.f=f; return; } if(ord==null) return; L.push({nome:String(nome).trim(),k:k||'',f:f||null,ord}); };
@@ -660,7 +682,7 @@
     return bar+`<div class="alm-fm" role="dialog" aria-modal="true" aria-label="Folha de assinatura do ${FW()}"><div class="alm-fmb"><div class="alm-fmh"><div><div class="eyebrow">RH · ${FWU()}</div><h2>Folha de assinatura${fkCafe()?' do café':''} · ${esc(c.br(d))}</h2></div><button class="btn sec" data-act="alm-ffecha" data-k="${K}">Fechar</button></div>
       <div class="alm-fmg"><div class="alm-fml">${fotoBloco(c,d)}${folhaCard(c,d)}</div><aside class="alm-fmr">${folhaPrevia(c,d)}</aside></div></div></div>`; }
   /* as duas faixas (almoço e café) na tela do dia; depois volta ao tipo que está em uso (A.fkAt) */
-  function folhasPaineis(c,d){ let h=''; try{ fkUsa('alm'); h+=folhaPainel(c,d); fkUsa('cafe'); h+=folhaPainel(c,d); } finally { fkUsa(A.fkAt||'alm'); } return h; }
+  function folhasPaineis(c,d){ let h=''; try{ fkUsa('alm'); h+=refCom('alm',()=>folhaPainel(c,d)); fkUsa('cafe'); h+=refCom('cafe',()=>folhaPainel(c,d)); } finally { fkUsa(A.fkAt||'alm'); } return '<!--nofx-->'+h+'<!--/nofx-->'; }
   function folhaBusca(c,d){ const esc=c.esc, q=fNorm(A.fbusca||''); if(q.length<2) return ''; const F=folhaEst(c,d), {L}=folhaPessoas(c,d); F.tirar=F.tirar||{};
     const xs=L.filter(x=>fNorm(x.nome).includes(q)).slice(0,10); if(!xs.length) return '<div class="sub" style="margin-top:6px">Ninguém da lista com esse nome.</div>';
     return `<div class="alm-fbr">${xs.map(x=>{ const tir=F.tirar[x.nome], m=fMarca(F,x), st=tir?'Tirado desta folha':m||(x.passou?'Passou no Face ID':'Normal (assina)');
@@ -694,7 +716,7 @@
     if(R.lendo) return `<section class="alm-ff">${cab}<div class="alm-ffe">Lendo a foto…</div></section>`;
     const err=R.erros.length?`<div class="alm-ffx">${R.erros.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`:'';
     if(!nomes.length) return `<section class="alm-ff">${cab}${err}<div class="alm-ffa">${inp()}</div></section>`;
-    const {L,temDia}=folhaPessoas(c,d), kDe=n=>{ const x=L.find(y=>y.nome===n); return x&&x.k||''; }, sv=n=>{ const k=kDe(n); if(!k||!temDia) return ''; if(fkCafe()){ const x=(((A.dados[m]||{}).dias||{})[d]||{})[k]; return x?(x.c?'sim':'nao'):''; } return situacao(m,d,k).v; };
+    const {L,temDia}=folhaPessoas(c,d), kDe=n=>{ const x=L.find(y=>y.nome===n); return x&&x.k||''; }, sv=n=>{ const k=kDe(n); if(!k||!temDia) return ''; if(fkCafe()){ const x=(((A.dados[m]||{}).dias||{})[d]||{})[k]; return x?(x.c?'sim':'nao'):''; } return refCom('alm',()=>situacao(m,d,k).v); };
     const g={sim:[],nao:[],duv:[]}; nomes.forEach(n=>{ if(g[ass[n]]) g[ass[n]].push(n); });
     const semFace=g.sim.filter(n=>sv(n)&&sv(n)!=='sim'), semAss=g.nao.filter(n=>sv(n)==='sim');
     const chip=(n,extra)=>`<span class="alm-ffc ${ass[n]}"><button class="lnk" data-act="alm-fftg" data-n="${esc(n)}" title="Tocar para trocar">${esc(n)}</button>${extra||''}</span>`;
@@ -738,7 +760,7 @@
     if(a==='alm-fftg'){ const R=ffEst(d), n=b.dataset.n, at=ffAss(c,d)[n]; R.man[n]=at==='sim'?'nao':'sim'; P.render(); return; }
     if(a==='alm-ffsalva') return ffSalvar(c,d);
     if(a==='alm-ffconta'){ const n=b.dataset.n, x=folhaPessoas(c,d).L.find(y=>y.nome===n); if(!x||!x.k) return P.toast('Não achei o CPF desta pessoa.');
-      try{ await gravaAj(x.k,d,{v:'sim',mot:'Assinou a folha do almoço',por:c.eu(),em:new Date().toISOString()}); P.toast('Almoço contado para '+n+'.'); P.render(); }catch(e){ P.toast('Não foi possível gravar: '+((e&&e.message)||e)); } return; }
+      try{ await refCom('alm',()=>gravaAj(x.k,d,{v:'sim',mot:'Assinou a folha do almoço',por:c.eu(),em:new Date().toISOString()})); P.toast('Almoço contado para '+n+'.'); P.render(); }catch(e){ P.toast('Não foi possível gravar: '+((e&&e.message)||e)); } return; }
     if(a==='alm-fabre'){ A.folhaAb=true; P.render(); return; } if(a==='alm-ffecha'){ A.folhaAb=false; P.render(); return; }
     if(a==='alm-fbase'){ A.folha.rasc=LISTA_BASE.slice(); P.toast('Lista base de 20/10 carregada (67 nomes). Clique em “Salvar lista fixa”.'); P.render(); return; }
     if(a==='alm-flista'){ A.folha.ed=!A.folha.ed; A.folha.rasc=null; A.folha.colar=false; P.render(); return; }
@@ -796,7 +818,7 @@
         const at=fer?null:atDe({funcId:f._id,cpf:f.cpf},d);
         fs.push({n:titulo(f.nome),s:f.setor||'',e:prEmp(f,null),m:fer?'Férias':at?(window.RHAtest?RHAtest.TIPO(at.tipo)[1]:'Atestado'):'Sem registro'}); });
       fs.sort((a,b)=>a.n.localeCompare(b.n,'pt-BR')); }
-    const C=cfg(); return {dia:d,exp,lim:limT,alm:[C.ini,C.fim],p:ps,f:fs}; }
+    const C=cfgBase(); return {dia:d,exp,lim:limT,alm:[C.ini,C.fim],p:ps,f:fs}; }
   async function publicar(c){ if(!c||!c.P||PR.ocupado) return; const P=c.P, R=c.R; A.ctx=A.ctx||c; if(!(R.lido&&R.lido.func&&R.lido.fer)) return;
     const hj=P.hojeStr(), d0=(()=>{ const x=new Date(hj+'T12:00'); x.setDate(x.getDate()-15); return x.toISOString().slice(0,10); })();
     [...new Set([hj.slice(0,7),d0.slice(0,7)])].forEach(m=>{ try{ assinar(m); }catch(e){} });
@@ -842,9 +864,9 @@
   function carregar(c,m){ A.ctx=A.ctx||c; assinar(m); return new Promise(res=>{ const t0=Date.now(); const ver=()=>{ if((A.dados[m]&&A.aj[m])||Date.now()-t0>9000) return res(!!A.dados[m]); setTimeout(ver,150); }; ver(); }); }
   /* números do mês por pessoa, para o fechamento da folha (rh.js) */
   function fechamento(c,m){ A.ctx=A.ctx||c; const D=A.dados[m]; if(!D) return null; const ds=Object.keys(D.dias||{}).sort(); const sv={mes:A.mes,q:A.q,emp:A.emp,setor:A.setor,sit:A.sit};
-    let G=[]; try{ A.mes=m; A.q=''; A.emp=''; A.setor=''; A.sit=''; G=grade(ds,pessoasDoMes(m)); } finally{ Object.assign(A,sv); }
-    const vd=+cfg().valorDesc||0, alm={}; G.forEach(g=>{ alm[g.p.k]={nome:g.p.nome,emp:empCurta(g.p.emp),alm:g.tot,sj:g.sj,jj:g.jj,desc:g.sj*vd}; });
-    return {m,valorDesc:vd,alm,ponto:pontoMes(c,m)}; }
+    const umaRef=r=>refCom(r,()=>{ let G=[]; try{ A.mes=m; A.q=''; A.emp=''; A.setor=''; A.sit=''; G=grade(ds,pessoasDoMes(m)); } finally{ Object.assign(A,sv); } const vd=+cfg().valorDesc||0, o={}; G.forEach(g=>{ o[g.p.k]={nome:g.p.nome,emp:empCurta(g.p.emp),alm:g.tot,sj:g.sj,jj:g.jj,desc:g.sj*vd}; }); return {vd,o}; });
+    const a=umaRef('alm'), cf=umaRef('cafe');
+    return {m,valorDesc:a.vd,alm:a.o,cafe:cf.o,valorDescCafe:cf.vd,ponto:pontoMes(c,m)}; }
   /* filtros da tela na Pontualidade (empresa, setor; a busca filtra na tela e no PDF/Excel) */
   const pontFil=o=>(!A.emp||(A.emp==='-'?o.emp==='Sem empresa':o.emp===empCurta(A.emp)))&&(!A.setor||(A.setor==='-'?!o.setor:o.setor===A.setor));
   const pontLista=X=>Object.values(X.pes).filter(pontFil);
