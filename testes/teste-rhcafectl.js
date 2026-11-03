@@ -77,5 +77,16 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
   await H.dorme(800); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800);
   const z=await p.evaluate(()=>({k:(document.querySelector('.alm-fxk')||{}).textContent||'',s:(document.querySelector('.alm-fx2')||{}).textContent||''}));
   ok('Nome da lista sem Face ID aparece embaixo e explica a diferença', /4 na folha para assinar/.test(z.k)&&/1 da folha sem Face ID/.test(z.k)&&/Zeca/.test(z.s)&&/não está ligado/.test(z.s), JSON.stringify(z).slice(0,300));
-  if(process.env.SHOT){ await p.evaluate(()=>{ document.querySelectorAll('.alm-fx').forEach(d=>d.open=true); document.querySelector('.alm-fx').scrollIntoView(); }); await p.screenshot({path:'/tmp/sh/fx.png'}); }
+  const ct=await p.evaluate(()=>(document.querySelector('.alm-conta')||{}).innerText||'');
+  const nums=(ct.match(/\d+/g)||[]).map(Number);
+  ok('A conta da folha fecha: 4 = 2 almoçaram + 1 sem justificativa + 1 não passou no Face ID', /Folha para assinar\s*4/.test(ct)&&/2\s*almoçaram/.test(ct)&&/1\s*sem justificativa/.test(ct)&&/1\s*na folha e sem Face ID/.test(ct)&&nums[0]===nums.slice(1).reduce((a,b)=>a+b,0), ct.replace(/\s+/g,' '));
+  const sf=await p.evaluate(()=>{ const b=document.querySelector('.alm-sf'); return b?{t:b.innerText,bt:[...b.querySelectorAll('[data-act]')].map(x=>x.dataset.act)}:null; });
+  ok('Quem está na folha sem Face ID aparece na coluna para marcar (Justificar, almoçou, não veio)', sf&&/Zeca/.test(sf.t)&&['alm-jus','alm-aj','alm-fxnv'].every(a=>sf.bt.includes(a)), JSON.stringify(sf));
+  await p.click('.alm-sf [data-act="alm-aj"]'); await H.dorme(1200); await p.evaluate(()=>__T.go('rhalmoco')); await H.dorme(800);
+  const ct2=await p.evaluate(()=>({c:(document.querySelector('.alm-conta')||{}).innerText||'',sf:!!document.querySelector('.alm-sf'),sim:(document.querySelector('.alm-v2s')||{}).innerText||''}));
+  const n2=(ct2.c.match(/\d+/g)||[]).map(Number);
+  ok('Marcar "almoçou" leva para Almoçaram e a conta continua fechando', !ct2.sf&&/Zeca/.test(ct2.sim)&&/3\s*almoçaram/.test(ct2.c)&&n2[0]===4&&n2[0]===n2.slice(1).reduce((a,b)=>a+b,0), JSON.stringify(ct2).slice(0,300));
+  const fe6=await p.evaluate(m=>window.RHAlmoco.fechamento(window.RHAlmoco._A.ctx,m),m);
+  ok('No fechamento o Zeca conta 1 almoço', fe6&&fe6.alm['nome:Motorista - Zeca Prado']&&fe6.alm['nome:Motorista - Zeca Prado'].alm===1, JSON.stringify(fe6&&Object.keys(fe6.alm)));
+  if(process.env.SHOT){ await p.evaluate(()=>{ document.querySelectorAll('.alm-fx').forEach(d=>d.open=true); document.querySelector('.alm-fx').scrollIntoView(); }); await p.screenshot({path:'/tmp/sh/fx.png'}); await p.evaluate(()=>document.querySelector('.alm-conta').scrollIntoView({block:'center'})); await p.screenshot({path:'/tmp/sh/conta.png'}); }
   console.log('erros:',B.erros.filter(x=>!/404/.test(x))); console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
