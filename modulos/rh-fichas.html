@@ -1224,6 +1224,12 @@
         descricoesFiltro.push("só pendentes no mês");
       }
     }
+    /* 03/11 ("as folhas estão saindo repetidas"): cadastro repetido da mesma pessoa (mesmo CPF/CNPJ ou mesmo nome) sai uma vez só */
+    var repetidos=[]; (function(){ var vistoDoc={}, vistoNome={}, fica=[];
+      alvo.forEach(function(c){ var dc=String(c.cpf||"").replace(/\D/g,""), nn=norm(c.nome);
+        if((dc.length>=11&&vistoDoc[dc])||vistoNome[nn]){ repetidos.push(c.nome); return; }
+        if(dc.length>=11) vistoDoc[dc]=1; vistoNome[nn]=1; fica.push(c); });
+      alvo=fica; })();
     alvo = alvo.sort(function(a,b){ return a.nome.localeCompare(b.nome,"pt-BR"); });
     if(ordemSetor){ ordemSetor=false; alvo.sort(function(a,b){ return String(a.setor||"").localeCompare(String(b.setor||""),"pt-BR")||a.nome.localeCompare(b.nome,"pt-BR"); }); }
     if(alvo.length === 0){
@@ -1272,6 +1278,7 @@
     var filtroLabel = descricoesFiltro.length ? " ("+descricoesFiltro.join(" · ")+")" : "";
     var totalPaginas = alvo.reduce(function(a,c){ return a+paginasDe(c,tipoFicha); },0);
     var notaEpi = semEpiPessoas.length ? " · "+semEpiPessoas.length+" não usa(m) EPI e fica(m) sem ficha" : "";
+    if(repetidos.length) notaEpi += " · <span style=\"color:#A2453D\">"+repetidos.length+" cadastro(s) repetido(s) saiu(ram) uma vez só: "+esc(repetidos.slice(0,6).join(", "))+(repetidos.length>6?"…":"")+" (acerte em RH → Funcionários)</span>";
     previewCount.innerHTML = "<b>"+alvo.length+"</b> funcionário(s)"+filtroLabel+" — <b>"+totalPaginas+"</b> página(s) A4"+notaEpi;
     btnImprimir.disabled = false;
     btnSalvarPdf.disabled = false;

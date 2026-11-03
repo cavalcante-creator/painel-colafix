@@ -269,7 +269,13 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       <div class="rh-fproxb"><button class="btn" data-act="rh-fimpprox">${P.ic('folha',18,2)}Imprimir as fichas de ${mesNome(proxM)}</button><button class="lnk" data-act="rh-fimpprox" data-setor="1">imprimir separado por setor</button></div></section>`:'';
     const sub=(P.hojeStr().slice(0,7)<FDESDE()?'O controle das fichas começa em '+mesNome(FDESDE())+' de '+FDESDE().slice(0,4)+'. ':'')+(fr.tot?`${fr.c.ass} de ${fr.tot} assinadas · ${fr.c.imp} falta assinar · ${fr.c.nao} não geradas`:'');
     const seg=`<div class="seg rh-modo" role="group" aria-label="Como mostrar">${[['lista','Lista'],['setor','Por setor']].map(([k,l])=>`<button data-act="rh-fmodo" data-v="${k}" aria-pressed="${R.fmodo===k}">${l}</button>`).join('')}</div>`;
-    return topo(mesTitulo(m),sub,acoes,EY)+odBarra()+ban+aviso+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':!fr.tot?'<section class="card"><div class="empty">Nenhum funcionário em atividade. Cadastre em Funcionários.</div></section>':R.fmodo==='setor'?vFichasSetor(fr,seg):vFichasLista(fr,m,seg)); }
+    /* 03/11: cadastro repetido (mesmo CPF/CNPJ ou mesmo nome) — a ficha sai uma vez só, mas avisa para acertar o cadastro */
+    const repG=(()=>{ const pai={}, raiz=k=>pai[k]===k?k:(pai[k]=raiz(pai[k])), une=(a,b)=>{ pai[raiz(a)]=raiz(b); }, xs=ativos();
+      xs.forEach(f=>{ pai[f._id]=f._id; }); const por={};
+      xs.forEach(f=>{ const d=dig(f.tipo==='PJ'?(f.cnpj||f.cpf):f.cpf); [d.length>=11?'d'+d:'', 'n'+norm(f.nome)].filter(Boolean).forEach(k=>{ if(por[k]) une(f._id,por[k]); else por[k]=f._id; }); });
+      const g={}; xs.forEach(f=>{ (g[raiz(f._id)]=g[raiz(f._id)]||[]).push(f); }); return Object.values(g).filter(x=>x.length>1); })();
+    const repH=repG.length?`<div class="banner" style="background:var(--warn-tint);color:var(--warn-ink);margin:0 0 12px"><b>${plural(repG.length,'pessoa está','pessoas estão')} com o cadastro repetido</b> — a ficha sai uma vez só para cada uma, mas acerte o cadastro em Funcionários (apague ou desligue o repetido): ${repG.map(x=>x.map(f=>`<button class="lnk" data-act="rh-pess" data-id="${f._id}">${esc(f.nome)}</button>`).join(' = ')).join(' · ')}</div>`:'';
+    return topo(mesTitulo(m),sub,acoes,EY)+odBarra()+ban+repH+aviso+(!R.lido.func?'<section class="card"><div class="empty">Carregando…</div></section>':!fr.tot?'<section class="card"><div class="empty">Nenhum funcionário em atividade. Cadastre em Funcionários.</div></section>':R.fmodo==='setor'?vFichasSetor(fr,seg):vFichasLista(fr,m,seg)); }
   function vFichasLista(fr,m,seg){ const F=R.ffil, q=norm(F.q), qd=dig(F.q), faltamN=fr.xs.filter(o=>o.s.k==='nao').length; /* igual ao botão do topo (30/10) */
     const cnt={todas:fr.tot,nao:fr.c.nao,imp:fr.c.imp,ass:fr.c.ass};
     const grupo=s=>s.k==='semepi'?(s.i?'imp':'nao'):s.k;
