@@ -154,10 +154,11 @@
       <label class="btn" style="cursor:pointer">${A.lendo?'Lendo…':P.ic('baixar',18,2.2)+'Importar do Face ID'}<input type="file" accept=".csv,text/csv" id="alm-arq" hidden ${A.lendo?'disabled':''}></label></div>
       <div class="sub alm-reg">${A.vis==='pont'?'Chegada, saída e faltas de cada pessoa pelo Face ID. ':(RC()?`Tomou café quem passou no <b>${esc(C.disp)}</b> antes das ${esc(C.fim)}. `:`Almoçou quem passou no <b>${esc(C.disp)}</b> entre ${esc(C.ini)} e ${esc(C.fim)}. `)}${roboTxt(c)}${ultImp?'Dados de '+esc(c.br(ultImp.de))+' a '+esc(c.br(ultImp.ate))+' · importado por '+esc(ultImp.por||'')+' em '+esc(new Date(ultImp.em).toLocaleDateString('pt-BR')):ds.length?'Dados de '+esc(c.br(ds[0]))+' a '+esc(c.br(ds[ds.length-1]))+'.':'Ainda não há dados deste mês.'}
         <details><summary>Como exportar do Control iD</summary><ol><li>Relatórios → Acessos → <b>Acessos Gerais</b>.</li><li>Escolha as datas (pode ser o mês todo), Pessoas: Todos, e clique em Listar.</li><li>Exportar → <b>Exportar CSV</b> e arraste o arquivo aqui (ou toque em "Importar do Face ID").</li><li>Importar de novo o mesmo período só atualiza esses dias: não duplica.</li></ol></details></div>
-      ${st&&A.vis!=='dia'&&A.vis!=='pont'?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
+      ${st&&A.vis!=='dia'&&A.vis!=='pont'&&A.vis!=='nota'?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Faltas sem justificativa</span><b class="num">${st.semJust}</b><small>vezes que alguém veio e não almoçou · ${st.just} justificadas · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
+    if(A.vis==='nota'&&!c.fixo) return topo+`<section class="card"><div class="alm-f"><div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="false">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="false">Fechamento do mês</button><button data-act="alm-vis" data-v="nota" aria-pressed="true">Solicitado × nota</button></div></div>${vNota(c)}</section>`;
     if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty"><b>Nenhum dado do Face ID em ${esc(mesNome(A.mes))}</b><span>Importe o CSV "Acessos Gerais" do Control iD (o robô do Face ID também manda sozinho, quando está ligado). As ausências no almoço já podem ser programadas.</span><span class="rh-vzb"><button class="btn sec" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button><label class="btn" for="alm-arq" style="cursor:pointer">${P.ic('baixar',16,2.2)}Importar do Face ID</label></span></div></section>`+vAus(c);
-    const abas=c.fixo?'':`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button></div>`; /* 30/10: Pontualidade e Diretoria viraram telas próprias (Relatórios) */
+    const abas=c.fixo?'':`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="nota" aria-pressed="${A.vis==='nota'}">Solicitado × nota</button></div>`; /* 30/10: Pontualidade e Diretoria viraram telas próprias (Relatórios) */
     if(A.vis==='pont') return topo+`<section class="card">${abas?`<div class="alm-f">${abas}</div>`:''}<div class="alm-f alm-f2">
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
       ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
@@ -988,6 +989,83 @@
   @media (max-width:760px){ .alm-ptab colgroup,.alm-ptab th:nth-child(5),.alm-ptab td:nth-child(5){display:none} .alm-ptab td.ac{white-space:normal} }
   .alm-pt{width:100%}.alm-pt td{vertical-align:middle}.alm-pdet td{background:var(--teal-wash)}.alm-pdg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.alm-pdg>div{display:flex;flex-direction:column;gap:3px;font-size:13px}.alm-pdg small{color:var(--muted)}
   @media (max-width:900px){ .alm-pk,.alm-pdg{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  </style>`); }catch(e){}
+  /* ---------- SOLICITADO × NOTA (04/11, "a parte mais importante: quantos almoços e cafés foram solicitados e quantos vêm na nota") ----------
+     Solicitado = pessoas da folha do dia (lista fixa − marcados "Não veio"/férias/tirados), o mesmo número do título da folha impressa.
+     Na nota = o que o restaurante cobrou, digitado pelo RH por dia (ou só o total do mês). Guardado em rh/dados/almoconota/{AAAA-MM}
+     {dias:{d:{a,c}}, tot:{a,c}, nf, obs, em, por}. As folhas do mês vêm de uma consulta só por coleção (almocofolha/cafefolha, campo dia). */
+  const NOTA={};
+  function notaEst(c,m){ let N=NOTA[m]; if(N) return N; N=NOTA[m]={ok:false,doc:{dias:{},tot:{}},fol:{alm:{},cafe:{}}};
+    const db=c.P.db(), q=col=>db.collection('rh/dados/'+col).where('dia','>=',m+'-01').where('dia','<=',m+'-31').get();
+    Promise.all([db.doc('rh/dados/almoconota/'+m).get().catch(()=>null),q('almocofolha').catch(()=>null),q('cafefolha').catch(()=>null)]).then(([g,a,b])=>{
+      const x=g&&g.exists?g.data():{}; N.doc={dias:x.dias||{},tot:x.tot||{},nf:x.nf||'',obs:x.obs||'',em:x.em||'',por:x.por||''};
+      [a,b].forEach((s,i)=>{ ((s&&s.docs)||[]).forEach(dd=>{ N.fol[i?'cafe':'alm'][dd.id]=dd.data(); }); }); N.ok=true; c.P.rerender(); });
+    return N; }
+  function notaSol(c,d,k){ const N=NOTA[d.slice(0,7)], sv=FK; fkUsa(k);
+    try{ A.fol=A.fol||{}; if(!A.fol[d]){ const x=(N&&N.fol[k][d])||{}; A.fol[d]={nv:x.nv||{},desm:x.desm||{},tirar:x.tirar||{},resp:x.resp||null,emit:x.emit||null,foto:x.foto||null,carregando:false}; }
+      const F=A.fol[d]; if(!listaFolha().length) return null; const L=folhaPessoas(c,d).L.filter(x=>!(F.tirar||{})[x.nome]);
+      return {n:L.length-L.filter(x=>fMarca(F,x)).length,emit:!!F.emit}; }
+    finally{ fkUsa(sv); } }
+  function notaDias(c,m){ const N=NOTA[m], h=c.P.hojeStr(), [y,mm]=m.split('-').map(Number), ult=new Date(y,mm,0).getDate(), D=A.dados[m]||{}, out=[];
+    for(let i=1;i<=ult;i++){ const d=m+'-'+pad(i); if(d>h) break; const wd=new Date(d+'T12:00').getDay(); let fer=false; try{ fer=!!(c.P.feriadoDe&&c.P.feriadoDe(d)); }catch(e){}
+      const tem=(N&&(N.fol.alm[d]||N.fol.cafe[d]||N.doc.dias[d]))||((D.dias||{})[d]&&Object.keys(D.dias[d]).length>=5); if(tem||(wd>0&&wd<6&&!fer)) out.push(d); }
+    return out; }
+  const nN=v=>v===''||v==null||isNaN(+v)?null:+v;
+  function notaDados(c,m){ const N=notaEst(c,m), ds=notaDias(c,m), rows=ds.map(d=>{ const a=notaSol(c,d,'alm'), cf=notaSol(c,d,'cafe'), z=N.doc.dias[d]||{}; return {d,a,cf,na:nN(z.a),nc:nN(z.c)}; });
+    const sm=(k)=>rows.reduce((s,r)=>s+(r[k]&&r[k].n||0),0), sn=k=>rows.reduce((s,r)=>s+(r[k]||0),0), temD=k=>rows.some(r=>r[k]!=null);
+    const sq=(k,kn)=>rows.reduce((s,r)=>s+(r[kn]!=null&&r[k]?r[k].n:0),0), qd=kn=>rows.filter(r=>r[kn]!=null).length;
+    const T={sa:sm('a'),sc:sm('cf'),na:temD('na')?sn('na'):nN(N.doc.tot.a),nc:temD('nc')?sn('nc'):nN(N.doc.tot.c),totA:!temD('na')&&nN(N.doc.tot.a)!=null,totC:!temD('nc')&&nN(N.doc.tot.c)!=null};
+    T.saC=T.totA||!temD('na')?T.sa:sq('a','na'); T.scC=T.totC||!temD('nc')?T.sc:sq('cf','nc'); T.qa=qd('na'); T.qc=qd('nc');
+    return {N,rows,T}; }
+  function difTxt(sol,nota,curto){ if(sol==null||nota==null) return {t:'',cl:''}; const df=nota-sol; if(!df) return {t:curto?'bate':'Bate',cl:'ok'};
+    return df>0?{t:curto?'+'+df:df+' a mais na nota',cl:'crit'}:{t:curto?String(df):(-df)+' a menos na nota',cl:'warn'}; }
+  function vNota(c){ const P=c.P, esc=c.esc, m=A.mes, X=notaDados(c,m), N=X.N, T=X.T, semLA=!refCom('alm',()=>{ const s=FK; fkUsa('alm'); try{ return listaFolha().length; } finally{ fkUsa(s); } }), semLC=!(listaCafe().length);
+    if(!N.ok) return `<div class="empty"><b>Carregando as folhas do mês…</b></div>`;
+    const dA=difTxt(T.saC,T.na), dC=difTxt(T.scC,T.nc), nos=(q,tot)=>tot?'total do mês':q?'nos '+q+(q>1?' dias':' dia')+' com nota':'', wd=d=>['dom','seg','ter','qua','qui','sex','sáb'][new Date(d+'T12:00').getDay()];
+    const k=(t,v,s,cl)=>`<div class="${cl?'nt-'+cl:''}"><span>${t}</span><b class="num">${v==null?'—':Number(v).toLocaleString('pt-BR')}</b><small>${s}</small></div>`;
+    const inp=(d,f,v)=>`<input class="txt nt-in" type="number" min="0" inputmode="numeric" data-nt="${d}|${f}" value="${v==null?'':v}" aria-label="${f==='a'?'Almoços':'Cafés'} na nota em ${c.br(d)}">`;
+    const cel=(sol,nota)=>{ const x=difTxt(sol&&sol.n,nota,true); return `<td class="nt-df ${x.cl}">${x.t}</td>`; };
+    const solC=s=>s?`<td class="num">${s.n}${s.emit?'':' <small title="A folha deste dia ainda não foi impressa: número da lista agora">*</small>'}</td>`:`<td class="nt-mut">—</td>`;
+    return `<!--nofx--><div class="nt-top"><div><b>Solicitado × nota do restaurante</b><div class="sub">Solicitado = pessoas na folha de assinatura do dia (lista fixa menos quem foi marcado "Não veio", férias ou tirado), o mesmo número do título da folha. Digite quanto veio na nota de cada dia.</div></div>
+      <span style="flex:1"></span><button class="btn sec rh-sm" data-act="alm-ntxls">Excel</button><button class="btn rh-sm" data-act="alm-ntpdf">Baixar PDF</button></div>
+      ${semLA||semLC?`<div class="alm-parc">${semLA?'A folha do <b>almoço</b> ainda não tem lista fixa. ':''}${semLC?'A folha do <b>café</b> ainda não tem lista fixa. ':''}Sem lista não dá para saber quantos foram solicitados: monte a lista em Por dia › Abrir a folha.</div>`:''}
+      <div class="alm-kpi nt-k">${k('Almoços solicitados',T.sa,'pessoas nas folhas do mês')}${k('Almoços na nota',T.na,T.totA?'total do mês digitado':'soma dos dias')}${k('Diferença no almoço',T.na==null?null:T.na-T.saC,dA.t?dA.t+' · '+nos(T.qa,T.totA):'digite a nota',dA.cl)}
+        ${k('Cafés solicitados',T.sc,'pessoas nas folhas do mês')}${k('Cafés na nota',T.nc,T.totC?'total do mês digitado':'soma dos dias')}${k('Diferença no café',T.nc==null?null:T.nc-T.scC,dC.t?dC.t+' · '+nos(T.qc,T.totC):'digite a nota',dC.cl)}</div>
+      <div class="nt-cab"><label>Nº da nota <input class="txt" data-ntc="nf" value="${esc(N.doc.nf||'')}" style="max-width:160px"></label>
+        <label>A nota veio só com o total? Almoços <input class="txt nt-in" type="number" min="0" data-ntc="ta" value="${N.doc.tot.a==null?'':esc(N.doc.tot.a)}"></label><label>Cafés <input class="txt nt-in" type="number" min="0" data-ntc="tc" value="${N.doc.tot.c==null?'':esc(N.doc.tot.c)}"></label>
+        <label style="flex:1;min-width:220px">Observação <input class="txt" data-ntc="obs" value="${esc(N.doc.obs||'')}" placeholder="ex.: nota 1234 conferida com o restaurante"></label></div>
+      <div class="nt-tw"><table class="nt-t"><thead><tr><th rowspan="2">Dia</th><th colspan="3">Almoço</th><th colspan="3">Café</th></tr><tr><th>Solicitado</th><th>Na nota</th><th>Diferença</th><th>Solicitado</th><th>Na nota</th><th>Diferença</th></tr></thead><tbody>
+      ${X.rows.map(r=>`<tr><td><b>${c.br(r.d).slice(0,5)}</b> <small>${wd(r.d)}</small></td>${solC(r.a)}<td>${inp(r.d,'a',r.na)}</td>${cel(r.a,r.na)}${solC(r.cf)}<td>${inp(r.d,'c',r.nc)}</td>${cel(r.cf,r.nc)}</tr>`).join('')||'<tr><td colspan="7" class="nt-mut">Nenhum dia de expediente ainda neste mês.</td></tr>'}
+      </tbody><tfoot><tr><td>Total</td><td class="num">${T.sa}</td><td class="num">${T.na==null?'—':T.na}</td><td class="nt-df ${dA.cl}">${difTxt(T.saC,T.na,true).t}</td><td class="num">${T.sc}</td><td class="num">${T.nc==null?'—':T.nc}</td><td class="nt-df ${dC.cl}">${difTxt(T.scC,T.nc,true).t}</td></tr></tfoot></table></div>
+      <div class="sub">* folha ainda não impressa: o número é o da lista agora. Enter passa para o dia de baixo. ${N.doc.em?'Nota atualizada'+(N.doc.por?' por '+esc(N.doc.por):'')+' em '+esc(new Date(N.doc.em).toLocaleDateString('pt-BR'))+'.':''}</div><!--/nofx-->`; }
+  async function notaGrava(c,m){ const N=NOTA[m]; if(!N) return; N.doc.em=new Date().toISOString(); N.doc.por=(c.P.S&&c.P.S.perfil&&c.P.S.perfil.nome)||'';
+    try{ await c.P.db().doc('rh/dados/almoconota/'+m).set(Object.assign({mes:m},N.doc)); }catch(e){ c.P.toast('Não foi possível guardar a nota: '+((e&&e.message)||e)); } }
+  document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!t.dataset||!A.ctx) return; const m=A.mes, N=NOTA[m]; if(!N) return;
+    if(t.dataset.nt){ const [d,f]=t.dataset.nt.split('|'); const z=N.doc.dias[d]=Object.assign({},N.doc.dias[d]); const v=nN(t.value); if(v==null) delete z[f]; else z[f]=v; if(!Object.keys(z).length) delete N.doc.dias[d]; notaGrava(A.ctx,m); A.ctx.P.rerender(); return; }
+    if(t.dataset.ntc){ const k=t.dataset.ntc; if(k==='nf'||k==='obs') N.doc[k]=t.value.trim(); else { const v=nN(t.value), f=k==='ta'?'a':'c'; N.doc.tot=Object.assign({},N.doc.tot); if(v==null) delete N.doc.tot[f]; else N.doc.tot[f]=v; } notaGrava(A.ctx,m); A.ctx.P.rerender(); } });
+  document.addEventListener('keydown',ev=>{ const t=ev.target; if(ev.key!=='Enter'||!t||!t.dataset||!t.dataset.nt) return; ev.preventDefault(); const f=t.dataset.nt.split('|')[1], xs=[...document.querySelectorAll('[data-nt$="|'+f+'"]')], i=xs.indexOf(t); (xs[i+1]||t).focus(); if(xs[i+1]) xs[i+1].select(); else t.blur(); });
+  function notaTab(c){ const X=notaDados(c,A.mes), br=d=>c.br(d), f=(s)=>s?String(s.n):'—', g=v=>v==null?'':String(v), df=(s,v)=>difTxt(s&&s.n,v,true).t;
+    return {X,rows:X.rows.map(r=>[br(r.d),f(r.a),g(r.na),df(r.a,r.na),f(r.cf),g(r.nc),df(r.cf,r.nc)])}; }
+  document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="alm-ntpdf"],[data-act="alm-ntxls"]'); if(!b||!A.ctx) return; ev.stopPropagation(); const c=A.ctx, P=c.P, Q=notaTab(c), T=Q.X.T, N=Q.X.N;
+    const cab=['Dia','Almoço solicitado','Almoço na nota','Diferença','Café solicitado','Café na nota','Diferença'], tot=['Total',String(T.sa),g0(T.na),difTxt(T.saC,T.na,true).t,String(T.sc),g0(T.nc),difTxt(T.scC,T.nc,true).t];
+    function g0(v){ return v==null?'':String(v); }
+    if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou.');
+    if(b.dataset.act==='alm-ntxls') return RHRel.xls('Almoco-cafe-nota-'+A.mes,[['Solicitado x nota',[cab].concat(Q.rows,[tot])]],{tit:'Almoço e café · solicitado × nota · '+mesNome(A.mes),sub:N.doc.nf?'Nota '+N.doc.nf:'',filtros:[]});
+    const dA=difTxt(T.saC,T.na), dC=difTxt(T.scC,T.nc), cor=x=>x.cl==='crit'?'crit':x.cl==='warn'?'warn':x.cl==='ok'?'ok':'cinza';
+    try{ await RHRel.pdf({tit:'Almoço e café · solicitado × nota',sub:mesNome(A.mes)+(N.doc.nf?' · nota '+N.doc.nf:''),filtros:[],arq:'Almoco-cafe-nota-'+A.mes,kpiCols:3,
+      kpis:[{t:'Almoços solicitados',v:String(T.sa),s:'pessoas nas folhas',c:'pet'},{t:'Almoços na nota',v:g0(T.na)||'—',s:T.totA?'total do mês':'soma dos dias',c:'pet'},{t:'Diferença no almoço',v:T.na==null?'—':String(T.na-T.saC),s:dA.t,c:cor(dA)},
+        {t:'Cafés solicitados',v:String(T.sc),s:'pessoas nas folhas',c:'teal'},{t:'Cafés na nota',v:g0(T.nc)||'—',s:T.totC?'total do mês':'soma dos dias',c:'teal'},{t:'Diferença no café',v:T.nc==null?'—':String(T.nc-T.scC),s:dC.t,c:cor(dC)}],
+      partes:[{secao:'Dia a dia',nota:'solicitado = pessoas na folha de assinatura do dia',cols:[{t:'Dia',w:14},{t:'Almoço solicitado',w:16,al:'r'},{t:'Almoço na nota',w:16,al:'r'},{t:'Diferença',w:14,al:'r'},{t:'Café solicitado',w:16,al:'r'},{t:'Café na nota',w:16,al:'r'},{t:'Diferença',w:14,al:'r'}],
+        rows:Q.rows.concat([Object.assign(tot,{_tot:true})]),vazio:'Nenhum dia.'}].concat(N.doc.obs?[{secao:'Observação',texto:N.doc.obs}]:[]),assina:'Conferido por (RH)'}); }catch(e){ P.toast(String(e&&e.message||e)); } },true);
+  try{ document.head.insertAdjacentHTML('beforeend',`<style id="alm-nota-css">
+  .nt-top{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin:6px 0 12px}.nt-top .sub{max-width:760px}
+  .nt-k{grid-template-columns:repeat(3,minmax(0,1fr))!important}.nt-k .nt-crit b{color:var(--crit)}.nt-k .nt-warn b{color:var(--warn)}.nt-k .nt-ok b{color:var(--ok)}
+  .nt-cab{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:12px 0}.nt-cab label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  .nt-tw{overflow-x:auto}.nt-t{width:100%;border-collapse:collapse;font-size:14px}.nt-t th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:6px 8px;text-align:center;border-bottom:1px solid var(--line,#dde4e9)}
+  .nt-t td{padding:4px 8px;border-bottom:1px solid var(--line,#eef2f5);text-align:center}.nt-t td:first-child{text-align:left;white-space:nowrap}.nt-t td small{color:var(--muted)}
+  .nt-t tfoot td{font-weight:700;border-top:2px solid var(--line,#dde4e9)}.nt-t .nt-in,.nt-cab .nt-in{width:96px!important;max-width:96px;text-align:right;padding:6px 8px}
+  .nt-df.crit{color:var(--crit);font-weight:700}.nt-df.warn{color:var(--warn);font-weight:700}.nt-df.ok{color:var(--ok)}.nt-mut{color:var(--muted)}
+  @media (max-width:700px){ .nt-k{grid-template-columns:repeat(2,minmax(0,1fr))!important} }
   </style>`); }catch(e){}
   window.RHAlmoco={_folhaDoc:(c,d)=>folhaDoc(c||A.ctx,d||A.dia),publicar,carregar,fechamento,_prDia:prDia,ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,_fk:()=>FK,importar:(c,f)=>{ if(c&&!A.ctx) A.ctx=c; return importar(f); },_A:A};
 })();
