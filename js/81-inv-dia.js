@@ -55,7 +55,7 @@ function invdHojeLista(){ const X=S.invd, C=invdCfg(), feito=invdContHoje(), L=[
   const it=(X.dia&&X.dia.itens)||{}; Object.keys(it).forEach(c=>{ if(vis[c]) return; vis[c]=1; L.push({cod:c,m:it[c].m,u:it[c].u||null,feito:!!feito[c]}); });
   const h=hojeStr(), mi={}; let ult=''; invdConfHoje().forEach(cf=>{ if(!cf||cf.excluida||(cf.dia||String(cf.em||'').slice(0,10))!==h||!(cf.por===S.uid||(!cf.por&&cf.porNome&&cf.porNome===((S.nomes&&S.nomes[S.uid])||'')))) return; Object.keys(cf.itens||{}).forEach(c=>mi[c]=1); const t=String(cf.em||''); if(t>ult) ult=t; });
   const hm=ult?new Date(ult).toTimeString().slice(0,5):'';
-  return {dia:X.diaK||hojeStr(),hora:C.hora,pronto:!!X._l_dia&&!!X.dia,itens:L,meus:Object.keys(mi).length,meusUlt:hm}; }
+  return {dia:X.diaK||hojeStr(),hora:C.hora,pronto:!!X._l_dia&&!!X.dia,itens:L,meus:Object.keys(mi).length,meusUlt:hm,meusItens:Object.keys(mi)}; }
 
 /* ---------- 2 · divergências abertas ao salvar a contagem ---------- */
 async function invdConf(cf){ const X=S.invd; if(!cf||!cf.itens||!S.db) return; const em=new Date().toISOString(), dia=cf.dia||hojeStr();

@@ -33,7 +33,9 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   await entra('conf','conf123'); f=await frame();
   const s=await p.evaluate(()=>{ const fr=document.querySelector('.inv-frx'); const r=fr&&fr.getBoundingClientRect(); return {solo:document.body.classList.contains('inv-solo'),w:r&&r.width,h:r&&r.height,nav:!!document.querySelector('#navlist')&&document.querySelector('#navlist').offsetParent!==null}; });
   const c=f&&await f.evaluate(()=>({perf:perfil().label,abas:perfil().abas,a3:confPerm().podeContarAlmox3,a30:confPerm().podeContarAlmox30,nome:USUARIO_LOGADO.nome}));
-  const tabs=f&&[await vis(f,'tab-transf-group'),await vis(f,'btnModoAuditoria'),await vis(f,'btnModoRecebimento')];
+  /* na tela inicial do conferente (dia.js) as abas ficam escondidas: confere o botão em si (permissão) */
+  const visB=(f,id)=>f.evaluate(id=>{ const e=document.getElementById(id); return !!e&&e.style.display!=='none'&&getComputedStyle(e).display!=='none'; },id);
+  const tabs=f&&[await vis(f,'tab-transf-group'),await visB(f,'btnModoAuditoria'),await visB(f,'btnModoRecebimento')];
   ok('Conferente vê só o programa, em tela cheia, com o perfil Conferente (Almox 3)', s.solo&&s.w===1440&&s.h===900&&!s.nav&&c&&c.perf==='Conferente'&&c.a3&&!c.a30&&c.nome==='Carla'&&tabs&&!tabs[0]&&!tabs[1]&&tabs[2], JSON.stringify({s,c,tabs}));
 
   /* contagem → salva no banco do painel */
