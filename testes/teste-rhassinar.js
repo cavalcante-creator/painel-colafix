@@ -68,6 +68,10 @@ function assina(orig,cn){ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asn-')
   /* conferência: outra pessoa assinou e o documento mudou */
   const c2=await p.evaluate(async([a,b])=>{ const u=Uint8Array.from(atob(a),c=>c.charCodeAt(0)); const r=await window.RHAssina._confere({R:{func:[{_id:'a1',nome:'JOAO PEREIRA TESTE'}]}},{tam:u.length+5,sha:'x',funcId:'a1',nome:'Joao'},Uint8Array.from(atob(b),c=>c.charCodeAt(0))); return r; },[PDF0.toString('base64'),assina(Buffer.from(PDF0.toString('latin1').replace('595 842','612 792'),'latin1'),'MARIA OUTRA PESSOA').toString('base64')]);
   ok('Confere e aponta: assinado por outra pessoa e documento diferente', c2.ok===false&&c2.probs.some(x=>/MARIA OUTRA PESSOA/.test(x))&&c2.probs.some(x=>/não começa igual/.test(x)), JSON.stringify(c2.probs));
+  /* apagar o documento gerado (dois toques) */
+  await p.click('[data-act="rh-dgdel"][data-id="g1"]'); await H.dorme(300); await p.click('[data-act="rh-dgdel"][data-id="g1"]:has-text("Confirmar")'); await H.dorme(900);
+  const S4=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), t4=await p.evaluate(()=>document.getElementById('view').innerText);
+  ok('Apagar o documento gerado (dois toques): some da lista e fica marcado removido', S4['rh/dados/docsgerados/g1'].removido===true&&!/Assinado pelo gov\.br/.test(t4), t4.replace(/\n/g,' | ').slice(0,200));
   ok('Nenhum erro de JavaScript', !erros.length&&!erros2.length, erros.concat(erros2).join(' | '));
   await B2.fechar?.(); await B.fechar?.(); const f=res.filter(r=>!r.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU tudo ('+res.length+')'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

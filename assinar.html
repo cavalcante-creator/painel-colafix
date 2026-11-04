@@ -128,6 +128,7 @@ ol.mini{margin:8px 0 0;padding-left:20px;color:var(--ink);font-size:15px}ol.mini
       catch(e){ console.warn(e); bt.disabled=false; bt.textContent='Mandar o documento assinado'; $('#er').textContent=String(e&&e.message)==='grande'?'Arquivo grande demais.':'Não foi possível mandar. Confira a internet e tente de novo. Se o link venceu, peça um novo para o RH.'; } });
   }
   (async()=>{ try{ const g=await fs.doc('rh/dados/assinped/'+T).get(); P=g.exists?g.data():null;
+      if(P&&P.cancelado) return fimTela('Este link foi cancelado','O RH cancelou este link. Se precisar, peça um novo para o RH da Colafix.');
       if(!P||P.usado) return fimTela(P?'Documento já assinado':'Este link não vale mais',P?'O documento deste link já foi assinado e mandado para o RH.':'Peça um link novo para o RH da Colafix.',!!P);
       if(+P.ateMs&&+P.ateMs<Date.now()) return fimTela('Este link venceu','Peça um link novo para o RH da Colafix.');
       tela(); }
