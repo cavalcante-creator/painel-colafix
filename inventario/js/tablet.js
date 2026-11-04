@@ -79,6 +79,7 @@
   window.salvarConferencia=async function(){ const snap=JSON.parse(JSON.stringify(CONFERENCIAS||{})); const r=await _salvar.apply(this,arguments);
     try{ if(Object.keys(CONFERENCIAS||{}).length||!Object.keys(snap).length) return r; /* não salvou (ou nada a salvar) */
       let rec=null; try{ rec=JSON.parse(sessionStorage.getItem(K)||'null'); sessionStorage.removeItem(K); }catch(e){}
+      if(window.invSemComparar&&window.invSemComparar()) return r; /* conferente conta sem comparar: a comparação fica com o PCP (pedido de 04/11) */
       const xs=divergentes(snap);
       if(rec&&(rec.cods||[]).length) resultado(xs.filter(x=>rec.cods.includes(x.cod)),rec.cods.filter(c=>snap[c]));
       else if(xs.length) oferece(xs); }catch(e){ console.warn('[recontagem]',e); }

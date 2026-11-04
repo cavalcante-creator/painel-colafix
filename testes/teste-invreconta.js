@@ -4,12 +4,12 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
 (async()=>{ const {d}=H.seed(); const D=d.docs;
   const it=(cod,desc,locais,grupos)=>({codigo:cod,descricao:desc,ativo:true,linhas:[],almox:{locais,grupos:grupos||['COLAFIX'],un:null,conv:null}});
   D['itens/AC0001']=Object.assign(it('AC0001','ARGAMASSA AC1 20 KG',['a3','a30']),{linhas:['Linha 1']}); D['config/geral'].paletes={'Linha 1':96}; /* múltiplo de palete da configuração */ D['itens/AC0002']=it('AC0002','ARGAMASSA AC2 20 KG',['a3','a30']); D['itens/RJ0001']=it('RJ0001','REJUNTE CINZA 1 KG',['rej'],['BAUTECH']);
-  D['pcpbase/itens']={em:'2026-10-13T08:00:00.000Z',atual:{},l:{AC0001:{a3:100,a30:50,d:'ARGAMASSA AC1 20 KG'},AC0002:{a3:20,a30:0,d:'ARGAMASSA AC2 20 KG'}}};
+  D['pcpbase/itens']={em:'2026-10-13T08:00:00.000Z',atual:{},l:{AC0001:{a3:100,a30:0,d:'ARGAMASSA AC1 20 KG'},AC0002:{a3:20,a30:0,d:'ARGAMASSA AC2 20 KG'}}};
   D['conferencias/CONF-1-1']={numero:'CONF-1-1',em:new Date(Date.now()-3600e3).toISOString(),dia:'2026-10-13',por:null,porNome:'CONFERENTE',local:'Almox 3',origem:'planilha',itens:{AC0002:{nome:'ARGAMASSA AC2 20 KG',almox3:30,almox30:0,total:30,pal3:0,sac3:30,pal30:0,sac30:0},XX9999:{nome:'ITEM FORA DO CADASTRO',almox3:12,almox30:0,total:12}}};
   d.users['conf@painel-colafix.app']={uid:'uCONF',pass:'conf123',nome:'Carla'}; D['perfis/uCONF']={nome:'Carla',usuario:'conf'}; D['acessos/uCONF']={perfil:'conf',mods:['almox'],locais:['a3'],contar:true,receber:true,ativo:true};
   d.users['sis@painel-colafix.app']={uid:'uSIS',pass:'sis123',nome:'Sara'}; D['perfis/uSIS']={nome:'Sara',usuario:'sis'}; D['acessos/uSIS']={perfil:'supsis',mods:['almox'],locais:['a3','a30','rej','sep','a1','a2'],contar:true,receber:true,auditar:true,verAud:true,ativo:true};
   const B=await H.abrir({viewport:{width:800,height:1280}}); const p=B.page; p.on('dialog',x=>x.accept());
-  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500);
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'sis','sis123'); /* desde 04/11 o conferente conta sem comparar; a recontagem guiada é de quem audita */ await H.dorme(2500);
   const frame=async()=>{ for(let i=0;i<60;i++){ const f=p.frames().find(x=>x.url().includes('inventario/index.html')); if(f&&await f.evaluate(()=>typeof USUARIO_LOGADO!=='undefined'&&!!USUARIO_LOGADO&&!!document.getElementById('confItemSelList')).catch(()=>false)) return f; await H.dorme(250); } return null; };
   let f=await frame(); await H.dorme(1200);
   const conta=async(vals)=>{ await f.evaluate(v=>{ Object.keys(v).forEach(c=>confToggleItem(c)); confIniciarConferencia(); Object.entries(v).forEach(([c,q])=>updateConf(c,q,'sac3')); },vals); await H.dorme(400); };

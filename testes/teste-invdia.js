@@ -16,11 +16,15 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
   const frame=async()=>{ for(let i=0;i<80;i++){ const f=p.frames().find(x=>x.url().includes('inventario/index.html')); if(f&&await f.evaluate(()=>typeof USUARIO_LOGADO!=='undefined'&&!!USUARIO_LOGADO&&!!document.getElementById('confItemSelList')).catch(()=>false)) return f; await H.dorme(250); } return null; };
   const card=async f=>{ for(let i=0;i<40;i++){ const t=await f.evaluate(()=>(document.getElementById('invDia')||{}).textContent||'').catch(()=>''); if(/para contar/.test(t)) return t; await H.dorme(300); } return ''; };
   const salva=async(f,vals)=>{ await f.evaluate(v=>{ Object.entries(v).forEach(([c,q])=>updateConf(c,q,'sac3')); },vals); await H.dorme(300); await f.click('#invBar [data-a="salvar"]'); await H.dorme(3000);
-    await f.evaluate(()=>{ const b=document.querySelector('#invRec [data-a="nao"],#invRec [data-a="ok"]'); if(b) b.click(); const x=document.getElementById('invRec'); if(x) x.remove(); }); await H.dorme(1500); };
+    viuRec=await f.evaluate(()=>!!document.getElementById('invRec')); await f.evaluate(()=>{ const b=document.querySelector('#invRec [data-a="nao"],#invRec [data-a="ok"]'); if(b) b.click(); const x=document.getElementById('invRec'); if(x) x.remove(); }); await H.dorme(1500); };
+  let viuRec=false;
   const troca=async(u,s)=>{ const b=await srv(); await H.preparar(p,b); await p.goto(H.BASE); await H.entrar(p,u,s); await H.dorme(2500); return frame(); };
 
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500);
-  let f=await frame(); let t=await card(f);
+  let f=await frame(); await H.dorme(2500); let t=await f.evaluate(()=>(document.getElementById('invDia')||{}).innerText||'');
+  ok('Saldo do Focco de ontem: o conferente espera a liberação (sem botão de começar, sem contar o que vê)', /Esperando a liberação/.test(t)&&!/Começar a contagem/.test(t)&&!/Escolher itens na lista/.test(t), t.replace(/\n/g,' | ').slice(0,200));
+  { const b0=await srv(); b0.docs['pcpbase/itens'].atual={SALDO:new Date().toISOString()}; await H.preparar(p,b0); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500); f=await frame(); }
+  t=await card(f);
   let b=await srv(); const dia=b.docs['invdia/'+hoje];
   ok('A lista do dia é gravada (invdia/hoje) com o giro alto e o rodízio', dia&&dia.itens&&dia.itens.AC0001&&dia.itens.AC0001.m==='giro'&&Object.values(dia.itens).some(x=>x.m==='rod'), JSON.stringify(dia&&dia.itens).slice(0,200));
   ok('AC0002 (giro alto, contado há 2 dias) não entra: só depois de 7 dias', dia&&!dia.itens.AC0002);
@@ -36,6 +40,8 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
   const sel=await f.evaluate(()=>({m:CONF_MODO,s:[...CONF_ITENS_SEL].sort()}));
   ok('"Começar a contagem do dia" abre a conferência com os 4 itens da lista', sel.m==='conferencia'&&sel.s.length===4&&sel.s.includes('AC0001'), JSON.stringify(sel));
   const vals={}; sel.s.forEach(c=>vals[c]=100); vals.AC0001=40; await salva(f,vals);
+  const semModal=!viuRec;
+  ok('Conferente salva sem a janela de comparação ("Recontagem recomendada" fica só no PCP)', semModal);
   b=await srv(); let dv=Object.entries(b.docs).filter(([k])=>k.startsWith('invdiv/')).map(([k,v])=>Object.assign({_id:k},v));
   ok('Contou 40 (sistema 100): abre divergência do AC0001 esperando recontagem; os que bateram não', dv.length===1&&dv[0].c==='AC0001'&&dv[0].st==='recontar'&&dv[0].c1.q===40&&dv[0].c1.s===100&&dv[0].c1.porNome==='Carla', JSON.stringify(dv).slice(0,250));
   await f.evaluate(()=>{ try{ confVoltarSelecao(); }catch(e){} }); await H.dorme(1500); t=await f.evaluate(()=>(document.getElementById('invDia')||{}).innerText||'');
@@ -55,7 +61,7 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
 
   await troca('iasmyn','senha123'); await p.evaluate(()=>__T.go('anlinvd')); await H.dorme(1500); await p.evaluate(()=>__T.go('anlinvd')); await H.dorme(2500);
   t=await H.txt(p,'#view')||'';
-  ok('Tela "Divergências do inventário": 1 para o PCP fechar, com a 1ª contagem e a recontagem', /Divergências do inventário/.test(t)&&/Para o PCP fechar\s*1/.test(t)&&/AC0001/.test(t)&&/Sara/.test(t)&&/Carla/.test(t), t.replace(/\n/g,' | ').slice(0,300));
+  t2=t; ok('Tela "Divergências do inventário": 1 para o PCP fechar, com a 1ª contagem e a recontagem', /Divergências do inventário/.test(t)&&/Para o PCP fechar\s*1/.test(t)&&/AC0001/.test(t)&&/Sara/.test(t)&&/Carla/.test(t), t.replace(/\n/g,' | ').slice(0,300));
   await p.click('[data-act="ivd-abre"]'); await H.dorme(400); await p.click('[data-act="ivd-ok"]'); await H.dorme(400);
   b=await srv(); x=Object.values(b.docs).find(y=>y&&y.c==='AC0001'&&y.b!=null);
   ok('Não fecha sem a causa', x.aberta===true);
@@ -70,5 +76,10 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
   ok('"Corrigi no Focco" com o nº do documento fecha a divergência', x.aberta===false&&x.st==='fechada'&&x.foc==='sim'&&x.doc==='AJ 7788'&&x.fechadoPorNome, JSON.stringify(x).slice(0,220));
   await p.click('[data-act="ivd-aba"][data-v="fe"]'); await H.dorme(800); t=await H.txt(p,'#view')||'';
   ok('Aba Fechadas mostra a causa e o documento', /AJ 7788/.test(t)&&/Faturado/.test(t), t.replace(/\n/g,' | ').slice(-300));
+  await p.evaluate(()=>{ const S=__T.S(); S.anl.base.itens=Object.assign({},S.anl.base.itens,{atual:{SALDO:'2000-01-02T08:00:00'},em:'2000-01-02T08:00:00.000Z'}); __T.go('anlinvd'); }); await H.dorme(1200);
+  t=await H.txt(p,'#view')||'';
+  ok('Sem o saldo de hoje, o PCP vê "Os conferentes estão esperando" com Importar e Liberar sem importar', /conferentes estão esperando/.test(t)&&/Importar o saldo agora/.test(t)&&/Liberar sem importar/.test(t), t.slice(0,200));
+  await p.click('[data-act="ivd-lib"]'); await H.dorme(1500); b=await srv();
+  ok('"Liberar sem importar" grava a liberação do dia e a tela mostra "Contagem liberada"', b.docs['invdia/'+hoje]&&b.docs['invdia/'+hoje].liberado&&b.docs['invdia/'+hoje].itens&&/Contagem liberada/.test(await H.txt(p,'#view')||''), JSON.stringify(b.docs['invdia/'+hoje]&&b.docs['invdia/'+hoje].liberado));
   if(process.env.SHOT) await p.screenshot({path:'/tmp/invd.png',fullPage:true});
   const fal=res.filter(r=>!r.ok).length; console.log(fal?`FALHOU ${fal} de ${res.length}`:`PASSOU ${res.length}`); await B.browser.close(); process.exit(fal?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

@@ -21,6 +21,8 @@
     const xs=(D.itens||[]).map(i=>Object.assign({},i,{it:F.find(x=>String(x.cod)===String(i.cod))})).filter(i=>i.it&&pode(i.it)); return Object.assign({},D,{xs}); }
   function locais(){ try{ const u=P()&&P().usuario&&P().usuario(); const ls=(u&&u.flags&&u.flags.locais)||[]; if(ls.length>=6) return 'todos os almoxarifados'; return ls.map(l=>LOC[l]||l).join(', '); }catch(e){ return ''; } }
   const podeReceber=()=>{ const b=$('btnModoRecebimento'); return !!(b&&b.style.display!=='none'); };
+  window.invSemComparar=()=>{ let pf={}, fl={}; try{ pf=perfil(); }catch(e){} try{ const u=P()&&P().usuario&&P().usuario(); fl=(u&&u.flags)||{}; if(u&&u.perfil==='administrador') return false; }catch(e){} return !(pf.podeAdmin||pf.podeAudit||fl.auditar); };
+  const espera=D=>{ let pf={}; try{ pf=perfil(); }catch(e){} return !pf.podeAdmin&&!!(D&&D.lib&&!D.lib.ok); };
   const MOT={rec:'recontar',giro:'sai muito',rod:'rodízio'};
   const SV=d=>`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const ICO={busca:SV('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),caixa:SV('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>'),feito:SV('<path d="M20 6 9 17l-5-5"/>'),
@@ -42,7 +44,7 @@
     let volta=$('ivhVolta'); if(!volta){ volta=document.createElement('button'); volta.id='ivhVolta'; volta.className='ivh-volta'; volta.textContent='← Voltar à tela inicial'; volta.addEventListener('click',()=>setLista(false)); sc.parentElement.insertBefore(volta,sc); }
     const rt=$('invRetoma'); if(rt&&naHome&&rt.nextElementSibling!==el) el.parentElement.insertBefore(rt,el); /* "Contagem em andamento · Continuar" fica em cima da tela inicial */
     el.style.display=naHome?'':'none'; if(!naHome) return;
-    const D=dados(), n=new Date(); const s=JSON.stringify([D&&D.pronto,D&&D.hora,D&&D.xs.map(i=>[i.cod,i.m,i.feito,i.meu]),D&&D.meus,D&&D.meusItens,podeReceber(),podeAud(),hist(),recHoje(),n.getHours(),n.getMinutes()]);
+    const D=dados(), n=new Date(); const s=JSON.stringify([D&&D.lib&&D.lib.ok,D&&D.pronto,D&&D.hora,D&&D.xs.map(i=>[i.cod,i.m,i.feito,i.meu]),D&&D.meus,D&&D.meusItens,podeReceber(),podeAud(),hist(),recHoje(),n.getHours(),n.getMinutes()]);
     if(s===sig) return; sig=s;
     const nome=(typeof USUARIO_LOGADO!=='undefined'&&USUARIO_LOGADO&&USUARIO_LOGADO.nome)||''; const pri=String(nome).trim().split(/\s+/)[0]||'';
     const h=n.getHours(), oi=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
@@ -52,7 +54,9 @@
     const [hh,mm]=String((D&&D.hora)||'07:30').split(':').map(Number), passou=n.getHours()*60+n.getMinutes()>(hh||0)*60+(mm||0);
     const ord=xs.filter(i=>!i.meu).sort((a,b)=>(a.feito-b.feito)||((b.m==='rec')-(a.m==='rec'))||(ondeI(a.it)-ondeI(b.it))||String(a.cod).localeCompare(String(b.cod))).concat(outros);
     const linha=i=>`<div class="ivh-it ${i.feito?'ok':''} ${i.m==='rec'&&!i.meu?'rec':''} ${i.meu?'meu':''}"><b>${esc(i.cod)}</b><span><span class="ivh-nm">${esc(i.it.name||'')}</span><small class="ivh-loc">${esc(onde(i.it))}</small></span><em>${i.meu?'outra pessoa reconta':i.feito?'✓ contado':MOT[i.m]||''}</em></div>`;
-    const cartao=!D||(!D.pronto&&!xs.length)?`<div class="ivh-k">Contagem do dia</div><h2>A lista de hoje ainda está sendo montada…</h2><p class="ivh-s">Enquanto isso, use "Contar o que estou vendo".</p>`
+    const esp=espera(D);
+    const cartao=esp?`<div class="ivh-k">Contagem do dia</div><h2>Esperando a liberação da contagem</h2><div class="ivh-h pas">${ICO.relogio}<span><b>O PCP ainda não liberou a contagem de hoje.</b> Assim que o saldo do Focco de hoje for importado, a lista aparece aqui sozinha.</span></div><p class="ivh-s" style="margin:14px 2px 0">Enquanto isso, dá para registrar o material que chegou.</p>`
+      :!D||(!D.pronto&&!xs.length)?`<div class="ivh-k">Contagem do dia</div><h2>A lista de hoje ainda está sendo montada…</h2><p class="ivh-s">Enquanto isso, use "Contar o que estou vendo".</p>`
       :`<div class="ivh-k">Contagem do dia</div><h2>${meusN} ${meusN===1?'item':'itens'} para contar hoje</h2>
         <div class="ivh-h ${passou?'pas':'ok'}">${ICO.relogio}<span>${passou?'<b>A expedição já começou</b> ('+esc(D.hora)+') · conte primeiro o que não está saindo agora':'<b>Dá tempo:</b> conte antes da expedição começar, até '+esc(D.hora)}</span></div>
         <div class="ivh-pg"><div class="ivh-anel" style="--p:${pct}"><i>${feitos}/${meusN}</i></div><div class="ivh-ns"><div><b>${falta.length}</b> para contar</div><div><b>${feitos}</b> já contados hoje</div>${rec.length?`<div class="r"><b>${rec.length}</b> ${rec.length===1?'recontagem pedida':'recontagens pedidas'} para você</div>`:''}${outros.length?`<div><b>${outros.length}</b> para outra pessoa recontar</div>`:''}</div></div>
@@ -60,13 +64,14 @@
         ${falta.length?`<button class="ivh-go" data-a="dia">Começar a contagem do dia (${falta.length})  ›</button>`:`<div class="ivh-fim">✓ Tudo da lista de hoje que você pode contar já foi contado.</div>`}`;
     el.innerHTML=`<div class="ivh-oi"><h1>${oi}${pri?', '+esc(pri):''}</h1><span>${esc(dsem)}, ${dt}${locais()?' · '+esc(locais()):''}</span></div>
       <div class="ivh-g"><section class="ivh-c ivh-dia">${cartao}</section>
-        <div class="ivh-lado"><button class="ivh-c ivh-t" data-a="achar"><span class="ivh-ic a">${ICO.busca}</span><span><b>Contar o que estou vendo</b><i>busque o item na sua frente, sem escolher antes</i></span></button>
+        <div class="ivh-lado"><button class="ivh-c ivh-t${esp?' dis':''}" data-a="achar"><span class="ivh-ic a">${ICO.busca}</span><span><b>Contar o que estou vendo</b><i>busque o item na sua frente, sem escolher antes</i></span></button>
         ${podeReceber()?(()=>{ const r=recHoje(); return `<button class="ivh-c ivh-t" data-a="receber"><span class="ivh-ic b">${ICO.caixa}</span><span><b>Receber material</b><i>${r.n?`${r.n} ${r.n===1?'recebimento':'recebimentos'} hoje${r.u?' · último às '+esc(r.u):''}`:'chegou nota? registre em 3 passos'}</i></span></button>`; })():''}
         <section class="ivh-c ivh-meus"><div class="ivh-k">Minhas contagens de hoje</div>${D&&D.meus?`<div class="ivh-mn"><b>${D.meus}</b> ${D.meus===1?'item contado':'itens contados'}${D.meusUlt?' · última às '+esc(D.meusUlt):''}</div><div class="ivh-mc">${(D.meusItens||[]).slice(0,8).map(c=>`<span>${esc(c)}</span>`).join('')}${(D.meusItens||[]).length>8?`<span>+${D.meusItens.length-8}</span>`:''}</div>`:'<div class="ivh-mn v">Você ainda não contou nada hoje.</div>'}</section></div></div>
-      <div class="ivh-rod"><button data-a="lista">${ICO.lista}Escolher itens na lista</button><button data-a="hist">${ICO.hist}${hist()?'Esconder contagens anteriores':'Ver contagens anteriores'}</button><button data-a="pdf">${ICO.imp}Imprimir lista de contagem</button>${podeAud()?`<button data-a="aud">${ICO.aud}Auditoria</button>`:''}</div>`; }
+      <div class="ivh-rod">${esp?'':`<button data-a="lista">${ICO.lista}Escolher itens na lista</button>`}<button data-a="hist">${ICO.hist}${hist()?'Esconder contagens anteriores':'Ver contagens anteriores'}</button><button data-a="pdf">${ICO.imp}Imprimir lista de contagem</button>${podeAud()?`<button data-a="aud">${ICO.aud}Auditoria</button>`:''}</div>`; }
   function clica(ev){ const b=ev.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a;
     if(a==='dia'){ const D=dados(); if(!D) return; const xs=D.xs.filter(i=>!i.feito&&!i.meu).map(i=>String(i.cod)); if(!xs.length) return;
       try{ CONF_ITENS_SEL.clear(); xs.forEach(c=>CONF_ITENS_SEL.add(c)); try{ atualizarBadgeSelConf(); }catch(e){} confIniciarConferencia(); }catch(e){ console.warn('[dia]',e); toast('Não consegui abrir a contagem do dia.'); } return; }
+    if((a==='achar'||a==='lista'||a==='dia')&&espera(dados())){ toast('A contagem de hoje ainda não foi liberada pelo PCP.'); return; }
     if(a==='achar'){ const x=$('fcAcharBtn'); if(x) x.click(); else toast('Aguarde um instante e tente de novo.'); return; }
     if(a==='receber'){ try{ confMudarModo('recebimento'); }catch(e){} let k=0; const t=setInterval(()=>{ const r=$('fcRecBtn'); if(r||++k>20){ clearInterval(t); if(r) r.click(); } },150); return; }
     if(a==='lista'){ setLista(true); try{ window.scrollTo(0,0); }catch(e){} return; }
@@ -106,6 +111,7 @@
   .ivh-fim{margin-top:auto;padding:14px;border-radius:12px;background:var(--okt);color:var(--ok);font-weight:500}
   .ivh-t{display:flex;gap:16px;align-items:center;text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:96px}
   .ivh-t b{display:block;font-size:19px;font-weight:600;color:var(--ts)}.ivh-t i{display:block;font-style:normal;color:var(--mu);font-size:14px;margin-top:3px}
+.ivh-t.dis{opacity:.45;cursor:not-allowed}
   .ivh-ic{width:52px;height:52px;flex:none;border-radius:14px;display:grid;place-items:center;background:var(--tt);color:var(--ts)}
   .ivh-meus .ivh-mn{margin:8px 0 8px;color:var(--mu)}.ivh-meus .ivh-mn b{font-size:26px;font-weight:300;color:var(--ts);margin-right:4px}.ivh-mn.v{color:var(--mu)}
   .ivh-mc{display:flex;flex-wrap:wrap;gap:6px}.ivh-mc span{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--sk);color:var(--ts)}

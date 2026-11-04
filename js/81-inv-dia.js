@@ -27,7 +27,7 @@ function invdAssina(){ const X=S.invd; if(!S.db||!S.acs||!S.acs.pronto) return; 
   if(!X.sub){ X.sub=true; inscrever('invdiv',()=>S.db.collection('invdiv').where('aberta','==',true).limit(500),snap=>{ X.ab=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); X._l_ab=true; rerenderSeguro(); }); }
   const h=hojeStr(); if(X.diaK!==h){ try{ X.uDia&&X.uDia(); }catch(e){} X.diaK=h; X.dia=null; X._l_dia=false;
     X.uDia=S.db.doc('invdia/'+h).onSnapshot(s=>{ X.dia=s.exists?s.data():null; X._l_dia=true; rerenderSeguro(); },e=>console.warn('[invdia]',e&&e.code)); }
-  if(X._l_dia&&!X.dia&&!X.gerando) invdGera(); }
+  if(X._l_dia&&!(X.dia&&X.dia.itens)&&!X.gerando) invdGera(); }
 function invdAssinaFe(){ const X=S.invd; if(X.subFe||!S.db) return; X.subFe=true;
   inscrever('invdivfe',()=>S.db.collection('invdiv').orderBy('fechadoEm','desc').limit(150),snap=>{ X.fe=snap.docs.map(d=>Object.assign({_id:d.id},d.data())).filter(x=>!x.aberta); rerenderSeguro(); }); }
 setInterval(()=>{ try{ invdAssina(); }catch(e){ console.warn('[invd]',e); } },1500);
@@ -45,17 +45,26 @@ function invdCalcLista(dia){ const C=invdCfg(), U=alxItensTodos().map(i=>String(
 async function invdGera(){ const X=S.invd; if(!(S.alx&&S.alx._l_conferencias)||!S.anl.base||!S.anl.base.itens||!(S.itens||[]).length||!X._l_ab) return;
   let pode=false; try{ pode=viewOk('inventario'); }catch(e){} if(!pode) return; X.gerando=true;
   try{ const h=hojeStr(), it=invdCalcLista(h); if(!Object.keys(it).length) return; const doc={dia:h,em:new Date().toISOString(),por:S.uid||null,porNome:(S.nomes&&S.nomes[S.uid])||'',itens:it,n:Object.keys(it).length};
-    await S.db.doc('invdia/'+h).set(doc); X.dia=doc; }catch(e){ console.warn('[invdia] gerar',e); } finally{ setTimeout(()=>{ X.gerando=false; },30000); } }
+    await S.db.doc('invdia/'+h).set(doc,{merge:true}); X.dia=Object.assign({},X.dia||{},doc); }catch(e){ console.warn('[invdia] gerar',e); } finally{ setTimeout(()=>{ X.gerando=false; },30000); } }
 function invdConfHoje(){ const X=S.invd, h=hojeStr(); if(S.alx&&S.alx._l_conferencias) return S.alx.conferencias;
   if(S.db&&(!X.hc||X.hc.dia!==h||Date.now()-X.hc.t>120000)&&!X.hcLendo){ X.hcLendo=true; S.db.collection('conferencias').where('dia','==',h).limit(100).get().then(q=>{ X.hc={dia:h,t:Date.now(),xs:q.docs.map(d=>d.data())}; rerenderSeguro(); }).catch(e=>console.warn('[invd] hoje',e)).then(()=>{ X.hcLendo=false; }); }
   return (X.hc&&X.hc.dia===h&&X.hc.xs)||[]; }
 function invdContHoje(){ const h=hojeStr(), s={}; invdConfHoje().forEach(cf=>{ if(!cf||cf.excluida||(cf.dia||String(cf.em||'').slice(0,10))!==h) return; for(const c in (cf.itens||{})) s[c]=cf.porNome||true; }); return s; }
+/* liberação da contagem (pedido de 04/11: "liberar para ele contar assim que eu importar o saldo; a comparação fica no meu login") */
+function invdSaldoEm(){ const I=(S.anl.base||{}).itens||{}, a=(I.atual||{}).SALDO; const d=new Date(a||I.em||0); return isNaN(d)||!(a||I.em)?null:d; }
+function invdLib(){ const h=hojeStr(), sd=invdSaldoEm(), X=S.invd, lb=X.dia&&X.dia.liberado;
+  if(sd&&hojeStr(sd)===h) return {ok:true,como:'saldo',hm:sd.toTimeString().slice(0,5)};
+  if(lb&&lb.em&&String(lb.em).slice(0,10)<=h&&(X.dia.dia||X.diaK)===h) return {ok:true,como:'manual',hm:new Date(lb.em).toTimeString().slice(0,5),por:lb.porNome||''};
+  return {ok:false,sd:sd?(hojeStr(sd)===hojeStr(new Date(Date.now()-864e5))?'ontem':dm(hojeStr(sd)))+' às '+sd.toTimeString().slice(0,5):''}; }
+async function invdLibera(){ const h=hojeStr(); try{ await S.db.doc('invdia/'+h).set({dia:h,liberado:{em:new Date().toISOString(),por:S.uid||null,porNome:(S.nomes&&S.nomes[S.uid])||''}},{merge:true}); toast('Contagem de hoje liberada para os conferentes.'); }catch(e){ erro(e); } }
+NAV_EXTRA.push(()=>{ try{ if(!viewOk('anlinvd')||!viewOk('anlbase')) return []; const L=invdLib(); if(L.ok) return []; const d=new Date(); if(d.getDay()===0||d.getDay()===6) return [];
+  return [{n:'',t:'Contagem do inventário esperando o saldo de hoje',s:'Importe o saldo do Focco para liberar os conferentes',acao:'anlinvd',c:'warn'}]; }catch(e){ return []; } });
 function invdHojeLista(){ const X=S.invd, C=invdCfg(), feito=invdContHoje(), L=[], vis={};
   X.ab.filter(x=>x.st==='recontar').forEach(x=>{ if(vis[x.c]) return; vis[x.c]=1; L.push({cod:x.c,m:'rec',div:x._id,b:x.b,porNome:(x.c1||{}).porNome||'',meu:invdMesma(x.c1||{},{por:S.uid,porNome:(S.nomes&&S.nomes[S.uid])||''}),feito:false}); });
   const it=(X.dia&&X.dia.itens)||{}; Object.keys(it).forEach(c=>{ if(vis[c]) return; vis[c]=1; L.push({cod:c,m:it[c].m,u:it[c].u||null,feito:!!feito[c]}); });
   const h=hojeStr(), mi={}; let ult=''; invdConfHoje().forEach(cf=>{ if(!cf||cf.excluida||(cf.dia||String(cf.em||'').slice(0,10))!==h||!(cf.por===S.uid||(!cf.por&&cf.porNome&&cf.porNome===((S.nomes&&S.nomes[S.uid])||'')))) return; Object.keys(cf.itens||{}).forEach(c=>mi[c]=1); const t=String(cf.em||''); if(t>ult) ult=t; });
   const hm=ult?new Date(ult).toTimeString().slice(0,5):'';
-  return {dia:X.diaK||hojeStr(),hora:C.hora,pronto:!!X._l_dia&&!!X.dia,itens:L,meus:Object.keys(mi).length,meusUlt:hm,meusItens:Object.keys(mi)}; }
+  const LB=invdLib(); return {dia:X.diaK||hojeStr(),hora:C.hora,lib:LB,pronto:!!X._l_dia&&!!(X.dia&&X.dia.itens),itens:L,meus:Object.keys(mi).length,meusUlt:hm,meusItens:Object.keys(mi)}; }
 
 /* ---------- 2 · divergências abertas ao salvar a contagem ---------- */
 async function invdConf(cf){ const X=S.invd; if(!cf||!cf.itens||!S.db) return; const em=new Date().toISOString(), dia=cf.dia||hojeStr();
@@ -100,7 +109,10 @@ function vInvd(){ invdAssina(); invdAssinaFe(); const X=S.invd, C=invdCfg();
   const k=(t,v,s,c,a)=>`<button class="cm-k ${c||''} ivd-k${X.aba===a?' on':''}" data-act="ivd-aba" data-v="${a}"><span>${t}</span><b class="num">${v}</b><i>${s}</i></button>`;
   const L=invdHojeLista(), nF=L.itens.filter(i=>i.feito).length, nR=L.itens.filter(i=>i.m==='rec').length, nG=L.itens.filter(i=>i.m==='giro').length, nO=L.itens.filter(i=>i.m==='rod').length;
   const agora=new Date(), [hh,mm]=String(C.hora).split(':').map(Number), passou=agora.getHours()*60+agora.getMinutes()>(hh||0)*60+(mm||0);
-  const lista=`<section class="card cm-s"><div class="cm-q">CONTAGEM DO DIA · ${dm(L.dia)}</div>
+  const LB=invdLib();
+  const libH=LB.ok?`<div class="ivd-lib ok"><b>Contagem liberada</b> · ${LB.como==='saldo'?'saldo do Focco de hoje às '+esc(LB.hm):'liberada às '+esc(LB.hm)+(LB.por?' por '+esc(LB.por):'')+' sem importar o saldo'}</div>`
+    :`<div class="ivd-lib"><div><b>Os conferentes estão esperando.</b> A contagem de hoje só começa depois que o saldo do Focco de hoje for importado${LB.sd?' (o último é de '+esc(LB.sd)+')':''}.</div><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" data-act="ivd-imp">Importar o saldo agora</button><button class="btn sec" data-act="ivd-lib">Liberar sem importar</button></div></div>`;
+  const lista=`<section class="card cm-s">${libH}<div class="cm-q">CONTAGEM DO DIA · ${dm(L.dia)}</div>
     <p class="cm-r">${L.pronto||nR?`${L.itens.length} ${L.itens.length===1?'item':'itens'} para contar hoje, antes da expedição (até ${esc(C.hora)}): ${nR} para recontar por outra pessoa, ${nG} de giro alto e ${nO} do rodízio. ${nF?nF+' já contados hoje.':'Nenhum contado ainda hoje.'}`:'A lista de hoje aparece quando alguém do inventário abrir o painel.'}${passou&&L.itens.length>nF+nR?' <b>A expedição já começou:</b> o que sair agora deixa a contagem diferente.':''}</p>
     <details class="ivd-dt"${X.listaAb?' open':''}><summary data-act="ivd-lista">Ver a lista e os ajustes</summary>
      <div class="ivd-ch">${L.itens.map(i=>`<span class="ivd-it ${i.feito?'ok':''} m-${i.m}"><b>${esc(i.cod)}</b> ${esc(invdDesc(i.cod)).slice(0,34)}<i>${i.m==='rec'?'recontar · não pode ser '+esc(i.porNome||'quem contou'):i.m==='giro'?'giro alto':'rodízio'}${i.u?' · última '+dm(i.u):i.m!=='rec'?' · nunca contado':''}${i.feito?' · ✓ contado':''}</i></span>`).join('')||'<span class="sub">Nada na lista.</span>'}</div>
@@ -128,6 +140,8 @@ invdReg(); setTimeout(invdReg,0);
 function invdLeForm(){ const F=S.invd.fm; if(!F) return; const v=id=>{ const e=document.getElementById(id); return e?e.value:null; };
   const c=v('ivd-causa'), d=v('ivd-doc'), o=v('ivd-obs'); if(c!=null) F.causa=c; if(d!=null) F.doc=d.trim(); if(o!=null) F.obs=o.trim(); }
 document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="ivd-"]'); if(!b) return; const a=b.dataset.act, X=S.invd;
+  if(a==='ivd-imp'){ go('anlbase'); return; }
+  if(a==='ivd-lib'){ await invdLibera(); render(); return; }
   if(a==='ivd-lista'){ X.listaAb=!X.listaAb; return; }
   if(a==='ivd-aba'){ X.aba=b.dataset.v; X.fm=null; render(); return; }
   if(a==='ivd-abre'){ X.fm={id:b.dataset.v,foc:'sim'}; render(); return; }
@@ -146,6 +160,7 @@ document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.targ
 document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&ev.target&&ev.target.id==='ivd-q'){ ev.preventDefault(); S.invd.q=ev.target.value.trim(); render(); } });
 document.addEventListener('change',ev=>{ if(ev.target&&ev.target.id==='ivd-q'){ S.invd.q=ev.target.value.trim(); render(); } });
 document.head.insertAdjacentHTML('beforeend',`<style>
+.ivd-lib{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:12px;background:var(--warn-tint,#F6EEDC);color:var(--warn-ink,#8A6A2A);margin-bottom:14px}.ivd-lib.ok{background:var(--ok-tint,#E3F0E9);color:var(--ok-ink,#3C8A63)}
 .ivd-k{text-align:left;cursor:pointer;border:2px solid transparent;font:inherit}.ivd-k.on{border-color:var(--teal,#14706A)}
 .ivd-c small{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.ivd-c i{display:block;font-style:normal;font-size:11px;color:var(--muted)}.ivd-pos{color:var(--warn,#B7791F)}
 .ivd-t td{vertical-align:top}.ivd-fr td{background:var(--surface-2,#EEF2F5)}
