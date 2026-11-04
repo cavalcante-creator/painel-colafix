@@ -21,6 +21,7 @@ const tk=k=>`<span class="rh-tk" data-k="${k}"></span>`;
  await p.click('[data-act="rh-dgo"][data-v="imprimir"]'); await H.dorme(1500);
  const imp=await p.evaluate(()=>{ const fr=[...document.querySelectorAll('iframe[aria-hidden="true"]')].pop(); const b=fr&&fr.contentWindow&&fr.contentWindow.document.body; return b?{t:b.innerText,amarelo:b.querySelectorAll('.rh-v').length,html:b.innerHTML.length}:null; });
  ok('Imprimir sai com o texto editado, sem a marcação amarela da prévia', imp&&/Cláusula extra combinada/.test(imp.t)&&/Rua das Acácias/.test(imp.t)&&imp.amarelo===0, JSON.stringify(imp&&{amarelo:imp.amarelo,t:imp.t.slice(0,120)}));
- const reg=await p.evaluate(async()=>{ const q=await __T.S().db.collection('rh/dados/docsgerados').get(); return q.size; }).catch(()=>-1);
+ const reg=await p.evaluate(async()=>{ const q=await __T.S().db.collection('rh/dados/docsgerados').get(); window.__dgh=q.docs.map(d=>d.data().html||''); return q.size; }).catch(()=>-1);
  ok('Fica no histórico de documentos da pessoa', reg>=1, 'docs: '+reg);
+ ok('Guarda o texto do documento como saiu (para Ver depois)', await p.evaluate(()=>(window.__dgh||[]).some(h=>/Encerrando a partir de 19\/10\/2026/.test(h))));
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

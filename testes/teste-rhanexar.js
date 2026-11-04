@@ -2,6 +2,9 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
  D['rh/dados/funcionarios/a1']={nome:'ANA TESTE SOUZA',tipo:'CLT',empresa:'COLAFIX',status:'Ativo',admissao:'2025-03-10',setor:'PRODUÇÃO',funcao:'AUXILIAR',admEntregues:[{nome:'RG (frente e verso)',em:'2025-03-10T10:00:00Z',url:'https://exemplo.invalid/rg.pdf'}]};
+ D['rh/dados/modelos/m1']={nome:'TERMO VT',html:'<p>Termo de vale-transporte de <span class="rh-tk" data-k="NOME">NOME</span>.</p>'};
+ D['rh/dados/docsgerados/g1']={funcId:'a1',funcionario:'ANA TESTE SOUZA',modeloId:'m1',modelo:'TERMO VT',em:'2026-11-03T10:00:00Z',porNome:'juliana'};
+ D['rh/dados/docsgerados/g2']={funcId:'a1',funcionario:'ANA TESTE SOUZA',modeloId:'m1',modelo:'TERMO ANTIGO',em:'2026-11-02T10:00:00Z',porNome:'juliana',html:'<p>Texto guardado do termo da Ana.</p>'};
  const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; const erros=[]; p.on('pageerror',e=>erros.push(e.message)); p.on('dialog',x=>x.accept());
  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
  await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(1000);
@@ -21,5 +24,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Tirar um documento (com confirmação) some da lista', /\(2\)/.test(t2), t2.replace(/\n/g,' | '));
  await p.click('[data-act="rh-pess"][data-id="a1"]'); await H.dorme(1200);
  ok('Perfil completo também mostra os arquivos', await p.evaluate(()=>!!document.querySelector('[data-rh-anxp="a1"]')));
+ await p.click('[data-act="rh-pess"][data-id="a1"]').catch(()=>{}); await H.dorme(300);
+ const [pop]=await Promise.all([p.context().waitForEvent('page',{timeout:5000}).catch(()=>null),p.click('[data-act="rh-dgver"][data-id="g2"]')]);
+ const ptxt=pop?await pop.evaluate(()=>document.body.innerText):''; if(pop) await pop.close();
+ ok('Documento gerado tem "Ver": abre o texto guardado com Imprimir', /Texto guardado do termo da Ana/.test(ptxt)&&/Imprimir/.test(ptxt), ptxt.slice(0,120));
+ await p.click('[data-act="rh-dgver"][data-id="g1"]'); await H.dorme(1200);
+ const dg=await p.evaluate(()=>({v:document.getElementById('view').innerText.slice(0,3000)}));
+ ok('Documento antigo (sem texto guardado) abre em Gerar contrato com a pessoa e o modelo', /Termo de vale-transporte de ANA TESTE SOUZA/i.test(dg.v), dg.v.slice(0,200).replace(/\n/g,' | '));
  ok('Sem erros na página', !erros.length, erros.join(' | '));
  await B.browser.close(); const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU '+f:'PASSOU tudo ('+res.length+')'); process.exit(f?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
