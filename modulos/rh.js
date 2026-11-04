@@ -947,10 +947,10 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   async function ferPdf(){ const X=ferRel(), nC=X.xs.filter(o=>o.s.c==='crit').length, nW=X.xs.filter(o=>o.s.c==='warn').length, ag=X.prox.filter(x=>x.inicio<=X.hj);
     await rrPdf({tit:'Férias dos CLT',sub:EMP_DOC.COLAFIX.nome+' · situação em '+br(X.hj),filtros:X.filtros,arq:'Ferias-'+X.hj,kpiCols:4,
       kpis:[{t:'Pessoas na lista',v:String(X.xs.length),c:'pet'},{t:'Prazo vencido',v:String(nC),c:nC?'crit':'cinza'},{t:'Dar férias logo',v:String(nW),c:nW?'warn':'cinza'},{t:'Marcadas / de férias agora',v:X.prox.length+' / '+ag.length,c:'teal'}],
-      partes:[{secao:'Situação de cada pessoa',cols:['Nome','Setor','Período aquisitivo','Dias','Dar até','Situação'],rows:X.rows.map(r=>[r[0],r[1],r[4],r[5],r[6],r[7]]),vazio:'Ninguém com estes filtros.'},
+      partes:[{secao:'Situação de cada pessoa',cols:['Nome','Setor','Período aquisitivo','Dias','Situação'],rows:X.rows.map(r=>[r[0],r[1],r[4],r[5],r[7]]),vazio:'Ninguém com estes filtros.'},
         {secao:'Férias marcadas',cols:['Nome','Início','Fim','Dias','Volta','Aviso'],rows:X.prox.map(x=>[titulo(x.funcionario||''),br(x.inicio),br(x.fim),String(x.dias||''),br(x.retorno),x.inicio<=X.hj?'de férias agora':temAviso(x)?'gerado':'falta gerar']),vazio:'Nenhuma férias marcada.'}]}); }
   async function ferXls(){ const X=ferRel();
-    await rrXls('Ferias-'+X.hj,[['Situação',[['Nome','Setor','Função','Admissão','Período aquisitivo','Dias a tirar','Dar até','Situação']].concat(X.rows)],
+    await rrXls('Ferias-'+X.hj,[['Situação',[['Nome','Setor','Função','Admissão','Período aquisitivo','Dias a tirar','Situação']].concat(X.rows.map(r=>[r[0],r[1],r[2],r[3],r[4],r[5],r[7]]))],
       ['Férias marcadas',[['Nome','Início','Fim','Dias','Volta','Aviso']].concat(X.prox.map(x=>[titulo(x.funcionario||''),br(x.inicio),br(x.fim),+x.dias||'',br(x.retorno),x.inicio<=X.hj?'de férias agora':temAviso(x)?'gerado':'falta gerar']))]],
       {tit:'Férias dos CLT',sub:'Situação em '+br(X.hj),filtros:X.filtros}); }
   document.addEventListener('change',ev=>{ const t=ev.target; if(t&&t.id==='rh-mapsetsel'){ R.mapSet=t.value; P.render(); } });
