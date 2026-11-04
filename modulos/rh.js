@@ -1904,7 +1904,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   avRH(()=>window.RHTar?window.RHTar.avisos(tarCtx()):[]);
   const unifCtx=()=>({P,R,esc,eu,br,topo,titulo,funcaoDe,setores:setoresCad});
   /* Pagamento dos PJ (modulos/rh-pjpag.js, 04/11): horas pelo Face ID → valor → pedido da nota fiscal por link (nota.html) */
-  const pjpCtx=()=>({P,R,esc,eu,topo,titulo,cargo,tokenNovo,EMP_DOC,alm:almCtx});
+  const pjpCtx=()=>({P,R,esc,eu,topo,titulo,cargo,tokenNovo,EMP_DOC,alm:almCtx,unif:unifCtx});
   avRH(()=>window.RHPJPag?window.RHPJPag.avisos(pjpCtx()):[]);
   avRH(()=>window.RHUnif?window.RHUnif.avisos(unifCtx()):[]);
   window.RHUnifNovo=()=>{ P.go('rhunif'); setTimeout(()=>{ try{ window.RHUnif.render(unifCtx()); window.RHUnif.novo(); }catch(e){} },60); };

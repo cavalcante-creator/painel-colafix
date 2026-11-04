@@ -522,7 +522,7 @@
     if(a==='rhu-volta'){ try{ const up={st:'novo',lancEm:null,lancPor:null}; await db.doc(COL+'/'+x._id).update(up); Object.assign(x,up); }catch(e){ P.erro(e); } P.render(); return; }
     if(a==='rhu-del'){ if(U.cx!==x._id){ U.cx=x._id; P.render(); setTimeout(()=>{ if(U.cx===x._id){ U.cx=null; P.render(); } },4000); return; } U.cx=null;
       try{ await db.doc(COL+'/'+x._id).update({removido:true,removidoEm:agora,removidoPor:eu}); U.xs=U.xs.filter(y=>y!==x); P.toast('Entrega apagada.'); }catch(e){ P.erro(e); } P.render(); return; } });
-  window.RHUnif={render:c=>{ C=c; return render(c); },gestor,_parc:{qDe,qProx,qAnt,parcInfo:(x)=>parcInfo(C,x),planLer,impAbre:(abas,arq)=>impAbre(C,abas,arq),qDados:Q=>qDados(C,Q),ehTerc:x=>ehTerc(C,x)},avisos:c=>{ C=C||c; try{ assina(c); return avisos(c); }catch(e){ return []; } },novo:()=>{ if(C) novo(C); },texto,_U:U};
+  window.RHUnif={render:c=>{ C=c; return render(c); },gestor,_parc:{qDe,qProx,qAnt,parcInfo:(x)=>parcInfo(C,x),marca:(x,Q,st)=>qMarca(C,x,Q,st),tira:(x,Q)=>parcGrava(C,x,P0=>{ P0.hist=P0.hist.filter(h=>h.q!==Q); }),planLer,impAbre:(abas,arq)=>impAbre(C,abas,arq),qDados:Q=>qDados(C,Q),ehTerc:x=>ehTerc(C,x)},avisos:c=>{ C=C||c; try{ assina(c); return avisos(c); }catch(e){ return []; } },novo:()=>{ if(C) novo(C); },texto,_U:U};
   document.head.insertAdjacentHTML('beforeend',`<style id="rhu-css">
 .rhu-fm{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
 .rhu-tams{font-size:12.5px;color:var(--ink-3,#5B6770);margin-top:-6px}

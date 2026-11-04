@@ -10,6 +10,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   D['rh/config']={setores:['Produção','Manutenção']};
   D['rh/dados/funcionarios/f1']={nome:'JOAO PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',salario:5000,setor:'Produção',funcao:'Operador',status:'Ativo',telefone:'(51) 99999-0000',admissao:'2025-01-10'};
   D['rh/dados/funcionarios/f2']={nome:'MARIA OLIVEIRA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'55566677788',setor:'Manutenção',funcao:'Mecânica',status:'Ativo',telefone:'51988887777',admissao:'2025-02-01',pjPag:{vh:28.41,ini:'08:00',fim:'18:00',intv:72}};
+  D['rh/dados/uniformes/u1']={nome:'Joao Pereira Teste',fid:'f1',setor:'Produção',data:'2026-10-20',itens:[{t:'Camisa',tam:'G',qtd:2}],desc:{nao:false,v:50},parc:{n:1,ini:'2026-10-31',hist:[]},st:'lancado',em:'2026-10-20T10:00:00.000Z',por:'uRH'};
   D['rh/dados/funcionarios/f3']={nome:'CARLOS CLT TESTE',tipo:'CLT',empresa:'COLAFIX',cpf:'99988877766',status:'Ativo'};
   const dias={}, uteis=['16','19','20','21','22','23','26','27','28','29','30'];
   uteis.forEach(x=>{ const k='2026-10-'+x; dias[k]={'11122233344':{p:1,a:1,t:x==='21'?['07:30:00 PORTARIA']:['07:28:10 PORTARIA','12:01:00 REFEITÓRIO','17:20:00 PORTARIA']},'55566677788':{p:1,a:0,t:['08:03:00 PORTARIA','17:58:00 PORTARIA']}}; });
@@ -34,9 +35,28 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Tocar no nome abre a gaveta da pessoa com os dias, a passagem do Face ID e o dia para corrigir', /Joao Pereira Teste/.test(gv)&&/Horas/.test(gv)&&/Regras desta pessoa/.test(gv)&&/07:28[\s\S]*12:01[\s\S]*17:20/.test(gv)&&/Só uma passagem/.test(gv)&&/Corrigir/.test(gv), gv.replace(/\n/g,' | ').slice(0,500));
   await p.click('[data-act="pjp-dcor"][data-d="2026-10-21"]'); await H.dorme(500);
   await p.fill('#pjp-cs','17:18'); await p.fill('#pjp-cm','Esqueceu de passar no Face ID'); await p.click('[data-act="pjp-dsalva"]'); await H.dorme(900);
-  await p.fill('input[data-pjp-c="desc"]','50,00'); await p.dispatchEvent('input[data-pjp-c="desc"]','change'); await H.dorme(900);
+  /* descontos: uniforme para confirmar + outro desconto */
+  await p.click('[data-act="pjp-tab"][data-v="desc"]'); await H.dorme(600);
+  let gd=await p.evaluate(()=>document.querySelector('.pjp-g').innerText);
+  ok('Aba Descontos: mostra a parcela do uniforme da quinzena para o RH confirmar (ainda não conta)', /Descontos \(1\)/.test(gd)&&/Uniforme · entrega de 20\/10\/2026/.test(gd)&&/2× Camisa G/.test(gd)&&/Descontar/.test(gd)&&/Para confirmar\s*1/i.test(gd), gd.replace(/\n/g,' | ').slice(0,500));
+  let fe0=await p.evaluate(()=>{ const b=document.querySelector('.pjp-g [data-act="pjp-fech"]'); if(b) b.click(); return new Promise(r=>setTimeout(()=>r(document.getElementById('toast')?document.getElementById('toast').innerText:''),700)); });
+  ok('Não deixa fechar o valor com o uniforme sem confirmar', /confirme o desconto do uniforme/i.test(fe0), fe0);
+  await p.click('[data-act="pjp-uok"]'); await H.dorme(1000);
+  await p.fill('#pjp-dxt','Vale / adiantamento'); await p.fill('#pjp-dxv','30,5'); await p.click('[data-act="pjp-dxadd"]'); await H.dorme(900);
+  gd=await p.evaluate(()=>document.querySelector('.pjp-g').innerText); let Su=await srv();
+  ok('Confirmar o uniforme grava a parcela na entrega e outro desconto entra na conta (aceita vírgula)', /Vai descontar/.test(gd)&&/Vale \/ adiantamento/.test(gd)&&/R\$\s?80,50/.test(gd)&&Su['rh/dados/uniformes/u1'].parc.hist.some(h=>h.q==='2026-10-31'&&h.st==='ok'&&h.v===50)&&Su['rh/dados/pjpag/2026-10-2'].pes.f1.dsc.x[0].v===30.5, gd.replace(/\n/g,' | ').slice(0,500));
+  await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag-descontos.png'});
+  await p.click('[data-act="pjp-dxx"]'); await H.dorme(900);
+  /* feriado: marcar, pagar o dia e tirar */
+  await p.click('[data-act="pjp-tab"][data-v="horas"]'); await H.dorme(500);
+  await p.click('[data-act="pjp-dcor"][data-d="2026-10-17"]'); await H.dorme(400); await p.fill('#pjp-cm','Dia do Teste'); await p.click('[data-act="pjp-dfer"]'); await H.dorme(900);
+  await p.click('[data-act="pjp-dferp"][data-v="1"][data-d="2026-10-17"]'); await H.dorme(900);
+  let gf=await p.evaluate(()=>document.querySelector('.pjp-g').innerText);
+  ok('Marcar feriado e pagar o dia (conta as horas da escala)', /Feriado · Dia do Teste/.test(gf)&&/feriado pago \(8h48\)/.test(gf)&&/105h36/.test(gf), gf.replace(/\n/g,' | ').slice(0,600));
+  await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag-feriado.png'});
+  await p.click('[data-act="pjp-dferx"][data-d="2026-10-17"]'); await H.dorme(900);
   s=await p.evaluate(()=>document.querySelector('.pjp-g').innerText); let S=await srv(), doc=S['rh/dados/pjpag/2026-10-2'];
-  ok('Corrigir o dia (com motivo) e lançar desconto: refaz a conta (96h48 × 22,7272… − 50 = 2.150,00)', /corrigido · Esqueceu de passar/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.150,00/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.aj['2026-10-21'].mot==='Esqueceu de passar no Face ID'&&doc.pes.f1.desc===50, s.replace(/\n/g,' | ').slice(0,400));
+  ok('Corrigir o dia (com motivo) e lançar desconto: refaz a conta (96h48 × 22,7272… − 50 = 2.150,00)', /corrigido · Esqueceu de passar/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.150,00/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.aj['2026-10-21'].mot==='Esqueceu de passar no Face ID'&&!doc.pes.f1.desc&&!(doc.pes.f1.dsc.x||[]).length, s.replace(/\n/g,' | ').slice(0,400));
   /* regras desta pessoa */
   await p.click('[data-act="pjp-tab"][data-v="regras"]'); await H.dorme(500);
   await p.fill('#pjp-rtol','10'); await p.click('[data-pjp-dw="6"] + span'); await H.dorme(100); await p.fill('#pjp-rob','Trabalha sábado de manhã'); await p.click('[data-act="pjp-psalva"]'); await H.dorme(900);
