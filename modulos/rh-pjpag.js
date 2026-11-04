@@ -134,69 +134,99 @@
     await c.P.db().doc(PED+'/'+t).set(ped);
     await grava(c,pid,f._id,{st:'pedido',ped:{t,em:agora(),por:c.eu(),valor:fe.valor,mes:p.mes,ateMs}},'Nota pedida ('+R$(fe.valor)+')');
     return ped; }
-  /* ---------- tela ---------- */
+  /* ---------- tela (04/11, 2ª versão: "o mais fácil possível", no jeito da planilha e da aba Desconto dos uniformes) ----------
+     Uma tabela só, uma linha por PJ, com UM botão: o próximo passo. Tocar no nome abre a "folha" da pessoa igual à planilha
+     (Dia · Entrada · Saída · Conta como · Horas) e o "Cálculo final" (horas × valor da hora − desconto = total a pagar). */
   const css=`<style id="pjp-css">
-  .pjp-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
-  .pjp-per{display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:12px;padding:3px}
-  .pjp-per b{padding:0 10px;font-size:15px;font-weight:600;white-space:nowrap}
-  .pjp-per button{border:0;background:none;height:34px;min-width:34px;border-radius:9px;cursor:pointer;font-size:18px;color:var(--teal-strong)}
-  .pjp-per button:hover{background:var(--surface-2,#EEF2F5)}
-  .pjp-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
-  .pjp-k>div{background:var(--surface);border-radius:14px;padding:12px 14px;box-shadow:0 1px 2px rgba(20,40,60,.06)}
-  .pjp-k small{display:block;font-size:12px;color:var(--muted)}.pjp-k b{display:block;font-size:24px;font-weight:400;margin-top:2px}
-  .pjp-av{padding:10px 14px;border-radius:12px;background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);margin-bottom:10px;font-size:14px}
-  .pjp-t{width:100%;border-collapse:collapse;font-size:14px}.pjp-t th{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line,#E1E7EB);font-weight:600}
-  .pjp-t td{padding:10px 8px;border-bottom:1px solid var(--line,#E1E7EB);vertical-align:top}.pjp-t td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-  .pjp-t small{display:block;color:var(--muted);font-size:12.5px}.pjp-nm{font-weight:600;background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--teal-strong);cursor:pointer;text-align:left}
-  .pjp-st{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
-  .pjp-st.warn{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310)}.pjp-st.ok{background:var(--ok-tint,#E3F0E8);color:var(--ok-ink,#2F6047)}.pjp-st.teal{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}
-  .pjp-ac{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}.pjp-ac .btn{height:34px;padding:0 12px;font-size:13.5px}
-  .pjp-det td{background:var(--surface-2,#F6F8FA);padding:14px}
-  .pjp-dg{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}@media(max-width:1100px){.pjp-dg{grid-template-columns:1fr}}
-  .pjp-dias{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--surface);border-radius:10px;overflow:hidden}.pjp-dias th,.pjp-dias td{padding:5px 8px;border-bottom:1px solid var(--line,#E1E7EB);text-align:left}
-  .pjp-dias tr.fds td{color:var(--muted)}.pjp-dias tr.al td{background:var(--warn-tint,#FBF1DC)}.pjp-dias tr.aj td:first-child{box-shadow:inset 3px 0 var(--teal)}
-  .pjp-dias input[type=time]{width:92px;height:30px;padding:0 4px;font:inherit;border:1px solid var(--line,#E1E7EB);border-radius:7px;background:var(--surface)}
+  .pjp{display:flex;flex-direction:column;gap:12px}
+  .pjp-rb{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.pjp-sp{flex:1}
+  .pjp-nav{display:flex;align-items:center;gap:10px}.pjp-nav>div{display:flex;flex-direction:column;line-height:1.2;min-width:150px}
+  .pjp-nav span,.pjp-k span,.pjp-lbl{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .pjp-nav b{font-size:17px}.pjp-nav small{font-size:12px;color:var(--muted)}
+  .pjp .btn.pjp-sm{height:34px;padding:0 12px;font-size:13.5px}
+  .pjp-fil{display:flex;gap:10px;flex-wrap:wrap}.pjp-fil label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}
+  .pjp-fil select,.pjp-fil input{height:36px;border:1px solid var(--line,#E1E7EB);border-radius:9px;padding:0 10px;background:var(--surface);color:inherit;font:inherit;min-width:170px}
+  .pjp-k{display:flex;gap:10px;flex-wrap:wrap}.pjp-k>div{background:var(--ground);border-radius:12px;padding:10px 16px;min-width:130px;display:flex;flex-direction:column}
+  .pjp-k b{font-size:22px}.pjp-k .dsc{background:var(--teal-strong);color:#fff}.pjp-k .dsc span{color:rgba(255,255,255,.75)}
+  .pjp-passos{display:flex;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.pjp-passos span{background:var(--ground);border-radius:999px;padding:3px 10px}
+  .pjp-passos span b{color:var(--teal-strong);margin-right:4px}
+  .pjp-av{padding:10px 14px;border-radius:12px;background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);font-size:14px}
+  .pjp-tw{overflow-x:auto}.pjp-t{width:100%;border-collapse:collapse;font-size:14px}
+  .pjp-t th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line,#E1E7EB)}
+  .pjp-t td{padding:9px 8px;border-bottom:1px solid var(--line,#E1E7EB);vertical-align:top}
+  .pjp-t .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.pjp-t small{display:block;color:var(--muted);font-size:12px}
+  .pjp-t tfoot td{font-weight:700;border-top:2px solid var(--line,#E1E7EB);border-bottom:0;padding-top:10px}
+  .pjp-t tr.feito td{color:var(--muted)}.pjp-t tr.aberto>td{background:var(--surface-2,#F6F8FA)}
+  .pjp-nm{background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--teal-strong);cursor:pointer;text-align:left}
+  .pjp-nm::after{content:" ›";color:var(--muted)}.pjp-nm[aria-expanded=true]::after{content:" ⌄"}
+  .pjp-qa{white-space:nowrap;text-align:right}.pjp-qa .btn{height:34px;padding:0 14px;font-size:13.5px}
+  .pjp-qa .lnk,.pjp-ps .lnk{display:block;margin:4px 0 0 auto;font-size:12.5px;background:none;border:0;color:var(--teal);cursor:pointer;padding:0}
+  .pjp-pill{display:inline-block;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .pjp-pill.warn{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310)}.pjp-pill.ok{background:var(--ok-tint,#E3F0E8);color:var(--ok-ink,#2F6047)}.pjp-pill.teal{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-pill.crit{background:var(--crit-tint,#F6E3E1);color:var(--crit-ink,#8E3A33)}
+  .pjp-fl td{padding:0 8px 16px!important;background:var(--surface-2,#F6F8FA)}
+  .pjp-folha{background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:12px;overflow:hidden}
+  .pjp-fh{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;padding:10px 14px;background:var(--ground);font-size:14px}.pjp-fh b{font-size:15px}
+  .pjp-fg{display:grid;grid-template-columns:minmax(0,1fr) 300px}@media(max-width:1000px){.pjp-fg{grid-template-columns:1fr}}
+  .pjp-dias{width:100%;border-collapse:collapse;font-size:13.5px}.pjp-dias th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--line,#E1E7EB)}
+  .pjp-dias td{padding:5px 10px;border-bottom:1px solid var(--line,#E1E7EB)}.pjp-dias .n{text-align:right;font-variant-numeric:tabular-nums}
+  .pjp-dias tr.fds td{color:var(--muted);background:var(--surface-2,#F6F8FA)}.pjp-dias tr.al td{background:var(--warn-tint,#FBF1DC)}
+  .pjp-dias input[type=time]{width:96px;height:30px;padding:0 4px;font:inherit;border:1px solid var(--line,#E1E7EB);border-radius:7px;background:var(--surface);color:inherit}
   .pjp-dias .ps{color:var(--muted);font-size:12px}
-  .pjp-box{background:var(--surface);border-radius:12px;padding:12px 14px;margin-bottom:10px}.pjp-box h4{margin:0 0 8px;font-size:14px}
-  .pjp-box label{display:block;font-size:12.5px;color:var(--muted);margin-top:8px}.pjp-box input,.pjp-box textarea,.pjp-box select{width:100%;height:36px;padding:0 8px;border:1px solid var(--line,#E1E7EB);border-radius:8px;font:inherit;background:var(--surface);color:inherit}
-  .pjp-box textarea{height:auto;padding:8px}.pjp-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 8px}
-  .pjp-pb{color:var(--crit-ink,#8E3A33);font-size:13px;margin:4px 0 0;padding-left:18px}
+  .pjp-calc{border-left:1px solid var(--line,#E1E7EB);padding:12px 14px;display:flex;flex-direction:column;gap:2px}@media(max-width:1000px){.pjp-calc{border-left:0;border-top:1px solid var(--line,#E1E7EB)}}
+  .pjp-cl{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line,#E1E7EB);font-size:14px}.pjp-cl span{color:var(--muted)}
+  .pjp-cl input{width:110px;height:32px;text-align:right;border:1px solid var(--line,#E1E7EB);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:inherit}
+  .pjp-cl.tot{border:0;border-radius:10px;background:var(--teal-strong);color:#fff;padding:10px 12px;margin-top:8px;font-size:16px}.pjp-cl.tot span{color:rgba(255,255,255,.8)}
+  .pjp-calc details{margin-top:10px;font-size:13px}.pjp-calc summary{cursor:pointer;color:var(--teal);font-weight:600}
+  .pjp-calc label{display:block;font-size:12px;color:var(--muted);margin-top:8px}.pjp-calc details input{width:100%;height:34px;padding:0 8px;border:1px solid var(--line,#E1E7EB);border-radius:8px;font:inherit;background:var(--surface);color:inherit}
+  .pjp-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 8px}
+  .pjp-nota{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--ground);font-size:13.5px}.pjp-nota ul{margin:4px 0 0;padding-left:18px;color:var(--crit-ink,#8E3A33)}
+  .pjp-hist{margin-top:10px;font-size:12px;color:var(--muted)}.pjp-hist div{padding:2px 0}
   .pjp-fundo{position:fixed;inset:0;background:rgba(10,25,35,.42);z-index:900;display:grid;place-items:center;padding:16px}
   .pjp-mod{background:var(--surface);border-radius:18px;max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
   .pjp-mod h3{margin:0 0 4px}.pjp-mod textarea{width:100%;min-height:130px;padding:10px;border:1px solid var(--line,#E1E7EB);border-radius:10px;font:inherit;background:var(--surface);color:inherit}
   .pjp-mod .lk{display:block;word-break:break-all;background:var(--surface-2,#EEF2F5);padding:8px 10px;border-radius:8px;font-size:13px;margin:8px 0}
+  .pjp-mod .pjp-box label{display:block;font-size:12.5px;color:var(--muted);margin-top:8px}.pjp-mod .pjp-box input,.pjp-mod .pjp-box select,.pjp-mod .pjp-box textarea{width:100%;height:36px;padding:0 8px;border:1px solid var(--line,#E1E7EB);border-radius:8px;font:inherit;background:var(--surface);color:inherit}
+  .pjp-mod .pjp-box textarea{height:auto;padding:8px}
+  .pjp-ac{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
   .pjp-lote li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line,#E1E7EB)}.pjp-lote{list-style:none;margin:8px 0;padding:0}
   </style>`;
-  const btn=(a,t,extra,cl)=>`<button class="btn ${cl||'sec'}" data-act="${a}" ${extra||''}>${t}</button>`;
+  const btn=(a,t,extra,cl)=>`<button class="btn ${cl==null?'sec':cl} pjp-sm" data-act="${a}" ${extra||''}>${t}</button>`;
+  const lnk=(a,t,extra)=>`<button class="lnk" data-act="${a}" ${extra||''}>${t}</button>`;
+  /* o próximo passo de cada PJ: um botão (ou a situação) + atalhos pequenos */
   function acoes(c,pid,f,x,r){ const fa=`data-f="${c.esc(f._id)}"`, st=x.st||'';
-    if(st==='') return btn('pjp-fech','Fechar valor',fa,'');
-    if(st==='fechado') return btn('pjp-reab','Reabrir',fa)+btn('pjp-ped','Pedir nota',fa,'');
-    if(st==='pedido') return btn('pjp-pedx','Cancelar pedido',fa)+btn('pjp-env','Mandar de novo',fa,'');
-    if(st==='chegou') return btn('pjp-nver','Ver nota',fa)+btn('pjp-nnao','Pedir outra',fa)+btn('pjp-nok','Está certa',fa,'');
-    if(st==='conferida') return btn('pjp-nver','Ver nota',fa)+btn('pjp-pago','Marcar pago',fa,'');
-    if(st==='pago') return btn('pjp-nver','Ver nota',fa)+btn('pjp-pagox','Desfazer pago',fa);
+    if(st==='') return (r.alerta?`<span class="pjp-pill warn">${r.alerta} dia${r.alerta>1?'s':''} para conferir</span><br>`:'')+btn('pjp-fech','Fechar valor',fa,'');
+    if(st==='fechado') return btn('pjp-ped','Pedir nota',fa,'')+lnk('pjp-reab','mudar o valor',fa);
+    if(st==='pedido') return `<span class="pjp-pill teal">Esperando a nota</span>`+lnk('pjp-env','mandar o link de novo',fa)+lnk('pjp-pedx','cancelar o pedido',fa);
+    if(st==='chegou') return (x.nota&&x.nota.conf==='ok'?'<span class="pjp-pill ok">Nota chegou · bate</span>':x.nota&&x.nota.conf==='dif'?'<span class="pjp-pill crit">Nota chegou · com diferença</span>':'<span class="pjp-pill warn">Nota chegou · conferir</span>')+'<br>'+btn('pjp-nok','Está certa',fa,'')+lnk('pjp-nver','ver a nota',fa)+lnk('pjp-nnao','pedir outra nota',fa);
+    if(st==='conferida') return btn('pjp-pago','Marcar pago',fa,'')+lnk('pjp-nver','ver a nota',fa);
+    if(st==='pago') return `<span class="pjp-pill ok">Pago</span>`+lnk('pjp-nver','ver a nota',fa)+lnk('pjp-pagox','desfazer',fa);
     return ''; }
-  function detalhe(c,pid,r,x){ const esc=c.esc, f=r.f, ed=!(x.st), h=r.h, pj=f.pjPag||{}, fa=`data-f="${esc(f._id)}"`;
-    const dn=['dom','seg','ter','qua','qui','sex','sáb'];
-    const linhas=r.dias.map(d=>`<tr class="${d.dw===0||d.dw===6?'fds':''} ${d.fl?'al':''} ${d.aj?'aj':''}"><td>${dn[d.dw]} ${brc(d.d)}</td>
-      <td class="ps">${d.hs.length?esc(d.hs.join(' · ')):'—'}</td>
-      <td>${ed?`<input type="time" data-pjp-dia="e" data-d="${d.d}" ${fa} value="${esc(d.e)}">`:esc(d.e||'—')}</td>
-      <td>${ed?`<input type="time" data-pjp-dia="s" data-d="${d.d}" ${fa} value="${esc(d.s)}">`:esc(d.s||'—')}</td>
-      <td>${d.m?hTxt(d.m):'—'}${d.E!=null&&d.S!=null&&d.m?`<span class="ps"> (${hhmm(d.E)}–${hhmm(d.S)})</span>`:''}</td>
-      <td class="ps">${d.fl?'<b style="color:var(--warn-ink,#7A5310)">'+esc(d.fl)+'</b> ':''}${d.aj?'ajustado'+(d.mot?': '+esc(d.mot):'')+(ed?` <button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>voltar ao Face ID</button>`:''):''}</td></tr>`).join('');
-    const pr=x.nota&&x.nota.probs&&x.nota.probs.length?`<ul class="pjp-pb">${x.nota.probs.map(p=>'<li>'+esc(p)+'</li>').join('')}</ul>`:'';
-    return `<tr class="pjp-det"><td colspan="8"><div class="pjp-dg"><div>
-      <table class="pjp-dias"><thead><tr><th>Dia</th><th>Passagens no Face ID</th><th>Entrada</th><th>Saída</th><th>Horas</th><th></th></tr></thead><tbody>${linhas}</tbody></table>
-      <p class="sub" style="margin:8px 0 0">Entrada e saída a até ${h.tol} min do horário (${h.ini} às ${h.fim}) contam como o horário certo; o intervalo de ${h.intv} min sai de cada dia.${h.dentro?' Não conta antes do início nem depois do fim.':''}${ed?' Para corrigir um dia (esqueceu de passar), digite a entrada ou a saída.':''}</p></div>
-      <div>${x.nota?`<div class="pjp-box"><h4>Nota ${x.nota.num?'nº '+esc(x.nota.num):''}</h4><div>${R$(x.nota.valor)} · ${x.nota.conf==='ok'?'<b style="color:var(--ok-ink,#2F6047)">bate com o pedido</b>':x.nota.conf==='dif'?'<b style="color:var(--crit-ink)">tem diferença</b>':'conferir à mão'}</div>${pr}${x.nota.obs?`<small>Recado do PJ: ${esc(x.nota.obs)}</small>`:''}</div>`:''}
-      <div class="pjp-box"><h4>Desconto</h4>${ed?`<label>Valor (R$)</label><input data-pjp-c="desc" ${fa} inputmode="decimal" value="${x.desc?esc(n2(x.desc)):''}" placeholder="0,00"><label>Motivo</label><input data-pjp-c="descMot" ${fa} value="${esc(x.descMot||'')}" maxlength="120">`:`<div>${x.desc?R$(x.desc)+(x.descMot?' · '+esc(x.descMot):''):'Sem desconto'}</div>`}</div>
-      <div class="pjp-box"><h4>Horário e valor desta pessoa</h4>
-        <div class="pjp-g3"><div><label>Entra</label><input type="time" data-pjp-p="ini" value="${esc(pj.ini||'')}" placeholder="${esc(h.ini)}"></div><div><label>Sai</label><input type="time" data-pjp-p="fim" value="${esc(pj.fim||'')}"></div><div><label>Intervalo (min)</label><input data-pjp-p="intv" inputmode="numeric" value="${pj.intv!=null?esc(pj.intv):''}" placeholder="${esc(h.intv)}"></div></div>
-        <label>Valor da hora (R$)${!(+pj.vh>0)&&r.vh?' · hoje: salário ÷ '+cfg(c).horasMes:''}</label><input data-pjp-p="vh" inputmode="decimal" value="${+pj.vh>0?esc(n2(pj.vh)):''}" placeholder="${r.vh?esc(n2(r.vh)):'0,00'}">
-        <label>Ou valor fixo no período (R$, não conta horas)</label><input data-pjp-p="fixo" inputmode="decimal" value="${+pj.fixo>0?esc(n2(pj.fixo)):''}" placeholder="—">
-        <button class="btn sec" style="margin-top:10px" data-act="pjp-psalva" ${fa}>Salvar no cadastro</button></div>
-      ${(x.hist||[]).length?`<div class="pjp-box"><h4>Histórico</h4>${x.hist.slice().reverse().map(h=>`<small>${esc(br(h.em.slice(0,10)))} ${esc(h.em.slice(11,16))} · ${esc(h.t)} · ${esc(h.por||'')}</small>`).join('')}</div>`:''}
-      </div></div></td></tr>`; }
+  /* a "folha" da pessoa, igual à planilha */
+  function detalhe(c,pid,r,x){ const esc=c.esc, f=r.f, ed=!(x.st), h=r.h, pj=f.pjPag||{}, fa=`data-f="${esc(f._id)}"`, dn=['dom','seg','ter','qua','qui','sex','sáb'];
+    const linhas=r.dias.map(d=>{ const fds=d.dw===0||d.dw===6; if(fds&&!d.hs.length&&!d.aj) return `<tr class="fds"><td>${dn[d.dw]} ${brc(d.d)}</td><td colspan="4" class="ps">fim de semana</td></tr>`;
+      return `<tr class="${d.fl?'al':''}"><td>${dn[d.dw]} ${brc(d.d)}</td>
+      <td>${ed?`<input type="time" data-pjp-dia="e" data-d="${d.d}" ${fa} value="${esc(d.e)}" aria-label="Entrada ${brc(d.d)}">`:esc(d.e||'—')}</td>
+      <td>${ed?`<input type="time" data-pjp-dia="s" data-d="${d.d}" ${fa} value="${esc(d.s)}" aria-label="Saída ${brc(d.d)}">`:esc(d.s||'—')}</td>
+      <td class="ps">${d.m&&d.E!=null?hhmm(d.E)+' às '+hhmm(d.S):''}</td>
+      <td class="n"><b>${d.m?hTxt(d.m):'—'}</b>${d.fl?`<small style="color:var(--warn-ink,#7A5310)">${esc(d.fl)}: digite a saída</small>`:''}${d.aj?`<small>corrigido à mão${ed?` · <button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>voltar ao Face ID</button>`:''}</small>`:''}</td></tr>`; }).join('');
+    const nota=x.nota?`<div class="pjp-nota"><b>Nota ${x.nota.num?'nº '+esc(x.nota.num):''} · ${R$(x.nota.valor)}</b> ${x.nota.conf==='ok'?'· bate com o pedido':x.nota.conf==='dif'?'· tem diferença':'· conferir abrindo o arquivo'}${x.nota.probs&&x.nota.probs.length&&x.nota.conf!=='ok'?`<ul>${x.nota.probs.map(p=>'<li>'+esc(p)+'</li>').join('')}</ul>`:''}${x.nota.obs?`<div class="ps">Recado do PJ: ${esc(x.nota.obs)}</div>`:''}</div>`:'';
+    return `<tr class="pjp-fl"><td colspan="7"><div class="pjp-folha">
+      <div class="pjp-fh"><b>${esc(c.titulo(f.nome))}</b><span>${esc([String(f.empresa||'').toUpperCase(),f.setor].filter(Boolean).join(' · '))}</span><span>Horário: ${esc(h.ini)} às ${esc(h.fim)} · intervalo ${h.intv} min</span></div>
+      <div class="pjp-fg"><div class="pjp-tw"><table class="pjp-dias"><thead><tr><th>Dia</th><th>Entrada</th><th>Saída</th><th>Conta como</th><th class="n">Horas</th></tr></thead><tbody>${linhas}</tbody></table>
+        <p class="ps" style="margin:8px 10px">Entrada e saída vêm do Face ID (primeira e última passagem do dia). Até ${h.tol} min do horário conta o horário certo; o intervalo sai de cada dia.${ed?' Esqueceu de passar? Digite a hora certa no dia.':''}</p></div>
+      <div class="pjp-calc"><div class="pjp-lbl">Cálculo final</div>
+        ${r.fixo?`<div class="pjp-cl"><span>Valor fixo</span><b>${R$(r.fixo)}</b></div>`:`<div class="pjp-cl"><span>Total de horas</span><b>${hTxt(r.min)} (${n2(hDec(r.min))} h)</b></div><div class="pjp-cl"><span>Valor da hora</span><b>${r.vh?R$(r.vh):'<span style="color:var(--crit-ink)">falta</span>'}</b></div>`}
+        <div class="pjp-cl"><span>Desconto</span>${ed?`<input data-pjp-c="desc" ${fa} inputmode="decimal" value="${x.desc?esc(n2(x.desc)):''}" placeholder="0,00" aria-label="Desconto">`:`<b>${r.desc?'− '+R$(r.desc):'—'}</b>`}</div>
+        ${ed?`<input data-pjp-c="descMot" ${fa} value="${esc(x.descMot||'')}" maxlength="120" placeholder="motivo do desconto (opcional)" style="height:32px;border:1px solid var(--line,#E1E7EB);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:inherit;margin-top:6px">`:x.descMot?`<div class="ps">${esc(x.descMot)}</div>`:''}
+        <div class="pjp-cl tot"><span>Total a pagar</span><b>${R$(r.valor)}</b></div>
+        ${nota}
+        <details ${!(r.vh||r.fixo)?'open':''}><summary>Mudar horário ou valor desta pessoa</summary>
+          <div class="pjp-g3"><div><label>Entra</label><input type="time" data-pjp-p="ini" value="${esc(pj.ini||'')}"></div><div><label>Sai</label><input type="time" data-pjp-p="fim" value="${esc(pj.fim||'')}"></div><div><label>Intervalo (min)</label><input data-pjp-p="intv" inputmode="numeric" value="${pj.intv!=null?esc(pj.intv):''}" placeholder="${esc(h.intv)}"></div></div>
+          <label>Valor da hora (R$)</label><input data-pjp-p="vh" inputmode="decimal" value="${+pj.vh>0?esc(n2(pj.vh)):''}" placeholder="${r.vh?esc(n2(r.vh)):'0,00'}">
+          <label>Ou valor fixo na quinzena (R$)</label><input data-pjp-p="fixo" inputmode="decimal" value="${+pj.fixo>0?esc(n2(pj.fixo)):''}" placeholder="—">
+          <button class="btn sec pjp-sm" style="margin-top:10px" data-act="pjp-psalva" ${fa}>Salvar no cadastro</button></details>
+        ${(x.hist||[]).length?`<div class="pjp-hist">${x.hist.slice().reverse().slice(0,6).map(h=>`<div>${esc(br(h.em.slice(0,10)).slice(0,5))} ${esc(h.em.slice(11,16))} · ${esc(h.t)}</div>`).join('')}</div>`:''}
+      </div></div></div></td></tr>`; }
   function modal(c){ const M=J.mod, esc=c.esc; if(!M) return '';
     if(M.k==='cfg'){ const g=cfg(c);
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Configurar o pagamento dos PJ"><h3>Como o painel faz a conta</h3><p class="sub">Vale para todos os PJ; o horário e o valor da hora de cada pessoa ficam no detalhe dela.</p>
@@ -218,37 +248,39 @@
         <textarea id="pjp-nmot" placeholder="ex.: nota emitida para o CNPJ errado"></textarea><div class="pjp-ac" style="margin-top:10px">${btn('pjp-modx','Cancelar')}${btn('pjp-nnaook','Voltar para fechado','data-f="'+esc(M.fid)+'"','')}</div></div></div>`; }
     return ''; }
   function render(c){ C=c; const esc=c.esc; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid);
-    const D=docP(pid), xs=pjs(c,p), linhas=[], tot={n:0,min:0,val:0,st:{}}; let semFid=0, alerta=0;
+    const D=docP(pid), xs=pjs(c,p), linhas=[], tot={n:0,min:0,val:0,desc:0,st:{}}; let semFid=0;
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
-    const q=norm(J.q);
+    const q=norm(J.q), ehAt=pid===perAtual(c);
     const rs=xs.map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=x.st&&x.fech?Object.assign(calcPessoa(c,f,p,x),{min:x.fech.min,valor:x.fech.valor,bruto:x.fech.bruto,desc:x.fech.desc||0}):calcPessoa(c,f,p,x); return {f,x,r}; })
       .filter(({f})=>(!J.emp||String(f.empresa||'').toUpperCase()===J.emp)&&(!q||norm(f.nome+' '+(f.setor||'')+' '+(f.empresa||'')).includes(q)));
-    rs.forEach(({f,x,r})=>{ tot.n++; tot.min+=r.min; tot.val+=r.valor; const st=x.st||''; tot.st[st]=(tot.st[st]||0)+1; if(r.semFid&&!r.fixo&&!x.st) semFid++; if(r.alerta&&!x.st) alerta++;
-      const [stT,stC]=ST[st]||ST[''], emp=String(f.empresa||'').toUpperCase(), ab=J.ab===f._id;
-      linhas.push(`<tr><td><button class="pjp-nm" data-act="pjp-ab" data-f="${esc(f._id)}" aria-expanded="${ab}">${esc(c.titulo(f.nome))}</button><small>${esc([emp,f.setor].filter(Boolean).join(' · '))}</small></td>
-        <td><small style="color:inherit">${esc(r.h.ini)} às ${esc(r.h.fim)}</small><small>intervalo ${r.h.intv} min</small></td>
-        <td class="n">${r.fixo?'<small>valor fixo</small>':hTxt(r.min)+'<small>'+n2(hDec(r.min))+' h</small>'}</td>
-        <td class="n">${r.fixo?'—':r.vh?R$(r.vh):'<b style="color:var(--crit-ink)">sem valor</b>'}</td>
+    rs.forEach(({f,x,r})=>{ tot.n++; tot.min+=r.min; tot.val+=r.valor; tot.desc+=r.desc||0; const st=x.st||''; tot.st[st]=(tot.st[st]||0)+1; if(r.semFid&&!r.fixo&&!x.st) semFid++;
+      const emp=String(f.empresa||'').toUpperCase(), ab=J.ab===f._id;
+      linhas.push(`<tr class="${st==='pago'?'feito':''} ${ab?'aberto':''}"><td><button class="pjp-nm" data-act="pjp-ab" data-f="${esc(f._id)}" aria-expanded="${ab}">${esc(c.titulo(f.nome))}</button><small>${esc([emp,f.setor].filter(Boolean).join(' · '))}</small>${!st&&r.semFid&&!r.fixo?'<small style="color:var(--crit-ink)">Sem passagem no Face ID</small>':''}</td>
+        <td class="n">${r.fixo?'<small>valor fixo</small>':`<b>${hTxt(r.min)}</b><small>${n2(hDec(r.min))} h</small>`}</td>
+        <td class="n">${r.fixo?'—':r.vh?R$(r.vh):'<b style="color:var(--crit-ink)">falta</b>'}</td>
         <td class="n">${r.desc?'− '+R$(r.desc):'—'}</td><td class="n"><b>${R$(r.valor)}</b></td>
-        <td><span class="pjp-st ${stC}">${stT}</span>${!st&&r.semFid&&!r.fixo?'<small style="color:var(--crit-ink)">Sem passagem no Face ID</small>':''}${!st&&r.alerta?`<small style="color:var(--warn-ink,#7A5310)">${r.alerta} dia${r.alerta>1?'s':''} para conferir</small>`:''}${x.nota&&x.nota.conf==='dif'?'<small style="color:var(--crit-ink)">Nota com diferença</small>':''}</td>
-        <td><div class="pjp-ac">${acoes(c,pid,f,x,r)}</div></td></tr>`+(ab?detalhe(c,pid,r,x):'')); });
-    const nAbre=rs.filter(({x})=>!x.st).length, nFech=rs.filter(({x})=>x.st==='fechado').length;
+        <td class="pjp-qa" colspan="2">${acoes(c,pid,f,x,r)}</td></tr>`+(ab?detalhe(c,pid,r,x):'')); });
+    const nAbre=rs.filter(({x})=>!x.st).length, nFech=rs.filter(({x})=>x.st==='fechado').length, falta=(tot.st.pedido||0);
     const dadosOk=!!(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes]);
     const dias=dadosOk?Object.keys(window.RHAlmoco._A.dados[p.mes].dias||{}).filter(d=>d>=p.de&&d<=p.ate).sort():[];
     const avFid=!dadosOk?'<div class="pjp-av">Carregando o Face ID do mês…</div>':!dias.length?`<div class="pjp-av">Ainda não tem Face ID importado de ${esc(p.curto)}. Importe o CSV em Almoço/café (ou espere o robô do Face ID).</div>`
-      :dias[dias.length-1]<p.ate&&p.ate<c.P.hojeStr()&&diasDe(p).some(d=>d>dias[dias.length-1]&&![0,6].includes(new Date(d+'T12:00:00').getDay()))?`<div class="pjp-av">O Face ID importado vai até ${brc(dias[dias.length-1])}; o período vai até ${brc(p.ate)}. Importe o resto antes de fechar.</div>`:'';
-    const acTopo=`${btn('pjp-cfg','Como é feita a conta')}${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF','','')}`;
-    return css+c.topo('Pagamento dos PJ','Horas pelo Face ID, valor de cada PJ e o pedido da nota fiscal por link. O PJ manda a nota pelo link e o painel confere.',acTopo,'RH · PAGAMENTO DOS PJ')+
-      `<div class="pjp-bar"><span class="pjp-per"><button data-act="pjp-per" data-v="-1" aria-label="Período anterior">‹</button><b>${esc(p.txt)}</b><button data-act="pjp-per" data-v="1" aria-label="Próximo período">›</button></span>
-        ${pid!==perAtual(c)?btn('pjp-per','Voltar ao atual','data-v="0"'):''}
-        <select id="pjp-emp" aria-label="Empresa" style="height:38px;border-radius:10px;border:1px solid var(--line,#E1E7EB);padding:0 8px;background:var(--surface);color:inherit;font:inherit"><option value="">Todas as empresas</option>${emps.map(e=>`<option ${J.emp===e?'selected':''}>${esc(e)}</option>`).join('')}</select>
-        <input id="pjp-q" placeholder="Procurar PJ" value="${esc(J.q)}" style="height:38px;border-radius:10px;border:1px solid var(--line,#E1E7EB);padding:0 10px;background:var(--surface);color:inherit;font:inherit;min-width:180px">
-        <span style="flex:1"></span>${nAbre?btn('pjp-fechtodos','Fechar o valor de todos ('+nAbre+')','',''):''}${nFech?btn('pjp-pedtodos','Pedir nota a todos os fechados ('+nFech+')','',''):''}</div>
-      ${avFid}${semFid?`<div class="pjp-av">${semFid} PJ sem passagem no Face ID no período: confira o CPF no cadastro (o Face ID liga pelo CPF ou pelo nome).</div>`:''}
-      <div class="pjp-k"><div><small>PJ no período</small><b>${tot.n}</b></div><div><small>Horas</small><b>${hTxt(tot.min)}</b></div><div><small>Total a pagar</small><b>${R$(tot.val)}</b></div>
-        <div><small>Notas pedidas</small><b>${(tot.st.pedido||0)}</b></div><div><small>Notas para conferir</small><b>${(tot.st.chegou||0)}</b></div><div><small>Pagos</small><b>${(tot.st.pago||0)}</b></div></div>
-      <section class="card" style="padding:6px 10px">${rs.length?`<table class="pjp-t"><thead><tr><th>PJ</th><th>Horário</th><th style="text-align:right">Horas</th><th style="text-align:right">Valor/hora</th><th style="text-align:right">Desconto</th><th style="text-align:right">Total</th><th>Situação</th><th></th></tr></thead><tbody>${linhas.join('')}</tbody></table>`
-        :`<div class="empty">${xs.length?'Nenhum PJ com esse filtro.':'Nenhum PJ ativo no cadastro do RH (Funcionários com vínculo PJ).'}</div>`}</section>`+modal(c); }
+      :dias[dias.length-1]<p.ate&&p.ate<c.P.hojeStr()&&diasDe(p).some(d=>d>dias[dias.length-1]&&![0,6].includes(new Date(d+'T12:00:00').getDay()))?`<div class="pjp-av">O Face ID importado vai até ${brc(dias[dias.length-1])}; a quinzena vai até ${brc(p.ate)}. Importe o resto antes de fechar.</div>`:'';
+    const passos=[['1','Confira as horas'],['2','Feche o valor'],['3','Peça a nota'],['4','Confira a nota'],['5','Marque pago']];
+    return css+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.',btn('pjp-cfg','Como é feita a conta'),'RH · PAGAMENTO DOS PJ')+
+      `<div class="pjp"><div class="pjp-rb"><div class="pjp-nav"><button class="btn sec pjp-sm" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
+          <div><span>${cfg(c).modo==='mes'?'Mês':'Quinzena'}</span><b>${esc(p.txt)}</b>${ehAt?'<small>a quinzena para pagar agora</small>':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
+          <button class="btn sec pjp-sm" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
+        <span class="pjp-sp"></span>${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF','','')}</div>
+      <div class="pjp-fil"><label>Empresa<select id="pjp-emp" aria-label="Empresa"><option value="">Todas</option>${emps.map(e=>`<option ${J.emp===e?'selected':''}>${esc(e)}</option>`).join('')}</select></label>
+        <label>Pessoa<input id="pjp-q" type="search" placeholder="Buscar" value="${esc(J.q)}"></label></div>
+      <div class="pjp-k"><div class="dsc"><span>Total a pagar</span><b>${R$(tot.val)}</b></div><div><span>PJ</span><b>${tot.n}</b></div><div><span>Horas</span><b>${hTxt(tot.min)}</b></div><div><span>Esperando a nota</span><b>${falta}</b></div><div><span>Pagos</span><b>${tot.st.pago||0}</b></div></div>
+      <div class="pjp-passos">${passos.map(([n,t])=>`<span><b>${n}</b>${t}</span>`).join('')}</div>
+      ${avFid}${semFid?`<div class="pjp-av">${semFid} PJ sem passagem no Face ID: confira o CPF no cadastro (o Face ID liga pelo CPF ou pelo nome).</div>`:''}
+      ${rs.length?`<div class="pjp-tw"><table class="pjp-t"><thead><tr><th>PJ <small style="display:inline;font-weight:400">· toque no nome para ver os dias</small></th><th class="n">Horas</th><th class="n">Valor da hora</th><th class="n">Desconto</th><th class="n">Total a pagar</th><th class="pjp-qa" colspan="2">Próximo passo</th></tr></thead><tbody>${linhas.join('')}</tbody>
+        <tfoot><tr><td>Total</td><td class="n">${hTxt(tot.min)}</td><td></td><td class="n">${tot.desc?'− '+R$(tot.desc):'—'}</td><td class="n">${R$(tot.val)}</td><td colspan="2"></td></tr></tfoot></table></div>`
+        :`<div class="empty">${xs.length?'Nenhum PJ com esse filtro.':'Nenhum PJ ativo no cadastro do RH (Funcionários com vínculo PJ).'}</div>`}
+      ${nAbre>1||nFech>1?`<div class="pjp-rb"><span class="pjp-sp"></span>${nAbre>1?btn('pjp-fechtodos','Fechar o valor dos '+nAbre):''}${nFech>1?btn('pjp-pedtodos','Pedir nota aos '+nFech+' fechados'):''}</div>`:''}
+      </div>`+modal(c); }
   /* ---------- relatórios ---------- */
   function linhasRel(c){ const pid=J.per, p=perDe(pid), D=docP(pid);
     return pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh}; }); }

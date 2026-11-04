@@ -63,7 +63,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.click('[data-act="pjp-nok"][data-f="f1"]'); await H.dorme(700); await p.click('[data-act="pjp-pago"][data-f="f1"]'); await H.dorme(700); S=await srv();
   ok('Está certa → conferida; Marcar pago → pago (com histórico)', S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pago'&&S['rh/dados/pjpag/2026-10-2'].pes.f1.hist.length>=5);
   /* a outra PJ: fechar todos, pedir, nota com diferença */
-  await p.click('[data-act="pjp-fechtodos"]'); await H.dorme(1000); await p.click('[data-act="pjp-ped"][data-f="f2"]'); await H.dorme(1100); S=await srv();
+  await p.click('[data-act="pjp-fech"][data-f="f2"]'); await H.dorme(1000); await p.click('[data-act="pjp-ped"][data-f="f2"]'); await H.dorme(1100); S=await srv();
   const pk2=Object.keys(S).find(k=>k.startsWith('rh/dados/pjnotaped/')&&S[k].fid==='f2'), tok2=pk2.split('/').pop(); await p.click('[data-act="pjp-modx"]'); await H.dorme(200);
   const B3=await H.abrir({viewport:{width:390,height:844}}); const q3=B3.page; await H.preparar(q3,{docs:S,users:{}}); await q3.goto(H.BASE+'nota.html?c='+tok2); await H.dorme(1200);
   await q3.setInputFiles('#arq',{name:'n.xml',mimeType:'text/xml',buffer:Buffer.from(xml({num:7,prest:'98765432000155',nomeP:'MARIA',toma:'08813381000130',valor:'2700.00'}))}); await H.dorme(600);
