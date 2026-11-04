@@ -156,7 +156,7 @@
     frEl(); if(!R._prevT) R._prevT=setTimeout(()=>{ R._prevT=null; if(P.S.view==='rhfichas') P.rerender(); },700); return null; }
 
   /* ---------- pedaços de tela ---------- */
-  const TELA_EY={rhcafe:'AUSÊNCIAS',rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhcom:'DOCUMENTOS',rhtarefas:'MINHA AGENDA',rhpedidos:'MINHA AGENDA',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhvagas:'VAGAS E CANDIDATOS',rhunif:'UNIFORMES',rhfuncoes:'CADASTROS'};
+  const TELA_EY={rhpjpag:'PAGAMENTO DOS PJ',rhcafe:'AUSÊNCIAS',rhinicio:'INÍCIO',rhagenda:'AGENDA',rhfunc:'FUNCIONÁRIOS',rhpres:'PESSOAS NA EMPRESA',rhterc:'TERCEIRIZADOS',rhfichas:'FICHAS DO MÊS',rhcom:'DOCUMENTOS',rhtarefas:'MINHA AGENDA',rhpedidos:'MINHA AGENDA',rhdocs:'DOCUMENTOS E CONTRATOS',rhferias:'FÉRIAS E PRAZOS',rhalmoco:'REFEITÓRIO',rhvagas:'VAGAS E CANDIDATOS',rhunif:'UNIFORMES',rhfuncoes:'CADASTROS'};
 const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('RH'+((P.S&&TELA_EY[P.S.view])?' · '+TELA_EY[P.S.view]:''))}</div><h1>${t}</h1>${s?`<div class="sub">${s}</div>`:''}</div>${acoes?`<div class="rh-acoes">${acoes}</div>`:''}</div>`;
   const opts=(xs,v)=>xs.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
   const unicos=k=>[...new Set(R.func.map(x=>x[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -185,6 +185,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     if(semFunc.length) av.push({c:'warn',r:'Atenção',t:semFunc.length+(semFunc.length===1?' funcionário sem função':' funcionários sem função'),s:'a ficha não tem itens: '+semFunc.slice(0,3).map(f=>f.nome).join(', ')+(semFunc.length>3?'…':''),act:'data-go="rhfunc"',l:'Resolver'});
     try{ if(window.RHTar) window.RHTar.avisos(tarCtx()).forEach(a=>av.push({c:a.nivel==='crit'?'crit':'warn',r:a.rotulo,t:a.titulo,s:a.texto,act:`data-go="${a.go}"`,l:'Abrir'})); }catch(e){} /* 31/10: Minha agenda */
     try{ if(window.RHUnif) window.RHUnif.avisos(unifCtx()).forEach(a=>av.push({c:'warn',r:'Uniforme',t:a.titulo,s:a.texto,act:'data-go="rhunif"',l:'Abrir'})); }catch(e){} /* entregas de uniforme para lançar (27/10) */
+    try{ if(window.RHPJPag) window.RHPJPag.avisos(pjpCtx()).forEach(a=>av.push({c:a.nivel||'warn',r:'PJ',t:a.titulo,s:a.texto,act:'data-go="rhpjpag"',l:'Abrir'})); }catch(e){} /* pagamento dos PJ (04/11) */
     avisosMais().forEach(a=>av.unshift(a));
     return av; }
   function barra(c,tot){ const p=n=>tot?(n/tot*100).toFixed(2):0; return `<div class="rh-bar" role="img" aria-label="${c.ass} assinadas, ${c.imp} falta assinar, ${c.nao} não geradas"><i class="ok" style="width:${p(c.ass)}%"></i><i class="warn" style="width:${p(c.imp)}%"></i></div>`; }
@@ -1840,6 +1841,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     rhterc:{nome:'Terceirizados',mob:'Terceiros',render:()=>{ R.fview='terc'; R.pess=null; return vTerc(true); }},
     rhpres:{nome:'Quem está hoje',mob:'Hoje',render:vPresRH},
     rhcafe:{nome:'Folha do café',mob:'Café',render:()=>{ setTimeout(()=>P.go('rhalmoco'),0); return '<section class="card">Abrindo Almoço/café…</section>'; }},
+    rhpjpag:{nome:'Pagamento dos PJ',mob:'Pagto PJ',render:()=>window.RHPJPag?window.RHPJPag.render(pjpCtx()):'<section class="card">Carregando…</section>'}, /* 04/11 */
     rhunif:{nome:'Uniformes',mob:'Uniformes',render:()=>window.RHUnif?window.RHUnif.render(unifCtx()):'<section class="card">Carregando…</section>'},
     rhferias:{nome:'Férias',mob:'Férias',render:()=>{ if(!['ferias','mapa'].includes(R.pzv)) R.pzv='ferias'; return vFerias(); }},
     rhatest:{nome:'Atestados e faltas',mob:'Atestados',render:()=>topo('Atestados e faltas','Atestado, declaração de horas e faltas de cada pessoa. Entra sozinho no fechamento da folha, na presença e no almoço.','','RH · ATESTADOS E FALTAS')+(window.RHAtest?RHAtest.render(Object.assign(atCtx(),{semTitulo:true})):'<section class="card">Carregando…</section>')},
@@ -1898,6 +1900,9 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   const tarCtx=()=>({P,esc,eu,topo,titulo,func:()=>ativos(),prazos:()=>{ try{ return agendaItens(); }catch(e){ return []; } }});
   avRH(()=>window.RHTar?window.RHTar.avisos(tarCtx()):[]);
   const unifCtx=()=>({P,R,esc,eu,br,topo,titulo,funcaoDe,setores:setoresCad});
+  /* Pagamento dos PJ (modulos/rh-pjpag.js, 04/11): horas pelo Face ID → valor → pedido da nota fiscal por link (nota.html) */
+  const pjpCtx=()=>({P,R,esc,eu,topo,titulo,cargo,tokenNovo,EMP_DOC,alm:almCtx});
+  avRH(()=>window.RHPJPag?window.RHPJPag.avisos(pjpCtx()):[]);
   avRH(()=>window.RHUnif?window.RHUnif.avisos(unifCtx()):[]);
   window.RHUnifNovo=()=>{ P.go('rhunif'); setTimeout(()=>{ try{ window.RHUnif.render(unifCtx()); window.RHUnif.novo(); }catch(e){} },60); };
   /* ---------- Férias pelo relatório do sistema de folha (PDF "Programação de férias", Alleader) ----------

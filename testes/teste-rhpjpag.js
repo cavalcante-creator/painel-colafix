@@ -1,0 +1,82 @@
+/* Pedido de 04/11: RH › Pagamento dos PJ — horas pelo Face ID (mesma conta da planilha "Horas trabalhadas Zenith/NEXUS"),
+   o RH fecha o valor, pede a nota por link (nota.html, sem login), o PJ manda o XML e o painel confere. Dados inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,400):'')); };
+const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00"><infNFSe Id="NFS1"><xLocEmi>Gravataí</xLocEmi><nNFSe>${o.num}</nNFSe>
+<emit><CNPJ>${o.prest}</CNPJ><xNome>${o.nomeP}</xNome></emit><valores><vLiq>${o.valor}</vLiq></valores><DPS versao="1.00"><infDPS Id="DPS1"><dhEmi>2026-11-01T10:00:00-03:00</dhEmi><dCompet>2026-10-31</dCompet>
+<prest><CNPJ>${o.prest}</CNPJ></prest><toma><CNPJ>${o.toma}</CNPJ><xNome>Tomador</xNome></toma><serv><cServ><xDescServ>Prestação de serviços</xDescServ></cServ></serv>
+<valores><vServPrest><vServ>${o.valor}</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>`;
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Produção','Manutenção']};
+  D['rh/dados/funcionarios/f1']={nome:'JOAO PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',salario:5000,setor:'Produção',funcao:'Operador',status:'Ativo',telefone:'(51) 99999-0000',admissao:'2025-01-10'};
+  D['rh/dados/funcionarios/f2']={nome:'MARIA OLIVEIRA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'55566677788',setor:'Manutenção',funcao:'Mecânica',status:'Ativo',telefone:'51988887777',admissao:'2025-02-01',pjPag:{vh:28.41,ini:'08:00',fim:'18:00',intv:72}};
+  D['rh/dados/funcionarios/f3']={nome:'CARLOS CLT TESTE',tipo:'CLT',empresa:'COLAFIX',cpf:'99988877766',status:'Ativo'};
+  const dias={}, uteis=['16','19','20','21','22','23','26','27','28','29','30'];
+  uteis.forEach(x=>{ const k='2026-10-'+x; dias[k]={'11122233344':{p:1,a:1,t:x==='21'?['07:30:00 PORTARIA']:['07:28:10 PORTARIA','12:01:00 REFEITÓRIO','17:20:00 PORTARIA']},'55566677788':{p:1,a:0,t:['08:03:00 PORTARIA','17:58:00 PORTARIA']}}; });
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias,pessoas:{'11122233344':{n:'JOAO PEREIRA TESTE',e:'ZENITH'},'55566677788':{n:'MARIA OLIVEIRA TESTE',e:'NEXUS'}},imp:[]};
+  const erros=[]; let B=await H.abrir({viewport:{width:1440,height:950}}); let p=B.page; p.on('pageerror',e=>erros.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), view=()=>p.evaluate(()=>document.getElementById('view').innerText);
+  /* a conta do dia, igual à planilha */
+  const cd=await p.evaluate(()=>{ const f=window.RHPJPag._calc.contaDia; return [f('07:28','17:20',{ini:'07:30',fim:'17:18',intv:60,tol:5}).m,f('07:40','17:18',{ini:'07:30',fim:'17:18',intv:60,tol:5}).m,f('07:20','17:18',{ini:'07:30',fim:'17:18',intv:60,tol:5}).m,f('07:20','17:18',{ini:'07:30',fim:'17:18',intv:60,tol:5,dentro:true}).m,f('07:30','',{ini:'07:30',fim:'17:18',intv:60,tol:5}).m]; });
+  ok('Conta do dia como a planilha (tolerância de 5 min encaixa no horário; fora dela vale a hora real; menos o intervalo)', JSON.stringify(cd)==='[528,518,538,528,0]', JSON.stringify(cd));
+  const pr=await p.evaluate(()=>{ const c=window.RHPJPag._calc; return [c.perDe('2026-10-2').de,c.perDe('2026-10-2').ate,c.perDe('2026-11-1').ate,c.perMove('2026-10-2',1),c.perMove('2026-10-1',-1)]; });
+  ok('Quinzenas: 16 ao fim do mês, 1 a 15, e a navegação', JSON.stringify(pr)==='["2026-10-16","2026-10-31","2026-11-15","2026-11-1","2026-09-2"]', JSON.stringify(pr));
+  /* menu */
+  const menu=await p.evaluate(()=>{ const b=document.querySelector('#navlist .gxg-gr[data-go="rhrelmes"]'); if(b) b.click(); return new Promise(r=>setTimeout(()=>r([...document.querySelectorAll('#navlist .gxg-si')].map(x=>x.dataset.go)),500)); });
+  ok('Menu do RH: "Pagamento dos PJ" em Relatórios', menu.includes('rhpjpag'), menu.join(','));
+  await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; __T.go('rhpjpag'); }); await H.dorme(1800);
+  let s=await view();
+  ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,24/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
+  ok('Avisa o dia com só uma passagem', /1 dia para conferir/.test(s));
+  await p.click('[data-act="pjp-ab"][data-f="f1"]'); await H.dorme(600);
+  await p.fill('input[data-pjp-dia="s"][data-d="2026-10-21"]','17:18'); await p.dispatchEvent('input[data-pjp-dia="s"][data-d="2026-10-21"]','change'); await H.dorme(900);
+  await p.fill('input[data-pjp-c="desc"]','50,00'); await p.dispatchEvent('input[data-pjp-c="desc"]','change'); await H.dorme(900);
+  s=await view(); let S=await srv(), doc=S['rh/dados/pjpag/2026-10-2'];
+  ok('Corrigir a saída do dia e lançar desconto: refaz a conta (96h48 × 22,73 − 50 = 2.150,26)', /96h48[\s\S]*R\$\s?2\.150,26/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.desc===50, s.replace(/\n/g,' | ').slice(0,400));
+  await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag.png',fullPage:true});
+  await p.click('[data-act="pjp-fech"][data-f="f1"]'); await H.dorme(900); S=await srv(); doc=S['rh/dados/pjpag/2026-10-2'];
+  ok('Fechar valor guarda o valor e os dias', doc.pes.f1.st==='fechado'&&doc.pes.f1.fech.valor===2150.26&&doc.pes.f1.fech.min===5808&&doc.pes.f1.fech.dias.length===16, JSON.stringify(doc.pes.f1.fech).slice(0,200));
+  await p.click('[data-act="pjp-ped"][data-f="f1"]'); await H.dorme(1200); S=await srv();
+  const pk=Object.keys(S).find(k=>k.startsWith('rh/dados/pjnotaped/')), ped=S[pk], tok=pk.split('/').pop();
+  const wa=await p.$eval('[data-act="pjp-wa"]',a=>a.href).catch(()=>''), lk=await p.evaluate(()=>(document.querySelector('.pjp-mod .lk')||{}).textContent||'');
+  ok('Pedir nota: cria o pedido (valor, empresa, CNPJ, dias) e abre o WhatsApp do PJ com a mensagem e o link', ped&&ped.valor===2150.26&&ped.tomador.cnpj==='62.944.495/0001-64'&&/ZENITH/.test(ped.tomador.nome)&&ped.dias.length===11&&/nota\.html\?c=[a-z0-9]{20}$/.test(lk)
+    &&/^https:\/\/wa\.me\/5551999990000\?text=/.test(wa)&&/R\$\s2\.150,26/.test(decodeURIComponent(wa))&&decodeURIComponent(wa).includes('nota.html?c='+tok)&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pedido', JSON.stringify({wa:decodeURIComponent(wa).slice(0,300),lk}));
+  await p.click('[data-act="pjp-modx"]'); await H.dorme(300);
+  /* o celular do PJ (outro aparelho: banco copiado) */
+  const B2=await H.abrir({viewport:{width:390,height:844}}); const q=B2.page; await H.preparar(q,{docs:S,users:{}}); await q.goto(H.BASE+'nota.html?c='+tok); await H.dorme(1300);
+  const tela=await q.evaluate(()=>document.body.innerText);
+  ok('Link do PJ abre sem login com o valor, as horas, o desconto e os dados para emitir', /Olá, Joao!/.test(tela)&&/R\$\s?2\.150,26/.test(tela)&&/96h48/.test(tela)&&/Desconto/.test(tela)&&/62\.944\.495\/0001-64/.test(tela)&&/ZENITH/.test(tela), tela.replace(/\n/g,' | ').slice(0,500));
+  await q.setInputFiles('#arq',{name:'nota15.xml',mimeType:'text/xml',buffer:Buffer.from(xml({num:15,prest:'12345678000190',nomeP:'JOAO',toma:'62944495000164',valor:'2150.26'}))}); await H.dorme(700);
+  const chk=await q.evaluate(()=>document.getElementById('chk').innerText), nn=await q.inputValue('#num');
+  ok('Lê o XML no próprio celular e mostra que confere', /confere com o pedido/.test(chk)&&nn==='15', chk);
+  await q.click('#env'); await H.dorme(1500); const fim=await q.evaluate(()=>document.body.innerText), S2=await q.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+  ok('PJ manda a nota: "Nota enviada" e o envio fica guardado', /Nota enviada/.test(fim)&&S2['rh/dados/pjnotaenv/'+tok]&&S2['rh/dados/pjnotaenv/'+tok].fid==='f1'&&S2['rh/dados/pjnotaenv/'+tok].d.length>100, fim.slice(0,200));
+  await B2.browser.close();
+  /* chega no RH */
+  await p.evaluate(s=>{ const o=JSON.parse(localStorage.getItem('__srv')); o.docs=s; localStorage.setItem('__srv',JSON.stringify(o)); window.__mockReconnect&&window.__mockReconnect(); },S2); await H.dorme(2000);
+  S=await srv(); doc=S['rh/dados/pjpag/2026-10-2']; s=await view();
+  ok('No RH: a nota chega, o painel lê o XML e diz que bate; o link deixa de valer', doc.pes.f1.st==='chegou'&&doc.pes.f1.nota.conf==='ok'&&doc.pes.f1.nota.num==='15'&&doc.pes.f1.nota.valor===2150.26&&S[pk].usado===true&&/Nota chegou/.test(s), JSON.stringify(doc.pes.f1.nota).slice(0,300));
+  await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(900); await p.click('[data-act="rh-iavt"]').catch(()=>{}); await H.dorme(500); const ini=await view();
+  ok('Início do RH avisa a nota para conferir', /nota de PJ chegou para conferir/.test(ini), ini.replace(/\n/g,' | ').slice(0,300));
+  await p.evaluate(()=>__T.go('rhpjpag')); await H.dorme(900);
+  await p.click('[data-act="pjp-nok"][data-f="f1"]'); await H.dorme(700); await p.click('[data-act="pjp-pago"][data-f="f1"]'); await H.dorme(700); S=await srv();
+  ok('Está certa → conferida; Marcar pago → pago (com histórico)', S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pago'&&S['rh/dados/pjpag/2026-10-2'].pes.f1.hist.length>=5);
+  /* a outra PJ: fechar todos, pedir, nota com diferença */
+  await p.click('[data-act="pjp-fechtodos"]'); await H.dorme(1000); await p.click('[data-act="pjp-ped"][data-f="f2"]'); await H.dorme(1100); S=await srv();
+  const pk2=Object.keys(S).find(k=>k.startsWith('rh/dados/pjnotaped/')&&S[k].fid==='f2'), tok2=pk2.split('/').pop(); await p.click('[data-act="pjp-modx"]'); await H.dorme(200);
+  const B3=await H.abrir({viewport:{width:390,height:844}}); const q3=B3.page; await H.preparar(q3,{docs:S,users:{}}); await q3.goto(H.BASE+'nota.html?c='+tok2); await H.dorme(1200);
+  await q3.setInputFiles('#arq',{name:'n.xml',mimeType:'text/xml',buffer:Buffer.from(xml({num:7,prest:'98765432000155',nomeP:'MARIA',toma:'08813381000130',valor:'2700.00'}))}); await H.dorme(600);
+  const chk3=await q3.evaluate(()=>document.getElementById('chk').innerText);
+  await q3.click('#env'); await H.dorme(1400); const S3=await q3.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); await B3.browser.close();
+  ok('Celular avisa valor diferente e CNPJ errado antes de mandar', /valor da nota[\s\S]*diferente/i.test(chk3)&&/outro CNPJ/.test(chk3), chk3);
+  await p.evaluate(s=>{ const o=JSON.parse(localStorage.getItem('__srv')); o.docs=s; localStorage.setItem('__srv',JSON.stringify(o)); window.__mockReconnect&&window.__mockReconnect(); },S3); await H.dorme(2000);
+  S=await srv(); const n2=S['rh/dados/pjpag/2026-10-2'].pes.f2.nota;
+  ok('No RH a nota com problema fica marcada com o que está errado', n2&&n2.conf==='dif'&&n2.probs.some(x=>/Valor da nota/.test(x))&&n2.probs.some(x=>/outro CNPJ/.test(x)), JSON.stringify(n2&&n2.probs));
+  await p.click('[data-act="pjp-nnao"][data-f="f2"]'); await H.dorme(400); await p.fill('#pjp-nmot','CNPJ errado'); await p.click('[data-act="pjp-nnaook"]'); await H.dorme(700); S=await srv();
+  ok('Pedir outra: volta para fechado e guarda o motivo', S['rh/dados/pjpag/2026-10-2'].pes.f2.st==='fechado'&&/CNPJ errado/.test(JSON.stringify(S['rh/dados/pjpag/2026-10-2'].pes.f2.hist)));
+  await p.click('[data-act="pjp-pdf"]'); await H.dorme(1500); const pdfN=await p.evaluate(()=>window.__rrUltimoPdf||'');
+  ok('Baixar PDF', /Pagamento-PJ-2026-10-2\.pdf/.test(pdfN), pdfN);
+  const e=erros.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
+  const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
+})().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

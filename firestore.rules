@@ -107,6 +107,25 @@ service cloud.firestore {
         && request.resource.data.d is string && request.resource.data.d.size() < 900000;
     }
 
+    // Pedido de nota fiscal do PJ (04/11, nota.html?c=CÓDIGO, sem login): o RH cria o pedido (código de 20 letras e números);
+    // o PJ só lê o próprio pedido e só CRIA o envio da nota, uma vez, enquanto o pedido vale. Não lê nada do RH.
+    match /rh/dados/pjnotaped/{t} {
+      allow get: if true;
+    }
+    match /rh/dados/pjnotaenv/{t} {
+      allow create: if (semConta() || logado()) && t.matches('[a-z0-9]{20}')
+        && exists(/databases/$(database)/documents/rh/dados/pjnotaped/$(t))
+        && get(/databases/$(database)/documents/rh/dados/pjnotaped/$(t)).data.get('usado', false) != true
+        && request.time.toMillis() < get(/databases/$(database)/documents/rh/dados/pjnotaped/$(t)).data.get('ateMs', 0)
+        && request.resource.data.keys().hasOnly(['pid', 'fid', 'nome', 'num', 'valor', 'obs', 'n', 'tipo', 'd', 'em'])
+        && request.resource.data.pid == get(/databases/$(database)/documents/rh/dados/pjnotaped/$(t)).data.pid
+        && request.resource.data.fid == get(/databases/$(database)/documents/rh/dados/pjnotaped/$(t)).data.fid
+        && request.resource.data.get('num', '') is string && request.resource.data.get('num', '').size() <= 40
+        && request.resource.data.get('obs', '') is string && request.resource.data.get('obs', '').size() <= 400
+        && request.resource.data.get('n', '') is string && request.resource.data.get('n', '').size() <= 120
+        && request.resource.data.d is string && request.resource.data.d.size() > 10 && request.resource.data.d.size() < 950000;
+    }
+
     // Chamado pelo QR da linha (sem login): só cria, com os campos do chamado.
     match /chamados/{id} {
       allow create: if semConta() && id.matches('q-[a-z0-9]+')

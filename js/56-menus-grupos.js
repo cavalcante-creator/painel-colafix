@@ -17,7 +17,7 @@ const RHG=[{v:'rhinicio'},
   {g:'Ausências',ic:'relogio',vs:[['rhferias','Férias'],['rhatest','Atestados e faltas'],['rhalmoco','Almoço/café']]},
   {g:'Prazos',ic:'cal2',vs:[['rhexp','Experiência'],['rhpj','Troca dos PJ'],['rhqual','Exames e NRs']]},
   {g:'Documentos',ic:'folha',vs:[['rhdocs','Contratos e documentos'],['rhfichas','Fichas de EPI'],['rhcom','Comunicados']]},
-  {g:'Relatórios',ic:'grafico',vs:[['rhrelmes','Relatório do mês'],['rhfech','Fechamento da folha'],['rhind','Indicadores'],['rhpont','Pontualidade'],['rhalmdir','Almoço (diretoria)']]},
+  {g:'Relatórios',ic:'grafico',vs:[['rhrelmes','Relatório do mês'],['rhfech','Fechamento da folha'],['rhpjpag','Pagamento dos PJ'],['rhind','Indicadores'],['rhpont','Pontualidade'],['rhalmdir','Almoço (diretoria)']]},
   {v:'rhfuncoes'}];
 const RH_SUB={};
 function sbRhSolo(){ try{ const ms=modsVis(); return ms.length===1&&ms[0].id==='rh'; }catch(e){ return false; } }

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#143F54">
+<meta name="robots" content="noindex">
+<title>Nota fiscal · Colafix</title>
+<link rel="icon" href="icons/favicon-32.png?v=5" sizes="32x32">
+<style>
+/* Pedido de nota fiscal do PJ (04/11): o RH manda o link (nota.html?c=CÓDIGO); o PJ vê o período, as horas e o valor,
+   emite a nota e manda o arquivo (XML ou PDF) por aqui, sem login. Lê rh/dados/pjnotaped/{código} e grava só
+   rh/dados/pjnotaenv/{código} (as regras do banco só deixam criar, uma vez, enquanto o pedido vale). */
+:root{--ground:#F2F4F6;--surface:#FFFFFF;--ink:#1C2B33;--muted:#5E6E77;--line:#E1E7EB;--teal:#1B5C7A;--teal-strong:#143F54;--ok:#2F6047;--crit-ink:#8E3A33;--warn:#7A5310}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
+.top{background:var(--teal-strong);color:#fff;padding:22px 18px 20px}
+.top small{display:block;font-size:12px;font-weight:700;letter-spacing:2px;color:#BFD7E3}
+.top h1{margin:6px 0 2px;font-size:24px}
+.top p{margin:0;color:#D6E4EB;font-size:15px}
+main{max-width:620px;margin:0 auto;padding:14px 14px 40px}
+.card{background:var(--surface);border-radius:14px;box-shadow:0 2px 8px rgba(26,26,26,.08);padding:16px;margin-top:12px}
+.card h2{margin:0 0 4px;font-size:18px}
+.dica{margin:0 0 10px;color:var(--muted);font-size:14px}
+.val{font-size:40px;font-weight:300;letter-spacing:-.5px;margin:4px 0 0}
+.lin{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}.lin:first-of-type{border-top:0}
+.lin span{color:var(--muted)}.lin b{text-align:right;word-break:break-word}
+.cp{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.cp:first-of-type{border-top:0}
+.cp small{display:block;color:var(--muted);font-size:12.5px}.cp b{word-break:break-word}
+label{display:block;margin-top:12px;font-size:13px;font-weight:700;color:#4A453C}
+input,textarea{display:block;width:100%;margin-top:4px;height:48px;padding:0 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+textarea{height:auto;padding:10px 12px}
+input:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:var(--teal)}
+.bt{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 14px;border-radius:10px;border:1.5px solid var(--line);background:#fff;color:var(--teal);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.arq{display:flex;align-items:center;justify-content:center;gap:8px;height:64px;margin-top:8px;border:2px dashed #9FBFCF;border-radius:12px;color:var(--teal);font-weight:700;cursor:pointer;text-align:center;padding:0 10px}
+.arq input{display:none}.arq.ok{border-style:solid;border-color:var(--ok);color:var(--ok)}
+.go{display:block;width:100%;height:54px;margin-top:16px;border:0;border-radius:12px;background:var(--teal);color:#fff;font:inherit;font-size:18px;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.6}
+.er{color:var(--crit-ink);font-weight:700;margin-top:10px;min-height:1px}
+.chk{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:14px}.chk.ok{background:#E3F0E8;color:var(--ok)}.chk.av{background:#FBF1DC;color:var(--warn)}
+.chk ul{margin:4px 0 0;padding-left:18px}
+details{margin-top:10px}summary{cursor:pointer;color:var(--teal);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}td,th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left}td.n,th.n{text-align:right}
+.passo{display:flex;gap:10px;margin-top:8px;font-size:15px}.passo i{flex:none;width:24px;height:24px;border-radius:12px;background:#E2ECF1;color:var(--teal-strong);font-style:normal;font-weight:700;display:grid;place-items:center;font-size:13px}
+.fim{text-align:center;padding:30px 18px}
+.fim .ic{width:76px;height:76px;border-radius:38px;background:#E3F0E8;color:var(--ok);display:grid;place-items:center;margin:0 auto 12px}
+.fim h2{font-size:22px}
+</style>
+</head>
+<body>
+<div class="top"><small>COLAFIX · RH</small><h1 id="ola">Nota fiscal de serviço</h1><p id="sub">Carregando…</p></div>
+<main id="m"></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+  'use strict';
+  const CFG=window.PAINEL_CONFIG||{}, $=s=>document.querySelector(s), M=$('#m');
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  const T=(location.search.match(/[?&]c=([a-z0-9]{20})\b/)||[])[1]||'';
+  const R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const n2=v=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const br=d=>d&&/^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'';
+  const hTxt=m=>{ m=Math.round(+m||0); return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0'); };
+  const dig=s=>String(s||'').replace(/\D/g,'');
+  const num=v=>{ const s=String(v||'').replace(/[^\d,.-]/g,''); if(!s) return 0; return /,\d{1,2}$/.test(s)?+s.replace(/\./g,'').replace(',','.'):+s.replace(/,/g,'')||0; };
+  const fimTela=(t,p,ok)=>{ M.innerHTML=`<section class="card fim"><div class="ic" style="${ok?'':'background:#F6E3E1;color:#8E3A33'}">${ok?'<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>':'<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 16.5v.01"/></svg>'}</div><h2>${t}</h2><p>${p}</p></section>`; };
+  if(!T){ fimTela('Link incompleto','Abra o link exatamente como o RH mandou, ou peça um novo.'); return; }
+  let fs;
+  try{ firebase.initializeApp(CFG.firebase); const BANCO=CFG.banco||'(default)';
+    if(BANCO==='(default)') fs=firebase.firestore(); else { const app=firebase.app(); const exp=app.container.getProvider('firestore').getImmediate({identifier:BANCO}); fs=new firebase.firestore.Firestore(app,exp); }
+  }catch(e){ console.warn(e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo.'); return; }
+  const ENV='nota.enviada.'+T; let enviada=false; try{ enviada=localStorage.getItem(ENV)==='1'; }catch(e){}
+  if(enviada){ fimTela('Nota enviada','Sua nota já chegou no RH da Colafix. Se precisar mudar alguma coisa, fale com o RH.',true); return; }
+
+  /* leitura do XML da NFS-e (padrão nacional; também o modelo ABRASF dos municípios) — a mesma do painel */
+  function lerXml(txt){ let x; try{ x=new DOMParser().parseFromString(String(txt||''),'application/xml'); }catch(e){ return null; } if(!x||x.getElementsByTagName('parsererror').length) return null;
+    const all=n=>[...x.getElementsByTagNameNS('*',n)], um=(n,dentro)=>{ const b=dentro?[...dentro.getElementsByTagNameNS('*',n)]:all(n); return b[0]?String(b[0].textContent||'').trim():''; };
+    const cont=ns=>{ for(const n of ns){ const e=all(n)[0]; if(e) return e; } return null; };
+    const cnpjEm=e=>e?(um('CNPJ',e)||um('Cnpj',e)||um('CPF',e)||um('Cpf',e)):'';
+    const prest=cont(['emit','prest','PrestadorServico','Prestador','IdentificacaoPrestador']), toma=cont(['toma','TomadorServico','Tomador','IdentificacaoTomador']);
+    const r={num:um('nNFSe')||um('Numero'),valor:num(um('vServ')||um('ValorServicos')||um('vLiq')),prest:dig(cnpjEm(prest)),toma:dig(cnpjEm(toma)),compet:(um('dCompet')||um('Competencia')).slice(0,10)};
+    return r.num||r.valor||r.prest?r:null; }
+
+  let arq=null; /* {d (base64), tipo, n, xml} */
+  function tela(p){
+    $('#ola').textContent='Olá, '+String(p.nome||'').split(' ')[0]+'!'; $('#sub').textContent='Nota fiscal de '+(p.perTxt||'');
+    const dias=(p.dias||[]).map(d=>`<tr><td>${esc(br(d.d))}</td><td>${esc(d.e)} – ${esc(d.s)}</td><td class="n">${hTxt(d.m)}</td></tr>`).join('');
+    const tom=p.tomador||{};
+    M.innerHTML=`<section class="card"><h2>Valor da nota</h2><p class="val">${R$(p.valor)}</p>
+      <div style="margin-top:10px"><div class="lin"><span>Período</span><b>${esc(br(p.de))} a ${esc(br(p.ate))}</b></div>
+      ${p.fixo?`<div class="lin"><span>Valor</span><b>fixo no período</b></div>`:`<div class="lin"><span>Horas trabalhadas</span><b>${hTxt(p.min)} (${n2(p.horas)} h)</b></div><div class="lin"><span>Valor da hora</span><b>${R$(p.vh)}</b></div>`}
+      ${p.desc?`<div class="lin"><span>Desconto</span><b>− ${R$(p.desc)}${p.descMot?' · '+esc(p.descMot):''}</b></div>`:''}</div>
+      ${dias?`<details><summary>Ver os dias (${(p.dias||[]).length})</summary><table><thead><tr><th>Dia</th><th>Horário</th><th class="n">Horas</th></tr></thead><tbody>${dias}</tbody></table></details>`:''}
+      <p class="dica" style="margin-top:10px">Se alguma coisa estiver diferente do que você anotou, fale com o RH antes de emitir.</p></section>
+    <section class="card"><h2>Como emitir</h2>
+      <div class="passo"><i>1</i><span>Entre no Emissor Nacional da NFS-e (app <b>NFS-e Mobile</b> ou o site <a href="https://www.nfse.gov.br/EmissorNacional" target="_blank" rel="noopener">nfse.gov.br</a>) com a sua conta gov.br.</span></div>
+      <div class="passo"><i>2</i><span>Emita a nota com os dados abaixo (toque em Copiar).</span></div>
+      <div class="passo"><i>3</i><span>Baixe o <b>XML</b> (ou o PDF) da nota e mande aqui embaixo.</span></div>
+      <div style="margin-top:10px">
+      <div class="cp"><div><small>Para (tomador do serviço)</small><b>${esc(tom.nome||'')}</b></div><span></span></div>
+      <div class="cp"><div><small>CNPJ do tomador</small><b>${esc(tom.cnpj||'')}</b></div><button class="bt" data-cp="${esc(dig(tom.cnpj))}">Copiar</button></div>
+      <div class="cp"><div><small>Descrição do serviço</small><b>${esc(p.servico||'')}</b></div><button class="bt" data-cp="${esc(p.servico||'')}">Copiar</button></div>
+      <div class="cp"><div><small>Valor do serviço</small><b>${R$(p.valor)}</b></div><button class="bt" data-cp="${esc(n2(p.valor))}">Copiar</button></div>
+      ${p.prest&&p.prest.cnpj?`<div class="cp"><div><small>Emita com o seu CNPJ</small><b>${esc(p.prest.cnpj)}</b></div><span></span></div>`:''}</div></section>
+    <section class="card"><h2>Mandar a nota</h2><p class="dica">O XML é o melhor: o RH confere sozinho. O PDF também serve.</p>
+      <label class="arq" id="arqL"><input type="file" id="arq" accept=".xml,.pdf,application/pdf,text/xml,application/xml"><span id="arqT">Escolher o arquivo da nota (XML ou PDF)</span></label>
+      <div id="chk"></div>
+      <label for="num">Número da nota</label><input id="num" inputmode="numeric" maxlength="40">
+      <label for="valor">Valor da nota (R$)</label><input id="valor" inputmode="decimal" value="${esc(n2(p.valor))}">
+      <label for="obs">Recado para o RH (opcional)</label><textarea id="obs" rows="2" maxlength="400"></textarea>
+      <p class="dica" style="margin-top:10px">A nota vai só para o RH da Colafix, para o pagamento.</p>
+      <button class="go" id="env">Mandar a nota</button><div class="er" id="er"></div></section>`;
+    M.querySelectorAll('[data-cp]').forEach(b=>b.addEventListener('click',async()=>{ try{ await navigator.clipboard.writeText(b.dataset.cp); b.textContent='Copiado ✓'; setTimeout(()=>b.textContent='Copiar',1800); }catch(e){ b.textContent='Selecione e copie'; } }));
+    $('#arq').addEventListener('change',e=>{ const f=e.target.files[0]; $('#er').textContent=''; $('#chk').innerHTML=''; arq=null; if(!f) return;
+      if(!/\.(xml|pdf)$/i.test(f.name)&&!/xml|pdf/i.test(f.type)){ $('#er').textContent='Mande o arquivo XML ou PDF da nota.'; return; }
+      if(f.size>700000){ $('#er').textContent='Arquivo grande demais. Mande o XML da nota (é bem pequeno).'; return; }
+      const r=new FileReader(); r.onload=()=>{ const d=String(r.result).split(',')[1]||'', xml=/xml$/i.test(f.name)||/xml/i.test(f.type); arq={d,tipo:xml?'text/xml':'application/pdf',n:f.name.slice(0,120)};
+        $('#arqL').classList.add('ok'); $('#arqT').textContent='✓ '+f.name;
+        if(xml){ let txt=''; try{ txt=decodeURIComponent(escape(atob(d))); }catch(er){ try{ txt=atob(d); }catch(e2){} } const x=lerXml(txt);
+          if(!x){ $('#chk').innerHTML='<div class="chk av">Não consegui ler este XML. Confira se é o XML da nota; pode mandar mesmo assim.</div>'; return; }
+          if(x.num) $('#num').value=x.num; if(x.valor) $('#valor').value=n2(x.valor);
+          const pb=[]; if(Math.abs((x.valor||0)-(+p.valor||0))>0.05) pb.push('O valor da nota ('+R$(x.valor)+') é diferente do pedido ('+R$(p.valor)+').');
+          if(dig(tom.cnpj)&&x.toma&&x.toma!==dig(tom.cnpj)) pb.push('A nota foi emitida para outro CNPJ. O certo é '+tom.cnpj+'.');
+          $('#chk').innerHTML=pb.length?'<div class="chk av"><b>Confira antes de mandar:</b><ul>'+pb.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>':'<div class="chk ok">✓ Nota '+(x.num?'nº '+esc(x.num)+' ':'')+'confere com o pedido.</div>'; } };
+      r.onerror=()=>{ $('#er').textContent='Não consegui ler o arquivo. Tente de novo.'; }; r.readAsDataURL(f); });
+    let enviando=false;
+    $('#env').addEventListener('click',async()=>{ const er=$('#er'), b=$('#env'); if(enviando) return; er.textContent='';
+      if(!arq||!arq.d){ er.textContent='Escolha o arquivo da nota (XML ou PDF).'; return; }
+      const d={pid:p.pid,fid:p.fid,nome:String(p.nome||'').slice(0,80),num:String($('#num').value||'').trim().slice(0,40),valor:num($('#valor').value),obs:String($('#obs').value||'').trim().slice(0,400),n:arq.n,tipo:arq.tipo,d:arq.d,em:new Date().toISOString()};
+      enviando=true; b.disabled=true; b.textContent='Mandando…';
+      try{ await fs.doc('rh/dados/pjnotaenv/'+T).set(d); try{ localStorage.setItem(ENV,'1'); }catch(e){} window.scrollTo(0,0);
+        fimTela('Nota enviada','Obrigado! O RH da Colafix recebeu a sua nota'+(d.num?' nº '+esc(d.num):'')+' e vai conferir.',true); }
+      catch(e){ console.warn('nota',e); enviando=false; b.disabled=false; b.textContent='Mandar a nota';
+        er.textContent=e&&/permission/.test(e.code||'')?'Este link já foi usado ou não vale mais. Fale com o RH.':e&&/network|unavailable/.test(e.code||'')?'Sem internet. Confira a conexão e toque em Mandar de novo.':'Não foi possível mandar agora. Tente de novo em instantes.'; } });
+  }
+  (async()=>{ try{ await firebase.auth().signInAnonymously(); }catch(e){ console.info('nota sem conta',e&&e.code); }
+    try{ const g=await fs.doc('rh/dados/pjnotaped/'+T).get(); const p=g.exists?g.data():null;
+      if(!p||p.usado) return fimTela(p&&p.cancelado?'Este pedido foi cancelado':'Este link não vale mais',p&&!p.cancelado?'A nota deste link já foi mandada. Se precisar mandar outra, peça um link novo para o RH.':'Peça um link novo para o RH da Colafix.');
+      if(+p.ateMs&&+p.ateMs<Date.now()) return fimTela('Este link venceu','Peça um link novo para o RH da Colafix.');
+      tela(p); }
+    catch(e){ console.warn('pedido',e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo. Se continuar, peça um link novo para o RH.'); } })();
+})();
+</script>
+</body>
+</html>
