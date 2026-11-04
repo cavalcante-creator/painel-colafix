@@ -53,7 +53,9 @@ function invdContHoje(){ const h=hojeStr(), s={}; invdConfHoje().forEach(cf=>{ i
 function invdHojeLista(){ const X=S.invd, C=invdCfg(), feito=invdContHoje(), L=[], vis={};
   X.ab.filter(x=>x.st==='recontar').forEach(x=>{ if(vis[x.c]) return; vis[x.c]=1; L.push({cod:x.c,m:'rec',div:x._id,b:x.b,porNome:(x.c1||{}).porNome||'',meu:invdMesma(x.c1||{},{por:S.uid,porNome:(S.nomes&&S.nomes[S.uid])||''}),feito:false}); });
   const it=(X.dia&&X.dia.itens)||{}; Object.keys(it).forEach(c=>{ if(vis[c]) return; vis[c]=1; L.push({cod:c,m:it[c].m,u:it[c].u||null,feito:!!feito[c]}); });
-  return {dia:X.diaK||hojeStr(),hora:C.hora,pronto:!!X._l_dia&&!!X.dia,itens:L}; }
+  const h=hojeStr(), mi={}; let ult=''; invdConfHoje().forEach(cf=>{ if(!cf||cf.excluida||(cf.dia||String(cf.em||'').slice(0,10))!==h||!(cf.por===S.uid||(!cf.por&&cf.porNome&&cf.porNome===((S.nomes&&S.nomes[S.uid])||'')))) return; Object.keys(cf.itens||{}).forEach(c=>mi[c]=1); const t=String(cf.em||''); if(t>ult) ult=t; });
+  const hm=ult?new Date(ult).toTimeString().slice(0,5):'';
+  return {dia:X.diaK||hojeStr(),hora:C.hora,pronto:!!X._l_dia&&!!X.dia,itens:L,meus:Object.keys(mi).length,meusUlt:hm}; }
 
 /* ---------- 2 · divergências abertas ao salvar a contagem ---------- */
 async function invdConf(cf){ const X=S.invd; if(!cf||!cf.itens||!S.db) return; const em=new Date().toISOString(), dia=cf.dia||hojeStr();

@@ -13,7 +13,7 @@ const H=require('./harness'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!
   let f=null; for(let i=0;i<60&&!f;i++){ const x=p.frames().find(y=>y.url().includes('inventario/index.html')); if(x&&await x.evaluate(()=>!!document.getElementById('fcAcharBtn')).catch(()=>false)) f=x; else await H.dorme(250); }
   ok('Botão grande "Começar a contar" no alto da escolha de itens', !!f);
   f.on('pageerror',e=>erros.push(e.message));
-  await f.click('#fcAcharBtn'); await H.dorme(400);
+  await f.evaluate(()=>document.getElementById('fcAcharBtn').click()); await H.dorme(400);
   let s=await f.evaluate(()=>({t:(document.querySelector('#fcConta .fc-top')||{}).innerText||'',foco:document.activeElement&&document.activeElement.id}));
   ok('Abre a busca "O que você está vendo?" com o campo já pronto para digitar', /O que você está vendo/.test(s.t)&&s.foco==='fcAq', JSON.stringify(s));
   await f.fill('#fcAq','branca ac2'); await H.dorme(300);

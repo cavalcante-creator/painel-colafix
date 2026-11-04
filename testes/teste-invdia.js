@@ -26,6 +26,12 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
   ok('AC0002 (giro alto, contado há 2 dias) não entra: só depois de 7 dias', dia&&!dia.itens.AC0002);
   ok('Rodízio = 30 itens ÷ 10 dias = 3 (+ o giro alto)', dia&&Object.values(dia.itens).filter(x=>x.m==='rod').length===3, dia&&dia.n);
   ok('Cartão "Contagem do dia" no alto da escolha de itens', /Contagem do dia/.test(t)&&/4\s*para contar/.test(t)&&/Começar a contagem do dia \(4\)/.test(t), t.replace(/\n/g,' | '));
+  const hm=await f.evaluate(()=>({home:document.body.classList.contains('ivh'),sel:getComputedStyle(document.getElementById('confSelCard')).display,t:document.getElementById('invDia').innerText}));
+  ok('Tela inicial do conferente: "Bom dia/tarde, Carla", Contar o que estou vendo, Receber material; a lista antiga escondida', hm.home&&hm.sel==='none'&&/(Bom dia|Boa tarde|Boa noite), Carla/.test(hm.t)&&/Contar o que estou vendo/.test(hm.t)&&/Receber material/.test(hm.t)&&/Escolher itens na lista/.test(hm.t), JSON.stringify(hm).slice(0,200));
+  await f.click('#invDia [data-a="lista"]'); await H.dorme(900);
+  const ls=await f.evaluate(()=>({sel:getComputedStyle(document.getElementById('confSelCard')).display,home:getComputedStyle(document.getElementById('invDia')).display}));
+  ok('"Escolher itens na lista" mostra a escolha antiga; "Voltar à tela inicial" volta', ls.sel!=='none'&&ls.home==='none', JSON.stringify(ls));
+  await f.click('#ivhVolta'); await H.dorme(900);
   await f.click('#invDia [data-a="dia"]'); await H.dorme(800);
   const sel=await f.evaluate(()=>({m:CONF_MODO,s:[...CONF_ITENS_SEL].sort()}));
   ok('"Começar a contagem do dia" abre a conferência com os 4 itens da lista', sel.m==='conferencia'&&sel.s.length===4&&sel.s.includes('AC0001'), JSON.stringify(sel));
