@@ -223,7 +223,7 @@
       <label for="lg-s">SENHA</label><div class="lg-in"><input id="lg-s" type="password" autocomplete="${pri ? 'new-password' : 'current-password'}" required minlength="${pri ? 8 : 6}" style="padding-right:76px"><button type="button" class="lg-olho" id="lg-o" aria-label="Mostrar senha">Mostrar</button></div>
       <div class="er" id="lg-er" role="alert"></div><button type="submit" class="lg-go">${pri ? 'Criar e entrar' : 'Entrar'}</button>
       ${instalarPossivel() ? '<button type="button" class="lg-inst" id="lg-inst">⤓ Instalar o app neste aparelho</button>' : ''}
-      <div class="rw"><span class="lk" style="cursor:default;text-decoration:none">${pri ? '' : 'Esqueceu a senha? Fale com o PCP.'}</span><button type="button" class="lk" id="lg-t">${pri ? 'Voltar' : 'Primeiro acesso'}</button></div>
+      <div class="rw"><span class="lk" style="cursor:default;text-decoration:none"></span><button type="button" class="lk" id="lg-t">${pri ? 'Voltar' : 'Primeiro acesso'}</button></div>
       <div class="lg-pe">Colafix · Produção · PCP · Almoxarifado · Manutenção</div></form></div>`;
     const f = el.querySelector('form'), er = el.querySelector('#lg-er');
     el.querySelector('#lg-t').onclick = () => telaEntrar(pri ? 'entrar' : 'primeiro');
