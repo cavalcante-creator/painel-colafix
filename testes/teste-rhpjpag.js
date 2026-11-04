@@ -29,11 +29,33 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   let s=await view();
   ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,24/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
   ok('Avisa o dia com só uma passagem', /1 dia para conferir/.test(s));
-  await p.click('[data-act="pjp-ab"][data-f="f1"]'); await H.dorme(600);
-  await p.fill('input[data-pjp-dia="s"][data-d="2026-10-21"]','17:18'); await p.dispatchEvent('input[data-pjp-dia="s"][data-d="2026-10-21"]','change'); await H.dorme(900);
+  await p.click('[data-act="pjp-ab"][data-f="f1"]'); await H.dorme(700);
+  const gv=await p.evaluate(()=>{ const g=document.querySelector('.pjp-g'); return g?g.innerText:''; });
+  ok('Tocar no nome abre a gaveta da pessoa com os dias, a passagem do Face ID e o dia para corrigir', /Joao Pereira Teste/.test(gv)&&/Horas/.test(gv)&&/Regras desta pessoa/.test(gv)&&/07:28[\s\S]*12:01[\s\S]*17:20/.test(gv)&&/Só uma passagem/.test(gv)&&/Corrigir/.test(gv), gv.replace(/\n/g,' | ').slice(0,500));
+  await p.click('[data-act="pjp-dcor"][data-d="2026-10-21"]'); await H.dorme(500);
+  await p.fill('#pjp-cs','17:18'); await p.fill('#pjp-cm','Esqueceu de passar no Face ID'); await p.click('[data-act="pjp-dsalva"]'); await H.dorme(900);
   await p.fill('input[data-pjp-c="desc"]','50,00'); await p.dispatchEvent('input[data-pjp-c="desc"]','change'); await H.dorme(900);
-  s=await view(); let S=await srv(), doc=S['rh/dados/pjpag/2026-10-2'];
-  ok('Corrigir a saída do dia e lançar desconto: refaz a conta (96h48 × 22,73 − 50 = 2.150,26)', /96h48[\s\S]*R\$\s?2\.150,26/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.desc===50, s.replace(/\n/g,' | ').slice(0,400));
+  s=await p.evaluate(()=>document.querySelector('.pjp-g').innerText); let S=await srv(), doc=S['rh/dados/pjpag/2026-10-2'];
+  ok('Corrigir o dia (com motivo) e lançar desconto: refaz a conta (96h48 × 22,73 − 50 = 2.150,26)', /corrigido · Esqueceu de passar/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.150,26/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.aj['2026-10-21'].mot==='Esqueceu de passar no Face ID'&&doc.pes.f1.desc===50, s.replace(/\n/g,' | ').slice(0,400));
+  /* regras desta pessoa */
+  await p.click('[data-act="pjp-tab"][data-v="regras"]'); await H.dorme(500);
+  await p.fill('#pjp-rtol','10'); await p.click('[data-pjp-dw="6"] + span'); await H.dorme(100); await p.fill('#pjp-rob','Trabalha sábado de manhã'); await p.click('[data-act="pjp-psalva"]'); await H.dorme(900);
+  S=await srv(); const rg=S['rh/dados/funcionarios/f1'].pjPag||{};
+  ok('Regras desta pessoa ficam no cadastro (tolerância, dias de trabalho, observação)', rg.tol===10&&JSON.stringify(rg.dias)==='[1,2,3,4,5,6]'&&rg.obs==='Trabalha sábado de manhã', JSON.stringify(rg));
+  await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag-gaveta.png'});
+  await p.click('[data-act="pjp-gx"]',{timeout:4000}); await H.dorme(500);
+  s=await view(); ok('Lista com o valor novo', /96h48[\s\S]*R\$\s?2\.150,26/.test(s), s.replace(/\n/g,' | ').slice(0,300));
+  /* filtros */
+  await p.selectOption('#pjp-emp','NEXUS'); await H.dorme(500); s=await view();
+  ok('Filtro por empresa', /Maria Oliveira/.test(s)&&!/Joao Pereira/.test(s));
+  await p.click('[data-act="pjp-flimpa"]'); await H.dorme(500);
+  /* Excel igual à planilha */
+  const [dl]=await Promise.all([p.waitForEvent('download',{timeout:15000}).catch(()=>null),p.click('[data-act="pjp-xls"]')]); await H.dorme(800);
+  const xl=await p.evaluate(()=>window.__pjpUltimoXls||''); let xinfo='';
+  if(dl){ try{ const fp='/tmp/pjp-teste.xlsx'; await dl.saveAs(fp); const EJ=require('exceljs'), wb=new EJ.Workbook(); await wb.xlsx.readFile(fp); const ws=wb.getWorksheet('Horas Trabalhadas Zenith');
+      let tit='',hd='',fD='',tot=null; ws.eachRow(r=>{ const a=String(r.getCell(1).value||''); if(/JOAO PEREIRA/.test(a)) tit=String(r.getCell(3).value); if(r.getCell(1).value==='Dia'&&!hd) hd=[1,2,3,4,5,6,7].map(k=>r.getCell(k).value).join('|'); if(!fD&&r.getCell(4).value&&r.getCell(4).value.formula) fD=r.getCell(4).value.formula; if(r.getCell(5).value==='Total a Pagar') tot=r.getCell(6).value; });
+      xinfo=JSON.stringify({abas:wb.worksheets.map(w=>w.name),tit,hd,fD,tot}); }catch(e){ xinfo='erro '+e.message; } }
+  ok('Excel no formato da planilha: aba por empresa, bloco por pessoa, colunas e fórmulas da planilha, total a pagar', /Pagamento-PJ-2026-10-2\.xlsx/.test(xl)&&/"Resumo","Horas Trabalhadas Zenith","NEXUS"/.test(xinfo)&&/Horário: 07:30hr às 17:18hr/.test(xinfo)&&/Dia\|Entrada\|Saída\|Entrada Tolerância Ajustada\|Saída Tolerância Ajustada\|Total de Horas/.test(xinfo)&&/TIME\(7,20,0\)/.test(xinfo)&&/"result":2150.26/.test(xinfo), xinfo.slice(0,500));
   await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag.png',fullPage:true});
   await p.click('[data-act="pjp-fech"][data-f="f1"]'); await H.dorme(900); S=await srv(); doc=S['rh/dados/pjpag/2026-10-2'];
   ok('Fechar valor guarda o valor e os dias', doc.pes.f1.st==='fechado'&&doc.pes.f1.fech.valor===2150.26&&doc.pes.f1.fech.min===5808&&doc.pes.f1.fech.dias.length===16, JSON.stringify(doc.pes.f1.fech).slice(0,200));
