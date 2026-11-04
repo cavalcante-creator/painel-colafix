@@ -62,6 +62,7 @@
   function iniciar(){ const sub=(k,mk)=>P.inscrever('rh-'+k,mk,snap=>{ R[k]=snap.docs.map(d=>Object.assign({_id:d.id},d.data())); R.lido[k]=true; P.rerender(); if(k==='func') setTimeout(()=>aplicarDesligAgendados(),0); if(k==='funcoes'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(funcoesPadrao,0); if(k==='modelos'&&!(snap.metadata&&snap.metadata.fromCache)) setTimeout(consertarNomesModelos,0); });
     sub('func',()=>P.db().collection(COL.func).limit(3000)); sub('funcoes',()=>P.db().collection(COL.funcoes).limit(500)); sub('epis',()=>P.db().collection(COL.epis).limit(500)); sub('terc',()=>P.db().collection(COL.terc).limit(1000));
     sub('modelos',()=>P.db().collection(COL.modelos).limit(200)); sub('docs',()=>P.db().collection(COL.docs).orderBy('em','desc').limit(300)); sub('fer',()=>P.db().collection(COL.ferias).limit(3000));
+    try{ if(window.RHAssina) window.RHAssina.iniciar(asnCtx()); }catch(e){ console.warn('[assinar]',e); }
     if(!window.__rhPres){ window.__rhPres=true; setTimeout(function prT(){ try{ if(window.RHAlmoco&&RHAlmoco.publicar) RHAlmoco.publicar(almCtx()); }catch(e){ console.warn('[presença]',e); } setTimeout(prT,20000); },4000); } /* presença para a Visão do gestor */
     P.inscrever('rh-fm',()=>P.db().collection(COL.fm).orderBy('mes','desc').limit(14),snap=>{ snap.docs.forEach(d=>{ R.fm[d.id]=d.data(); }); R.lido.fm=true; P.rerender(); });
     P.inscrever('rh-cfg',()=>P.db().collection('rh').limit(5),snap=>{ const d=snap.docs.find(x=>x.id==='config'); R.cfg=d?d.data():{}; R.lido.cfg=true; P.rerender(); setTimeout(funcoesPadrao,0); });
@@ -369,7 +370,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       <div style="display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap">${f._id&&f.status!=='Desligado'&&!f.desligAgendado?`<button class="lnk" data-act="rh-desl" data-id="${f._id}" style="color:var(--crit-ink)">Desligar…</button>`:'<span></span>'}<div style="display:flex;gap:10px"><button class="btn sec" data-act="rh-fx">Cancelar</button><button class="btn" data-act="rh-salvar" ${R.salv?'disabled':''}>${R.salv?'Salvando…':'Salvar'}</button></div></div></section>`; }
   function docsDaPessoa(fid){ const xs=R.docs.filter(d=>d.funcId===fid);
     return `<div class="rh-docs"><div class="rh-ch"><span class="label">DOCUMENTOS</span><button class="lnk" data-act="rh-dgpara" data-id="${fid}">Gerar documento</button></div>
-      ${xs.length?xs.slice(0,8).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>gerado em ${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' por '+esc(d.porNome):''}</small></div><span class="rh-anxa"><button class="lnk" data-act="rh-dgver" data-id="${d._id}">Ver</button>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</span></div>`).join(''):'<div class="sub" style="margin:4px 0 0">Nenhum documento gerado ainda.</div>'}${puxaBloco(fid)}${qualBloco(fid)}</div>`; }
+      ${xs.length?xs.slice(0,8).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>gerado em ${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' por '+esc(d.porNome):''}</small></div><span class="rh-anxa"><button class="lnk" data-act="rh-dgver" data-id="${d._id}">Ver</button>${asnBt(d)}${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</span></div>`).join(''):'<div class="sub" style="margin:4px 0 0">Nenhum documento gerado ainda.</div>'}${puxaBloco(fid)}${qualBloco(fid)}</div>`; }
 
   /* ---------- Cadastros do RH (pedido de 13/10): funções e EPIs, setores, configurações ---------- */
   /* Cadastros com cara de sistema (pedido de 13/10): menu à esquerda e cada cadastro numa tabela com busca */
@@ -689,7 +690,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const modH=GRUPOS.map(g=>{ const xs=lista.filter(m=>grpM(m)===g); return xs.length?`<div class="rh-v2dg">${g}</div>${xs.map(m=>{ const nq=perguntasDe(m.html||'').length; return `<button class="rh-v2dm${G.modeloId===m._id?' sel':''}" data-act="rh-dgmod" data-id="${m._id}" aria-pressed="${G.modeloId===m._id}"><span><b>${esc(m.nome)}</b><small>${esc(valeNome(m.vale))}${nq?' · '+plural(nq,'pergunta','perguntas'):''}</small></span><i aria-hidden="true">›</i></button>`; }).join('')}`:''; }).join('');
     const nFalta=f&&md?falta.length+qs.filter(q=>!String(G.resp[q]||'').trim()).length:0;
     const recentes=R.docs.slice().sort((a,b)=>String(b.em||'').localeCompare(String(a.em||''))).slice(0,8);
-    const recH=recentes.length?`<section class="card rh-v2rec"><h2>Feitos recentemente</h2>${recentes.map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')} · ${esc(titulo(d.funcionario||(R.func.find(x=>x._id===d.funcId)||{}).nome||''))}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div><button class="lnk" data-act="rh-dgver" data-id="${d._id}" style="margin-right:10px">Ver</button>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}</section>`:'';
+    const recH=recentes.length?`<section class="card rh-v2rec"><h2>Feitos recentemente</h2>${recentes.map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')} · ${esc(titulo(d.funcionario||(R.func.find(x=>x._id===d.funcId)||{}).nome||''))}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div><button class="lnk" data-act="rh-dgver" data-id="${d._id}" style="margin-right:10px">Ver</button>${asnBt(d)}${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}</section>`:'';
     return `<div class="rh-v2doc">
       <section class="card rh-v2dc" aria-label="1. Para quem"><div class="rh-v2dt"><span>1</span><h2>Para quem</h2></div>
         <input class="txt" id="rh-dgq" type="search" placeholder="Buscar nome ou CPF" value="${esc(R.dgq||'')}" autocomplete="off" aria-label="Buscar pessoa">
@@ -713,7 +714,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
         <div class="rh-dbt"><button class="btn" data-act="rh-dgo" data-v="imprimir" ${f&&md?'':'disabled'}>Imprimir</button><button class="btn sec" data-act="rh-dgo" data-v="pdf" ${f&&md?'':'disabled'}>Salvar PDF</button><button class="btn sec" data-act="rh-dgo" data-v="word" ${f&&md?'':'disabled'}>Baixar em Word</button></div>
         <div class="sub" style="font-size:12.5px;margin:10px 0 0">Fica guardado no histórico do funcionário (quem gerou e quando). Depois de assinado, anexe a cópia escaneada aqui embaixo ou no cadastro.</div></div></div>
 
-        ${f&&docs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:4px">Já gerados para ${esc(f.nome)}</div>${docs.slice(0,6).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div><button class="lnk" data-act="rh-dgver" data-id="${d._id}" style="margin-right:10px">Ver</button>${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}`:''}</section></div>${recH}`; }
+        ${f&&docs.length?`<div class="rh-sep"></div><div class="label" style="margin-bottom:4px">Já gerados para ${esc(f.nome)}</div>${docs.slice(0,6).map(d=>`<div class="rh-dl"><div><b>${esc(d.modelo||'Documento')}</b><small>${dmIso(d.em)}/${String(d.em||'').slice(0,4)}${d.porNome?' · '+esc(d.porNome):''}</small></div><button class="lnk" data-act="rh-dgver" data-id="${d._id}" style="margin-right:10px">Ver</button>${asnBt(d)}${d.assinado?`<button class="lnk" data-act="rh-dver" data-id="${d._id}">Ver assinado</button>`:anexar(`data-rh-danx="${d._id}"`,'Anexar assinado','lnk')}</div>`).join('')}`:''}</section></div>${recH}`; }
   function edSync(){ const ed=document.getElementById('rh-ed'); if(ed&&R.dm) R.dm.html=limpar(ed.innerHTML); const n=document.getElementById('rh-dnome'); if(n&&R.dm) R.dm.nome=n.value; const v=document.getElementById('rh-dvale'); if(v&&R.dm) R.dm.vale=v.value; const dd=document.getElementById('rh-ddesl'); if(dd&&R.dm&&R.dm.deslUser) R.dm.desliga=dd.checked; }
   function inserirNoEditor(html){ const ed=document.getElementById('rh-ed'); if(!ed) return; ed.focus(); const sel=getSelection();
     if(!sel.rangeCount||!ed.contains(sel.anchorNode)){ const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); }
@@ -753,7 +754,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   /* nome de arquivo simples: sem "·" nem caracteres que o Windows não aceita */
   const nomeArq=s=>String(s).replace(/\s*[·•]\s*/g,' - ').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
   const pdfDoc=(f,md)=>pdfPartes([docCorpo(f,md,false)+assinaDg(f,md)],nomeArq(md.nome+' - '+f.nome)+'.pdf');
-  async function pdfPartes(partes,nome){ if(!window.html2canvas) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  async function pdfPartes(partes,nome,soBlob){ if(!window.html2canvas) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     if(!(window.jspdf&&window.jspdf.jsPDF)) await carregarJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'}); let pg=0;
     for(const parte of partes){ const box=document.createElement('div'); box.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:83px 76px;box-sizing:border-box';
@@ -761,7 +762,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       try{ const cv=await window.html2canvas(box,{scale:2,backgroundColor:'#ffffff',logging:false});
         const pxPag=Math.floor(cv.width*297/210); for(let y=0;y<cv.height;y+=pxPag){ const c=document.createElement('canvas'); c.width=cv.width; c.height=Math.min(pxPag,cv.height-y); c.getContext('2d').drawImage(cv,0,y,cv.width,c.height,0,0,cv.width,c.height);
           if(pg) pdf.addPage('a4','portrait'); pdf.addImage(c.toDataURL('image/jpeg',0.9),'JPEG',0,0,210,c.height*210/cv.width); pg++; } } finally{ box.remove(); } }
-    baixar(pdf.output('blob'),nome); }
+    if(soBlob) return pdf.output('blob'); baixar(pdf.output('blob'),nome); }
   function wordDoc(f,md){ const h=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(md.nome)}</title><style>@page{size:21cm 29.7cm;margin:2.2cm 2cm}${DOC_CSS}</style></head><body>${docCorpo(f,md,false)}${assinaDg(f,md)}</body></html>`;
     baixar(new Blob(['﻿',h],{type:'application/msword'}),nomeArq(md.nome+' - '+f.nome)+'.doc'); }
   async function registrarDoc(f,md,acao){ const G=R.dg;
@@ -1907,6 +1908,14 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   const pjpCtx=()=>({P,R,esc,eu,topo,titulo,cargo,tokenNovo,EMP_DOC,alm:almCtx,unif:unifCtx});
   avRH(()=>window.RHPJPag?window.RHPJPag.avisos(pjpCtx()):[]);
   avRH(()=>window.RHUnif?window.RHUnif.avisos(unifCtx()):[]);
+  /* 04/11: assinar pelo gov.br (modulos/rh-assinar.js) */
+  async function guardaAssinado(d,b64,gov){ const nome=nomeArq((d.modelo||'Documento')+' - '+(d.funcionario||'')+' (assinado gov.br)')+'.pdf', od=OD(); let url;
+    if(od){ const r=await od.enviar('Documentos/'+nomeArq(d.funcionario||'Sem nome')+'/'+nome,b64,'application/pdf'); url=(r&&r.webUrl)||''; }
+    else url=linkArq(await salvarArquivo({nome,mime:'application/pdf',tipo:'documento',funcId:d.funcId||'',funcionario:d.funcionario||''},b64));
+    await P.db().doc(COL.docs+'/'+d._id).set({assinado:{url,nome,em:agora(),porNome:'gov.br',gov}},{merge:true}); }
+  const asnCtx=()=>({P,R,esc,eu,titulo,tokenNovo,pdfDoDoc:d=>pdfPartes([d.html],'documento.pdf',true),guardaAssinado});
+  const asnBt=d=>window.RHAssina?window.RHAssina.botao(asnCtx(),d):'';
+  avRH(()=>window.RHAssina?window.RHAssina.avisos():[]);
   window.RHUnifNovo=()=>{ P.go('rhunif'); setTimeout(()=>{ try{ window.RHUnif.render(unifCtx()); window.RHUnif.novo(); }catch(e){} },60); };
   /* ---------- Férias pelo relatório do sistema de folha (PDF "Programação de férias", Alleader) ----------
      O RH importa o PDF; o painel guarda em cada funcionário a situação da folha (ferFolha) e cria as férias já programadas.

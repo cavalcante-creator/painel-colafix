@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#143F54">
+<meta name="robots" content="noindex">
+<title>Assinar documento · Colafix</title>
+<link rel="icon" href="icons/favicon-32.png?v=5" sizes="32x32">
+<style>
+/* Assinar pelo gov.br (04/11): o RH manda o link (assinar.html?c=CÓDIGO); a pessoa baixa o PDF, assina no assinador do
+   governo (assinador.iti.br) com a conta gov.br e manda o arquivo assinado por aqui, sem login. Lê rh/dados/assinped/{código}
+   e os pedaços rh/dados/assinpdf/{código}-{n}; grava só rh/dados/assinenvp/{código}-{n} e rh/dados/assinenv/{código}. */
+:root{--ground:#F2F4F6;--surface:#FFFFFF;--ink:#1C2B33;--muted:#5E6E77;--line:#E1E7EB;--teal:#1B5C7A;--teal-strong:#143F54;--ok:#2F6047;--crit-ink:#8E3A33;--warn:#7A5310}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
+.top{background:var(--teal-strong);color:#fff;padding:22px 18px 20px}
+.top small{display:block;font-size:12px;font-weight:700;letter-spacing:2px;color:#BFD7E3}
+.top h1{margin:6px 0 2px;font-size:24px}
+.top p{margin:0;color:#D6E4EB;font-size:15px}
+main{max-width:620px;margin:0 auto;padding:14px 14px 40px}
+.card{background:var(--surface);border-radius:14px;box-shadow:0 2px 8px rgba(26,26,26,.08);padding:16px;margin-top:12px}
+.card h2{margin:0 0 4px;font-size:18px}
+.dica{margin:0 0 10px;color:var(--muted);font-size:14px}
+.val{font-size:40px;font-weight:300;letter-spacing:-.5px;margin:4px 0 0}
+.lin{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}.lin:first-of-type{border-top:0}
+.lin span{color:var(--muted)}.lin b{text-align:right;word-break:break-word}
+.cp{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.cp:first-of-type{border-top:0}
+.cp small{display:block;color:var(--muted);font-size:12.5px}.cp b{word-break:break-word}
+label{display:block;margin-top:12px;font-size:13px;font-weight:700;color:#4A453C}
+input,textarea{display:block;width:100%;margin-top:4px;height:48px;padding:0 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+textarea{height:auto;padding:10px 12px}
+input:focus,textarea:focus{outline:3px solid #9FBFCF;border-color:var(--teal)}
+.bt{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 14px;border-radius:10px;border:1.5px solid var(--line);background:#fff;color:var(--teal);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.arq{display:flex;align-items:center;justify-content:center;gap:8px;height:64px;margin-top:8px;border:2px dashed #9FBFCF;border-radius:12px;color:var(--teal);font-weight:700;cursor:pointer;text-align:center;padding:0 10px}
+.arq input{display:none}.arq.ok{border-style:solid;border-color:var(--ok);color:var(--ok)}
+.go{display:block;width:100%;height:54px;margin-top:16px;border:0;border-radius:12px;background:var(--teal);color:#fff;font:inherit;font-size:18px;font-weight:700;cursor:pointer}
+.go:disabled{opacity:.6}
+.er{color:var(--crit-ink);font-weight:700;margin-top:10px;min-height:1px}
+.chk{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:14px}.chk.ok{background:#E3F0E8;color:var(--ok)}.chk.av{background:#FBF1DC;color:var(--warn)}
+.chk ul{margin:4px 0 0;padding-left:18px}
+details{margin-top:10px}summary{cursor:pointer;color:var(--teal);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}td,th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left}td.n,th.n{text-align:right}
+.passo{display:flex;gap:10px;margin-top:8px;font-size:15px}.passo i{flex:none;width:24px;height:24px;border-radius:12px;background:#E2ECF1;color:var(--teal-strong);font-style:normal;font-weight:700;display:grid;place-items:center;font-size:13px}
+.fim{text-align:center;padding:30px 18px}
+.fim .ic{width:76px;height:76px;border-radius:38px;background:#E3F0E8;color:var(--ok);display:grid;place-items:center;margin:0 auto 12px}
+.fim h2{font-size:22px}
+.gov{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;margin-top:12px;border:0;border-radius:12px;background:#1351B4;color:#fff;font:inherit;font-size:17px;font-weight:700;text-decoration:none}
+.sec{display:flex;align-items:center;justify-content:center;width:100%;height:50px;margin-top:10px;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--teal);font:inherit;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none}
+.num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:14px;background:var(--teal-strong);color:#fff;font-size:15px;font-weight:700;margin-right:8px;flex:none}
+.cab{display:flex;align-items:center}.feito .num{background:var(--ok)}
+ol.mini{margin:8px 0 0;padding-left:20px;color:var(--ink);font-size:15px}ol.mini li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="top"><small>COLAFIX · RH</small><h1 id="ola">Assinar documento</h1><p id="sub">Carregando…</p></div>
+<main id="m"></main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="modulos/assin-ler.js"></script>
+<script>
+(function(){
+  'use strict';
+  const CFG=window.PAINEL_CONFIG||{}, $=s=>document.querySelector(s), M=$('#m');
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  const T=(location.search.match(/[?&]c=([a-z0-9]{20})\b/)||[])[1]||'';
+  const br=d=>d&&/^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'';
+  const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim();
+  const mesma=(a,b)=>{ const x=norm(a).split(' '), y=norm(b).split(' '); return !!x[0]&&x[0]===y[0]&&x[x.length-1]===y[y.length-1]; };
+  const ok='<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const fimTela=(t,p,bom)=>{ M.innerHTML=`<section class="card fim"><div class="ic" style="${bom?'':'background:#F6E3E1;color:#8E3A33'}">${bom?ok:'<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 16.5v.01"/></svg>'}</div><h2>${t}</h2><p>${p}</p></section>`; };
+  if(!T){ fimTela('Link incompleto','Abra o link exatamente como o RH mandou, ou peça um novo.'); return; }
+  let fs;
+  try{ firebase.initializeApp(CFG.firebase); const BANCO=CFG.banco||'(default)';
+    if(BANCO==='(default)') fs=firebase.firestore(); else { const app=firebase.app(); const exp=app.container.getProvider('firestore').getImmediate({identifier:BANCO}); fs=new firebase.firestore.Firestore(app,exp); }
+  }catch(e){ console.warn(e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo.'); return; }
+  const ENV='assinar.enviado.'+T; let enviado=false; try{ enviado=localStorage.getItem(ENV)==='1'; }catch(e){}
+  if(enviado){ fimTela('Documento enviado','O documento assinado já chegou no RH da Colafix.',true); return; }
+  const b64De=u8=>{ let s=''; for(let i=0;i<u8.length;i+=32768) s+=String.fromCharCode.apply(null,u8.subarray(i,i+32768)); return btoa(s); };
+  const deB64=b=>{ const s=atob(b), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; };
+  let P=null, original=null, arq=null; /* arq = {u8, n, ver} */
+  async function pdfOriginal(){ if(original) return original; let b=''; for(let k=0;k<(+P.partes||1);k++){ const g=await fs.doc('rh/dados/assinpdf/'+T+'-'+k).get(); if(!g.exists) throw new Error('falta parte'); b+=g.data().d||''; }
+    original=new Blob([deB64(b)],{type:'application/pdf'}); return original; }
+  function baixar(blob,nome){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),120000); }
+  function tela(){
+    $('#ola').textContent='Olá, '+String(P.nome||'').split(' ')[0]+'!'; $('#sub').textContent='Assinar pelo gov.br: '+(P.doc||'documento');
+    M.innerHTML=`<section class="card"><h2>${esc(P.doc||'Documento')}</h2><p class="dica" style="margin:4px 0 0">O RH da Colafix pediu para você assinar este documento pelo <b>gov.br</b>. São 3 passos, pelo celular.${P.ateMs?' O link vale até '+br(new Date(+P.ateMs).toISOString())+'.':''}</p></section>
+    <section class="card" id="p1"><div class="cab"><span class="num">1</span><h2>Baixe o documento</h2></div>
+      <p class="dica" style="margin-top:6px">Leia com calma antes de assinar. O arquivo fica salvo no seu celular.</p>
+      <button class="go" id="baixa">Baixar o documento (PDF)</button><button class="sec" id="ler">Só ler o documento</button><div class="er" id="er1"></div></section>
+    <section class="card" id="p2"><div class="cab"><span class="num">2</span><h2>Assine no gov.br</h2></div>
+      <ol class="mini"><li>Toque no botão azul e entre com o seu <b>CPF e a senha do gov.br</b>.</li><li>Toque em <b>Escolher arquivo</b> e escolha o documento que você baixou no passo 1.</li>
+        <li>Coloque a assinatura no lugar certo e toque em <b>Avançar</b> / <b>Assinar</b>.</li><li>Confirme com o código que chega no aplicativo gov.br.</li><li>Toque em <b>Baixar</b>: o arquivo assinado fica no seu celular.</li></ol>
+      <a class="gov" href="https://assinador.iti.br/" target="_blank" rel="noopener">Abrir o assinador gov.br</a>
+      <details><summary>Não consigo assinar</summary><p class="dica" style="margin-top:8px">A assinatura do gov.br precisa da conta <b>prata ou ouro</b>. No aplicativo gov.br, toque em <b>Aumentar nível da conta</b> (dá para fazer com o reconhecimento facial ou pelo seu banco). Para ver o nível da sua conta: <a href="https://confiabilidades.acesso.gov.br/" target="_blank" rel="noopener">confiabilidades.acesso.gov.br</a>.</p>
+      <p class="dica">Se mesmo assim não der, fale com o RH: dá para assinar no papel.</p></details></section>
+    <section class="card" id="p3"><div class="cab"><span class="num">3</span><h2>Mande o documento assinado</h2></div>
+      <p class="dica" style="margin-top:6px">Escolha o arquivo que o gov.br deixou baixar <b>depois</b> de assinar (o nome costuma terminar com <b>_assinado</b>).</p>
+      <label class="arq" id="arqL"><input type="file" id="arq" accept=".pdf,application/pdf"><span id="arqT">Escolher o documento assinado (PDF)</span></label>
+      <div id="chk"></div>
+      <p class="dica" style="margin-top:10px">O documento vai só para o RH da Colafix.</p>
+      <button class="go" id="env" disabled>Mandar o documento assinado</button><div class="er" id="er"></div></section>`;
+    $('#baixa').addEventListener('click',async()=>{ $('#er1').textContent=''; try{ baixar(await pdfOriginal(),P.arq||'documento.pdf'); $('#p1').classList.add('feito'); }catch(e){ $('#er1').textContent='Não foi possível baixar. Confira a internet e tente de novo.'; } });
+    $('#ler').addEventListener('click',async()=>{ $('#er1').textContent=''; const w=window.open('','_blank'); try{ const u=URL.createObjectURL(await pdfOriginal()); if(w) w.location=u; else location.href=u; }catch(e){ if(w) w.close(); $('#er1').textContent='Não foi possível abrir. Confira a internet e tente de novo.'; } });
+    $('#arq').addEventListener('change',async e=>{ const f=e.target.files[0]; $('#er').textContent=''; $('#chk').innerHTML=''; arq=null; $('#env').disabled=true; $('#arqL').classList.remove('ok'); if(!f) return;
+      if(f.size>6*1024*1024){ $('#er').textContent='Arquivo grande demais (máximo 6 MB).'; return; }
+      $('#arqT').textContent='Conferindo…';
+      try{ const u8=new Uint8Array(await f.arrayBuffer()), r=await window.AssinLer.ler(u8);
+        if(!r.pdf){ $('#arqT').textContent='Escolher o documento assinado (PDF)'; $('#er').textContent='Este arquivo não é um PDF. Escolha o documento que o gov.br deixou baixar.'; return; }
+        if(!r.ass.length){ $('#arqT').textContent='Escolher o documento assinado (PDF)'; $('#chk').innerHTML=`<div class="chk av"><b>Este arquivo ainda não está assinado.</b><br>Faça o passo 2 e escolha aqui o arquivo que o gov.br deixou baixar depois de assinar.</div>`; return; }
+        let mesmo=null; try{ mesmo=u8.length>=+P.tam&&(await window.AssinLer.sha(u8.subarray(0,+P.tam)))===P.sha; }catch(er){}
+        const nomes=r.ass.map(x=>x.nome).filter(Boolean), dele=r.ass.some(x=>mesma(x.nome,P.nome)), gov=r.ass.some(x=>x.gov||x.icp), av=[];
+        if(mesmo===false) av.push('Este parece ser outro documento (não é o que o RH mandou). Confira se escolheu o arquivo certo.');
+        if(!dele) av.push('Assinado por '+(nomes.join(' e ')||'outra pessoa')+'. O documento é para '+P.nome+'.');
+        if(!gov) av.push('A assinatura não parece ser do gov.br.');
+        arq={u8,n:f.name,ver:{nomes:nomes.slice(0,4),mesmo,gov,dele}}; $('#arqL').classList.add('ok'); $('#arqT').textContent='✓ '+f.name;
+        $('#chk').innerHTML=av.length?`<div class="chk av"><b>Confira antes de mandar:</b><ul>${av.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`:`<div class="chk ok">✓ Assinado por <b>${esc(nomes[0]||P.nome)}</b> pelo gov.br. Pode mandar.</div>`;
+        $('#env').disabled=false; $('#p2').classList.add('feito'); }
+      catch(er){ console.warn(er); $('#arqT').textContent='Escolher o documento assinado (PDF)'; $('#er').textContent='Não consegui ler este arquivo. Tente de novo.'; } });
+    $('#env').addEventListener('click',async()=>{ if(!arq) return; const bt=$('#env'); bt.disabled=true; bt.textContent='Mandando…'; $('#er').textContent='';
+      try{ const b=b64De(arq.u8), N=850000, n=Math.ceil(b.length/N)||1; if(n>12) throw new Error('grande');
+        for(let k=0;k<n;k++) await fs.doc('rh/dados/assinenvp/'+T+'-'+k).set({d:b.slice(k*N,(k+1)*N)});
+        await fs.doc('rh/dados/assinenv/'+T).set({n:String(arq.n||'').slice(0,160),tam:arq.u8.length,partes:n,em:new Date().toISOString(),ver:arq.ver});
+        try{ localStorage.setItem(ENV,'1'); }catch(e){} window.scrollTo(0,0);
+        fimTela('Documento enviado','Obrigado! O RH da Colafix recebeu o documento assinado.',true); }
+      catch(e){ console.warn(e); bt.disabled=false; bt.textContent='Mandar o documento assinado'; $('#er').textContent=String(e&&e.message)==='grande'?'Arquivo grande demais.':'Não foi possível mandar. Confira a internet e tente de novo. Se o link venceu, peça um novo para o RH.'; } });
+  }
+  (async()=>{ try{ const g=await fs.doc('rh/dados/assinped/'+T).get(); P=g.exists?g.data():null;
+      if(!P||P.usado) return fimTela(P?'Documento já assinado':'Este link não vale mais',P?'O documento deste link já foi assinado e mandado para o RH.':'Peça um link novo para o RH da Colafix.',!!P);
+      if(+P.ateMs&&+P.ateMs<Date.now()) return fimTela('Este link venceu','Peça um link novo para o RH da Colafix.');
+      tela(); }
+    catch(e){ console.warn('pedido',e); fimTela('Não foi possível abrir','Confira a internet e abra o link de novo. Se continuar, peça um link novo para o RH.'); } })();
+})();
+</script>
+</body>
+</html>

@@ -126,6 +126,33 @@ service cloud.firestore {
         && request.resource.data.d is string && request.resource.data.d.size() > 10 && request.resource.data.d.size() < 950000;
     }
 
+    // Assinar pelo gov.br (04/11, assinar.html?c=CÓDIGO, sem login): o RH cria o pedido e o PDF em pedaços; quem tem o
+    // código só lê o próprio pedido/PDF e só CRIA o arquivo assinado (pedaços primeiro, depois o envio), uma vez,
+    // enquanto o pedido vale. Não lê nada do RH.
+    function asnPed(t) { return get(/databases/$(database)/documents/rh/dados/assinped/$(t)).data; }
+    function asnVale(t) { return exists(/databases/$(database)/documents/rh/dados/assinped/$(t))
+      && asnPed(t).get('usado', false) != true && request.time.toMillis() < asnPed(t).get('ateMs', 0)
+      && !exists(/databases/$(database)/documents/rh/dados/assinenv/$(t)); }
+    match /rh/dados/assinped/{t} {
+      allow get: if true;
+    }
+    match /rh/dados/assinpdf/{p} {
+      allow get: if true;
+    }
+    match /rh/dados/assinenvp/{p} {
+      allow create: if (semConta() || logado()) && p.matches('[a-z0-9]{20}-[0-9]{1,2}')
+        && asnVale(p.split('-')[0])
+        && request.resource.data.keys().hasOnly(['d'])
+        && request.resource.data.d is string && request.resource.data.d.size() > 0 && request.resource.data.d.size() < 900000;
+    }
+    match /rh/dados/assinenv/{t} {
+      allow create: if (semConta() || logado()) && t.matches('[a-z0-9]{20}') && asnVale(t)
+        && request.resource.data.keys().hasOnly(['n', 'tam', 'partes', 'em', 'ver'])
+        && request.resource.data.partes is int && request.resource.data.partes >= 1 && request.resource.data.partes <= 12
+        && request.resource.data.get('n', '') is string && request.resource.data.get('n', '').size() <= 160
+        && request.resource.data.get('ver', {}) is map;
+    }
+
     // Chamado pelo QR da linha (sem login): só cria, com os campos do chamado.
     match /chamados/{id} {
       allow create: if semConta() && id.matches('q-[a-z0-9]+')
