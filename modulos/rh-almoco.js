@@ -156,9 +156,8 @@
         <details><summary>Como exportar do Control iD</summary><ol><li>Relatórios → Acessos → <b>Acessos Gerais</b>.</li><li>Escolha as datas (pode ser o mês todo), Pessoas: Todos, e clique em Listar.</li><li>Exportar → <b>Exportar CSV</b> e arraste o arquivo aqui (ou toque em "Importar do Face ID").</li><li>Importar de novo o mesmo período só atualiza esses dias: não duplica.</li></ol></details></div>
       ${st&&A.vis!=='dia'&&A.vis!=='pont'&&A.vis!=='nota'?`<div class="alm-kpi"><div><span>Almoços no mês</span><b class="num">${st.tot.toLocaleString('pt-BR')}</b><small>${st.dExp} dias de expediente</small></div><div><span>Média por dia</span><b class="num">${st.media}</b><small>${st.ant?varTxt(st.media,st.ant.media)+' que '+mesNome(st.ant.mes).split(' ')[0]:'nos dias de expediente'}</small></div>
         <div><span>Adesão</span><b class="num">${st.ades}%</b><small>de quem estava na empresa almoçou</small></div><div><span>Pessoas que almoçaram</span><b class="num">${st.pessoas}</b><small>${st.semCad?st.semCad+' sem cadastro no RH':'todas no cadastro do RH'}</small></div><div class="${st.semJust?'alm-kw':''}"><span>Faltas sem justificativa</span><b class="num">${st.semJust}</b><small>vezes que alguém veio e não almoçou · ${st.just} justificadas · ${st.fora} não almoçam aqui</small></div></div>`:''}</section>`;
-    if(A.vis==='nota'&&!c.fixo) return topo+`<section class="card"><div class="alm-f"><div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="false">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="false">Fechamento do mês</button><button data-act="alm-vis" data-v="nota" aria-pressed="true">Solicitado × nota</button></div></div>${vNota(c)}</section>`;
     if(!D||!ds.length&&!Object.keys((A.aj[A.mes]||{}).aj||{}).length) return topo+`<section class="card"><div class="empty"><b>Nenhum dado do Face ID em ${esc(mesNome(A.mes))}</b><span>Importe o CSV "Acessos Gerais" do Control iD (o robô do Face ID também manda sozinho, quando está ligado). As ausências no almoço já podem ser programadas.</span><span class="rh-vzb"><button class="btn sec" data-act="alm-aus">${P.ic('mais',16,2.4)}Ausência no almoço</button><label class="btn" for="alm-arq" style="cursor:pointer">${P.ic('baixar',16,2.2)}Importar do Face ID</label></span></div></section>`+vAus(c);
-    const abas=c.fixo?'':`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button><button data-act="alm-vis" data-v="nota" aria-pressed="${A.vis==='nota'}">Solicitado × nota</button></div>`; /* 30/10: Pontualidade e Diretoria viraram telas próprias (Relatórios) */
+    const abas=c.fixo?'':`<div class="seg" role="group"><button data-act="alm-vis" data-v="dia" aria-pressed="${A.vis==='dia'}">Por dia</button><button data-act="alm-vis" data-v="mes" aria-pressed="${A.vis==='mes'}">Fechamento do mês</button></div>`; /* 30/10: Pontualidade e Diretoria viraram telas próprias (Relatórios) */
     if(A.vis==='pont') return topo+`<section class="card">${abas?`<div class="alm-f">${abas}</div>`:''}<div class="alm-f alm-f2">
       <select class="txt" id="alm-emp" style="max-width:220px"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e||'-')}" ${A.emp===(e||'-')?'selected':''}>${esc(empCurta(e))}</option>`).join('')}</select>
       ${setores.length?`<select class="txt" id="alm-setor" style="max-width:200px"><option value="">Todos os setores</option>${setores.map(x=>`<option value="${esc(x)}" ${A.setor===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="-" ${A.setor==='-'?'selected':''}>Sem setor</option></select>`:''}
@@ -171,7 +170,7 @@
       <select class="txt" id="alm-sit" style="max-width:240px">${[['','Todas as situações'],['sim','Almoçou'],['nao','Sem almoço e sem justificativa'],['just','Justificado'],['fora','Não almoça na empresa']].map(([v,t])=>`<option value="${v}" ${A.sit===v?'selected':''}>${t}</option>`).join('')}</select>
       <input class="txt" id="alm-q" type="search" autocomplete="off" placeholder="Buscar nome, setor ou CPF" value="${esc(A.q)}" style="max-width:260px"><span class="sub" id="alm-qn"></span></div>`;
     if(A.vis==='dia') return topo+`<section class="card alm-v2f">${filtros}</section>`+vDia(c,ds,ps,st)+vPessoa(c,ds)+vJust(c)+vAus(c);
-    return topo+`<section class="card">${filtros}${vMes(c,ds,ps)}</section>`+vPessoa(c,ds)+vJust(c)+vAus(c); }
+    return topo+(c.fixo?'':vNotaMes(c))+`<section class="card">${filtros}${vMes(c,ds,ps)}</section>`+vPessoa(c,ds)+vJust(c)+vAus(c); }
   function mesAnt(m){ const [y,mm]=m.split('-').map(Number), d=new Date(y,mm-2,1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
   const varTxt=(a,b)=>{ if(!b) return ''; const v=Math.round((a-b)/b*100); return v===0?'igual':(v>0?'▲ '+v+'% a mais':'▼ '+(-v)+'% a menos'); };
   /* números do mês (sempre de todos, sem os filtros da tela) */
@@ -1014,7 +1013,7 @@
   function notaDados(c,m){ const N=notaEst(c,m), ds=notaDias(c,m), rows=ds.map(d=>{ const a=notaSol(c,d,'alm'), cf=notaSol(c,d,'cafe'), z=N.doc.dias[d]||{}; return {d,a,cf,na:nN(z.a),nc:nN(z.c)}; });
     const sm=(k)=>rows.reduce((s,r)=>s+(r[k]&&r[k].n||0),0), sn=k=>rows.reduce((s,r)=>s+(r[k]||0),0), temD=k=>rows.some(r=>r[k]!=null);
     const sq=(k,kn)=>rows.reduce((s,r)=>s+(r[kn]!=null&&r[k]?r[k].n:0),0), qd=kn=>rows.filter(r=>r[kn]!=null).length;
-    const T={sa:sm('a'),sc:sm('cf'),na:temD('na')?sn('na'):nN(N.doc.tot.a),nc:temD('nc')?sn('nc'):nN(N.doc.tot.c),totA:!temD('na')&&nN(N.doc.tot.a)!=null,totC:!temD('nc')&&nN(N.doc.tot.c)!=null};
+    const T={sa:sm('a'),sc:sm('cf'),na:nN(N.doc.tot.a),nc:nN(N.doc.tot.c),totA:true,totC:true};
     T.saC=T.totA||!temD('na')?T.sa:sq('a','na'); T.scC=T.totC||!temD('nc')?T.sc:sq('cf','nc'); T.qa=qd('na'); T.qc=qd('nc');
     return {N,rows,T}; }
   function difTxt(sol,nota,curto){ if(sol==null||nota==null) return {t:'',cl:''}; const df=nota-sol; if(!df) return {t:curto?'bate':'Bate',cl:'ok'};
@@ -1064,8 +1063,24 @@
   .nt-tw{overflow-x:auto}.nt-t{width:100%;border-collapse:collapse;font-size:14px}.nt-t th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:6px 8px;text-align:center;border-bottom:1px solid var(--line,#dde4e9)}
   .nt-t td{padding:4px 8px;border-bottom:1px solid var(--line,#eef2f5);text-align:center}.nt-t td:first-child{text-align:left;white-space:nowrap}.nt-t td small{color:var(--muted)}
   .nt-t tfoot td{font-weight:700;border-top:2px solid var(--line,#dde4e9)}.nt-t .nt-in,.nt-cab .nt-in{width:96px!important;max-width:96px;text-align:right;padding:6px 8px}
+  .nt-card{margin-bottom:14px}.nt-l{display:grid;grid-template-columns:110px repeat(3,minmax(0,1fr));gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line,#eef2f5)}
+  .nt-l>div{display:flex;flex-direction:column;gap:2px}.nt-l span{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.nt-l small{font-size:12px;color:var(--muted)}.nt-l b.num{font-size:24px}
+  .nt-l .nt-crit b.num{color:var(--crit)}.nt-l .nt-warn b.num{color:var(--warn)}.nt-l .nt-ok b.num{color:var(--ok)}.nt-l .nt-in{width:120px!important;max-width:120px;font-size:18px;text-align:right}
+  .nt-nf{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.nt-nf .txt{width:160px}.nt-dd{margin-top:8px}.nt-dd summary{cursor:pointer;color:var(--teal-strong,#1f6e80);font-size:13px}.nt-dd .nt-t{max-width:360px;margin-top:6px}
+  @media (max-width:700px){ .nt-l{grid-template-columns:1fr 1fr} .nt-l>b{grid-column:1/-1} }
   .nt-df.crit{color:var(--crit);font-weight:700}.nt-df.warn{color:var(--warn);font-weight:700}.nt-df.ok{color:var(--ok)}.nt-mut{color:var(--muted)}
   @media (max-width:700px){ .nt-k{grid-template-columns:repeat(2,minmax(0,1fr))!important} }
   </style>`); }catch(e){}
+  /* 04/11 (2º pedido): a nota do restaurante é MENSAL — sem aba: quadro no alto do Fechamento do mês com solicitado (folhas) × nota do mês */
+  function vNotaMes(c){ const esc=c.esc, m=A.mes, X=notaDados(c,m), N=X.N, T=X.T; if(!N.ok) return '';
+    const semLA=!refCom('alm',()=>{ const s=FK; fkUsa('alm'); try{ return listaFolha().length; } finally{ fkUsa(s); } }), semLC=!listaCafe().length;
+    const ln=(nm,f,sol,nota,sem)=>{ const x=difTxt(sol,nota); return `<div class="nt-l"><b>${nm}</b><div><span>Solicitados</span><b class="num">${sem?'—':sol.toLocaleString('pt-BR')}</b><small>${sem?'sem lista fixa na folha':'pessoas nas folhas do mês'}</small></div>
+      <div><span>Na nota</span><input class="txt nt-in" type="number" min="0" inputmode="numeric" data-ntc="${f}" value="${nota==null?'':nota}" aria-label="${nm} na nota do mês"></div>
+      <div class="nt-${x.cl||'mut'}"><span>Diferença</span><b class="num">${nota==null||sem?'—':(nota-sol>0?'+':'')+(nota-sol)}</b><small>${nota==null?'digite o que veio na nota':sem?'':x.t}</small></div></div>`; };
+    const ds=X.rows.filter(r=>(r.a&&r.a.n)||(r.cf&&r.cf.n)), nao=ds.filter(r=>(r.a&&!r.a.emit)||(r.cf&&!r.cf.emit)).length;
+    return `<!--nofx--><section class="card nt-card"><div class="nt-top"><div><div class="eyebrow">NOTA DO RESTAURANTE · ${esc(mesNome(m).toUpperCase())}</div><b>Solicitado × nota</b><div class="sub">Solicitado = pessoas na folha de assinatura de cada dia (lista fixa menos quem foi marcado "Não veio", férias ou tirado), somado no mês.</div></div>
+      <label class="nt-nf">Nº da nota <input class="txt" data-ntc="nf" value="${esc(N.doc.nf||'')}"></label></div>
+      ${ln('Almoço','ta',T.sa,nN(N.doc.tot.a),semLA)}${ln('Café','tc',T.sc,nN(N.doc.tot.c),semLC)}
+      <details class="nt-dd"><summary>Ver o solicitado dia a dia (${ds.length} dias${nao?' · '+nao+' com folha ainda não impressa':''})</summary><table class="nt-t"><thead><tr><th>Dia</th><th>Almoço</th><th>Café</th></tr></thead><tbody>${ds.map(r=>`<tr><td>${c.br(r.d).slice(0,5)}</td><td class="num">${r.a?r.a.n+(r.a.emit?'':'*'):'—'}</td><td class="num">${r.cf?r.cf.n+(r.cf.emit?'':'*'):'—'}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="num">${T.sa}</td><td class="num">${T.sc}</td></tr></tfoot></table><div class="sub">* folha ainda não impressa: número da lista agora.</div></details></section><!--/nofx-->`; }
   window.RHAlmoco={_folhaDoc:(c,d)=>folhaDoc(c||A.ctx,d||A.dia),publicar,carregar,fechamento,_prDia:prDia,ausencia:P=>{ const h=P.hojeStr(); A.vis='dia'; A.pes=null; A.aus={k:'',fixo:false,tipo:'dia',data:h,dias:[],de:h,ate:'',mot:''}; P.go('rhalmoco'); },render,iniciar:c=>{ A.ctx=c; },interpretar,_fk:()=>FK,importar:(c,f)=>{ if(c&&!A.ctx) A.ctx=c; return importar(f); },_A:A};
 })();
