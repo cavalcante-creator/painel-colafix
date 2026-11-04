@@ -1,0 +1,25 @@
+/* RH: anexar documentos (foto ou PDF) no cadastro da pessoa (04/11). Nomes inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,240):'')); };
+(async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
+ D['rh/dados/funcionarios/a1']={nome:'ANA TESTE SOUZA',tipo:'CLT',empresa:'COLAFIX',status:'Ativo',admissao:'2025-03-10',setor:'PRODUÇÃO',funcao:'AUXILIAR',admEntregues:[{nome:'RG (frente e verso)',em:'2025-03-10T10:00:00Z',url:'https://exemplo.invalid/rg.pdf'}]};
+ const B=await H.abrir({viewport:{width:1500,height:950}}); const p=B.page; const erros=[]; p.on('pageerror',e=>erros.push(e.message)); p.on('dialog',x=>x.accept());
+ await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123'); await H.dorme(2000);
+ await p.evaluate(()=>__T.go('rhfunc')); await H.dorme(1000);
+ await p.click('[data-act="rh-fusel"]:has-text("ANA TESTE")'); await H.dorme(400);
+ await p.click('[data-act="rh-fab"][data-v="docs"]'); await H.dorme(900);
+ const t0=await p.evaluate(()=>(document.querySelector('.rh-anxd')||{}).innerText||'');
+ ok('Ficha da pessoa › Documentos tem "Arquivos da pessoa" com Anexar documento e o RG entregue na admissão', /ARQUIVOS DA PESSOA/i.test(t0)&&/Anexar documento/.test(t0)&&/RG \(frente e verso\)/.test(t0)&&/entregue na admissão/.test(t0), t0.replace(/\n/g,' | '));
+ await p.selectOption('#rh-anxt-a1','CTPS (carteira de trabalho)');
+ await p.setInputFiles('[data-rh-anxp="a1"]',[{name:'ctps.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4 teste')},{name:'ctps-verso.jpg',mimeType:'image/jpeg',buffer:Buffer.from([255,216,255,224,1,2,3])}]);
+ await H.dorme(2500);
+ const t1=await p.evaluate(()=>(document.querySelector('.rh-anxd')||{}).innerText||'');
+ ok('Anexar 2 arquivos de uma vez: aparecem com o tipo do documento', /CTPS \(carteira de trabalho\) · ctps\.pdf/.test(t1)&&/ctps-verso\.jpg/.test(t1)&&/\(3\)/.test(t1), t1.replace(/\n/g,' | '));
+ const lst=await p.evaluate(()=>{ const s=JSON.parse(localStorage.getItem('__srv')).docs; return Object.keys(s).filter(k=>k.startsWith('rh/arquivos/lista/')).map(k=>s[k]).filter(x=>x.tipo==='docpessoa'); });
+ ok('Guardado nos arquivos do RH com a pessoa e o tipo', lst.length===2&&lst.every(x=>x.funcId==='a1'&&x.doc==='CTPS (carteira de trabalho)'&&x.partes>=1), JSON.stringify(lst.map(x=>({n:x.nome,d:x.doc,p:x.partes}))));
+ await p.click('.rh-anxd [data-act="rh-anxdel"]'); await H.dorme(1500);
+ const t2=await p.evaluate(()=>(document.querySelector('.rh-anxd')||{}).innerText||'');
+ ok('Tirar um documento (com confirmação) some da lista', /\(2\)/.test(t2), t2.replace(/\n/g,' | '));
+ await p.click('[data-act="rh-pess"][data-id="a1"]'); await H.dorme(1200);
+ ok('Perfil completo também mostra os arquivos', await p.evaluate(()=>!!document.querySelector('[data-rh-anxp="a1"]')));
+ ok('Sem erros na página', !erros.length, erros.join(' | '));
+ await B.browser.close(); const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU '+f:'PASSOU tudo ('+res.length+')'); process.exit(f?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
