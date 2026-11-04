@@ -10,6 +10,10 @@ async function gpImgs(){ if(_gpImg) return _gpImg; const ld=src=>new Promise(res
   _gpImg={escuro:esc1,lys,claro:cl}; return _gpImg; }
 function gpNovo(tit,sub,img){ const J=window.jspdf&&window.jspdf.jsPDF; if(!J) throw new Error('O gerador de PDF não carregou. Confira a internet e tente de novo.');
   const doc=new J({unit:'mm',format:'a4',orientation:'portrait'}); const C=GPDF.cor, W=GPDF.W, M=GPDF.M;
+  /* proteção (04/11): o jsPDF recusa texto que não é texto e posição que não é número ("Invalid arguments passed to jsPDF.text");
+     aqui todo valor vira texto e posição inválida vira 0, para nenhum relatório parar por um campo vazio */
+  { const t0=doc.text.bind(doc); doc.text=function(t,x,y,o,...r){ const s=v=>v==null?'':String(v);
+      t=Array.isArray(t)?t.map(s):s(t); x=Number.isFinite(+x)?+x:0; y=Number.isFinite(+y)?+y:0; return t0(t,x,y,o,...r); }; }
   const P={doc,y:0,tit,sub,img,W,M,cw:W-2*M};
   const fc=c=>doc.setFillColor(c[0],c[1],c[2]), tc=c=>doc.setTextColor(c[0],c[1],c[2]), dc=c=>doc.setDrawColor(c[0],c[1],c[2]);
   P.fc=fc; P.tc=tc; P.dc=dc;

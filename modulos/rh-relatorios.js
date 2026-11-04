@@ -17,6 +17,12 @@
   async function pdf(o){ const PP=window.Painel&&window.Painel.pdf; if(!PP) throw new Error('O painel ainda está carregando. Tente de novo em instantes.');
     if(!(window.jspdf&&window.jspdf.jsPDF)){ try{ await carrega(JSPDF); }catch(e){} }
     if(!(window.jspdf&&window.jspdf.jsPDF)) throw new Error('O gerador de PDF não carregou. Confira a internet e tente de novo.');
+    const tx=v=>v==null?'':String(v); o.tit=tx(o.tit); o.sub=tx(o.sub); o.filtros=(o.filtros||[]).map(tx).filter(Boolean);
+    (o.kpis||[]).forEach(k=>{ k.t=tx(k.t); k.v=tx(k.v); k.s=tx(k.s); });
+    (o.partes||[]).forEach(p=>{ if(p.secao!=null) p.secao=tx(p.secao); if(p.nota!=null) p.nota=tx(p.nota); if(p.texto!=null) p.texto=tx(p.texto); if(!p.cols) return;
+      p.rows=(p.rows||[]).map(r=>{ const n=(Array.isArray(r)?r:[r]).map(tx); if(r&&r._tot) n._tot=r._tot; if(r&&r._cor) n._cor=r._cor; return n; });
+      p.cols=p.cols.map((c,i)=>{ if(c&&typeof c==='object') return Object.assign({},c,{t:tx(c.t),w:Number.isFinite(+c.w)&&+c.w>0?+c.w:20});
+        const mx=Math.max(tx(c).length,...p.rows.map(r=>tx(r[i]).length)); return {t:tx(c),w:Math.max(8,Math.min(46,mx))}; }); });
     const img=await PP.imgs(), P=PP.novo(o.tit,o.sub||'',img); P.capa();
     P.texto('Filtros: '+filtrosTxt(o.filtros),{fs:8,c:o.filtros&&o.filtros.length?'ink':'mut',b:!!(o.filtros&&o.filtros.length)});
     if(o.kpis&&o.kpis.length){ P.secao(o.resumo||'Resumo'); P.kpis(o.kpis,o.kpiCols||Math.min(4,o.kpis.length)); }
