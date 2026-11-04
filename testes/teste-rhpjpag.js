@@ -27,7 +27,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Menu do RH: "Pagamento dos PJ" em Relatórios', menu.includes('rhpjpag'), menu.join(','));
   await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; __T.go('rhpjpag'); }); await H.dorme(1800);
   let s=await view();
-  ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,24/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
+  ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,00/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
   ok('Avisa o dia com só uma passagem', /1 dia para conferir/.test(s));
   await p.click('[data-act="pjp-ab"][data-f="f1"]'); await H.dorme(700);
   const gv=await p.evaluate(()=>{ const g=document.querySelector('.pjp-g'); return g?g.innerText:''; });
@@ -36,7 +36,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.fill('#pjp-cs','17:18'); await p.fill('#pjp-cm','Esqueceu de passar no Face ID'); await p.click('[data-act="pjp-dsalva"]'); await H.dorme(900);
   await p.fill('input[data-pjp-c="desc"]','50,00'); await p.dispatchEvent('input[data-pjp-c="desc"]','change'); await H.dorme(900);
   s=await p.evaluate(()=>document.querySelector('.pjp-g').innerText); let S=await srv(), doc=S['rh/dados/pjpag/2026-10-2'];
-  ok('Corrigir o dia (com motivo) e lançar desconto: refaz a conta (96h48 × 22,73 − 50 = 2.150,26)', /corrigido · Esqueceu de passar/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.150,26/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.aj['2026-10-21'].mot==='Esqueceu de passar no Face ID'&&doc.pes.f1.desc===50, s.replace(/\n/g,' | ').slice(0,400));
+  ok('Corrigir o dia (com motivo) e lançar desconto: refaz a conta (96h48 × 22,7272… − 50 = 2.150,00)', /corrigido · Esqueceu de passar/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.150,00/.test(s)&&doc&&doc.pes.f1.aj['2026-10-21'].s==='17:18'&&doc.pes.f1.aj['2026-10-21'].mot==='Esqueceu de passar no Face ID'&&doc.pes.f1.desc===50, s.replace(/\n/g,' | ').slice(0,400));
   /* regras desta pessoa */
   await p.click('[data-act="pjp-tab"][data-v="regras"]'); await H.dorme(500);
   await p.fill('#pjp-rtol','10'); await p.click('[data-pjp-dw="6"] + span'); await H.dorme(100); await p.fill('#pjp-rob','Trabalha sábado de manhã'); await p.click('[data-act="pjp-psalva"]'); await H.dorme(900);
@@ -44,7 +44,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Regras desta pessoa ficam no cadastro (tolerância, dias de trabalho, observação)', rg.tol===10&&JSON.stringify(rg.dias)==='[1,2,3,4,5,6]'&&rg.obs==='Trabalha sábado de manhã', JSON.stringify(rg));
   await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag-gaveta.png'});
   await p.click('[data-act="pjp-gx"]',{timeout:4000}); await H.dorme(500);
-  s=await view(); ok('Lista com o valor novo', /96h48[\s\S]*R\$\s?2\.150,26/.test(s), s.replace(/\n/g,' | ').slice(0,300));
+  s=await view(); ok('Lista com o valor novo', /96h48[\s\S]*R\$\s?2\.150,00/.test(s), s.replace(/\n/g,' | ').slice(0,300));
   /* filtros */
   await p.selectOption('#pjp-emp','NEXUS'); await H.dorme(500); s=await view();
   ok('Filtro por empresa', /Maria Oliveira/.test(s)&&!/Joao Pereira/.test(s));
@@ -55,21 +55,21 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   if(dl){ try{ const fp='/tmp/pjp-teste.xlsx'; await dl.saveAs(fp); const EJ=require('exceljs'), wb=new EJ.Workbook(); await wb.xlsx.readFile(fp); const ws=wb.getWorksheet('Horas Trabalhadas Zenith');
       let tit='',hd='',fD='',tot=null; ws.eachRow(r=>{ const a=String(r.getCell(1).value||''); if(/JOAO PEREIRA/.test(a)) tit=String(r.getCell(3).value); if(r.getCell(1).value==='Dia'&&!hd) hd=[1,2,3,4,5,6,7].map(k=>r.getCell(k).value).join('|'); if(!fD&&r.getCell(4).value&&r.getCell(4).value.formula) fD=r.getCell(4).value.formula; if(r.getCell(5).value==='Total a Pagar') tot=r.getCell(6).value; });
       xinfo=JSON.stringify({abas:wb.worksheets.map(w=>w.name),tit,hd,fD,tot}); }catch(e){ xinfo='erro '+e.message; } }
-  ok('Excel no formato da planilha: aba por empresa, bloco por pessoa, colunas e fórmulas da planilha, total a pagar', /Pagamento-PJ-2026-10-2\.xlsx/.test(xl)&&/"Resumo","Horas Trabalhadas Zenith","NEXUS"/.test(xinfo)&&/Horário: 07:30hr às 17:18hr/.test(xinfo)&&/Dia\|Entrada\|Saída\|Entrada Tolerância Ajustada\|Saída Tolerância Ajustada\|Total de Horas/.test(xinfo)&&/TIME\(7,20,0\)/.test(xinfo)&&/"result":2150.26/.test(xinfo), xinfo.slice(0,500));
+  ok('Excel no formato da planilha: aba por empresa, bloco por pessoa, colunas e fórmulas da planilha, total a pagar', /Pagamento-PJ-2026-10-2\.xlsx/.test(xl)&&/"Resumo","Horas Trabalhadas Zenith","NEXUS"/.test(xinfo)&&/Horário: 07:30hr às 17:18hr/.test(xinfo)&&/Dia\|Entrada\|Saída\|Entrada Tolerância Ajustada\|Saída Tolerância Ajustada\|Total de Horas/.test(xinfo)&&/TIME\(7,20,0\)/.test(xinfo)&&/"result":2150/.test(xinfo), xinfo.slice(0,500));
   await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag.png',fullPage:true});
   await p.click('[data-act="pjp-fech"][data-f="f1"]'); await H.dorme(900); S=await srv(); doc=S['rh/dados/pjpag/2026-10-2'];
-  ok('Fechar valor guarda o valor e os dias', doc.pes.f1.st==='fechado'&&doc.pes.f1.fech.valor===2150.26&&doc.pes.f1.fech.min===5808&&doc.pes.f1.fech.dias.length===16, JSON.stringify(doc.pes.f1.fech).slice(0,200));
+  ok('Fechar valor guarda o valor e os dias', doc.pes.f1.st==='fechado'&&doc.pes.f1.fech.valor===2150&&doc.pes.f1.fech.min===5808&&doc.pes.f1.fech.dias.length===16, JSON.stringify(doc.pes.f1.fech).slice(0,200));
   await p.click('[data-act="pjp-ped"][data-f="f1"]'); await H.dorme(1200); S=await srv();
   const pk=Object.keys(S).find(k=>k.startsWith('rh/dados/pjnotaped/')), ped=S[pk], tok=pk.split('/').pop();
   const wa=await p.$eval('[data-act="pjp-wa"]',a=>a.href).catch(()=>''), lk=await p.evaluate(()=>(document.querySelector('.pjp-mod .lk')||{}).textContent||'');
-  ok('Pedir nota: cria o pedido (valor, empresa, CNPJ, dias) e abre o WhatsApp do PJ com a mensagem e o link', ped&&ped.valor===2150.26&&ped.tomador.cnpj==='62.944.495/0001-64'&&/ZENITH/.test(ped.tomador.nome)&&ped.dias.length===11&&/nota\.html\?c=[a-z0-9]{20}$/.test(lk)
-    &&/^https:\/\/wa\.me\/5551999990000\?text=/.test(wa)&&/R\$\s2\.150,26/.test(decodeURIComponent(wa))&&decodeURIComponent(wa).includes('nota.html?c='+tok)&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pedido', JSON.stringify({wa:decodeURIComponent(wa).slice(0,300),lk}));
+  ok('Pedir nota: cria o pedido (valor, empresa, CNPJ, dias) e abre o WhatsApp do PJ com a mensagem e o link', ped&&ped.valor===2150&&ped.tomador.cnpj==='62.944.495/0001-64'&&/ZENITH/.test(ped.tomador.nome)&&ped.dias.length===11&&/nota\.html\?c=[a-z0-9]{20}$/.test(lk)
+    &&/^https:\/\/wa\.me\/5551999990000\?text=/.test(wa)&&/R\$\s2\.150,00/.test(decodeURIComponent(wa))&&decodeURIComponent(wa).includes('nota.html?c='+tok)&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pedido', JSON.stringify({wa:decodeURIComponent(wa).slice(0,300),lk}));
   await p.click('[data-act="pjp-modx"]'); await H.dorme(300);
   /* o celular do PJ (outro aparelho: banco copiado) */
   const B2=await H.abrir({viewport:{width:390,height:844}}); const q=B2.page; await H.preparar(q,{docs:S,users:{}}); await q.goto(H.BASE+'nota.html?c='+tok); await H.dorme(1300);
   const tela=await q.evaluate(()=>document.body.innerText);
-  ok('Link do PJ abre sem login com o valor, as horas, o desconto e os dados para emitir', /Olá, Joao!/.test(tela)&&/R\$\s?2\.150,26/.test(tela)&&/96h48/.test(tela)&&/Desconto/.test(tela)&&/62\.944\.495\/0001-64/.test(tela)&&/ZENITH/.test(tela), tela.replace(/\n/g,' | ').slice(0,500));
-  await q.setInputFiles('#arq',{name:'nota15.xml',mimeType:'text/xml',buffer:Buffer.from(xml({num:15,prest:'12345678000190',nomeP:'JOAO',toma:'62944495000164',valor:'2150.26'}))}); await H.dorme(700);
+  ok('Link do PJ abre sem login com o valor, as horas, o desconto e os dados para emitir', /Olá, Joao!/.test(tela)&&/R\$\s?2\.150,00/.test(tela)&&/96h48/.test(tela)&&/Desconto/.test(tela)&&/62\.944\.495\/0001-64/.test(tela)&&/ZENITH/.test(tela), tela.replace(/\n/g,' | ').slice(0,500));
+  await q.setInputFiles('#arq',{name:'nota15.xml',mimeType:'text/xml',buffer:Buffer.from(xml({num:15,prest:'12345678000190',nomeP:'JOAO',toma:'62944495000164',valor:'2150'}))}); await H.dorme(700);
   const chk=await q.evaluate(()=>document.getElementById('chk').innerText), nn=await q.inputValue('#num');
   ok('Lê o XML no próprio celular e mostra que confere', /confere com o pedido/.test(chk)&&nn==='15', chk);
   await q.click('#env'); await H.dorme(1500); const fim=await q.evaluate(()=>document.body.innerText), S2=await q.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
@@ -78,7 +78,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   /* chega no RH */
   await p.evaluate(s=>{ const o=JSON.parse(localStorage.getItem('__srv')); o.docs=s; localStorage.setItem('__srv',JSON.stringify(o)); window.__mockReconnect&&window.__mockReconnect(); },S2); await H.dorme(2000);
   S=await srv(); doc=S['rh/dados/pjpag/2026-10-2']; s=await view();
-  ok('No RH: a nota chega, o painel lê o XML e diz que bate; o link deixa de valer', doc.pes.f1.st==='chegou'&&doc.pes.f1.nota.conf==='ok'&&doc.pes.f1.nota.num==='15'&&doc.pes.f1.nota.valor===2150.26&&S[pk].usado===true&&/Nota chegou/.test(s), JSON.stringify(doc.pes.f1.nota).slice(0,300));
+  ok('No RH: a nota chega, o painel lê o XML e diz que bate; o link deixa de valer', doc.pes.f1.st==='chegou'&&doc.pes.f1.nota.conf==='ok'&&doc.pes.f1.nota.num==='15'&&doc.pes.f1.nota.valor===2150&&S[pk].usado===true&&/Nota chegou/.test(s), JSON.stringify(doc.pes.f1.nota).slice(0,300));
   await p.evaluate(()=>__T.go('rhinicio')); await H.dorme(900); await p.click('[data-act="rh-iavt"]').catch(()=>{}); await H.dorme(500); const ini=await view();
   ok('Início do RH avisa a nota para conferir', /nota de PJ chegou para conferir/.test(ini), ini.replace(/\n/g,' | ').slice(0,300));
   await p.evaluate(()=>__T.go('rhpjpag')); await H.dorme(900);

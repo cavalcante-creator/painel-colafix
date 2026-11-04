@@ -68,7 +68,7 @@
   const horDe=(c,f)=>{ const g=cfg(c), x=f.pjPag||{}, he=f.horEsp||{}, tem=v=>v!=null&&v!=='';
     return {ini:x.ini||he.ini||g.ini,fim:x.fim||he.fim||g.fim,intv:tem(x.intv)?+x.intv:+g.intv,tol:tem(x.tol)?+x.tol:+g.tol,dentro:typeof x.dentro==='boolean'?x.dentro:!!g.dentro,
       dias:Array.isArray(x.dias)&&x.dias.length?x.dias:Array.isArray(he.dias)&&he.dias.length?he.dias:[1,2,3,4,5],de:{ini:x.ini?'pj':he.ini?'cad':'pad',fim:x.fim?'pj':he.fim?'cad':'pad'}}; };
-  const vhDe=(c,f)=>{ const x=f.pjPag||{}; if(+x.vh>0) return +x.vh; const s=num(f.salario); return s>0?Math.round(s/(+cfg(c).horasMes||220)*100)/100:0; };
+  const vhDe=(c,f)=>{ const x=f.pjPag||{}; if(+x.vh>0) return +x.vh; const s=num(f.salario); return s>0?s/(+cfg(c).horasMes||220):0; }; /* como a planilha: valor da hora com todas as casas (5000/220 = 22,7272…); só o total vira centavos */
   const empDe=(c,f)=>{ const k=String(f.empresa||'').toUpperCase(); return (c.EMP_DOC||{})[k]||{nome:f.empresa||'',cnpj:''}; };
   /* chave do Face ID: o CPF do cadastro; sem CPF (ou CPF que não aparece), pelo nome */
   function chaveFid(c,f,dados){ const P0=(dados&&dados.pessoas)||{}, cpf=dig(f.cpf).padStart(11,'0');
@@ -86,7 +86,7 @@
       let info='';
       if(!(a&&(a.e||a.s||a.zero))){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
       out.push({d,dw,hs,e,s,E:r.E,S:r.S,m:r.m,aj:!!(a&&(a.e||a.s||a.zero)),zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw)}); tot+=r.m; });
-    const fixo=+((f.pjPag||{}).fixo)||0, desc=num(x&&x.desc), bruto=fixo>0?fixo:Math.round(hDec(tot)*vh*100)/100;
+    const fixo=+((f.pjPag||{}).fixo)||0, desc=num(x&&x.desc), bruto=fixo>0?fixo:hDec(tot)*vh;
     return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,valor:Math.max(0,Math.round((bruto-desc)*100)/100),alerta,comFid,semFid:!dados||!comFid,dados:!!dados}; }
   /* ---------- banco ---------- */
   function assina(c,pid){ const P=c.P; if(!J.sub[pid]){ J.sub[pid]=true;
@@ -291,7 +291,7 @@
           <div class="pjp-dw" style="margin-top:6px">${[1,2,3,4,5,6,0].map(i=>`<label><input type="checkbox" data-pjp-dw="${i}" ${h.dias.includes(i)?'checked':''}><span>${DNL[i]}</span></label>`).join('')}</div>
           <label class="pjp-ck" style="margin-top:12px"><input type="checkbox" id="pjp-rdentro" ${h.dentro?'checked':''}> Não contar o tempo antes da entrada nem depois da saída</label></div>
         <div class="pjp-sec"><h4>Valor</h4><div class="pjp-rv">
-          <label><input type="radio" name="pjp-rv" value="h" ${+pj.fixo>0?'':'checked'}> Por hora trabalhada · R$ <input type="text" id="pjp-rvh" inputmode="decimal" value="${+pj.vh>0?esc(n2(pj.vh)):''}" placeholder="${r.vh?esc(n2(r.vh)):'0,00'}" style="width:110px"> por hora ${!(+pj.vh>0)&&r.vh?`<small style="color:var(--muted)">(hoje: salário ÷ ${g.horasMes})</small>`:''}</label>
+          <label><input type="radio" name="pjp-rv" value="h" ${+pj.fixo>0?'':'checked'}> Por hora trabalhada · R$ <input type="text" id="pjp-rvh" inputmode="decimal" value="${+pj.vh>0?esc(String(+pj.vh).replace('.',',')):''}" placeholder="${r.vh?esc(n2(r.vh)):'0,00'}" style="width:110px"> por hora ${!(+pj.vh>0)&&r.vh?`<small style="color:var(--muted)">(hoje: salário ÷ ${g.horasMes})</small>`:''}</label>
           <label><input type="radio" name="pjp-rv" value="f" ${+pj.fixo>0?'checked':''}> Valor fixo por ${g.modo==='mes'?'mês':'quinzena'} · R$ <input type="text" id="pjp-rfx" inputmode="decimal" value="${+pj.fixo>0?esc(n2(pj.fixo)):''}" placeholder="0,00" style="width:110px"></label></div></div>
         <div class="pjp-sec"><h4>Observação</h4><input class="pjp-rob" id="pjp-rob" style="width:100%" maxlength="200" value="${esc(pj.obs||'')}" placeholder="ex.: trabalha sábado de manhã, combinado com o Marcelo"></div>
         <div class="pjp-ac">${btn('pjp-ppad','Voltar tudo ao padrão',fa)}${btn('pjp-psalva','Salvar regras',fa,'')}</div>`; }
@@ -304,7 +304,7 @@
       <div class="pjp-gs"><span class="pjp-pill ${stC}">${stT}</span><small style="color:var(--muted)">${esc(h.ini)} às ${esc(h.fim)} · intervalo ${h.intv} min · ${h.dias.map(i=>DN[i]).join(', ')}</small></div>
       <div class="pjp-tabs" role="tablist">${[['horas','Horas'],['regras','Regras desta pessoa'],['hist','Histórico']].map(([k,t])=>`<button role="tab" class="${tab===k?'on':''}" aria-selected="${tab===k}" data-act="pjp-tab" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="pjp-gb">${corpo}</div>
-      ${tab==='horas'?`<div class="pjp-tot"><div>Horas<b>${r.fixo?'fixo':hTxt(r.min)}</b></div><div>× Valor da hora<b>${r.fixo?'—':r.vh?R$(r.vh):'falta'}</b></div>
+      ${tab==='horas'?`<div class="pjp-tot"><div>Horas (decimal)<b>${r.fixo?'fixo':n2(hDec(r.min))+' h'}</b>${r.fixo?'':`<small>${hTxt(r.min)}</small>`}</div><div>× Valor da hora<b>${r.fixo?'—':r.vh?R$(r.vh):'falta'}</b></div>
         <div>− Desconto${ed?`<input data-pjp-c="desc" ${fa} inputmode="decimal" value="${x.desc?esc(n2(x.desc)):''}" placeholder="0,00" aria-label="Desconto">`:`<b>${r.desc?R$(r.desc):'—'}</b>`}</div>
         <div>Motivo${ed?`<input data-pjp-c="descMot" ${fa} value="${esc(x.descMot||'')}" maxlength="120" placeholder="(opcional)" style="width:150px;text-align:left">`:`<b style="font-size:13px">${esc(x.descMot||'—')}</b>`}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b></div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
@@ -341,7 +341,7 @@
     rs.forEach(({f,x,r})=>{ tot.n++; tot.min+=r.min; tot.val+=r.valor; tot.desc+=r.desc||0; const st=x.st||''; tot.st[st]=(tot.st[st]||0)+1; if(r.semFid&&!r.fixo&&!x.st) semFid++;
       const emp=String(f.empresa||'').toUpperCase(), ab=J.ab===f._id;
       linhas.push(`<tr class="${st==='pago'?'feito':''} ${ab?'aberto':''}"><td><button class="pjp-nm" data-act="pjp-ab" data-f="${esc(f._id)}" aria-haspopup="dialog">${esc(c.titulo(f.nome))}</button><small>${esc([emp,f.setor].filter(Boolean).join(' · '))}</small>${!st&&r.semFid&&!r.fixo?'<small style="color:var(--crit-ink)">Sem passagem no Face ID</small>':''}</td>
-        <td class="n">${r.fixo?'<small>valor fixo</small>':`<b>${hTxt(r.min)}</b><small>${n2(hDec(r.min))} h</small>`}</td>
+        <td class="n">${r.fixo?'<small>valor fixo</small>':`<b>${n2(hDec(r.min))} h</b><small>${hTxt(r.min)}</small>`}</td>
         <td class="n">${r.fixo?'—':r.vh?R$(r.vh):'<b style="color:var(--crit-ink)">falta</b>'}</td>
         <td class="n">${r.desc?'− '+R$(r.desc):'—'}</td><td class="n"><b>${R$(r.valor)}</b></td>
         <td class="pjp-qa" colspan="2">${acoes(c,pid,f,x,r)}</td></tr>`); });
@@ -438,7 +438,7 @@
         cf('Total Horas',6,{formula:`SUM(F${d0}:F${d1})`,result:o.min/1440},'[h]:mm'); W.getCell('G'+rT).value={formula:`F${rT}*24`,result:+(o.min/60).toFixed(4)}; W.getCell('G'+rT).numFmt='0.00'; W.getCell('G'+rT).border=bd;
         const rV=cf(o.r.fixo?'Valor fixo':'Valor Horas',6,o.r.fixo?o.r.fixo:(o.vh||0),FR);
         const rD=cf('Desconto',6,o.desc||0,FR); if(o.x.descMot) W.getCell('H'+rD).value=o.x.descMot;
-        cf('Total a Pagar',6,{formula:o.r.fixo?`F${rV}-F${rD}`:`ROUND(F${rV}*G${rT},2)-F${rD}`,result:o.valor},FR,true);
+        cf('Total a Pagar',6,{formula:o.r.fixo?`F${rV}-F${rD}`:`F${rV}*G${rT}-F${rD}`,result:o.valor},FR,true);
         r+=1; });
     }
     const buf=await wb.xlsx.writeBuffer(), arq='Pagamento-PJ-'+J.per+'.xlsx', blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
