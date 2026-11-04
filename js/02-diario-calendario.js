@@ -1276,7 +1276,7 @@ function vCalendario(){
    <div class="calscroll ${calRO()?'calro':''}"><div class="calgrid" style="grid-template-columns:${cols}">
     <div class="ch ch0"></div>${dias.map(d=>{ const p=pendDia(d); return `<div class="ch ${d===h?'hoje':''}">${dLab(d)}${p?`<small class="num">${f0(p)} pendente</small>`:''}</div>`; }).join('')}
     ${L.map(l=>{ const cap=capDe(l);
-      const cel=(xs,d,extra)=>{ const pend=xs.filter(o=>o.status==='aberta').reduce((a,o)=>a+Math.max(0,o.total-entregueDe(o)),0); const over=cap&&pend>cap&&!extra;
+      const cel=(xs,d,extra)=>{ const pend=xs.filter(o=>o.status==='aberta').reduce((a,o)=>a+capQtd(o),0); const over=cap&&pend>cap&&!extra;
         const pvs=extra?[]:prevAtivas().filter(p=>p.linha===l&&(p.data===d||(d===h&&p.data<h)));
         xs=xs.concat(pvs).sort(seqCmp); const nab=xs.filter(o=>o._pv||o.status==='aberta').length; let k=0;
         return `<div class="cc ${d===h?'hoje':''} ${extra?'atr':''}" ${extra?'':`data-drop-l="${esc(l)}" data-drop-d="${d}"`}>${xs.map(o=>o._pv?prevCard(o,nab>1?++k:0):calCard(o,nab>1&&o.status==='aberta'?++k:0)).join('')}${extra?'':calContDe(l,d,vis).map(o=>calCont(o,d,C.sab)).join('')}${extra||calRO()?'':`<button class="cadd" data-act="pv-nova-cal" data-l="${esc(l)}" data-d="${d}" title="Incluir uma previsão (planejada, ainda sem ordem) na ${esc(l)} em ${dm(d)}">+ planejar</button>`}${pend?(()=>{ const cr=extra?0:capRealMemo(l); const ar=!over&&cr&&pend>cr*1.02; return `<div class="cfoot num ${over?'over':''} ${ar?'acreal':''}" ${ar?`title="Acima do que a linha tem feito: ${f0(cr)} por dia (média dos melhores dias de linha cheia)"`:''}>${f0(pend)}${cap&&!extra?' / '+f0(cap):''}${ar?`<em>acima do real (${f0(cr)})</em>`:''}</div>`; })():''}${extra?'':corCal(l,d)}</div>`; };
@@ -1299,7 +1299,7 @@ async function calHtml(){ const C=S.cal; if(!C.ini) C.ini=segundaStr(new Date())
     return `<div class="c${atr?' at':''}" data-q="${E(buscaNorm([o.num,o.produto,o.ensaca].join(' ')))}"><div class="c1">${k?`<span class="sq">${k}</span>`:''}<b class="cd">${E(codigoDe(o))}</b><span class="q">${f0(e?pen:o.total)}<small>${E(uA(o))}${e?' faltam':''}</small></span></div>
      <div class="nm">${E(nomeCurto(o))}</div>
      <div class="mt"><span>Ordem ${E(o.num)}</span>${o.ensaca?`<span>ensaca ${E(o.ensaca)}</span>`:''}${o.turno&&o.turno!=='Dia todo'?`<span>${E(o.turno)}</span>`:''}${atr?`<span class="tg at">atrasada · ${dm(dataEf(o))}</span>`:''}${hora}</div>${e?`<div class="pb"><i style="width:${pct}%"></i></div>`:''}</div>`; };
-  const cel=(l,d,di)=>{ const xs=itensCel(l,d); let k=0; const n=xs.length, pend=xs.reduce((a,o)=>a+pendDe(o),0), cap=capDe(l);
+  const cel=(l,d,di)=>{ const xs=itensCel(l,d); let k=0; const n=xs.length, pend=xs.reduce((a,o)=>a+capQtd(o,pendDe(o)),0), cap=capDe(l);
     const uso=cap?Math.min(100,pend/cap*100):0, over=cap&&pend>cap;
     return `<td class="${d===h?'hj':''}${n?'':' vz'}" data-di="${di}"><div class="dm">${DL[new Date(d+'T12:00:00').getDay()]} ${dm(d)}</div>${n?xs.map(o=>card(o,n>1?++k:0)).join(''):'<div class="nada">—</div>'}
       ${pend?`<div class="cap${over?' ov':''}">${cap?`<div class="cb"><i style="width:${uso}%"></i></div>`:''}<span>${f0(pend)}${cap?` de ${f0(cap)}`:''}</span></div>`:''}</td>`; };

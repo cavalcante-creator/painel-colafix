@@ -905,7 +905,7 @@ function expediente(){ const txt=S.cfg.expediente||EXPED_PADRAO; const ps=[]; St
 function avancar(t,min,ps){ let dia=0; for(let g=0;g<400;g++){ for(const [i,f] of ps){ const ini=i+dia*1440, fim=f+dia*1440; if(t<ini) t=ini; if(t>=fim) continue; const cabe=fim-t; if(min<=cabe) return {t:t+min,passa:dia>0}; min-=cabe; t=fim; } dia++; } return {t,passa:true}; }
 function estimarGrupo(itens,dia,linha){ const cap=capDe(linha); if(!cap) return {}; const ps=expediente(); const tot=ps.reduce((a,[i,f])=>a+f-i,0); if(!tot) return {}; const porMin=cap/tot;
   const h=hojeStr(); let t=ps[0][0]; if(dia===h){ const n=new Date(); t=Math.max(t,n.getHours()*60+n.getMinutes()); } else if(dia<h) return {};
-  const out={}; let passou=false; itens.forEach(o=>{ const q=o._pv?(+o.qtd||0):Math.max(0,o.total-entregueDe(o)); if(!(q>0)) return; const st=avancar(t,0,ps); const a=st.t; const r=avancar(a,q/porMin,ps); t=r.t; passou=passou||st.passa||r.passa; out[seqId(o)]={ini:a,fim:t,passa:passou,dia}; }); return out; }
+  const out={}; let passou=false; itens.forEach(o=>{ const q=capQtd(o); if(!(q>0)) return; const st=avancar(t,0,ps); const a=st.t; const r=avancar(a,q/porMin,ps); t=r.t; passou=passou||st.passa||r.passa; out[seqId(o)]={ini:a,fim:t,passa:passou,dia}; }); return out; }
 function difDias(a,b){ return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5); }
 function estimarLinha(linha){ const cap=capDe(linha); if(!cap) return {}; const ps=expediente(); const tot=ps.reduce((a,[i,f])=>a+f-i,0); if(!tot) return {}; const porMin=cap/tot;
   const h=hojeStr(), kd=x=>{ const d=dataEf(x); return d<h?h:d; };
@@ -913,7 +913,7 @@ function estimarLinha(linha){ const cap=capDe(linha); if(!cap) return {}; const 
   const out={}; let carry=-Infinity; S._sobra=S._sobra||{};
   dias.forEach(d=>{ const k=difDias(h,d); if(k>400) return; let ini0=k*1440+ps[0][0]; if(k===0){ const n=new Date(); ini0=Math.max(ini0,n.getHours()*60+n.getMinutes()); }
     const sobra=carry>ini0?carry:0; S._sobra[d+'|'+linha]=sobra?sobra-k*1440:0; let t=Math.max(carry,ini0);
-    todos.filter(x=>kd(x)===d).sort(seqCmp).forEach(o=>{ const q=o._pv?(+o.qtd||0):Math.max(0,o.total-entregueDe(o)); if(!(q>0)) return; const a=avancar(t,0,ps).t; const r=avancar(a,q/porMin,ps); t=r.t; out[seqId(o)]={ini:a-k*1440,fim:t-k*1440,passa:t>(k+1)*1440,dia:d}; });
+    todos.filter(x=>kd(x)===d).sort(seqCmp).forEach(o=>{ const q=capQtd(o); if(!(q>0)) return; const a=avancar(t,0,ps).t; const r=avancar(a,q/porMin,ps); t=r.t; out[seqId(o)]={ini:a-k*1440,fim:t-k*1440,passa:t>(k+1)*1440,dia:d}; });
     carry=t; });
   return out; }
 function seqCmp(a,b){ const x=a.seq!=null?+a.seq:1e9, y=b.seq!=null?+b.seq:1e9; return x-y||String(a.num).localeCompare(String(b.num)); }
@@ -996,7 +996,7 @@ function vProgramacao(){
   </section>`;
 }
 function grpHead(k,its){ const [d,l]=k.split('|'); const cap=capDe(l); const ab=its.filter(o=>o._pv||o.status==='aberta');
-  const pend=ab.reduce((a,o)=>a+(o._pv?(+o.qtd||0):Math.max(0,o.total-entregueDe(o))),0); const over=cap&&pend>cap; const pct=cap?Math.min(100,pend/cap*100):0;
+  const pend=ab.reduce((a,o)=>a+capQtd(o),0); /* 04/11: item com fardo conta em fardos (js/79) */ const over=cap&&pend>cap; const pct=cap?Math.min(100,pend/cap*100):0;
   const h=hojeStr(), sob=(S._sobra||{})[d+'|'+l]||0; const pend0=d===h?ab.filter(o=>!o._pv&&o.total-entregueDe(o)>0):[];
   return `<div class="ogrp ${over?'over':''}"><b>${esc(dmTxt(d))}</b><span class="dot">·</span><b>${esc(l)}</b><span class="dot">·</span><span>${ab.length} ${ab.length===1?'item':'itens'}</span>${(()=>{ const cr=ab.filter(o=>!o._pv&&o.rancho); if(!cr.length) return ''; const ent=cr.filter(o=>{ const r=o.rdb||{}; return r.ent||r.conf; }).length; return `<span class="dot">·</span><span class="ogrch ${ent===cr.length?'ok':''}" title="Ordens com rancho já entregue na linha">${ent===cr.length?'✓ ':''}ranchos entregues ${ent}/${cr.length}</span>`; })()}${sob?`<span class="dot">·</span><span class="ogsob" title="O que sobrou do dia anterior ocupa a linha até esse horário">começa ${sob>=1440?'depois de amanhã':'às '+minHora(sob)} <small>(sobra do dia anterior)</small></span>`:''}${pend0.length?`<button class="lnk ogpass" data-act="o-passar" data-v="${esc(l)}" title="Passa as ordens abertas de hoje desta linha para o próximo dia útil, na frente das que já estão lá">Passar ${pend0.length} p/ ${amanhaLab().toLowerCase()} ›</button>`:''}
    <span class="ogcap num">${cap?`<span class="ogbar"><i style="width:${pct}%"></i></span><b>${f0(pend)}</b> / ${f0(cap)} <small>sc/dia</small>${over?' <span class="pill crit" style="font-size:11px;padding:1px 8px">acima da capacidade</span>':''}`:`<b>${f0(pend)}</b> <small>pendente</small> <button class="lnk" data-go="ajustes" style="padding:0;font-size:12px">definir capacidade</button>`}</span>${corGrp(d,l)}</div>`; }
