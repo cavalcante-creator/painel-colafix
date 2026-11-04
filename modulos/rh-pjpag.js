@@ -33,7 +33,14 @@
   const hDec=m=>((+m||0)/60);
   const R$=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   const n2=v=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const num=v=>{ if(typeof v==='number') return v; const s=String(v||'').replace(/[^\d,.-]/g,''); if(!s) return 0; return /,\d{1,2}$/.test(s)?+s.replace(/\./g,'').replace(',','.'):+s.replace(/,/g,'')||0; };
+  /* aceita vírgula ou ponto: o último separador é o decimal (22,7272 · 22.7272 · 1.234,56 · 1,234.56); só pontos em grupos de 3 (5.000) = milhar */
+  const num=v=>{ if(typeof v==='number') return v; let s=String(v||'').replace(/[^\d,.-]/g,''); if(!s) return 0;
+    const c=s.lastIndexOf(','), d=s.lastIndexOf('.');
+    if(c>=0&&d>=0){ const dec=c>d?',':'.'; s=s.split(dec===','?'.':',').join('').replace(dec,'.'); }
+    else if(c>=0) s=s.replace(/,/g,(m,i)=>i===c?'.':'');
+    else if(d>=0&&/^-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+    else if(d>=0) s=s.replace(/\./g,(m,i)=>i===d?'.':'');
+    return +s||0; };
   const agora=()=>new Date().toISOString();
   const hojeS=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
   const fCNPJ=s=>{ const d=dig(s); return d.length===14?d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):s||''; };
