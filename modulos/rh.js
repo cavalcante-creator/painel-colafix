@@ -1645,6 +1645,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       <div class="rh-v2more"><button class="lnk" data-act="rh-paj" data-k="afast" data-id="${f._id}">${f.afast&&f.afast.ini?'Afastamento':'Está afastado'}</button> · <button class="lnk" data-act="rh-paj" data-k="hor" data-id="${f._id}">Horário diferente</button></div>${presAjModal()}
         ${e?`<div class="rh-v2ex"><div><b>Experiência 45 + 45</b><span class="pill ${e.c}">${esc(e.t)}</span></div><div class="rh-v2bar"><i style="width:${Math.max(2,Math.min(100,diasEntre(f.admissao,P.hojeStr())/90*100)).toFixed(0)}%"></i><em></em></div><div class="rh-v2bl"><span>1ª etapa até ${br(e.f1)}</span><span>2ª até ${br(e.f2)}</span></div>
           <div class="rh-pfb">${e.etapa===1?`<button class="btn sec rh-sm" data-act="rh-expprorr" data-id="${f._id}">Prorrogar</button>`:''}<button class="btn sec rh-sm" data-act="rh-expefet" data-id="${f._id}">Efetivar</button></div></div>`:''}
+        ${R.reatDoc===f._id?`<div class="rh-reatdoc" role="status"><b>${esc(titulo(f.nome).split(' ')[0])} voltou a trabalhar.</b> Quer gerar o documento agora (contrato, termo…)?<span><button class="btn rh-sm" data-act="rh-dsreatdoc" data-id="${f._id}">Gerar documento</button><button class="btn sec rh-sm" data-act="rh-dsreatnao">Agora não</button></span></div>`:''}
         ${f.status==='Desligado'||f.desligAgendado?`<div class="rh-v2ds">${f.status==='Desligado'?'Desligado em <b>'+br(f.desligamento)+'</b>':'Sai em <b>'+br(f.desligamento)+'</b>'}${f.desligMotivo?' · '+esc(f.desligMotivo):''} ${deslForm(f)}</div>`:''}
         ${f.obs?`<div class="sub" style="margin:12px 0 0;font-size:13.5px">${esc(f.obs)}</div>`:''}`; }
     else if(ab==='ferias'){ if(sf){ const p=sf.p, us=p?30-p.saldo:0, fx=ferDe(f).filter(x=>!x.anterior&&x.status!=='cancelada').sort((a,b)=>String(b.inicio).localeCompare(String(a.inicio))).slice(0,5);
@@ -2108,12 +2109,14 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn rh-sm" data-act="rh-desagenda" data-id="${x._id}">Agendar (fica ativo até lá)</button><button class="btn sec rh-sm" data-act="rh-descancela" data-id="${x._id}">Cancelar desligamento</button><button class="lnk" data-act="rh-desfazx">Fechar</button></div></div>`; }
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rh-dsreat"]'); if(!b) return; const a=b.dataset.act;
     if(a==='rh-dsreat'){ R.reat=b.dataset.id; R.desfaz=null; P.render(); return; } if(a==='rh-dsreatx'){ R.reat=null; P.render(); return; }
+    if(a==='rh-dsreatnao'){ R.reatDoc=null; P.render(); return; }
+    if(a==='rh-dsreatdoc'){ const id=b.dataset.id; R.reatDoc=null; R.dg={funcId:id,modeloId:'',extra:{},resp:{},feriasId:'',guardar:true}; R.dv='gerar'; R.f=null; R.fdesl=null; P.go('rhdocs'); return; }
     const f=R.func.find(x=>x._id===b.dataset.id); if(!f) return; const g=id=>String((document.getElementById(id)||{}).value||'').trim(), d=g('rh-rtdata');
     if(!okIso(d)) return P.toast('Escolha a data em que voltou.'); if(okIso(f.desligamento)&&d<=f.desligamento) return P.toast('A volta tem que ser depois da saída ('+br(f.desligamento)+').');
     try{ const ant={admissao:f.admissao||'',desligamento:f.desligamento||'',motivo:f.desligMotivo||'',funcao:f.funcao||'',setor:f.setor||'',empresa:f.empresa||'',em:agora(),por:eu()};
       const up={status:'Ativo',admissao:d,desligamento:'',desligAgendado:false,desligMotivo:'',vinculos:(f.vinculos||[]).concat([ant]),reativadoEm:agora(),reativadoPor:eu(),funcao:g('rh-rtfun')||f.funcao||'',setor:g('rh-rtset')||f.setor||''};
       if(f.tipo==='PJ'){ up.ultimaTroca=''; up.pjProx=''; }
-      await grava(COL.func+'/'+f._id,up); Object.assign(f,up); R.reat=null; P.toast(titulo(f.nome)+' reativado(a): admissão em '+br(d)+'.'); P.render(); }
+      await grava(COL.func+'/'+f._id,up); Object.assign(f,up); R.reat=null; R.reatDoc=f._id; P.toast(titulo(f.nome)+' reativado(a): admissão em '+br(d)+'.'); P.render(); }
     catch(e){ P.toast('Não foi possível reativar: '+((e&&e.message)||e)); } });
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rh-des"]'); if(!b) return; const a=b.dataset.act; if(!['rh-desfaz','rh-desfazx','rh-desagenda','rh-descancela'].includes(a)) return;
     if(a==='rh-desfaz'){ R.desfaz=b.dataset.id; P.render(); return; } if(a==='rh-desfazx'){ R.desfaz=null; P.render(); return; }
@@ -2146,7 +2149,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   window.rhAutoCampos=autoCampos;
   document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="rh-dauto"]'); if(!b||!R.dm) return; const antes=camposDe(R.dm.html||'').length;
     R.dm.html=limpar(autoCampos(R.dm.html||'')); const dep=camposDe(R.dm.html).length; P.render(); P.toast(dep>antes?(dep-antes)+' campo(s) reconhecido(s). Confira e salve o modelo.':'Não encontrei mais dados para trocar por campos.'); });
-  try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-doc-css">.rh-dslk{display:block;font-size:12px;margin-top:2px}.rh-reatb{margin-top:8px}.rh-reatf{border:1px solid var(--teal);border-radius:10px;padding:10px 12px;background:var(--surface)}.rh-dsf{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding:8px;border-radius:10px;background:var(--sunken)}</style>'); }catch(e){}
+  try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-doc-css">.rh-dslk{display:block;font-size:12px;margin-top:2px}.rh-reatb{margin-top:8px}.rh-reatdoc{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;background:var(--ok-tint,#E3F0E8);color:var(--ok-ink,#2F6047);border-radius:12px;padding:10px 14px;margin:0 0 10px}.rh-reatdoc span{display:flex;gap:6px}.rh-reatf{border:1px solid var(--teal);border-radius:10px;padding:10px 12px;background:var(--surface)}.rh-dsf{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding:8px;border-radius:10px;background:var(--sunken)}</style>'); }catch(e){}
 
   /* ---------- puxar dados de um documento já feito (Word ou PDF com texto) para o cadastro, e guardar o arquivo na pessoa ---------- */
   R.pux=null; R.arqP={};

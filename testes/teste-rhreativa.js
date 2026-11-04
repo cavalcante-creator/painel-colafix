@@ -2,7 +2,7 @@
 const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,400):'')); };
 (async()=>{ const {d}=seedManut(); const D=d.docs;
   d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
-  D['rh/config']={setores:['Produção']};
+  D['rh/config']={setores:['Produção']}; D['rh/dados/modelos/m1']={nome:'Contrato PJ',vale:'PJ',html:'<p>CONTRATADO: <span class="rh-tk" data-k="NOME"></span></p>'};
   D['rh/dados/funcionarios/f1']={nome:'PEDRO VOLTA TESTE',tipo:'PJ',empresa:'ZENITH',cnpj:'12345678000190',funcao:'Operador',setor:'Produção',status:'Desligado',admissao:'2025-03-01',desligamento:'2026-08-15',desligMotivo:'Pediu para sair',ultimaTroca:'2026-06-01',trocas:[{data:'2026-06-01',obs:''}]};
   const erros=[]; const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; p.on('pageerror',e=>erros.push(e.message));
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(2500);
@@ -18,9 +18,15 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   const f=(await srv())['rh/dados/funcionarios/f1'];
   ok('Reativar: volta a Ativo com a data nova, setor novo, troca do PJ volta a contar da data nova', f.status==='Ativo'&&f.admissao==='2026-10-20'&&f.desligamento===''&&f.setor==='Expedição'&&f.ultimaTroca==='', JSON.stringify(f).slice(0,300));
   ok('A passagem anterior fica guardada', (f.vinculos||[]).length===1&&f.vinculos[0].admissao==='2025-03-01'&&f.vinculos[0].desligamento==='2026-08-15'&&f.vinculos[0].motivo==='Pediu para sair', JSON.stringify(f.vinculos));
+  const pg=await p.evaluate(()=>{ const x=document.querySelector('.rh-reatdoc'); return x?x.innerText:''; });
+  ok('Depois de reativar pergunta se quer gerar o documento', /voltou a trabalhar[\s\S]*Quer gerar o documento/.test(pg), pg);
   await p.click('[data-act="rh-fab"][data-v="hist"]').catch(()=>{}); await H.dorme(500);
+  const hv0=await p.evaluate(()=>document.getElementById('view').innerText);
   const hv=await p.evaluate(()=>document.getElementById('view').innerText);
   ok('A história mostra a admissão e o desligamento anteriores e a volta', /Desligamento anterior/.test(hv)&&/Voltou a trabalhar/.test(hv), hv.replace(/\n/g,' | ').slice(0,300));
+  await p.click('[data-act="rh-fab"][data-v="resumo"]').catch(()=>{}); await H.dorme(400); await p.click('[data-act="rh-dsreatdoc"]'); await H.dorme(900);
+  const dv=await p.evaluate(()=>({v:__T.S().view,t:document.getElementById('view').innerText}));
+  ok('"Gerar documento" abre Contratos e documentos com a pessoa escolhida', dv.v==='rhdocs'&&/Pedro Volta Teste|PEDRO VOLTA TESTE/.test(dv.t), dv.v+' '+dv.t.replace(/\n/g,' | ').slice(0,200));
   const e=erros.filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
   const n=res.filter(x=>!x.ok).length; console.log(n?'FALHOU ('+n+')':'PASSOU — '+res.length+' verificações'); process.exit(n?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });
