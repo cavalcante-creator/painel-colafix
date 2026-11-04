@@ -1250,6 +1250,8 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const ex=f.exp||{}; if(ex.status==='prorrogado') add(ex.em,'Experiência prorrogada','2ª etapa até '+br(expFim2(f)),'purple'); if(ex.status==='efetivado') add(ex.em,titulo(f.nome).split(' ')[0]+' foi efetivado(a)','fim do contrato de experiência','ok');
     ferDe(f).filter(x=>!x.anterior&&okIso(x.inicio)).forEach(x=>add(x.inicio,(x.inicio>P.hojeStr()?'Férias marcadas · ':'Férias · ')+plural(+x.dias,'dia','dias'),br(x.inicio)+' a '+br(x.fim)+(temAviso(x)?' · aviso de férias gerado':' · aviso de férias ainda não gerado'),'teal'));
     (f.trocas||[]).forEach(x=>add(x.data,'Troca do PJ',x.obs||'','purple'));
+    (f.vinculos||[]).forEach(v=>{ add(v.admissao,'Admissão anterior',[v.funcao,v.setor].filter(Boolean).join(' · '),'ink'); add(v.desligamento,'Desligamento anterior',v.motivo||'','crit'); });
+    if(okIso(String(f.reativadoEm||'').slice(0,10))&&(f.vinculos||[]).length) add(f.admissao,'Voltou a trabalhar (reativado)',[f.funcao,f.setor].filter(Boolean).join(' · '),'ok');
     R.docs.filter(d=>d.funcId===f._id).forEach(d=>add(d.em,d.modelo||'Documento',d.assinado?'gerado e assinado':'gerado','teal'));
     Object.keys(R.fm).forEach(m=>{ const a=((R.fm[m]||{}).assinadas||{})[f._id]; if(a) add(okIso(String(a.em||'').slice(0,10))?a.em:m+'-01','Ficha de EPI de '+mesNome(m)+' assinada','escaneada e guardada','ok'); });
     ocDe(f._id).forEach(x=>add(x.data,x.tipo+(x.dias?' · '+plural(+x.dias,'dia','dias'):''),x.motivo||'',ocCor(x.tipo)==='ok'?'ok':ocCor(x.tipo)==='neu'?'teal':'crit'));
@@ -2092,9 +2094,27 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
 @media (max-width:760px){.rh-mapsel{margin-left:0}}
 </style>`); }catch(e){}
   /* ---------- desligamento: corrigir quando a pessoa ainda não saiu (agendar para a data certa ou cancelar) ---------- */
-  function deslForm(x){ if(R.desfaz!==x._id) return `<button class="lnk rh-dslk" data-act="rh-desfaz" data-id="${x._id}">${x.status==='Desligado'?'Ainda não foi desligado?':'Mudar data ou cancelar'}</button>`;
+  /* reativar quem saiu e voltou (04/11, pedido: "PJs que são desligados mas depois voltam"): volta a Ativo com a data nova de
+     admissão; a passagem anterior fica guardada em `vinculos[]` {admissao,desligamento,motivo,funcao,setor,empresa,em,por} e aparece na história */
+  function reatForm(x){ const ant=x.desligamento?' (saiu em '+br(x.desligamento)+')':'';
+    if(R.reat!==x._id) return `<button class="btn rh-sm rh-reatb" data-act="rh-dsreat" data-id="${x._id}">Reativar · voltou a trabalhar</button>`;
+    return `<div class="rh-dsf rh-reatf"><b>Reativar ${esc(titulo(x.nome).split(' ')[0])}${esc(ant)}</b>
+      <label><span class="label">Volta em (nova data de admissão)</span><input class="txt" type="date" id="rh-rtdata" value="${esc(P.hojeStr())}"></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><label><span class="label">Função</span><input class="txt" id="rh-rtfun" value="${esc(x.funcao||'')}"></label><label><span class="label">Setor</span><input class="txt" id="rh-rtset" value="${esc(x.setor||'')}"></label></div>
+      <small style="color:var(--muted)">A passagem anterior (${esc(br(x.admissao)||'—')} a ${esc(br(x.desligamento)||'—')}) fica guardada na história da pessoa.${x.tipo==='PJ'?' A troca do PJ volta a contar desta data.':''}</small>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn rh-sm" data-act="rh-dsreatok" data-id="${x._id}">Reativar</button><button class="lnk" data-act="rh-dsreatx">Cancelar</button></div></div>`; }
+  function deslForm(x){ if(R.desfaz!==x._id) return (x.status==='Desligado'?reatForm(x):'')+(R.reat===x._id?'':`<button class="lnk rh-dslk" data-act="rh-desfaz" data-id="${x._id}">${x.status==='Desligado'?'Ainda não foi desligado?':'Mudar data ou cancelar'}</button>`);
     return `<div class="rh-dsf"><label><span class="label">Desliga em</span><input class="txt" type="date" id="rh-dsdata" value="${esc(okIso(x.desligamento)&&x.desligamento>P.hojeStr()?x.desligamento:addDias(P.hojeStr(),1))}"></label>
       <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn rh-sm" data-act="rh-desagenda" data-id="${x._id}">Agendar (fica ativo até lá)</button><button class="btn sec rh-sm" data-act="rh-descancela" data-id="${x._id}">Cancelar desligamento</button><button class="lnk" data-act="rh-desfazx">Fechar</button></div></div>`; }
+  document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rh-dsreat"]'); if(!b) return; const a=b.dataset.act;
+    if(a==='rh-dsreat'){ R.reat=b.dataset.id; R.desfaz=null; P.render(); return; } if(a==='rh-dsreatx'){ R.reat=null; P.render(); return; }
+    const f=R.func.find(x=>x._id===b.dataset.id); if(!f) return; const g=id=>String((document.getElementById(id)||{}).value||'').trim(), d=g('rh-rtdata');
+    if(!okIso(d)) return P.toast('Escolha a data em que voltou.'); if(okIso(f.desligamento)&&d<=f.desligamento) return P.toast('A volta tem que ser depois da saída ('+br(f.desligamento)+').');
+    try{ const ant={admissao:f.admissao||'',desligamento:f.desligamento||'',motivo:f.desligMotivo||'',funcao:f.funcao||'',setor:f.setor||'',empresa:f.empresa||'',em:agora(),por:eu()};
+      const up={status:'Ativo',admissao:d,desligamento:'',desligAgendado:false,desligMotivo:'',vinculos:(f.vinculos||[]).concat([ant]),reativadoEm:agora(),reativadoPor:eu(),funcao:g('rh-rtfun')||f.funcao||'',setor:g('rh-rtset')||f.setor||''};
+      if(f.tipo==='PJ'){ up.ultimaTroca=''; up.pjProx=''; }
+      await grava(COL.func+'/'+f._id,up); Object.assign(f,up); R.reat=null; P.toast(titulo(f.nome)+' reativado(a): admissão em '+br(d)+'.'); P.render(); }
+    catch(e){ P.toast('Não foi possível reativar: '+((e&&e.message)||e)); } });
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="rh-des"]'); if(!b) return; const a=b.dataset.act; if(!['rh-desfaz','rh-desfazx','rh-desagenda','rh-descancela'].includes(a)) return;
     if(a==='rh-desfaz'){ R.desfaz=b.dataset.id; P.render(); return; } if(a==='rh-desfazx'){ R.desfaz=null; P.render(); return; }
     const f=R.func.find(x=>x._id===b.dataset.id); if(!f) return;
@@ -2126,7 +2146,7 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   window.rhAutoCampos=autoCampos;
   document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="rh-dauto"]'); if(!b||!R.dm) return; const antes=camposDe(R.dm.html||'').length;
     R.dm.html=limpar(autoCampos(R.dm.html||'')); const dep=camposDe(R.dm.html).length; P.render(); P.toast(dep>antes?(dep-antes)+' campo(s) reconhecido(s). Confira e salve o modelo.':'Não encontrei mais dados para trocar por campos.'); });
-  try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-doc-css">.rh-dslk{display:block;font-size:12px;margin-top:2px}.rh-dsf{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding:8px;border-radius:10px;background:var(--sunken)}</style>'); }catch(e){}
+  try{ document.head.insertAdjacentHTML('beforeend','<style id="rh-doc-css">.rh-dslk{display:block;font-size:12px;margin-top:2px}.rh-reatb{margin-top:8px}.rh-reatf{border:1px solid var(--teal);border-radius:10px;padding:10px 12px;background:var(--surface)}.rh-dsf{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding:8px;border-radius:10px;background:var(--sunken)}</style>'); }catch(e){}
 
   /* ---------- puxar dados de um documento já feito (Word ou PDF com texto) para o cadastro, e guardar o arquivo na pessoa ---------- */
   R.pux=null; R.arqP={};
