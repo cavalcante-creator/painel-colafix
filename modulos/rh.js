@@ -742,7 +742,12 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
     const sel=(k,l,ops)=>`<label><span>${l}</span><select class="txt" data-rh-rf="${k}">${ops.map(([v,t])=>`<option value="${esc(v)}" ${R.rf[k]===v?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
     return `<div class="rr-fil">${sel('emp','Empresa',[['','Todas']].concat(emps.map(e=>[e,empNome(e)||e])))}${sel('vinc','Vínculo',[['','CLT e PJ'],['CLT','CLT'],['PJ','PJ']])}${sel('setor','Setor',[['','Todos']].concat(sets.map(x=>[x,x]),[['-','Sem setor']]))}</div>`
       +(window.RHRel?RHRel.barra({chips:[{t:'Empresa',v:R.rf.emp&&(empNome(R.rf.emp)||R.rf.emp)},{t:'Vínculo',v:R.rf.vinc},{t:'Setor',v:R.rf.setor&&(R.rf.setor==='-'?'sem setor':R.rf.setor)}],limpar:'rh-rflimpa'}):''); }
-  async function rrPdf(o){ if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou. Recarregue a página.'); try{ await RHRel.pdf(o); }catch(e){ P.toast(String(e&&e.message||e)); } }
+  async function rrPdf(o){ if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou. Recarregue a página.');
+    /* 04/11: colunas em texto viram {t,w} (largura pelo maior texto) e toda célula vira texto — o jsPDF recusa número e vazio */
+    (o.partes||[]).forEach(p=>{ if(!p.cols) return; p.rows=(p.rows||[]).map(r=>r.map(v=>v==null?'':String(v)));
+      if(typeof p.cols[0]==='string') p.cols=p.cols.map((t,i)=>{ const mx=Math.max(String(t).length,...p.rows.map(r=>String(r[i]||'').length)); return {t,w:Math.max(8,Math.min(46,mx))}; }); });
+    (o.kpis||[]).forEach(k=>{ k.v=k.v==null?'':String(k.v); });
+    try{ await RHRel.pdf(o); }catch(e){ P.toast(String(e&&e.message||e)); } }
   async function rrXls(arq,abas,info){ if(!window.RHRel) return P.toast('O gerador de relatórios ainda não carregou. Recarregue a página.'); try{ await RHRel.xls(arq,abas,info); }catch(e){ P.toast(String(e&&e.message||e)); } }
   /* nome de arquivo simples: sem "·" nem caracteres que o Windows não aceita */
   const nomeArq=s=>String(s).replace(/\s*[·•]\s*/g,' - ').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
