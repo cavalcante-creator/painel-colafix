@@ -57,7 +57,6 @@
       <div class="asn-ps"><i>1</i><span>O painel faz o PDF do documento e um link só desta pessoa.</span></div>
       <div class="asn-ps"><i>2</i><span>A pessoa abre o link no celular, baixa o PDF e assina no <b>gov.br</b> (precisa da conta prata ou ouro).</span></div>
       <div class="asn-ps"><i>3</i><span>Ela manda o arquivo assinado pelo mesmo link. O painel confere e guarda em "Ver assinado".</span></div>
-      <label>WhatsApp da pessoa<input id="asn-tel" inputmode="tel" value="${e(M.tel||'')}" placeholder="(51) 99999-0000"></label>
       <label>Mensagem (<b>{NOME}</b>, <b>{DOC}</b> e <b>{LINK}</b> são trocados sozinhos)<textarea id="asn-msg">${e(M.msg!=null?M.msg:msgPad)}</textarea></label>
       <label>O link vale por (dias)<input id="asn-dias" inputmode="numeric" value="${e(M.dias||15)}" style="max-width:120px"></label>
       ${M.erro?`<div class="asn-av">${e(M.erro)}</div>`:''}
@@ -67,11 +66,12 @@
       <span class="lk" id="asn-link">${e(linkDe(M.t))}</span>
       <label>Mensagem<textarea id="asn-txt">${e(msg)}</textarea></label>
       <p class="sub" style="margin-top:10px">Quando a pessoa mandar o documento assinado, ele aparece aqui na lista como "Assinado pelo gov.br".</p>
-      <div class="asn-ac"><button class="btn sec" data-act="asn-copia">Copiar</button><button class="btn sec" data-act="asn-x">Fechar</button><button class="btn" data-act="asn-wa">Mandar no WhatsApp</button></div>`; }
+      <div class="asn-ac"><button class="btn sec" data-act="asn-copia">Copiar</button><button class="btn sec" data-act="asn-x">Fechar</button><button class="btn" data-act="asn-wa">Abrir o WhatsApp</button></div>
+      <p class="sub" style="margin:8px 0 0;text-align:right">O WhatsApp abre com a mensagem pronta: você escolhe a pessoa e manda.${dig(M.tel)?` · <button class="lnk" data-act="asn-wa" data-tel="1">mandar direto para ${e(M.tel)} (do cadastro)</button>`:''}</p>`; }
     el.innerHTML=`<div class="asn-f" data-asn-f><div class="asn-m" role="dialog" aria-label="Assinar pelo gov.br"><h3>Assinar pelo gov.br</h3>${corpo}</div></div>`; }
   async function pdfDe(d){ const blob=A.pdfFn?await A.pdfFn(d):await C.pdfDoDoc(d); return new Uint8Array(await blob.arrayBuffer()); }
   async function criar(){ const M=A.mod, d=M.d, f=fDe(d), P=C.P, g=id=>(document.getElementById(id)||{}).value;
-    M.tel=g('asn-tel')||''; M.msg=g('asn-msg'); M.dias=Math.max(1,Math.min(60,parseInt(g('asn-dias'),10)||15)); M.erro=''; M.ocup=true; desenha();
+    M.msg=g('asn-msg'); M.dias=Math.max(1,Math.min(60,parseInt(g('asn-dias'),10)||15)); M.erro=''; M.ocup=true; desenha();
     try{ if(!window.AssinLer) throw new Error('O leitor de assinaturas ainda não carregou. Recarregue a página.');
       const u8=await pdfDe(d), sha=await window.AssinLer.sha(u8), b=b64De(u8), t=C.tokenNovo(), n=Math.ceil(b.length/PEDACO)||1, ateMs=Date.now()+M.dias*864e5;
       for(let k=0;k<n;k++) await P.db().doc(PDF+'/'+t+'-'+k).set({d:b.slice(k*PEDACO,(k+1)*PEDACO)});
@@ -92,7 +92,7 @@
     if(a==='asn-criar'){ criar(); return; }
     const txt=(document.getElementById('asn-txt')||{}).value||A.mod.txt||'';
     if(a==='asn-copia'){ try{ await navigator.clipboard.writeText(txt); C.P.toast('Mensagem copiada.'); }catch(e){ C.P.toast('Selecione o texto e copie.'); } return; }
-    if(a==='asn-wa'){ const tel=dig(A.mod.tel), u=(tel?'https://wa.me/'+(tel.length<=11?'55':'')+tel:'https://wa.me/')+'?text='+encodeURIComponent(txt); window.__asnUltimoWa=u; window.open(u,'_blank','noopener'); return; } },true);
+    if(a==='asn-wa'){ const tel=b.dataset.tel?dig(A.mod.tel):'', u=(tel?'https://wa.me/'+(tel.length<=11?'55':'')+tel:'https://wa.me/')+'?text='+encodeURIComponent(txt); window.__asnUltimoWa=u; window.open(u,'_blank','noopener'); return; } },true);
   document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&A.mod){ A.mod=null; desenha(); } });
 
   /* ---------- o documento assinado chegou: conferir e guardar ---------- */

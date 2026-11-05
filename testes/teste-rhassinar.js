@@ -30,13 +30,15 @@ function assina(orig,cn){ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asn-')
   ok('Documento gerado tem "Assinar pelo gov.br"', /Assinar pelo gov\.br/.test(t0), t0.replace(/\n/g,' | ').slice(0,300));
   await p.click('[data-act="asn-abre"]'); await H.dorme(500);
   const m0=await p.evaluate(()=>(document.getElementById('asn-mw')||{}).innerText||'');
-  ok('Janela explica os 3 passos e traz o WhatsApp do cadastro', /Assinar pelo gov\.br/.test(m0)&&/conta prata ou ouro/.test(m0)&&await p.inputValue('#asn-tel')==='(51) 99999-0000', m0.replace(/\n/g,' | '));
+  ok('Janela explica os 3 passos e não pede o número', /Assinar pelo gov\.br/.test(m0)&&/conta prata ou ouro/.test(m0)&&!(await p.$('#asn-tel')), m0.replace(/\n/g,' | '));
   await p.click('[data-act="asn-criar"]'); await H.dorme(2000);
   let S=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const tok=Object.keys(S).find(k=>k.startsWith('rh/dados/assinped/')).split('/').pop(); const ped=S['rh/dados/assinped/'+tok];
   ok('Cria o pedido (código de 20, PDF em pedaços, resumo do PDF) e marca o documento como enviado', /^[a-z0-9]{20}$/.test(tok)&&ped.partes===1&&ped.tam===PDF0.length&&ped.sha===require('crypto').createHash('sha256').update(PDF0).digest('hex')&&!!S['rh/dados/assinpdf/'+tok+'-0']&&S['rh/dados/docsgerados/g1'].ass.st==='enviado', JSON.stringify(ped).slice(0,240));
   const lk=await p.evaluate(()=>document.getElementById('asn-link').innerText);
-  await p.click('[data-act="asn-wa"]'); const wa=await p.evaluate(()=>decodeURIComponent(window.__asnUltimoWa||''));
-  ok('Link assinar.html e WhatsApp com a mensagem para a pessoa', lk.endsWith('assinar.html?c='+tok)&&/^https:\/\/wa\.me\/5551999990000\?text=Olá, Joao!/.test(wa)&&wa.includes('TERMO DE TESTE')&&wa.includes(lk), wa.slice(0,200));
+  await p.click('button.btn[data-act="asn-wa"]'); const wa0=await p.evaluate(()=>decodeURIComponent(window.__asnUltimoWa||''));
+  ok('"Abrir o WhatsApp" abre sem número (o RH escolhe a pessoa)', /^https:\/\/wa\.me\/\?text=Olá, Joao!/.test(wa0), wa0.slice(0,120));
+  await p.click('[data-act="asn-wa"][data-tel]'); const wa=await p.evaluate(()=>decodeURIComponent(window.__asnUltimoWa||''));
+  ok('Link assinar.html e, pelo atalho, direto para o número do cadastro', lk.endsWith('assinar.html?c='+tok)&&/^https:\/\/wa\.me\/5551999990000\?text=Olá, Joao!/.test(wa)&&wa.includes('TERMO DE TESTE')&&wa.includes(lk), wa.slice(0,200));
   await p.click('[data-act="asn-x"]'); await H.dorme(600);
   const t1=await p.evaluate(()=>document.getElementById('view').innerText);
   ok('Lista mostra "Esperando assinatura"', /Esperando assinatura/.test(t1));
