@@ -61,7 +61,11 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  ok('Editor da lista fixa: 67 linhas, situação "Salva" e "Não estão na lista" com quem é do cadastro (José Novo)', ed.n===67&&/Salva/.test(ed.t)&&ed.sug.some(n=>/Jose Novo/i.test(n)), JSON.stringify({n:ed.n,sug:ed.sug}));
  await p.selectOption('#alm-fltp','Terceiro - '); await p.fill('#alm-flnovo','Fulano Teste'); await p.keyboard.press('Enter'); await H.dorme(300);
  await p.click('[data-act="alm-fl-x"][data-i="0"]'); await H.dorme(300); await p.click('[data-act="alm-fl-dn"][data-i="0"]'); await H.dorme(300);
+ const fec=await p.evaluate(()=>{const d=document.querySelector('details.alm-fls');return d&&!d.open;});
+ ok('"Não estão na lista" começa fechado', fec);
+ await p.click('details.alm-fls>summary'); await H.dorme(200);
  await p.click('.alm-flsg'); await H.dorme(300);
+ ok('"Não estão na lista" continua aberto depois de acrescentar', await p.evaluate(()=>{const d=document.querySelector('details.alm-fls');return !d||d.open;}));
  ed=await p.evaluate(()=>({t:(document.querySelector('.alm-fl')||{}).innerText||'',v:[...document.querySelectorAll('.alm-flin')].map(i=>i.dataset.v)}));
  ok('Acrescentar (Terceiro - Fulano Teste), tirar (Alberto), descer e acrescentar a sugestão: "Alterações ainda não salvas"', ed.v.length===68&&ed.v[0]==='Arthur Sales'&&ed.v[1]==='Augusto Teles'&&ed.v.includes('Terceiro - Fulano Teste')&&!ed.v.includes('Alberto Ramos')&&/não salvas/.test(ed.t), JSON.stringify(ed.v.slice(0,3))+' '+ed.v.length);
  await p.click('[data-act="alm-flsalva"]'); await H.dorme(900);
