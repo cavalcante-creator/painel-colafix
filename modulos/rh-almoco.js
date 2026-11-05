@@ -59,7 +59,7 @@
     if(cel||row.length){ row.push(cel); L.push(row); } return L.filter(r=>r.some(x=>x.trim())); }
   function interpretar(txt){ const L=lerCsv(txt); if(!L.length) throw new Error('Arquivo vazio.'); const cfg=cfgBase;
     const cab=L[0].map(nrm), col=re=>cab.findIndex(h=>re.test(h));
-    const iH=col(/^HORA$|DATA E HORA/), iN=col(/NOME/), iC=col(/^CPF$/), iE=col(/^EMPRESA$/), iG=col(/^GRUPO/), iAu=col(/AUTORIZA/), iD=col(/DISPOSITIVO/);
+    const iH=col(/^HORA$|DATA E HORA/), iN=col(/NOME/), iC=col(/^CPF$/), iE=col(/^EMPRESA$/), iG=col(/^GRUPO/), iAu=col(/AUTORIZA/), iD=col(/DISPOSITIVO/), iAr=col(/^AREA$/);
     if(iH<0||iC<0||iD<0) throw new Error('Este arquivo não parece o relatório de acessos do Control iD (faltam as colunas Hora, CPF ou Dispositivo).');
     const C=cfg(), dRef=nrm(C.disp), ini=hm(C.ini), fim=hm(C.fim), cafe=hm(C.cafeAte); const out={}, pes={}; let lidos=0, de='', ate='';
     for(const r of L.slice(1)){ const h=String(r[iH]||'').match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}:\d{2})(:\d{2})?/); if(!h) continue;
@@ -67,13 +67,14 @@
       const k=cpf.padStart(11,'0'), d=h[3]+'-'+h[2]+'-'+h[1], t=h[4].padStart(5,'0'), m=hm(t); lidos++; if(!de||d<de) de=d; if(!ate||d>ate) ate=d;
       const x=((out[d]=out[d]||{})[k]=out[d][k]||{p:1});
       (x.t=x.t||[]).push(t+(h[5]||'')+' '+String(r[iD]||'').trim().slice(0,30)); /* todas as passagens do dia, para o detalhe da pessoa */
+      if(iAr>=0){ const ar=String(r[iAr]||'').trim().slice(0,30); if(ar) (x.ar=x.ar||{})[t+(h[5]||'')]=ar; } /* área do Control iD de cada passagem (05/11: o PJ escolhe quais leitores contam) */
       if(nrm(r[iD])===dRef){ if(m>=ini&&m<=fim){ if(!x.a||t<x.a) x.a=t; } else if(m<cafe){ if(!x.c||t<x.c) x.c=t; } }
       pes[k]={n:titulo(r[iN]||''),e:iE>=0?String(r[iE]||'').trim():'',g:iG>=0?String(r[iG]||'').trim():''}; }
     Object.values(out).forEach(o=>Object.values(o).forEach(x=>{ if(x.t) x.t.sort(); }));
     if(!lidos) throw new Error('Nenhum acesso autorizado no arquivo.'); return {dias:out,pessoas:pes,lidos,de,ate}; }
   /* reimportar JUNTA as passagens com as que já estavam no dia (um arquivo parcial não apaga o almoço já lido) e refaz almoço/café */
   function juntaDia(antes,novo){ if(!antes) return novo; const C=cfgBase(), dRef=nrm(C.disp), ini=hm(C.ini), fim=hm(C.fim), cafe=hm(C.cafeAte), out={};
-    new Set(Object.keys(antes).concat(Object.keys(novo))).forEach(k=>{ const a=antes[k]||{}, b=novo[k]||{}, t=[...new Set((a.t||[]).concat(b.t||[]))].sort(); const x={p:1};
+    new Set(Object.keys(antes).concat(Object.keys(novo))).forEach(k=>{ const a=antes[k]||{}, b=novo[k]||{}, t=[...new Set((a.t||[]).concat(b.t||[]))].sort(); const x={p:1}; if(a.ar||b.ar) x.ar=Object.assign({},a.ar||{},b.ar||{});
       if(t.length){ x.t=t; t.forEach(z=>{ const mm=z.match(/^(\d{2}:\d{2})(:\d{2})?\s+(.*)$/); if(!mm) return; const hh=mm[1], mi=hm(hh); if(nrm(mm[3])===dRef){ if(mi>=ini&&mi<=fim){ if(!x.a||hh<x.a) x.a=hh; } else if(mi<cafe){ if(!x.c||hh<x.c) x.c=hh; } } }); }
       else { if(a.a||b.a) x.a=[a.a,b.a].filter(Boolean).sort()[0]; if(a.c||b.c) x.c=[a.c,b.c].filter(Boolean).sort()[0]; }
       out[k]=x; }); return out; }

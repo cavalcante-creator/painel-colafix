@@ -119,6 +119,24 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Pedir outra: volta para fechado e guarda o motivo', S['rh/dados/pjpag/2026-10-2'].pes.f2.st==='fechado'&&/CNPJ errado/.test(JSON.stringify(S['rh/dados/pjpag/2026-10-2'].pes.f2.hist)));
   await p.click('[data-act="pjp-pdf"]'); await H.dorme(1500); const pdfN=await p.evaluate(()=>window.__rrUltimoPdf||'');
   ok('Baixar PDF', /Pagamento-PJ-2026-10-2\.pdf/.test(pdfN), pdfN);
+  /* leitores que contam (05/11): passagem no refeitório depois da saída não pode virar a saída */
+  await p.evaluate(()=>{ const D=window.RHAlmoco._A.dados['2026-10'], x=D.dias['2026-10-22']['55566677788']; x.t.push('18:30:00 REFEITÓRIO'); x.ar={'08:03:00':'Produção','17:58:00':'Produção','18:30:00':'Refeitório'}; window.Painel.render(); });
+  await p.click('[data-act="pjp-ab"][data-f="f2"]'); await H.dorme(600);
+  const c0=await p.evaluate(()=>[...document.querySelectorAll('.pjp-chips span')].filter(x=>/^18:30/.test(x.textContent)).map(x=>x.className+'|'+x.textContent).join(','));
+  ok('Sem escolher leitores: todas as passagens contam (18:30 do refeitório vira a saída) e cada uma mostra o leitor', /^pe\|18:30Refeit/i.test(c0), c0);
+  await p.keyboard.press('Escape'); await H.dorme(400); await p.click('[data-act="pjp-cfg"]'); await H.dorme(500);
+  const cx=await p.evaluate(()=>[...document.querySelectorAll('[data-pjp-clt]')].map(i=>i.dataset.pjpClt).join(','));
+  ok('Configurar mostra os leitores do mês (áreas e dispositivos)', /PRODUCAO/.test(cx)&&/REFEITORIO/.test(cx)&&/PORTARIA/.test(cx), cx);
+  await p.check('[data-pjp-clt="PRODUCAO"]'); await p.check('[data-pjp-clt="PORTARIA"]'); await p.click('[data-act="pjp-cfgok"]'); await H.dorme(900);
+  const SL=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/config'].pjPag.leit);
+  await p.click('[data-act="pjp-ab"][data-f="f2"]'); await H.dorme(600);
+  const c1=await p.evaluate(()=>{ const sp=[...document.querySelectorAll('.pjp-chips span')]; return sp.filter(x=>/^(18:30|17:58)/.test(x.textContent)).map(x=>x.className+'|'+x.textContent.slice(0,5)).join(','); });
+  ok('Com Produção e Portaria escolhidos: o refeitório fica riscado e a saída volta a ser 17:58', Array.isArray(SL)&&SL.includes('PRODUCAO')&&/pe\|17:58/.test(c1)&&/fo\|18:30/.test(c1), JSON.stringify(SL)+' '+c1);
+  await p.click('[data-act="pjp-tab"][data-v="regras"]'); await H.dorme(500);
+  await p.check('input[name="pjp-rlm"][value="sel"]'); await p.uncheck('[data-pjp-rlt="PRODUCAO"]').catch(()=>{}); await p.uncheck('[data-pjp-rlt="PORTARIA"]').catch(()=>{}); await p.check('[data-pjp-rlt="REFEITORIO"]');
+  await p.click('[data-act="pjp-psalva"]'); await H.dorme(800);
+  const F2=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/dados/funcionarios/f2'].pjPag.leit);
+  ok('Regra só desta pessoa: guarda os leitores dela no cadastro', JSON.stringify(F2)==='["REFEITORIO"]', JSON.stringify(F2));
   const e=erros.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });
