@@ -102,4 +102,12 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  ok('Na folha impressa ele sai em cinza com "Não almoça na empresa"', rs.cz&&rs.c[1]==='Não almoça na empresa', JSON.stringify(rs));
  await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v==='Terceiro - Silas Ramos'); i.closest('.alm-flr').querySelector('[data-act="alm-fl-fora"][data-on="0"]').click(); }); await H.dorme(900);
  ok('"desfazer" volta a contar', await p.evaluate(()=>window.RHAlmoco._A.ctx.R.cfg.almoco.fora['nome:Terceiro - Silas Ramos'].removido===true));
+ /* 05/11: segurar o ⋮⋮ e arrastar muda a ordem */
+ const ordem=()=>p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].map(x=>x.dataset.v));
+ await p.evaluate(()=>{ const l=document.querySelector('.alm-fll'); if(l) l.scrollTop=0; }); await H.dorme(200);
+ const o0=await ordem(); const g0=await p.$('.alm-flg[data-i="0"]'), b0=await g0.boundingBox(), r3=await (await p.$$('.alm-flr'))[3].boundingBox();
+ await p.mouse.move(b0.x+b0.width/2,b0.y+b0.height/2); await p.mouse.down(); await p.mouse.move(b0.x+5,r3.y+8,{steps:8}); await H.dorme(100);
+ const ind=await p.evaluate(()=>!!document.querySelector('.alm-flr.alm-dpa'));
+ await p.mouse.up(); await H.dorme(500); const o1=await ordem();
+ ok('Arrastar pelo ⋮⋮: mostra onde vai cair e muda a ordem (1º nome vai para a 3ª posição)', ind&&o1[2]===o0[0]&&o1[0]===o0[1]&&o1[1]===o0[2]&&o1.length===o0.length&&/não salvas/.test(await p.evaluate(()=>document.querySelector('.alm-fl').innerText)), JSON.stringify([o0.slice(0,4),o1.slice(0,4)]));
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
