@@ -86,4 +86,20 @@ const iso=x=>x.toISOString().slice(0,10), hj=iso(new Date()), m=hj.slice(0,7), l
  await p.evaluate(()=>{ [...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v==='Terceiro - Silas').click(); }); await H.dorme(300); await p.fill('#alm-flvq','Silas Ramos'); await p.click('[data-act="alm-fl-vtxt"]'); await H.dorme(300);
  ok('"Só corrigir o nome" troca para o que foi digitado, mantendo o "Terceiro -"', await p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].some(x=>x.dataset.v==='Terceiro - Silas Ramos')));
  ok('"usar nome completo" troca para "Terceiro - Tania Souza"', nd[0]==='Terceiro - Tania Souza'&&/Cadastrado|No Face ID/.test(await idOf('Terceiro - Tania Souza')), nd.join());
+ /* 05/11: trocar o tipo na própria linha e marcar "não almoça na empresa" direto na lista */
+ const linhaDe=n=>p.evaluate(n=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v===n); return i?i.closest('.alm-flr'):null; },n);
+ const sel=await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v==='Arthur Sales'); const s=i.closest('.alm-flr').querySelector('select[data-almfltp]'); return s?s.dataset.almfltp:null; });
+ await p.selectOption(`select[data-almfltp="${sel}"]`,'Terceiro - '); await H.dorme(400);
+ ok('Tipo trocado na linha: "Arthur Sales" vira "Terceiro - Arthur Sales" (falta salvar)', await p.evaluate(()=>[...document.querySelectorAll('.alm-flin')].some(x=>x.dataset.v==='Terceiro - Arthur Sales'))&&/não salvas/.test(await p.evaluate(()=>document.querySelector('.alm-fl').innerText)));
+ await p.click('[data-act="alm-flsalva"]'); await H.dorme(900);
+ const ia=await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v==='Terceiro - Arthur Sales'); return i.closest('.alm-flr').innerText; });
+ ok('Quem já estava marcado (Arthur, pelo CPF) aparece na lista como "Não almoça na empresa"', /Não almoça na empresa/.test(ia), ia);
+ p.once('dialog',x=>x.accept('Almoça em casa'));
+ await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v==='Terceiro - Silas Ramos'); i.closest('.alm-flr').querySelector('[data-act="alm-fl-fora"]').click(); }); await H.dorme(900);
+ const fo=await p.evaluate(()=>window.RHAlmoco._A.ctx.R.cfg.almoco.fora['nome:Terceiro - Silas Ramos']);
+ ok('Marcar "não almoça na empresa" num terceiro sem CPF grava pela chave do nome, com o motivo', fo&&fo.mot==='Almoça em casa'&&!fo.removido, JSON.stringify(fo));
+ t=await imprimir(); const rs=row(t,'Terceiro - Silas Ramos');
+ ok('Na folha impressa ele sai em cinza com "Não almoça na empresa"', rs.cz&&rs.c[1]==='Não almoça na empresa', JSON.stringify(rs));
+ await p.evaluate(()=>{ const i=[...document.querySelectorAll('.alm-flin')].find(x=>x.dataset.v==='Terceiro - Silas Ramos'); i.closest('.alm-flr').querySelector('[data-act="alm-fl-fora"][data-on="0"]').click(); }); await H.dorme(900);
+ ok('"desfazer" volta a contar', await p.evaluate(()=>window.RHAlmoco._A.ctx.R.cfg.almoco.fora['nome:Terceiro - Silas Ramos'].removido===true));
  await B.browser.close(); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
