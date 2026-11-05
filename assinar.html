@@ -59,7 +59,7 @@ ol.mini{margin:8px 0 0;padding-left:20px;color:var(--ink);font-size:15px}ol.mini
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
-<script src="modulos/assin-ler.js"></script>
+<script src="modulos/assin-ler.js?v=2"></script>
 <script>
 (function(){
   'use strict';
@@ -113,10 +113,11 @@ ol.mini{margin:8px 0 0;padding-left:20px;color:var(--ink);font-size:15px}ol.mini
         let mesmo=null; try{ mesmo=u8.length>=+P.tam&&(await window.AssinLer.sha(u8.subarray(0,+P.tam)))===P.sha; }catch(er){}
         const nomes=r.ass.map(x=>x.nome).filter(Boolean), dele=r.ass.some(x=>mesma(x.nome,P.nome)), gov=r.ass.some(x=>x.gov||x.icp), av=[];
         if(mesmo===false) av.push('Este parece ser outro documento (não é o que o RH mandou). Confira se escolheu o arquivo certo.');
-        if(!dele) av.push('Assinado por '+(nomes.join(' e ')||'outra pessoa')+'. O documento é para '+P.nome+'.');
-        if(!gov) av.push('A assinatura não parece ser do gov.br.');
+        const semLer=r.ass.every(x=>x.semLer);
+        if(!dele&&!semLer) av.push('Assinado por '+(nomes.join(' e ')||'outra pessoa')+'. O documento é para '+P.nome+'.');
+        if(!gov&&!semLer) av.push('A assinatura não parece ser do gov.br.');
         arq={u8,n:f.name,ver:{nomes:nomes.slice(0,4),mesmo,gov,dele}}; $('#arqL').classList.add('ok'); $('#arqT').textContent='✓ '+f.name;
-        $('#chk').innerHTML=av.length?`<div class="chk av"><b>Confira antes de mandar:</b><ul>${av.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`:`<div class="chk ok">✓ Assinado por <b>${esc(nomes[0]||P.nome)}</b> pelo gov.br. Pode mandar.</div>`;
+        $('#chk').innerHTML=av.length?`<div class="chk av"><b>Confira antes de mandar:</b><ul>${av.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`:semLer?`<div class="chk ok">✓ O arquivo tem assinatura digital. Pode mandar: o RH confere quem assinou.</div>`:`<div class="chk ok">✓ Assinado por <b>${esc(nomes[0]||P.nome)}</b> pelo gov.br. Pode mandar.</div>`;
         $('#env').disabled=false; $('#p2').classList.add('feito'); }
       catch(er){ console.warn(er); $('#arqT').textContent='Escolher o documento assinado (PDF)'; $('#er').textContent='Não consegui ler este arquivo. Tente de novo.'; } });
     $('#env').addEventListener('click',async()=>{ if(!arq) return; const bt=$('#env'); bt.disabled=true; bt.textContent='Mandando…'; $('#er').textContent='';

@@ -5,7 +5,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const {
 const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
 const PDF0=Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n186\n%%EOF\n','latin1');
 /* assina como o assinador: acrescenta no fim um dicionário /Sig com /ByteRange e /Contents (CMS destacado, SHA-256) */
-function assina(orig,cn){ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asn-')), q=f=>path.join(dir,f), sh=c=>execSync(c,{cwd:dir,stdio:'pipe'});
+function assina(orig,cn,ber){ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asn-')), q=f=>path.join(dir,f), sh=c=>execSync(c,{cwd:dir,stdio:'pipe'});
   sh(`openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.pem -days 30 -subj "/O=Gov-Br/CN=AC Final do Governo Federal do Brasil v1"`);
   sh(`openssl req -newkey rsa:2048 -nodes -keyout eu.key -out eu.csr -subj "/O=Gov-Br/CN=${cn}"`);
   sh(`openssl x509 -req -in eu.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out eu.pem -days 30`);
@@ -14,7 +14,7 @@ function assina(orig,cn){ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asn-')
   const b=orig.length+pre.length, c=b+Z+2, d=f.length-c, put=(tag,n)=>{ const s=f.toString('latin1'), i=s.indexOf(tag); f=Buffer.concat([f.subarray(0,i),Buffer.from(String(n).padEnd(tag.length,' '),'latin1'),f.subarray(i+tag.length)]); };
   put('##########A',b); put('##########B',c); put('##########C',d);
   fs.writeFileSync(q('cont.bin'),Buffer.concat([f.subarray(0,b),f.subarray(c)]));
-  sh(`openssl cms -sign -binary -in cont.bin -signer eu.pem -inkey eu.key -certfile ca.pem -outform DER -md sha256 -out sig.der`);
+  sh(`openssl cms -sign -binary -in cont.bin -signer eu.pem -inkey eu.key -certfile ca.pem -outform DER -md sha256 ${ber?'-stream ':''}-out sig.der`);
   const hx=fs.readFileSync(q('sig.der')).toString('hex').toUpperCase(); const s=f.toString('latin1'); const i=s.indexOf('<'+'0'.repeat(Z)); f=Buffer.concat([f.subarray(0,i+1),Buffer.from(hx,'latin1'),f.subarray(i+1+hx.length)]);
   return f; }
 (async()=>{ const {d}=seedManut(x=>x); const D=d.docs;
@@ -70,6 +70,10 @@ function assina(orig,cn){ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asn-')
   /* conferência: outra pessoa assinou e o documento mudou */
   const c2=await p.evaluate(async([a,b])=>{ const u=Uint8Array.from(atob(a),c=>c.charCodeAt(0)); const r=await window.RHAssina._confere({R:{func:[{_id:'a1',nome:'JOAO PEREIRA TESTE'}]}},{tam:u.length+5,sha:'x',funcId:'a1',nome:'Joao'},Uint8Array.from(atob(b),c=>c.charCodeAt(0))); return r; },[PDF0.toString('base64'),assina(Buffer.from(PDF0.toString('latin1').replace('595 842','612 792'),'latin1'),'MARIA OUTRA PESSOA').toString('base64')]);
   ok('Confere e aponta: assinado por outra pessoa e documento diferente', c2.ok===false&&c2.probs.some(x=>/MARIA OUTRA PESSOA/.test(x))&&c2.probs.some(x=>/não começa igual/.test(x)), JSON.stringify(c2.probs));
+  /* assinatura em BER (tamanho indefinido, 30 80…), como sai do assinador do gov.br */
+  const ber=assina(PDF0,'JOAO PEREIRA TESTE:11122233344',true);
+  const rb=await p.evaluate(async b=>{ const u=Uint8Array.from(atob(b),c=>c.charCodeAt(0)); return await window.AssinLer.ler(u); },ber.toString('base64'));
+  ok('Lê assinatura em BER (tamanho indefinido, como o gov.br faz)', /3080/.test(ber.toString('latin1').match(/\/Contents <([0-9A-F]{4})/)[1])&&rb.ass.length===1&&rb.ass[0].nome==='JOAO PEREIRA TESTE'&&rb.ass[0].digOk===true, JSON.stringify(rb.ass));
   /* apagar o documento gerado (dois toques) */
   await p.click('[data-act="rh-dgdel"][data-id="g1"]'); await H.dorme(300); await p.click('[data-act="rh-dgdel"][data-id="g1"]:has-text("Confirmar")'); await H.dorme(900);
   const S4=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs), t4=await p.evaluate(()=>document.getElementById('view').innerText);

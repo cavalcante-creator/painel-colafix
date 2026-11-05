@@ -103,8 +103,9 @@
     else if(!as.length) probs.push('O arquivo não tem assinatura digital.');
     if(mesmo===false) probs.push('O PDF assinado não começa igual ao que o RH mandou: pode ser outro documento ou ter sido mudado. Confira no Validar.');
     if(as.length){ const dele=as.find(x=>mesmaPessoa(x.nome,f.nome)||(x.cpf&&dig(f.cpf)&&x.cpf===dig(f.cpf)));
-      if(!dele) probs.push('Assinado por '+as.map(x=>x.nome||'nome não lido').join(' e ')+' (o cadastro é '+(f.nome||ped.nome)+').');
-      if(!as.some(x=>x.gov||x.icp)) probs.push('A assinatura não é do gov.br nem de certificado ICP-Brasil.');
+      if(as.every(x=>x.semLer)) probs.push('Tem assinatura digital, mas o painel não conseguiu ler quem assinou. Confira no Validar.');
+      else if(!dele) probs.push('Assinado por '+as.map(x=>x.nome||'nome não lido').join(' e ')+' (o cadastro é '+(f.nome||ped.nome)+').');
+      if(!as.every(x=>x.semLer)&&!as.some(x=>x.gov||x.icp)) probs.push('A assinatura não é do gov.br nem de certificado ICP-Brasil.');
       if(as.some(x=>x.digOk===false)) probs.push('Uma assinatura não confere com o conteúdo do arquivo.');
       if(ult&&!ult.cobre) probs.push('Há mudanças no arquivo depois da última assinatura.'); }
     return {ok:!probs.length,probs,mesmo,ass:as.map(x=>({nome:x.nome,cpf:x.cpf?x.cpf.slice(0,3)+'.***.***-'+x.cpf.slice(-2):'',emissor:x.emissor,gov:x.gov,icp:x.icp,quando:x.quando,digOk:x.digOk}))}; }

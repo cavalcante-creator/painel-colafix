@@ -8,10 +8,13 @@
    AssinLer.sha(u8) → SHA-256 em hexadecimal. */
 (function(){
   const lat=u=>{ let s=''; for(let i=0;i<u.length;i+=32768) s+=String.fromCharCode.apply(null,u.subarray(i,i+32768)); return s; };
-  function no(u,p){ if(p+2>u.length) return null; const t=u[p]; let l=u[p+1], h=2;
+  /* aceita também o tamanho "indefinido" do BER (0x80 … 00 00), que o assinador do gov.br usa (04/11) */
+  function no(u,p,d){ d=d||0; if(p+2>u.length||d>60) return null; const t=u[p]; let l=u[p+1], h=2;
+    if(l===0x80){ if(!(t&0x20)) return null; let q=p+2; while(q+1<u.length&&!(u[q]===0&&u[q+1]===0)){ const c=no(u,q,d+1); if(!c||c.fim<=q) return null; q=c.fim; }
+      if(q+1>=u.length) return null; return {t,p,ini:p+2,fe:q,fim:q+2,cons:true}; }
     if(l&0x80){ const n=l&0x7f; if(n<1||n>4) return null; l=0; for(let i=0;i<n;i++) l=l*256+u[p+2+i]; h=2+n; }
-    return {t,p,ini:p+h,fim:p+h+l,cons:!!(t&0x20)}; }
-  function filhos(u,n){ const out=[]; let p=n.ini; while(p<n.fim){ const c=no(u,p); if(!c||c.fim>n.fim) break; out.push(c); p=c.fim; } return out; }
+    return {t,p,ini:p+h,fe:p+h+l,fim:p+h+l,cons:!!(t&0x20)}; }
+  function filhos(u,n){ const out=[]; let p=n.ini; while(p<n.fe){ const c=no(u,p); if(!c||c.fim>n.fe) break; out.push(c); p=c.fim; } return out; }
   function oid(u,n){ const b=u.subarray(n.ini,n.fim); if(!b.length) return ''; const r=[Math.floor(b[0]/40),b[0]%40]; let v=0;
     for(let i=1;i<b.length;i++){ v=v*128+(b[i]&0x7f); if(!(b[i]&0x80)){ r.push(v); v=0; } } return r.join('.'); }
   function txt(u,n){ const b=u.subarray(n.ini,n.fim);
@@ -52,7 +55,7 @@
       if(br[0]!==0||br[1]<=0||br[2]<=br[1]||br[2]+br[3]>u8.length) continue;
       const hx=s.slice(br[1],br[2]).replace(/[<>\s]/g,''); if(!/^[0-9a-fA-F]+$/.test(hx)) continue;
       const der=new Uint8Array(hx.length>>1); for(let i=0;i<der.length;i++) der[i]=parseInt(hx.substr(i*2,2),16);
-      const raiz=no(der,0); if(!raiz||raiz.t!==0x30) continue; const cs=certs(der,raiz);
+      const raiz=no(der,0); if(!raiz||raiz.t!==0x30){ res.ass.push({nome:'',cpf:'',emissor:'',org:'',gov:false,icp:false,quando:'',cobre:br[2]+br[3]===u8.length,digOk:null,semLer:true}); continue; } const cs=certs(der,raiz);
       /* certificado de quem assinou = o que não é emissor de nenhum outro (o último da cadeia) */
       const cns=new Set(cs.map(c=>c.emissor.cn)), fim=cs.find(c=>!cns.has(c.sujeito.cn)||c.sujeito.cn===c.emissor.cn&&cs.length===1)||cs[0]||null;
       const at=atributos(der,raiz); let digOk=null;
