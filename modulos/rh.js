@@ -1055,10 +1055,12 @@ const topo=(t,s,acoes,ey)=>`<div class="head"><div><div class="eyebrow">${ey||('
   /* data no futuro (aviso trabalhado): continua ativo e vira Desligado sozinho no dia (desligAgendado) */
   async function desligar(f,data,motivo){ const fut=data>P.hojeStr(), up=fut?{desligamento:data,desligMotivo:String(motivo||'').trim(),desligAgendado:true}:{status:'Desligado',desligamento:data,desligMotivo:String(motivo||'').trim(),desligAgendado:false};
     if(f.exp&&f.exp.status!=='efetivado'&&expInfo(f)) up.exp=Object.assign({},f.exp,{status:'desligado',em:agora(),porNome:eu()}); else if(!f.exp&&expInfo(f)) up.exp={status:'desligado',em:agora(),porNome:eu()};
-    await grava(COL.func+'/'+f._id,up); Object.assign(f,up); return fut; }
+    await grava(COL.func+'/'+f._id,up); Object.assign(f,up); if(!fut) tiraListas(f); return fut; }
+  /* 05/11: quem é desligado sai da lista fixa das folhas do almoço e do café */
+  function tiraListas(f){ try{ if(window.RHAlmoco&&RHAlmoco.tiraDasListas) RHAlmoco.tiraDasListas(almCtx(),f).then(n=>{ if(n) P.toast(titulo(f.nome)+' saiu da lista da folha do almoço/café.'); }).catch(()=>{}); }catch(e){} }
   const desligJa={};
   async function aplicarDesligAgendados(){ const hj=P.hojeStr(); for(const f of R.func){ if(f.desligAgendado&&f.status!=='Desligado'&&okIso(f.desligamento)&&f.desligamento<=hj&&!desligJa[f._id]){ desligJa[f._id]=1;
-      try{ const up={status:'Desligado',desligAgendado:false}; if(expInfo(f)) up.exp=Object.assign({},f.exp||{},{status:'desligado',em:agora(),porNome:eu()}); await grava(COL.func+'/'+f._id,up); }catch(e){ console.warn('[RH] desligamento marcado',e); } } } }
+      try{ const up={status:'Desligado',desligAgendado:false}; if(expInfo(f)) up.exp=Object.assign({},f.exp||{},{status:'desligado',em:agora(),porNome:eu()}); await grava(COL.func+'/'+f._id,up); tiraListas(Object.assign({},f,up)); }catch(e){ console.warn('[RH] desligamento marcado',e); } } } }
   const qDeslig=qs=>qs.find(q=>/DESLIG|ULTIMO DIA|RESCIS|TERMINO|FIM DO CONTRATO/.test(norm(q))&&qData(q));
   const modeloDesliga=md=>!!md&&(md.desliga!=null?!!md.desliga:/DEMISS|RESCIS|DESLIG/.test(norm(md.nome)));
 
