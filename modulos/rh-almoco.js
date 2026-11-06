@@ -602,6 +602,17 @@
      FK = tipo ativo ('alm'|'cafe'); o estado de cada tipo (fol, folha, ff, folhaAb, fbusca, _wb) é trocado em A por fkUsa. */
   let FK='alm'; const FKS={alm:{},cafe:{}};
   function fkUsa(k){ if(!k||k===FK) return; const s0=FKS[FK]; ['fol','folha','ff','folhaAb','fbusca','_wb'].forEach(x=>{ s0[x]=A[x]; A[x]=FKS[k][x]; }); FK=k; }
+  /* 06/11: a folha do café é feita no dia anterior. A faixa do café mostra a do PRÓXIMO DIA ÚTIL (preparar e imprimir; sexta → segunda,
+     pela regra de dias úteis do painel, anlUtil); "Conferir a de hoje" troca para o dia aberto (conferência da folha assinada). A.cafeVer = 'prox' | 'hoje'. */
+  function cafeProx(d){ let x=d; for(let i=0;i<12;i++){ const y=new Date(x+'T12:00:00'); y.setDate(y.getDate()+1); x=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0'); if(typeof anlUtil==='function'?anlUtil(x):(y.getDay()!==0&&y.getDay()!==6)) return x; } return x; }
+  const folhaDiaK=(k,d)=>k==='cafe'&&A.cafeVer!=='hoje'?cafeProx(d):d, folhaDia=()=>folhaDiaK(FK,A.dia);
+  const diaSemana=d=>new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long'});
+  function cafeFaixa(h,c,d,dC){ const esc=c.esc, ant='Folha de assinatura do café · '+esc(c.br(dC))+'</b>'; if(h.indexOf(ant)<0) return h;
+    const nov=A.cafeVer==='hoje'?'Folha do café de hoje · '+esc(c.br(dC))+'</b> <button class="lnk cf-dia" data-act="alm-cafedia" data-v="prox">Preparar a de '+esc(diaSemana(cafeProx(d)))+'</button>'
+      :'Folha do café para '+esc(diaSemana(dC))+', '+esc(c.br(dC))+'</b> <button class="lnk cf-dia" data-act="alm-cafedia" data-v="hoje">Conferir a de hoje</button>';
+    return h.replace(ant,nov); }
+  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act="alm-cafedia"]'); if(!b||!A.ctx) return; A.cafeVer=b.dataset.v==='hoje'?'hoje':'prox'; A.ctx.P.render(); });
+  try{ document.head.insertAdjacentHTML('beforeend','<style>.cf-dia{font-size:13px;font-weight:600;margin-left:8px}</style>'); }catch(e){}
   const fkCafe=()=>FK==='cafe', FW=()=>fkCafe()?'café':'almoço', FWU=()=>fkCafe()?'CAFÉ':'ALMOÇO';
   const cafeGrupo=n=>{ const t=String(n||'').trim(); return !!t&&t===t.toUpperCase()&&(/\//.test(t)||/^(ADM|PROD|MOTORISTAS?|TERCEIRIZAD[OA]S?|EXPEDI)/.test(t)); };
   function listaCafe(){ const cf=((A.ctx&&A.ctx.R.cfg&&A.ctx.R.cfg.cafe)||{}); if(Array.isArray(cf.lista)) return cf.lista; return (Array.isArray(cf.linhas)?cf.linhas:[]).map(x=>String(x||'').trim()).filter(x=>x&&!cafeGrupo(x)); }
@@ -784,7 +795,7 @@
     return bar+`<div class="alm-fm" role="dialog" aria-modal="true" aria-label="Folha de assinatura do ${FW()}"><div class="alm-fmb"><div class="alm-fmh"><div><div class="eyebrow">RH · ${FWU()}</div><h2>Folha de assinatura${fkCafe()?' do café':''} · ${esc(c.br(d))}</h2></div><button class="btn sec" data-act="alm-ffecha" data-k="${K}">Fechar</button></div>
       <div class="alm-fmg"><div class="alm-fml">${fotoBloco(c,d)}${folhaCard(c,d)}</div><aside class="alm-fmr">${folhaPrevia(c,d)}</aside></div></div></div>`; }
   /* as duas faixas (almoço e café) na tela do dia; depois volta ao tipo que está em uso (A.fkAt) */
-  function folhasPaineis(c,d){ let h=''; try{ fkUsa('alm'); h+=refCom('alm',()=>folhaPainel(c,d)); fkUsa('cafe'); h+=refCom('cafe',()=>folhaPainel(c,d)); } finally { fkUsa(A.fkAt||'alm'); } return '<!--nofx-->'+h+'<!--/nofx-->'; }
+  function folhasPaineis(c,d){ let h=''; try{ fkUsa('alm'); h+=refCom('alm',()=>folhaPainel(c,d)); fkUsa('cafe'); const dC=folhaDiaK('cafe',d); h+=refCom('cafe',()=>cafeFaixa(folhaPainel(c,dC),c,d,dC)); } finally { fkUsa(A.fkAt||'alm'); } return '<!--nofx-->'+h+'<!--/nofx-->'; }
   function folhaBusca(c,d){ const esc=c.esc, q=fNorm(A.fbusca||''); if(q.length<2) return ''; const F=folhaEst(c,d), {L}=folhaPessoas(c,d); F.tirar=F.tirar||{};
     const xs=L.filter(x=>fNorm(x.nome).includes(q)).slice(0,10); if(!xs.length) return '<div class="sub" style="margin-top:6px">Ninguém da lista com esse nome.</div>';
     return `<div class="alm-fbr">${xs.map(x=>{ const tir=F.tirar[x.nome], m=fMarca(F,x), st=tir?'Tirado desta folha':m||(x.passou?'Passou no Face ID':'Normal (assina)');
@@ -848,16 +859,16 @@
       A._wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); A.folha.abas=A._wb.SheetNames.slice(0,60); A.folha.aba=0; const ns=folhaAbaNomes(0); A.folha.rasc=ns;
       c.P.toast(ns.length+' nomes lidos da aba “'+A._wb.SheetNames[0]+'”. Se não for o dia certo, escolha outra aba. Depois, “Salvar lista fixa”.'); c.P.render(); }
     catch(e){ console.warn('[almoço folha]',e); c.P.toast('Não consegui ler a planilha.'); } }
-  document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!A.ctx||!t.dataset) return; const c=A.ctx, d=A.dia;
+  document.addEventListener('change',ev=>{ const t=ev.target; if(!t||!A.ctx||!t.dataset) return; const c=A.ctx; let d=folhaDia();
     if(t.dataset.almFnv!=null){ const F=folhaEst(c,d); if(t.checked) F.nv[t.dataset.almFnv]=t.dataset.mot||'Não veio'; else delete F.nv[t.dataset.almFnv]; if(F.emit) F.emit.mudou=true; folhaSalvar(c,d); (c.P.render||c.P.rerender)(); } /* caixinha em foco: redesenha já */
     if(t.dataset.almFprog!=null){ const F=folhaEst(c,d); F.desm=F.desm||{}; if(t.checked) delete F.desm[t.dataset.almFprog]; else F.desm[t.dataset.almFprog]=true; if(F.emit) F.emit.mudou=true; folhaSalvar(c,d); (c.P.render||c.P.rerender)(); } /* caixinha em foco: redesenha já */
     if(t.dataset.almFxls!=null&&t.files&&t.files[0]) folhaXls(c,t.files[0]);
-    if(t.dataset.almFfoto!=null&&t.files&&t.files.length){ if(t.dataset.k){ fkUsa(t.dataset.k); A.fkAt=t.dataset.k; } const fs=[...t.files]; t.value=''; ffLer(c,d,fs); }
+    if(t.dataset.almFfoto!=null&&t.files&&t.files.length){ if(t.dataset.k){ fkUsa(t.dataset.k); A.fkAt=t.dataset.k; d=folhaDia(); } const fs=[...t.files]; t.value=''; ffLer(c,d,fs); }
     if(t.dataset.almFaba!=null&&A._wb){ A.folha.aba=+t.value; const ns=folhaAbaNomes(A.folha.aba); A.folha.rasc=ns; c.P.toast(ns.length+' nomes da aba “'+A._wb.SheetNames[A.folha.aba]+'”.'); c.P.render(); } });
   document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&A.folhaAb&&A.ctx){ A.folhaAb=false; A.ctx.P.render(); } });
-  document.addEventListener('input',ev=>{ const t=ev.target; if(!t||t.id!=='alm-fbusca'||!A.ctx) return; A.fbusca=t.value; const r=document.getElementById('alm-fres'); if(r) r.innerHTML=folhaBusca(A.ctx,A.dia); });
+  document.addEventListener('input',ev=>{ const t=ev.target; if(!t||t.id!=='alm-fbusca'||!A.ctx) return; A.fbusca=t.value; const r=document.getElementById('alm-fres'); if(r) r.innerHTML=folhaBusca(A.ctx,folhaDia()); });
   document.addEventListener('click',async ev=>{ const b=ev.target.closest&&ev.target.closest('[data-act^="alm-f"]'); if(!b||!A.ctx) return; const a=b.dataset.act; if(b.dataset.k&&(a==='alm-fabre'||a==='alm-ffecha')){ fkUsa(b.dataset.k); A.fkAt=b.dataset.k; } if(!['alm-folha','alm-flista','alm-flsalva','alm-fimp','alm-fsem','alm-fvolta','alm-fadd','alm-fnvset','alm-fnvx','alm-ftirar','alm-fdev','alm-fabre','alm-ffecha','alm-fbase','alm-fftg','alm-ffconta','alm-ffsalva'].includes(a)) return;
-    const c=A.ctx, P=c.P, d=A.dia; A.folha=A.folha||{}; const F=folhaEst(c,d);
+    const c=A.ctx, P=c.P, d=folhaDia(); A.folha=A.folha||{}; const F=folhaEst(c,d);
     if(a==='alm-folha') return folhaImprimir(c,d);
     if(a==='alm-fftg'){ const R=ffEst(d), n=b.dataset.n, at=ffAss(c,d)[n]; R.man[n]=at==='sim'?'nao':'sim'; P.render(); return; }
     if(a==='alm-ffsalva') return ffSalvar(c,d);

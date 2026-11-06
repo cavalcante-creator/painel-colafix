@@ -18,6 +18,16 @@ const NOMES=[...G1,...G2,...MOT,...TER], TOT=NOMES.length;
   await dia(hj);
   const bars=await p.evaluate(()=>[...document.querySelectorAll('.alm-fbar>div>b')].map(b=>b.textContent));
   ok('Almoço/café › Por dia tem as duas faixas iguais: almoço e café', bars.length===2&&/almoço/.test(bars[0])&&/café/.test(bars[1]), JSON.stringify(bars));
+  { const f=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); let px=new Date(hj+'T12:00:00'); do{ px.setDate(px.getDate()+1); }while([0,6].includes(px.getDay())); px=f(px); const brp=px.slice(8)+'/'+px.slice(5,7)+'/'+px.slice(0,4);
+    const cb=await p.evaluate(()=>(document.querySelector('.cf-bar')||{}).innerText||'');
+    ok('06/11: a faixa do café mostra a folha do PRÓXIMO DIA ÚTIL ('+brp+'), feita no dia anterior, com "Conferir a de hoje"', cb.includes('Folha do café para ')&&cb.includes(brp)&&/Conferir a de hoje/.test(cb), cb.replace(/\n/g,' | ').slice(0,160));
+    await p.click('.cf-bar [data-act="alm-fabre"]'); await H.dorme(700);
+    const popP=p.context().waitForEvent('page'); await p.click('.alm-fmr [data-act="alm-folha"]'); const wP=await popP; await wP.waitForLoadState(); await H.dorme(400); const htP=await wP.content(); await wP.close(); await H.dorme(600);
+    const emP=await p.evaluate(x=>__T.S().db.doc('rh/dados/cafefolha/'+x).get().then(g=>g.exists&&!!(g.data().emit)),px);
+    ok('A folha de '+brp+' imprime com "CAFÉ - '+brp+'" e fica guardada no dia dela (cafefolha/'+px+')', htP.includes('CAFÉ - '+brp)&&emP, String(emP));
+    await p.click('.alm-fm [data-act="alm-ffecha"]'); await H.dorme(400);
+    await p.click('.cf-bar [data-act="alm-cafedia"][data-v="hoje"]'); await H.dorme(500);
+    ok('"Conferir a de hoje" volta para a folha do dia (conferência), com "Preparar a de …"', /Folha do café de hoje/.test(await p.evaluate(()=>(document.querySelector('.cf-bar')||{}).innerText||''))); }
   await p.click('.cf-bar [data-act="alm-fabre"]'); await H.dorme(700);
   ok('Abre a mesma janela do almoço, agora do café', await p.evaluate(()=>{ const m=document.querySelector('.alm-fm'); return !!m&&/café/.test(m.getAttribute('aria-label'))&&!!m.querySelector('.alm-fml .alm-folha')&&!!m.querySelector('.alm-fmr #alm-fmk'); }));
   ok('Lista antiga do café vem sem os títulos dos grupos', await p.evaluate(()=>/Lista fixa \(3\)/.test(document.querySelector('.alm-fm').innerText)));
