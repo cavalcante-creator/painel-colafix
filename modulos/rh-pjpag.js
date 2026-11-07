@@ -383,6 +383,23 @@
         <div>${r.uPend?`<span class="pjp-pill warn">${r.uPend} de uniforme para confirmar</span>`:''}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b></div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
+  /* ---------- Enviar ao Conectwork (pedido de 07/11) ----------
+     O Conectwork (projeto Firebase separado) recebe a medição do período de cada prestadora (Zenith, Nexus) por um link:
+     <app do Conectwork>#medicoes/importar/<resumo em base64url>. O resumo vai depois do "#": não passa por servidor nenhum.
+     Lá, alguém da Colafix logado confere e confirma. Vão só os PJ com o valor fechado; nada de CPF.
+     Endereço do app: rh/config.pjPag.conectwork (padrão: o GitHub Pages do Conectwork). Formato em
+     conectwork-app/docs/PLANO-COBRANCA-NOTAS.md. Registra o envio em pjpag/{pid}.cw.{EMPRESA} {em,por,n,total}. */
+  const CW_URL='https://cavalcante-creator.github.io/conectwork-app/';
+  const cwUrl=c=>String(cfg(c).conectwork||CW_URL).replace(/#.*$/,'').replace(/\/?$/,'/');
+  const b64url=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  function cwResumo(c,pid,emp){ const p=perDe(pid), D=docP(pid);
+    const xs=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===emp).map(f=>({f,x:(D.pes||{})[f._id]||{}}));
+    const fech=xs.filter(({x})=>x.st&&x.fech), pend=xs.filter(({x})=>!(x.st&&x.fech)).map(({f})=>c.titulo(f.nome));
+    const itens=fech.map(({f,x})=>({n:c.titulo(f.nome),h:x.fech.fixo?null:Math.round(hDec(x.fech.min)*100)/100,v:Math.round((+x.fech.valor||0)*100)}));
+    const doc=fech.length?empDe(c,fech[0].f):(xs.length?empDe(c,xs[0].f):{nome:emp,cnpj:''});
+    return {emp,nomeEmp:doc.nome||emp,cnpj:dig(doc.cnpj),itens,pend,total:itens.reduce((t,i)=>t+i.v,0),antes:((D.cw||{})[emp])||null}; }
+  function cwLink(c,pid,r){ return cwUrl(c)+'#medicoes/importar/'+b64url({v:1,origem:'painel-colafix',periodo:pid,cnpj:r.cnpj,nome:r.emp,ref:pid+':'+r.emp,total:r.total,itens:r.itens}); }
+
   function modal(c){ const M=J.mod, esc=c.esc; if(!M) return '';
     if(M.k==='cfg'){ const g=cfg(c);
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Configurar o pagamento dos PJ"><h3>Como o painel faz a conta</h3><p class="sub">Vale para todos os PJ; o horário e o valor da hora de cada pessoa ficam no detalhe dela.</p>
@@ -400,6 +417,15 @@
         <div class="pjp-ac" style="margin-top:12px">${btn('pjp-modx','Fechar')}${btn('pjp-copia','Copiar mensagem')}${M.email?btn('pjp-mail','E-mail'):''}<a class="btn" data-act="pjp-wa" href="${esc(wa)}" target="_blank" rel="noopener">Mandar no WhatsApp</a></div></div></div>`; }
     if(M.k==='lote'){ return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Pedidos de nota"><h3>${M.xs.length} pedidos de nota criados</h3><p class="sub">Toque em cada um para mandar no WhatsApp (abre a conversa com a mensagem pronta).</p>
         <ul class="pjp-lote">${M.xs.map((p,i)=>`<li><span><b>${esc(p.nome)}</b><small class="sub" style="display:block">${R$(p.valor)}${p.tel?'':' · sem telefone'}</small></span><span><button class="btn sec" data-act="pjp-loteum" data-i="${i}">${p.feito?'Mandado ✓':'Mandar no WhatsApp'}</button></span></li>`).join('')}</ul>
+        <div class="pjp-ac">${btn('pjp-modx','Fechar','','')}</div></div></div>`; }
+    if(M.k==='cw'){ const p=perDe(J.per);
+      return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Enviar ao Conectwork"><h3>Enviar ao Conectwork · ${esc(p.txt)}</h3>
+        <p class="sub">Manda a medição da quinzena de cada prestadora para o Conectwork: o total e, de cada PJ, o nome, as horas e o valor (sem CPF). Lá, alguém da Colafix confere e envia para a prestadora.</p>
+        <ul class="pjp-lote" id="pjp-cwl">${M.rs.map((r,i)=>`<li><span><b>${esc(r.emp)}</b><small class="sub" style="display:block">${r.itens.length} PJ com valor fechado · ${R$(r.total/100)}${r.cnpj.length===14?'':' · <b style="color:var(--crit-ink)">sem CNPJ da empresa</b>'}</small>
+          ${r.pend.length?`<small class="sub" style="display:block;color:var(--warn-ink,#7A5310)">Ficam de fora (valor ainda não fechado): ${esc(r.pend.join(', '))}</small>`:''}
+          ${r.antes?`<small class="sub" style="display:block">Já enviado em ${esc(new Date(r.antes.em).toLocaleString('pt-BR'))} (${R$((r.antes.total||0)/100)})</small>`:''}</span>
+          <span>${r.itens.length&&r.cnpj.length===14?`<button class="btn ${r.antes?'sec':''}" data-act="pjp-cwenv" data-i="${i}">${r.antes?'Enviar de novo':'Enviar'}</button>`:''}</span></li>`).join('')||'<li>Nenhum PJ nesta quinzena.</li>'}</ul>
+        <p class="sub" style="margin-top:10px">O Conectwork abre numa aba nova. Entre com o seu login de lá (RH ou administrador da Colafix). Mandar de novo o mesmo período não duplica: o Conectwork avisa que já recebeu.</p>
         <div class="pjp-ac">${btn('pjp-modx','Fechar','','')}</div></div></div>`; }
     if(M.k==='nao'){ return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Pedir outra nota"><h3>Pedir outra nota · ${esc(M.nome)}</h3><p class="sub">O valor volta para "fechado"; confira e peça de novo. Diga o que estava errado (vai no histórico).</p>
         <textarea id="pjp-nmot" placeholder="ex.: nota emitida para o CNPJ errado"></textarea><div class="pjp-ac" style="margin-top:10px">${btn('pjp-modx','Cancelar')}${btn('pjp-nnaook','Voltar para fechado','data-f="'+esc(M.fid)+'"','')}</div></div></div>`; }
@@ -430,7 +456,7 @@
       `<div class="pjp"><div class="pjp-rb"><div class="pjp-nav"><button class="btn sec pjp-sm" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
           <div><span>${cfg(c).modo==='mes'?'Mês':'Quinzena'}</span><b>${esc(p.txt)}</b>${ehAt?'<small>a quinzena para pagar agora</small>':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
           <button class="btn sec pjp-sm" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
-        <span class="pjp-sp"></span>${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF','','')}</div>
+        <span class="pjp-sp"></span>${btn('pjp-cw','Enviar ao Conectwork')}${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF','','')}</div>
       <div class="pjp-fil"><label>Empresa<select id="pjp-emp" aria-label="Empresa"><option value="">Todas</option>${emps.map(e=>`<option ${J.emp===e?'selected':''}>${esc(e)}</option>`).join('')}</select></label>
         ${sets.length?`<label>Setor<select id="pjp-set" aria-label="Setor"><option value="">Todos</option>${sets.map(e=>`<option ${J.set===e?'selected':''}>${esc(e)}</option>`).join('')}</select></label>`:''}
         <label>Situação<select id="pjp-sit" aria-label="Situação"><option value="*">Todas</option>${Object.entries(ST).map(([k,[t]])=>`<option value="${k}" ${J.sit===k?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
@@ -632,6 +658,12 @@
       if(a==='pjp-nnaook'){ const f=fDe(b.dataset.f), m=String(document.getElementById('pjp-nmot').value||'').trim(); await grava(c,J.per,f._id,{st:'fechado',ped:null,nota:null},'Pediu outra nota'+(m?': '+m:'')); J.mod=null; P.render(); return; }
       if(a==='pjp-pago'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr()}},'Marcado como pago'); P.render(); return; }
       if(a==='pjp-pagox'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',pago:null},'Pago desfeito'); P.render(); return; }
+      if(a==='pjp-cw'){ const p=perDe(J.per), emps=[...new Set(pjs(c,p).map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
+        J.mod={k:'cw',rs:emps.map(e=>cwResumo(c,J.per,e))}; P.render(); return; }
+      if(a==='pjp-cwenv'){ const r=J.mod&&J.mod.rs[+b.dataset.i]; if(!r) return;
+        window.open(cwLink(c,J.per,r),'_blank','noopener');            /* abre já no clique (o navegador bloqueia janela aberta depois de esperar) */
+        try{ await P.db().doc(COL+'/'+J.per).set({cw:{[r.emp]:{em:agora(),por:c.eu(),n:r.itens.length,total:r.total}}},{merge:true}); const D=docP(J.per); D.cw=Object.assign({},D.cw,{[r.emp]:{em:agora(),n:r.itens.length,total:r.total}}); }catch(e){ console.warn('pjp cw',e); }
+        P.toast('Conectwork aberto com a medição de '+r.emp+'. Confira lá e envie para a prestadora.'); J.mod={k:'cw',rs:J.mod.rs.map(x=>x.emp===r.emp?Object.assign({},x,{antes:{em:agora(),total:r.total}}):x)}; P.render(); return; }
       if(a==='pjp-xls'){ await excel(c); return; } if(a==='pjp-pdf'){ await pdf(c); return; }
     }catch(e){ if(e&&e.aviso) P.toast(e.message); else P.erro(e); } });
   document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!C) return; if(J.mod){ J.mod=null; C.P.render(); } else if(J.edDia){ J.edDia=null; C.P.render(); } else if(J.ab){ J.ab=''; C.P.render(); } });
