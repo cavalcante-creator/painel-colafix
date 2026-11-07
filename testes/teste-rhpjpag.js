@@ -137,6 +137,22 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.click('[data-act="pjp-psalva"]'); await H.dorme(800);
   const F2=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/dados/funcionarios/f2'].pjPag.leit);
   ok('Regra só desta pessoa: guarda os leitores dela no cadastro', JSON.stringify(F2)==='["REFEITORIO"]', JSON.stringify(F2));
+  /* Enviar ao Conectwork (07/11): a medição da quinzena por prestadora, no link, sem CPF */
+  await p.keyboard.press('Escape'); await H.dorme(300);
+  await p.evaluate(()=>{ window.open=()=>null; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.ab=''; __T.go('rhpjpag'); }); await H.dorme(1500);
+  const cwB=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
+  for(let i=0;i<2&&!(await p.evaluate(()=>window.__pjpUltimoCw));i++){ await p.click('[data-act="pjp-cw"][data-e="ZENITH"]'); await H.dorme(700); }
+  const cwU=await p.evaluate(()=>window.__pjpUltimoCw||'');
+  /* lê o link do mesmo jeito que o Conectwork (modulos/medicoes.js, lerResumo) */
+  const cwR=await p.evaluate(u=>{ try{ const t=u.split('#medicoes/importar/')[1], b64=t.replace(/-/g,'+').replace(/_/g,'/'), pad=b64+'==='.slice((b64.length+3)%4);
+    return JSON.parse(decodeURIComponent(Array.from(atob(pad)).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }catch(e){ return null; } },cwU);
+  const cwS=(await srv())['rh/dados/pjpag/2026-10-2'];
+  ok('Enviar ao Conectwork: um botão por prestadora; o link leva período, CNPJ da prestadora, nome, horas e valor de cada PJ (sem CPF) e fica registrado',
+    /Zenith/.test(cwB)&&/Nexus/.test(cwB)&&!/Colafix/i.test(cwB)&&/^https:\/\/cavalcante-creator\.github\.io\/conectwork-app\/#medicoes\/importar\//.test(cwU)&&!/11122233344|55566677788/.test(cwU)&&!/11122233344/.test(JSON.stringify(cwR))
+    &&cwR&&cwR.v===1&&cwR.periodo==='2026-10-2'&&cwR.cnpj==='62944495000164'&&cwR.itens.length===1&&cwR.itens[0].n==='Joao Pereira Teste'&&Number.isInteger(cwR.itens[0].v)&&cwR.itens[0].v>0&&cwR.total===cwR.itens[0].v&&typeof cwR.itens[0].h==='number'
+    &&cwS&&cwS.cw&&cwS.cw.ZENITH&&cwS.cw.ZENITH.total===cwR.total&&cwS.cw.ZENITH.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwR,cw:cwS&&cwS.cw}));
+  const cwB2=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
+  ok('Depois de enviar, mostra quando e por quem e o botão vira "Enviar de novo"', /Enviado em \d{2}\/\d{2} às \d{2}:\d{2} por Stefani RH/.test(cwB2)&&/Enviar de novo/.test(cwB2), cwB2.slice(0,300));
   const e=erros.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

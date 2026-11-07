@@ -12,6 +12,7 @@
      rh/dados/pjnotaenv/{t}   o que o PJ manda (regra: só cria, uma vez, enquanto o pedido vale)
      funcionarios/{id}.pjPag  {vh (R$/hora), ini, fim, intv (min), fixo (valor fixo no período, sem horas)}
      rh/config.pjPag          {modo:'quinzena'|'mes', tol, dentro (só conta dentro do horário), ini, fim, intv, horasMes, msg, dias}
+     rh/dados/pjpag/{pid}.cw  {EMPRESA:{em,por,total (centavos),n}} — medição mandada ao Conectwork ("Enviar ao Conectwork")
    Usado pelo rh.js: window.RHPJPag.render(ctx) · .avisos(ctx). Prefixo `pjp`. */
 (function(){
   const COL='rh/dados/pjpag', PED='rh/dados/pjnotaped', ENV='rh/dados/pjnotaenv';
@@ -194,6 +195,10 @@
   const css=`<style id="pjp-css">
   .pjp{display:flex;flex-direction:column;gap:12px}
   .pjp-rb{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.pjp-sp{flex:1}
+  .pjp-cw{margin-top:16px;border:1px solid var(--line,#dde3ea);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--surface,#fff)}
+  .pjp-cw>div:first-child small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+  .pjp-cwe{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line,#dde3ea)}
+  .pjp-cwe>span{flex:1;min-width:220px}.pjp-cwe small{display:block;font-size:12px;color:var(--muted)}
   .pjp-nav{display:flex;align-items:center;gap:10px}.pjp-nav>div{display:flex;flex-direction:column;line-height:1.2;min-width:150px}
   .pjp-nav span,.pjp-k span,.pjp-lbl{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
   .pjp-nav b{font-size:17px}.pjp-nav small{font-size:12px;color:var(--muted)}
@@ -404,6 +409,29 @@
     if(M.k==='nao'){ return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Pedir outra nota"><h3>Pedir outra nota · ${esc(M.nome)}</h3><p class="sub">O valor volta para "fechado"; confira e peça de novo. Diga o que estava errado (vai no histórico).</p>
         <textarea id="pjp-nmot" placeholder="ex.: nota emitida para o CNPJ errado"></textarea><div class="pjp-ac" style="margin-top:10px">${btn('pjp-modx','Cancelar')}${btn('pjp-nnaook','Voltar para fechado','data-f="'+esc(M.fid)+'"','')}</div></div></div>`; }
     return ''; }
+  /* ---------- Enviar ao Conectwork (07/11): a medição da quinzena de cada prestadora (Zenith, Nexus…) ----------
+     Abre o Conectwork em #medicoes/importar/<resumo>: lá o RH (ou o admin) da Colafix confere e manda para a prestadora.
+     O resumo vai no próprio link (base64url do JSON {v:1, periodo, cnpj da prestadora, nome, total em centavos, ref,
+     itens:[{n: nome, h: horas decimais ou null quando é valor fixo, v: centavos}]}): só nome, horas e valor, NUNCA CPF.
+     Usa o valor fechado de cada PJ (ou o calculado agora, se ainda não foi fechado). Fica registrado no período
+     (cw.{EMPRESA} = {em, por, total, n}). Endereço do Conectwork: rh/config.conectworkUrl (padrão: o do GitHub Pages). */
+  const CW_URL='https://cavalcante-creator.github.io/conectwork-app/';
+  const b64u=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  function cwMedicao(c,pid,empK){ const p=perDe(pid), D=docP(pid), emp=(c.EMP_DOC||{})[empK]||null;
+    const rs=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===empK).map(f=>{ const x=(D.pes||{})[f._id]||{}, r=calcPessoa(c,f,p,x), fe=x.st&&x.fech;
+      return {f,x,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,fixo:r.fixo}; });
+    const itens=rs.filter(o=>o.valor>0).map(o=>({n:c.titulo(o.f.nome).slice(0,120),h:o.fixo?null:Math.round(hDec(o.min)*100)/100,v:Math.round(o.valor*100)}));
+    return {emp,rs,itens,abertos:rs.filter(o=>!o.x.st).length,
+      payload:{v:1,periodo:pid,cnpj:dig(emp&&emp.cnpj),nome:emp?emp.nome:empK,total:itens.reduce((a,i)=>a+i.v,0),ref:'painel-rh:'+pid+':'+empK,itens}}; }
+  const quando=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
+  const cwLink=(c,payload)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes/importar/'+b64u(JSON.stringify(payload));
+  function cwBloco(c,pid,emps){ const esc=c.esc, D=docP(pid), ks=emps.filter(k=>k!=='COLAFIX'&&dig(((c.EMP_DOC||{})[k]||{}).cnpj).length===14); if(!ks.length) return '';
+    return `<div class="pjp-cw"><div><b>Conectwork</b><small>Mande a medição da ${cfg(c).modo==='mes'?'mês':'quinzena'} de cada prestadora: nome, horas e valor de cada PJ (sem CPF). Lá você confere e envia para a prestadora.</small></div>
+      ${ks.map(k=>{ const M=cwMedicao(c,pid,k), ja=(D.cw||{})[k], conf=J.cwConf===k;
+        return `<div class="pjp-cwe"><span><b>${esc(c.titulo(k))}</b> · ${M.itens.length} PJ · ${R$(M.payload.total/100)}${ja?`<small>Enviado em ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''}${ja.total!==M.payload.total?' · o valor mudou depois':''}</small>`:''}
+          ${M.abertos&&!conf?`<small style="color:var(--crit-ink)">${M.abertos} ${M.abertos===1?'PJ ainda sem':'PJ ainda sem'} o valor fechado</small>`:''}${conf?`<small style="color:var(--crit-ink)">Toque de novo para enviar com ${M.abertos} sem o valor fechado (vai o valor calculado agora)</small>`:''}</span>
+          ${M.itens.length?btn('pjp-cw',(ja?'Enviar de novo':'Enviar ao Conectwork'),'data-e="'+esc(k)+'"',conf||!ja?'':'sec'):'<small>Nenhum valor para enviar</small>'}</div>`; }).join('')}</div>`; }
+
   function render(c){ C=c; const esc=c.esc; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid);
     const D=docP(pid), xs=pjs(c,p), linhas=[], tot={n:0,min:0,val:0,desc:0,st:{}}; let semFid=0;
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
@@ -443,6 +471,7 @@
       ${rs.length?`<div class="pjp-tw"><table class="pjp-t"><thead><tr><th>PJ <small style="display:inline;font-weight:400">· toque no nome para ver os dias</small></th><th class="n">Horas</th><th class="n">Valor da hora</th><th class="n">Desconto</th><th class="n">Total a pagar</th><th class="pjp-qa" colspan="2">Próximo passo</th></tr></thead><tbody>${linhas.join('')}</tbody>
         <tfoot><tr><td>Total</td><td class="n">${hTxt(tot.min)}</td><td></td><td class="n">${tot.desc?'− '+R$(tot.desc):'—'}</td><td class="n">${R$(tot.val)}</td><td colspan="2"></td></tr></tfoot></table></div>`
         :`<div class="empty">${xs.length?'Nenhum PJ com esse filtro.':'Nenhum PJ ativo no cadastro do RH (Funcionários com vínculo PJ).'}</div>`}
+      ${cwBloco(c,pid,emps)}
       ${nAbre>1||nFech>1?`<div class="pjp-rb"><span class="pjp-sp"></span>${nAbre>1?btn('pjp-fechtodos','Fechar o valor dos '+nAbre):''}${nFech>1?btn('pjp-pedtodos','Pedir nota aos '+nFech+' fechados'):''}</div>`:''}
       </div>`+gaveta(c,pid,rsT)+modal(c); }
   /* ---------- relatórios ---------- */
@@ -632,6 +661,12 @@
       if(a==='pjp-nnaook'){ const f=fDe(b.dataset.f), m=String(document.getElementById('pjp-nmot').value||'').trim(); await grava(c,J.per,f._id,{st:'fechado',ped:null,nota:null},'Pediu outra nota'+(m?': '+m:'')); J.mod=null; P.render(); return; }
       if(a==='pjp-pago'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr()}},'Marcado como pago'); P.render(); return; }
       if(a==='pjp-pagox'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',pago:null},'Pago desfeito'); P.render(); return; }
+      if(a==='pjp-cw'){ const k=b.dataset.e, M=cwMedicao(c,J.per,k);
+        if(M.abertos&&J.cwConf!==k){ J.cwConf=k; P.render(); return; }
+        J.cwConf=''; const url=cwLink(c,M.payload); window.__pjpUltimoCw=url; window.open(url,'_blank','noopener');
+        const p=perDe(J.per), D=docP(J.per), reg={em:agora(),por:c.eu(),total:M.payload.total,n:M.itens.length}; D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
+        await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:reg}},{merge:true});
+        P.toast('Medição de '+c.titulo(k)+' aberta no Conectwork. Confira lá e envie para a prestadora.'); P.render(); return; }
       if(a==='pjp-xls'){ await excel(c); return; } if(a==='pjp-pdf'){ await pdf(c); return; }
     }catch(e){ if(e&&e.aviso) P.toast(e.message); else P.erro(e); } });
   document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!C) return; if(J.mod){ J.mod=null; C.P.render(); } else if(J.edDia){ J.edDia=null; C.P.render(); } else if(J.ab){ J.ab=''; C.P.render(); } });
