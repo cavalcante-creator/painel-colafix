@@ -1,5 +1,5 @@
 /* Painel Colafix · abertura animada (08/11, padrão do Conectwork)
-   A logo da Colafix (grande) aparece primeiro; embaixo, o "V" pequeno se desenha, a folha entra e vem "Painel de Operação".
+   A logo da Colafix se monta ("Cola" se desenha, o "fix" entra); embaixo, pequenos, o "V" e "Painel de Operação".
    ~2,5 s, só na 1ª abertura da sessão (sessionStorage), não bloqueia nada (pointer-events:none) e some sozinha.
    Não aparece: com "reduzir movimento" no aparelho, nas TVs/janelas/totens (?tela ?janela ?totem ?linhas, rodízio
    automático), com ?semAbertura e nos testes automáticos (navigator.webdriver; ?abertura=1 força).
@@ -14,13 +14,12 @@
   try { sessionStorage.setItem('colafix.abertura', '1'); } catch (e) {}
   var tema = 'auto'; try { tema = localStorage.getItem('colafix.tema') || 'auto'; } catch (e) {}
   var escuro = tema === 'dark' || (tema !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  var logo = escuro ? 'icons/logo-colafix-escuro.png' : ((document.querySelector('.brand img') || {}).src || 'icons/logo-colafix-escuro.png');
+  var fix = escuro ? 'icons/logo-fix-escuro.png' : 'icons/logo-fix-claro.png';
   var a = document.createElement('div');
   a.id = 'abertura'; a.className = escuro ? 'ab-esc' : 'ab-clr'; a.setAttribute('aria-hidden', 'true');
-  /* a Colafix é a principal (grande, primeiro); o V da Lys vem pequeno, embaixo, ao lado de "Painel de Operação" */
-  a.innerHTML = '<div class="ab-c"><img class="ab-logo" src="' + logo + '" alt="">' +
-    '<div class="ab-ass"><div class="ab-sim"><img class="ab-corpo" src="icons/v-corpo.png" alt=""><img class="ab-folha" src="icons/v-folha.png" alt=""></div>' +
-    '<div class="ab-frase">Painel de Operação</div></div></div>';
+  /* a logo da Colafix se monta: "Cola" se desenha da esquerda para a direita e o "fix" entra; o V da Lys fica pequeno, embaixo */
+  a.innerHTML = '<div class="ab-c"><div class="ab-logo"><img class="ab-cola" src="icons/logo-cola.png" alt=""><img class="ab-fix" src="' + fix + '" alt=""></div>' +
+    '<div class="ab-ass"><img class="ab-v" src="icons/assinatura.png" alt=""><div class="ab-frase">Painel de Operação</div></div></div>';
   document.body.appendChild(a);
   setTimeout(function () { a.classList.add('sai'); }, 2150);
   setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 2650);

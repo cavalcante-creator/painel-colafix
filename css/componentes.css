@@ -194,16 +194,16 @@ dialog.pc-jan.gaveta::backdrop{background:rgba(10,20,26,.3);backdrop-filter:none
 #abertura.ab-clr{background:radial-gradient(120% 90% at 50% 40%,#FFFFFF 0%,#F2F4F6 60%,#E6EBEF 100%)}
 #abertura.ab-esc{background:radial-gradient(120% 90% at 50% 40%,#1E2A31 0%,#15191B 62%,#0F1214 100%)}
 #abertura.sai{opacity:0}
-#abertura .ab-c{display:flex;flex-direction:column;align-items:center;gap:22px;transform:translateY(-4%)}
-#abertura .ab-logo{width:min(300px,72vw);height:auto;opacity:0;transform:translateY(12px) scale(.96);animation:abSobe .6s cubic-bezier(.2,.8,.3,1) .1s forwards}
-#abertura .ab-ass{display:flex;align-items:center;gap:10px}
-#abertura .ab-sim{position:relative;width:34px;height:30px;flex:none}
-#abertura .ab-sim img{position:absolute;inset:0;width:100%;height:100%}
-#abertura .ab-corpo{clip-path:inset(0 100% 0 0);animation:abDesenha .7s cubic-bezier(.65,0,.35,1) .65s forwards}
-#abertura .ab-folha{opacity:0;transform-origin:72% 30%;transform:translate(-4px,4px) scale(.5) rotate(-20deg);animation:abFolha .45s cubic-bezier(.2,.9,.3,1.3) 1.2s forwards}
-#abertura .ab-frase{font-family:Archivo,system-ui,sans-serif;font-size:15px;letter-spacing:.06em;color:#5E6E77;opacity:0;transform:translateY(6px);animation:abSobe .5s ease-out .85s forwards}
+#abertura .ab-c{display:flex;flex-direction:column;align-items:center;gap:14px;transform:translateY(-4%)}
+#abertura .ab-logo{position:relative;width:min(190px,56vw);aspect-ratio:300/80}
+#abertura .ab-logo img{position:absolute;inset:0;width:100%;height:100%}
+#abertura .ab-cola{clip-path:inset(0 100% 0 0);animation:abDesenha .75s cubic-bezier(.65,0,.35,1) .1s forwards}
+#abertura .ab-fix{opacity:0;transform:translateY(-10px);animation:abFix .45s cubic-bezier(.2,.9,.3,1.3) .8s forwards}
+#abertura .ab-ass{display:flex;align-items:center;gap:7px;opacity:0;transform:translateY(6px);animation:abSobe .5s ease-out 1.2s forwards}
+#abertura .ab-v{width:18px;height:auto}
+#abertura .ab-frase{font-family:Archivo,system-ui,sans-serif;font-size:13px;letter-spacing:.06em;color:#5E6E77}
 #abertura.ab-esc .ab-frase{color:#9FAAAF}
 @keyframes abDesenha{to{clip-path:inset(0 0 0 0)}}
-@keyframes abFolha{to{opacity:1;transform:none}}
+@keyframes abFix{to{opacity:1;transform:none}}
 @keyframes abSobe{to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#abertura{display:none}}

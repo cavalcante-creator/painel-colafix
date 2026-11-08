@@ -6,7 +6,7 @@ const semRobo=()=>Object.defineProperty(navigator,'webdriver',{get:()=>false}); 
 (async()=>{ fs.mkdirSync('/tmp/sh',{recursive:true}); const {d}=seedManut(x=>x);
  let B=await H.abrir({viewport:{width:1280,height:800}}); let p=B.page; await B.ctx.addInitScript(semRobo); await H.preparar(p,d);
  await p.goto(H.BASE); await H.dorme(150);
- ok('Na 1ª abertura aparece por cima de tudo, com o V, a folha e a logo', await p.evaluate(()=>{ const a=document.getElementById('abertura'); return !!a&&getComputedStyle(a).position==='fixed'&&!!a.querySelector('.ab-corpo')&&!!a.querySelector('.ab-folha')&&!!a.querySelector('.ab-logo')&&/Painel de Operação/.test(a.innerText); }));
+ ok('Na 1ª abertura aparece por cima de tudo, com a logo da Colafix em duas partes (Cola e fix) e o V pequeno', await p.evaluate(()=>{ const a=document.getElementById('abertura'); return !!a&&getComputedStyle(a).position==='fixed'&&!!a.querySelector('.ab-cola')&&!!a.querySelector('.ab-fix')&&!!a.querySelector('.ab-v')&&/Painel de Operação/.test(a.innerText); }));
  ok('Não bloqueia o clique (pointer-events: none)', await p.evaluate(()=>getComputedStyle(document.getElementById('abertura')).pointerEvents==='none'));
  await H.dorme(250); const imgs=await p.evaluate(()=>[...document.querySelectorAll('#abertura img')].map(i=>i.complete&&i.naturalWidth>0));
  ok('As três imagens carregaram', imgs.length===3&&imgs.every(Boolean), JSON.stringify(imgs));
@@ -29,7 +29,7 @@ const semRobo=()=>Object.defineProperty(navigator,'webdriver',{get:()=>false}); 
  /* escuro + celular, só para a foto */
  B=await H.abrir({viewport:{width:390,height:844},ctx:{colorScheme:'dark'}}); p=B.page; await B.ctx.addInitScript(semRobo); await H.preparar(p,d);
  await p.goto(H.BASE); await H.dorme(1700); await p.screenshot({path:'/tmp/sh/abertura-escuro-cel.png'});
- ok('No escuro usa o fundo escuro e a logo com o "fix" branco', await p.evaluate(()=>{ const a=document.getElementById('abertura'); return !!a&&a.classList.contains('ab-esc')&&/logo-colafix-escuro/.test(a.querySelector('.ab-logo').src); }));
+ ok('No escuro usa o fundo escuro e a logo com o "fix" branco', await p.evaluate(()=>{ const a=document.getElementById('abertura'); return !!a&&a.classList.contains('ab-esc')&&/logo-fix-escuro/.test(a.querySelector('.ab-fix').src); }));
  await B.browser.close();
  const f=res.filter(r=>!r.ok); console.log(f.length?`FALHOU (${f.length})`:`PASSOU (${res.length})`); process.exit(f.length?1:0);
 })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
