@@ -1,0 +1,185 @@
+/* Painel Colafix · PEÇAS COMUNS (nov/2026, padrão vindo do Conectwork)
+   Um jogo pequeno de peças para todas as telas novas — e para as antigas, quando forem revisadas, módulo a módulo.
+   Regras:
+   1. Só cores por variável (--pc-* abaixo, que apontam para as do painel). Nada de cor escrita direto: assim o
+      tema escuro funciona sozinho, sem conserto por tela.
+   2. Tudo com o prefixo pc- (o painel inteiro roda no mesmo escopo: .card, .pill, .sr… já existem).
+   3. Montar pelo JS com Painel.ui (js/83-componentes.js), que já escapa os textos.
+   Carregado depois de refino.css. Não muda nenhuma tela existente. */
+
+/* ---------- 1. Cores com nome de uso (claro e escuro vêm das variáveis do painel) ---------- */
+:root{
+  --pc-fundo:var(--ground); --pc-sup:var(--surface); --pc-sup2:var(--surface-2); --pc-linha:var(--line);
+  --pc-txt:var(--ink); --pc-txt2:var(--muted); --pc-fraco:var(--faint);
+  --pc-pri:var(--teal-strong); --pc-pri-h:var(--teal);
+  --pc-info:var(--teal); --pc-info-bg:var(--teal-tint);
+  --pc-ok:var(--ok-ink); --pc-ok-bg:var(--ok-tint);
+  --pc-warn:var(--warn-ink); --pc-warn-bg:var(--warn-tint);
+  --pc-crit:var(--crit-ink); --pc-crit-bg:var(--crit-tint);
+  --pc-sombra:var(--shadow); --pc-raio:16px; --pc-raio-p:10px;
+  --pc-foco:0 0 0 3px var(--teal-tint);
+}
+
+/* ---------- 2. Cartão ---------- */
+.pc-card{background:var(--pc-sup);border:1px solid var(--pc-linha);border-radius:var(--pc-raio);box-shadow:var(--pc-sombra);min-width:0}
+.pc-ch{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--pc-linha);flex-wrap:wrap}
+.pc-ch h3{margin:0;font-size:15px;font-weight:600;flex:1 0 auto;max-width:100%}
+.pc-ch .pc-cont{font-size:12px;color:var(--pc-txt2);background:var(--pc-sup2);border-radius:999px;padding:1px 9px;font-weight:500}
+.pc-ic{width:32px;height:32px;border-radius:9px;background:var(--pc-info-bg);color:var(--pc-info);display:grid;place-items:center;flex:none}
+.pc-ic svg{width:17px;height:17px}
+.pc-ic.ok{background:var(--pc-ok-bg);color:var(--pc-ok)}.pc-ic.warn{background:var(--pc-warn-bg);color:var(--pc-warn)}.pc-ic.crit{background:var(--pc-crit-bg);color:var(--pc-crit)}
+.pc-cb{padding:16px 18px}
+.pc-cb.sem{padding:0}
+.pc-cf{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--pc-linha);background:var(--pc-sup2);border-radius:0 0 var(--pc-raio) var(--pc-raio)}
+.pc-g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.pc-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+.pc-pilha{display:flex;flex-direction:column;gap:18px}
+@media (max-width:1100px){.pc-g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){.pc-g2,.pc-g3{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- 3. Selo de situação (com o pontinho de cor) ---------- */
+.pc-selo{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 10px;border-radius:999px;white-space:nowrap;background:var(--pc-sup2);color:var(--pc-txt2);line-height:1.4}
+.pc-selo::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.pc-selo.ok{background:var(--pc-ok-bg);color:var(--pc-ok)}
+.pc-selo.warn{background:var(--pc-warn-bg);color:var(--pc-warn)}
+.pc-selo.crit{background:var(--pc-crit-bg);color:var(--pc-crit)}
+.pc-selo.info{background:var(--pc-info-bg);color:var(--pc-info)}
+.pc-selo.sp::before{display:none}
+
+/* ---------- 4. Aviso ---------- */
+.pc-aviso{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-radius:12px;font-size:14px;line-height:1.45;background:var(--pc-info-bg);color:var(--pc-info)}
+.pc-aviso>svg{width:18px;height:18px;flex:none;margin-top:2px}
+.pc-aviso .t{flex:1;min-width:0}
+.pc-aviso strong{display:block;font-weight:600}
+.pc-aviso .pc-av-bt{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.pc-aviso.ok{background:var(--pc-ok-bg);color:var(--pc-ok)}
+.pc-aviso.warn{background:var(--pc-warn-bg);color:var(--pc-warn)}
+.pc-aviso.crit{background:var(--pc-crit-bg);color:var(--pc-crit)}
+
+/* ---------- 5. Tela ou lista vazia ---------- */
+.pc-vazio{padding:36px 22px;text-align:center;color:var(--pc-txt2);display:flex;flex-direction:column;align-items:center;gap:8px}
+.pc-vazio .pc-ic{width:50px;height:50px;border-radius:15px}
+.pc-vazio .pc-ic svg{width:24px;height:24px}
+.pc-vazio strong{color:var(--pc-txt);font-size:15px;font-weight:600}
+.pc-vazio p{margin:0;max-width:44ch}
+.pc-vazio.ok .pc-ic{background:var(--pc-ok-bg);color:var(--pc-ok)}
+
+/* ---------- 6. Dados da pessoa / do registro (rótulo pequeno em cima, valor embaixo) ---------- */
+.pc-dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px;margin:0}
+.pc-dl.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pc-dl>div{min-width:0}
+.pc-dl dt{font-size:12px;color:var(--pc-txt2);margin-bottom:2px}
+.pc-dl dd{margin:0;font-size:14px;font-weight:500;overflow-wrap:anywhere}
+.pc-dl dd.vz{color:var(--pc-fraco);font-weight:400}
+.pc-dl .tudo{grid-column:1/-1}
+@media (max-width:620px){.pc-dl,.pc-dl.c3{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- 7. Formulário em grade de 12 colunas ---------- */
+.pc-form{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px 14px}
+.pc-c2{grid-column:span 2}.pc-c3{grid-column:span 3}.pc-c4{grid-column:span 4}.pc-c6{grid-column:span 6}.pc-c8{grid-column:span 8}.pc-c12{grid-column:span 12}
+@media (max-width:720px){.pc-c2,.pc-c3,.pc-c4{grid-column:span 6}.pc-c6,.pc-c8{grid-column:span 12}}
+.pc-campo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pc-campo>span{font-size:12.5px;color:var(--pc-txt2);font-weight:500}
+.pc-campo>span i{font-style:normal;color:var(--pc-crit)}
+.pc-campo input,.pc-campo select,.pc-campo textarea{width:100%;background:var(--pc-sup);border:1px solid var(--pc-linha);border-radius:var(--pc-raio-p);padding:10px 12px;color:var(--pc-txt);font:inherit;font-size:15px;min-height:42px}
+.pc-campo textarea{min-height:84px;resize:vertical}
+.pc-campo input:focus,.pc-campo select:focus,.pc-campo textarea:focus{border-color:var(--pc-pri-h);outline:none;box-shadow:var(--pc-foco)}
+.pc-campo em{font-style:normal;font-size:12px;color:var(--pc-fraco)}
+.pc-campo.erro input,.pc-campo.erro select,.pc-campo.erro textarea{border-color:var(--pc-crit)}
+.pc-campo.erro em{color:var(--pc-crit)}
+.pc-marca{display:flex;gap:12px;align-items:flex-start;font-size:14px;cursor:pointer;padding:11px 13px;border:1px solid var(--pc-linha);border-radius:12px;background:var(--pc-sup)}
+.pc-marca:has(input:checked){border-color:var(--pc-pri-h);background:var(--pc-info-bg)}
+.pc-marca input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--pc-pri);flex:none}
+.pc-marca small{display:block;color:var(--pc-txt2);font-size:12.5px}
+
+/* ---------- 8. Tabela que vira cartão no celular ---------- */
+.pc-rola{overflow-x:auto}
+table.pc-tab{width:100%;border-collapse:collapse;font-size:14px}
+.pc-tab th{text-align:left;font-weight:500;color:var(--pc-txt2);font-size:12px;padding:10px 14px;border-bottom:1px solid var(--pc-linha);background:var(--pc-sup2);white-space:nowrap}
+.pc-tab td{padding:12px 14px;border-bottom:1px solid var(--pc-linha);vertical-align:middle}
+.pc-tab th:first-child,.pc-tab td:first-child{padding-left:18px}
+.pc-tab th:last-child,.pc-tab td:last-child{padding-right:18px}
+.pc-tab tbody tr:last-child td{border-bottom:0}
+.pc-tab tr.pc-clic{cursor:pointer}
+.pc-tab tr.pc-clic:hover td{background:var(--pc-sup2)}
+.pc-tab .dir{text-align:right;font-variant-numeric:tabular-nums}
+.pc-cel{display:flex;align-items:center;gap:12px;min-width:0}
+.pc-cel strong{display:block;font-weight:600}
+.pc-cel small{display:block;color:var(--pc-txt2);font-size:12.5px}
+@media (max-width:760px){
+  table.pc-tab.pc-resp thead{display:none}
+  table.pc-tab.pc-resp tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:12px 16px;border-bottom:1px solid var(--pc-linha)}
+  table.pc-tab.pc-resp tbody tr:last-child{border-bottom:0}
+  table.pc-tab.pc-resp td{border:0;padding:0!important}
+  table.pc-tab.pc-resp td.m-esc{display:none}
+  table.pc-tab.pc-resp td.m-tudo{grid-column:1/-1}
+  table.pc-tab.pc-resp td[data-r]::before{content:attr(data-r) " · ";color:var(--pc-txt2);font-size:12px}
+}
+
+/* ---------- 9. Iniciais da pessoa ---------- */
+.pc-ini{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:13px;font-weight:600;color:#fff;flex:none;letter-spacing:.02em;background:var(--pc-pri)}
+.pc-ini.p{width:28px;height:28px;font-size:10.5px;border-radius:8px}
+
+/* ---------- 10. Números do topo (o cartão inteiro leva à tela) ---------- */
+.pc-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.pc-num{display:flex;flex-direction:column;gap:2px;background:var(--pc-sup);border:1px solid var(--pc-linha);border-radius:var(--pc-raio);padding:14px 16px;box-shadow:var(--pc-sombra);color:var(--pc-txt);text-align:left;font:inherit;min-width:0}
+button.pc-num{cursor:pointer}
+button.pc-num:hover{border-color:var(--pc-pri-h)}
+.pc-num span{font-size:12.5px;color:var(--pc-txt2)}
+.pc-num b{font-size:28px;font-weight:300;letter-spacing:-.03em;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-num small{font-size:12px;color:var(--pc-fraco)}
+.pc-num.warn b{color:var(--pc-warn)}.pc-num.crit b{color:var(--pc-crit)}.pc-num.ok b{color:var(--pc-ok)}
+@media (max-width:620px){.pc-nums{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pc-num{padding:12px}.pc-num b{font-size:22px}}
+
+/* ---------- 11. "Precisa de você": lista uniforme ---------- */
+.pc-pv{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.pc-pvi{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--pc-linha);background:var(--pc-sup);color:var(--pc-txt);border-radius:12px;padding:10px 14px;font:inherit;min-width:0}
+button.pc-pvi{cursor:pointer}
+button.pc-pvi:hover{border-color:var(--pc-pri-h)}
+.pc-pvi .t{flex:1;min-width:0}
+.pc-pvi strong{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-pvi small{display:block;color:var(--pc-txt2);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-pvi .pc-selo{flex:none}
+.pc-pv-ok{display:flex;align-items:center;gap:10px;color:var(--pc-ok);font-weight:500;font-size:14px;padding:6px 2px}
+.pc-pv-ok svg{width:18px;height:18px}
+@media (max-width:520px){.pc-pvi .pc-selo{display:none}}
+
+/* ---------- 12. Linha do tempo ---------- */
+.pc-tempo{list-style:none;margin:0;padding:4px 0}
+.pc-tempo li{display:grid;grid-template-columns:14px minmax(0,1fr);gap:12px;padding:8px 0;position:relative}
+.pc-tempo li::before{content:"";position:absolute;left:6px;top:24px;bottom:-8px;width:2px;background:var(--pc-linha)}
+.pc-tempo li:last-child::before{display:none}
+.pc-tempo .b{width:14px;height:14px;border-radius:50%;margin-top:4px;border:3px solid var(--pc-sup);box-shadow:0 0 0 2px var(--pc-info)}
+.pc-tempo .b.ok{box-shadow:0 0 0 2px var(--pc-ok)}.pc-tempo .b.warn{box-shadow:0 0 0 2px var(--pc-warn)}.pc-tempo .b.crit{box-shadow:0 0 0 2px var(--pc-crit)}
+.pc-tempo p{margin:0;font-size:14px}
+.pc-tempo small{color:var(--pc-fraco);font-size:12px}
+
+/* ---------- 13. Janela e gaveta lateral (dialog do navegador: Esc e fundo já vêm prontos) ---------- */
+dialog.pc-jan{border:0;border-radius:20px;padding:0;max-width:600px;width:calc(100% - 28px);max-height:calc(100dvh - 28px);background:var(--pc-sup);color:var(--pc-txt);box-shadow:0 30px 80px -20px rgba(10,20,26,.55)}
+dialog.pc-jan.larga{max-width:860px}
+dialog.pc-jan::backdrop{background:rgba(10,20,26,.5);backdrop-filter:blur(2px)}
+dialog.pc-jan[open]{display:flex;flex-direction:column}
+.pc-jh{padding:18px 22px 12px;display:flex;align-items:flex-start;gap:12px}
+.pc-jh h2{margin:0;font-size:19px;font-weight:600;line-height:1.3}
+.pc-jh .sub{font-size:13.5px;margin:2px 0 0}
+.pc-jh .t{flex:1;min-width:0}
+.pc-jx{background:var(--pc-sup2);border:0;width:36px;height:36px;border-radius:10px;cursor:pointer;color:var(--pc-txt2);display:grid;place-items:center;flex:none;font-size:20px;line-height:1}
+.pc-jx:hover{color:var(--pc-txt)}
+.pc-jb{padding:4px 22px 18px;display:flex;flex-direction:column;gap:14px;overflow:auto;flex:1;min-height:0}
+.pc-jf{padding:12px 22px;border-top:1px solid var(--pc-linha);display:flex;justify-content:flex-end;gap:8px;background:var(--pc-sup2);border-radius:0 0 20px 20px;flex-wrap:wrap}
+dialog.pc-jan.gaveta{margin:0 0 0 auto;height:100%;max-height:100%;width:min(560px,100%);max-width:100%;border-radius:0}
+dialog.pc-jan.gaveta .pc-jf{border-radius:0}
+dialog.pc-jan.gaveta::backdrop{background:rgba(10,20,26,.3);backdrop-filter:none}
+@media (prefers-reduced-motion:no-preference){
+  dialog.pc-jan.gaveta[open]{animation:pcGav .22s ease-out}
+  dialog.pc-jan:not(.gaveta)[open]{animation:pcJan .16s ease-out}
+  @keyframes pcGav{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes pcJan{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+}
+@media (max-width:620px){dialog.pc-jan:not(.gaveta){margin:auto 0 0;width:100%;max-width:100%;border-radius:20px 20px 0 0}.pc-jf{border-radius:0}.pc-jf .btn{flex:1}}
+
+/* ---------- 14. Filtros em chip ---------- */
+.pc-chips{display:flex;gap:6px;flex-wrap:wrap}
+.pc-chip{border:1px solid var(--pc-linha);background:var(--pc-sup);color:var(--pc-txt2);border-radius:999px;padding:6px 13px;font:inherit;font-size:13px;cursor:pointer;font-weight:500}
+.pc-chip[aria-pressed="true"]{background:var(--pc-pri);border-color:var(--pc-pri);color:var(--pc-sup)}
+.pc-chip b{font-weight:600;margin-left:4px;opacity:.75}
