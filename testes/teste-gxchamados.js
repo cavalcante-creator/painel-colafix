@@ -12,7 +12,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Menu do Marcelo tem "Manutenção" (Chamados dentro)', /Manutenção/.test(nav), nav.replace(/\n/g,'|'));
  await p.click('#navlist [data-go="gxch"]'); await H.dorme(800);
  let t1=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Tela "Chamados e tarefas" abre com os números e o botão de nova tarefa', /Chamados e tarefas/.test(t1)&&/aguardando técnico/.test(t1)&&/Nova tarefa para a manutenção/.test(t1), t1.slice(0,200).replace(/\n/g,'|'));
+ ok('Tela "Chamados e tarefas" abre com os números e o botão de nova tarefa', /Chamados e tarefas/.test(t1)&&/aguardando técnico/i.test(t1)&&/Nova tarefa para a manutenção/.test(t1), t1.slice(0,200).replace(/\n/g,'|'));
  await p.click('[data-act="gch-nova"]'); await H.dorme(400);
  await p.fill('#gch-tx','Consertar o portão da portaria que não fecha'); await p.selectOption('#gch-on','Portaria'); await H.dorme(400);
  await p.fill('#gch-lc','portão 2'); await p.selectOption('#gch-tp','serralheria'); await p.selectOption('#gch-tc','Bruno Lima');

@@ -29,7 +29,7 @@ h1{font-size:30px;line-height:36px}
 .card{border-radius:14px;padding:20px 22px;box-shadow:0 2px 8px rgba(20,63,84,.07)}
 :root[data-theme="dark"] .card{box-shadow:none}
 .btn{height:44px;padding:0 18px;border-radius:10px;font-size:14.5px;background:var(--teal-strong)}
-:root[data-theme="dark"] .btn{background:var(--teal)}
+:root[data-theme="dark"] .btn:not(.sec){background:var(--teal)}
 .btn:hover:not(:disabled){filter:brightness(1.08)}
 .btn.sec{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
 .btn.sec:hover:not(:disabled){filter:none;border-color:var(--teal)}

@@ -18,6 +18,7 @@ function gchSit(c){ const E=c.exec||{};
   if(manFechada(c)) return ['Feito'+(c.concluidoPorNome?' · '+c.concluidoPorNome:'')+(c.concluidoEm?' · '+dm(hojeStr(new Date(c.concluidoEm)))+' '+hora(c.concluidoEm):''),'ok'];
   if(E.tecnico) return ['Com '+tecNomes(c)+(E.inicio?' desde '+(String(E.inicio).slice(0,10)===hojeStr()?'':dm(String(E.inicio).slice(0,10))+' ')+String(E.inicio).slice(11,16):''),'and'];
   return ['Aguardando técnico'+(c.paraTec?' · para '+c.paraTec:''),c.impacto==='parou'||c.prioridade==='urgente'?'atr':'pen']; }
+const gchTom=k=>k==='atr'?'crit':k==='and'?'info':k==='ok'?'ok':'';
 function gchAtrasada(c){ return !manFechada(c)&&c.prazo&&c.prazo<hojeStr(); }
 function gchLista(){ const f=S.gch.f, d30=new Date(Date.now()-30*864e5).toISOString();
   const xs=(S.chamados||[]).filter(c=>!c.excluido&&!c.prevId&&(+c.numero||0)<900000);
@@ -31,17 +32,17 @@ function vGxChamados(){ const G=S.gch, {m,xs}=gchLista(), ab=m.abertos, ag=ab.fi
     const onde=esc(c.linha||'')+(c.local?' · '+esc(c.local):''), oq=c.defeito||'';
     const conf=G.feito===c._id?`<div class="gch-cf"><label class="gx-f">O que foi feito (opcional)<input id="gch-obs" maxlength="200" placeholder="Ex.: trocado o disjuntor do portão"></label><div class="gch-cfb"><button class="btn sec" data-act="gch-feito-nao">Voltar</button><button class="btn" data-act="gch-feito-ok" data-id="${esc(c._id)}" ${G.busy?'disabled':''}>Confirmar: está feito</button></div></div>`:'';
     return `<article class="gch-c ${fech?'fe':k==='atr'?'crit':''}" data-b="${esc((oq+' '+(c.linha||'')+' '+(c.local||'')+' '+((c.exec||{}).tecnico||'')+' '+manNum(c.numero)).toLowerCase())}">
-      <div class="gch-l"><div class="gch-h"><b>${onde}</b><span class="gch-n">OS ${manNum(c.numero)}</span>${c.tarefa?`<span class="gx-st gch-tf">Tarefa</span>`:''}${pr?`<span class="gx-st ${pr[2]==='crit'?'atr':pr[2]==='warn'?'and':'pen'}">${pr[1]}</span>`:c.impacto==='parou'?'<span class="gx-st atr">Máquina parada</span>':''}${gchAtrasada(c)?`<span class="gx-st atr">Passou do prazo</span>`:''}</div>
+      <div class="gch-l"><div class="gch-h"><b>${onde}</b><span class="gch-n">OS ${manNum(c.numero)}</span>${c.tarefa?PCU.selo('Tarefa','',{semPonto:1}):''}${pr?PCU.selo(pr[1],pr[2]==='crit'?'crit':pr[2]==='warn'?'warn':''):c.impacto==='parou'?PCU.selo('Máquina parada','crit'):''}${gchAtrasada(c)?PCU.selo('Passou do prazo','crit'):''}</div>
         <p class="gch-o">${esc(oq)}</p>
         <span class="gch-s">${c.tipo?esc(gchTipoT(c.tipo)||c.tipo)+' · ':''}${c.equip&&!c.tarefa?esc(c.equip)+' · ':''}aberto ${dm(hojeStr(new Date(c.criado||Date.now())))} ${hora(c.criado)} por ${esc(c.nome||'—')}${c.prazo?' · prazo '+dm(c.prazo):''}</span>
-        <span class="gx-st ${k} gch-sit">${esc(st)}</span></div>
+        <span class="pc-selo ${gchTom(k)} gch-sit">${esc(st)}</span></div>
       <div class="gch-a">${fech?'':`<button class="btn gch-bf" data-act="gch-feito" data-id="${esc(c._id)}">Marcar como feito</button>`}<button class="btn sec gx-bs" data-act="man-abrir" data-n="${c.numero}" data-ir="1">Ver detalhes</button>${!fech&&c.tarefa&&c.por===S.uid?`<button class="btn sec gx-bs gx-del" data-act="gch-canc" data-id="${esc(c._id)}">${G.canc===c._id?'Toque de novo para cancelar':'Cancelar'}</button>`:''}</div>${conf}</article>`; };
   const chip=(k,t)=>`<button class="gx-chip" data-act="gch-f" data-v="${k}" aria-pressed="${G.f===k}">${t} (${m[k].length})</button>`;
   return `${banner()}${gxCab('MANUTENÇÃO · VISÃO DO GESTOR','Chamados e tarefas',`<button class="btn" data-act="gch-nova">${ic('mais',18,2)}Nova tarefa para a manutenção</button>`)}
-   <div class="gch-ks"><div class="${ag.length?'crit':''}"><b>${ag.length}</b><span>aguardando técnico</span></div><div><b>${ex.length}</b><span>em andamento</span></div><div class="${atr.length?'warn':''}"><b>${atr.length}</b><span>passaram do prazo</span></div><div class="ok"><b>${m.feitos.length}</b><span>feitos em 30 dias</span></div></div>
+   ${PCU.nums([{r:'Aguardando técnico',v:ag.length,tom:ag.length?'crit':'',act:'gch-f',dv:'abertos',s:ag.length?'ver os abertos':'ninguém esperando'},{r:'Em andamento',v:ex.length,act:'gch-f',dv:'abertos',s:'com um técnico'},{r:'Passaram do prazo',v:atr.length,tom:atr.length?'warn':'',act:'gch-f',dv:'abertos',s:atr.length?'ver os abertos':'nenhum atrasado'},{r:'Feitos em 30 dias',v:m.feitos.length,tom:'ok',act:'gch-f',dv:'feitos',s:'ver os feitos'}])}
    <div class="gch-bar"><div class="gx-chips" role="group" aria-label="Mostrar">${chip('abertos','Abertos')}${chip('minhas','Minhas tarefas')}${chip('feitos','Feitos')}${chip('todos','Todos')}</div>
     <label class="gch-q">${ic('lupa',16,2)}<input id="gch-q" placeholder="Buscar: o que, onde, técnico, nº" aria-label="Buscar chamado" data-gchq></label></div>
-   <section class="card gch-lst">${xs.length?xs.map(card).join(''):`<div class="empty">${G.f==='abertos'?'Nenhum chamado aberto. Tudo em dia.':'Nada aqui.'}</div>`}</section>
+   <section class="pc-card gch-lst gch-lst2">${xs.length?xs.map(card).join(''):G.f==='abertos'?PCU.vazio({tom:'ok',tit:'Nenhum chamado aberto. Tudo em dia.',txt:'Quando alguém abrir um chamado ou você mandar uma tarefa, ela aparece aqui.'}):PCU.vazio({tit:'Nada aqui.',txt:G.f==='feitos'?'Nenhum chamado feito nos últimos 30 dias.':G.f==='minhas'?'Você não mandou nenhuma tarefa nos últimos 30 dias.':'Troque o filtro para ver outros chamados.'})}</section>
    <p class="gx-p">As tarefas aparecem no computador da manutenção (oficina), que toca o alarme, e no monitor. O técnico aceita passando o crachá; quando ele termina, a tarefa vem para você conferir em "Para conferir" — ou você marca como feito aqui.</p>
    ${G.nova?gchForm():''}`; }
 

@@ -31,7 +31,7 @@ const pcH=v=>v==null?'':String(v);
 const PCU={
   ic:pcIc,
   bt(txt,act,o){ o=o||{}; return `<button type="button" class="btn${o.sec?' sec':''}${o.cls?' '+esc(o.cls):''}"${pcAct(act,o.dv)}${o.id?` id="${esc(o.id)}"`:''}${o.off?' disabled':''}>${o.ic?pcIc(o.ic,16):''}${esc(txt)}</button>`; },
-  selo(txt,tom,o){ o=o||{}; return `<span class="pc-selo ${pcTom(tom)}${o.semPonto?' sp':''}">${esc(txt)}</span>`; },
+  selo(txt,tom,o){ o=o||{}; return `<span class="pc-selo ${pcTom(tom)}${o.semPonto?' pc-semp':''}">${esc(txt)}</span>`; },
   ini(nome,o){ o=o||{}; const p=String(nome||'?').trim().split(/\s+/).filter(Boolean); const t=((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); return `<span class="pc-ini${o.p?' p':''}" aria-hidden="true">${esc(t)}</span>`; },
   cartao(o){ o=o||{};
     const cab=(o.tit||o.acoes)?`<div class="pc-ch">${o.ic?`<span class="pc-ic ${pcTom(o.tom)}">${pcIc(o.ic,17)}</span>`:''}<h3>${esc(o.tit||'')}</h3>${o.cont!=null?`<span class="pc-cont">${esc(o.cont)}</span>`:''}${pcH(o.acoes)}</div>`:'';
@@ -44,10 +44,14 @@ const PCU={
   dados(itens,o){ o=o||{}; return `<dl class="pc-dl${o.c3?' c3':''}">${(itens||[]).map(x=>{ const v=x[1], vz=v==null||v===''; return `<div${x[2]&&x[2].tudo?' class="tudo"':''}><dt>${esc(x[0])}</dt><dd${vz?' class="vz"':''}>${vz?'não informado':esc(v)}</dd></div>`; }).join('')}</dl>`; },
   nums(itens){ return `<div class="pc-nums">${(itens||[]).map(x=>{ const tag=x.act?'button':'div';
     return `<${tag}${x.act?' type="button"':''} class="pc-num ${pcTom(x.tom)}"${pcAct(x.act,x.dv)}><span>${esc(x.r)}</span><b>${esc(x.v)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</${tag}>`; }).join('')}</div>`; },
-  /* "Precisa de você": itens [{tit, txt, ic, tom, selo:[texto,tom], act, dv}]; vazio → "Tudo em dia" */
+  /* "Precisa de você": itens [{tit, txt, rot, ic, tom, selo:[texto,tom], act, dv, attr, bt:{t, act, dv, attr}, cls}]; vazio → "Tudo em dia".
+     act/dv: a linha inteira é o botão. bt: a linha fica parada e o botão de ação vai à direita (attr = atributos já montados
+     pelo código do painel, nunca texto digitado). rot = rótulo pequeno em cima do título. cls = classes a mais na linha. */
   pv(itens,o){ o=o||{}; if(!(itens||[]).length) return `<div class="pc-pv-ok">${pcIc('ok')}${esc(o.vazio||'Tudo em dia. Nada esperando por você.')}</div>`;
-    return `<div class="pc-pv">${itens.map(x=>{ const tag=x.act?'button':'div';
-      return `<${tag}${x.act?' type="button"':''} class="pc-pvi"${pcAct(x.act,x.dv)}><span class="pc-ic ${pcTom(x.tom)}">${pcIc(x.ic||pcTom(x.tom)||'info',17)}</span><span class="t"><strong>${esc(x.tit)}</strong>${x.txt?`<small>${esc(x.txt)}</small>`:''}</span>${x.selo?PCU.selo(x.selo[0],x.selo[1]):''}</${tag}>`; }).join('')}</div>`; },
+    return `<div class="pc-pv">${itens.map(x=>{ const inteira=!x.bt&&(x.act||x.attr), tag=inteira?'button':'div';
+      const at=inteira?(x.attr?' '+x.attr:pcAct(x.act,x.dv)):'';
+      const bt=x.bt?`<button type="button" class="pc-pvb"${x.bt.attr?' '+x.bt.attr:pcAct(x.bt.act,x.bt.dv)}>${esc(x.bt.t||'Abrir')}</button>`:'';
+      return `<${tag}${inteira?' type="button"':''} class="pc-pvi${x.cls?' '+esc(x.cls):''}"${at}><span class="pc-ic ${pcTom(x.tom)}">${pcIc(x.ic||pcTom(x.tom)||'info',17)}</span><span class="t">${x.rot?`<em class="pc-pvr ${pcTom(x.tom)}">${esc(x.rot)}</em>`:''}<strong>${esc(x.tit)}</strong>${x.txt?`<small>${esc(x.txt)}</small>`:''}</span>${x.selo?PCU.selo(x.selo[0],x.selo[1]):''}${bt}</${tag}>`; }).join('')}</div>`; },
   /* linha do tempo: [{t:'o que aconteceu', q:'quando · quem', tom}] */
   tempo(itens){ return `<ol class="pc-tempo">${(itens||[]).map(x=>`<li><span class="b ${pcTom(x.tom)}"></span><div><p>${esc(x.t)}</p>${x.q?`<small>${esc(x.q)}</small>`:''}</div></li>`).join('')}</ol>`; },
   /* tabela: cols [{t, dir, m:'esc'|'tudo', r:'rótulo no celular'}]; linhas [{c:[html ou texto], h:true (já é html), act, dv}] */
