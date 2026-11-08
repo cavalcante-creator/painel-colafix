@@ -1,5 +1,5 @@
 /* Painel Colafix · abertura animada (08/11, padrão do Conectwork)
-   O "V" se desenha da esquerda para a direita, a folha entra, depois a logo da Colafix e "Painel de Operação".
+   A logo da Colafix (grande) aparece primeiro; embaixo, o "V" pequeno se desenha, a folha entra e vem "Painel de Operação".
    ~2,5 s, só na 1ª abertura da sessão (sessionStorage), não bloqueia nada (pointer-events:none) e some sozinha.
    Não aparece: com "reduzir movimento" no aparelho, nas TVs/janelas/totens (?tela ?janela ?totem ?linhas, rodízio
    automático), com ?semAbertura e nos testes automáticos (navigator.webdriver; ?abertura=1 força).
@@ -17,8 +17,10 @@
   var logo = escuro ? 'icons/logo-colafix-escuro.png' : ((document.querySelector('.brand img') || {}).src || 'icons/logo-colafix-escuro.png');
   var a = document.createElement('div');
   a.id = 'abertura'; a.className = escuro ? 'ab-esc' : 'ab-clr'; a.setAttribute('aria-hidden', 'true');
-  a.innerHTML = '<div class="ab-c"><div class="ab-sim"><img class="ab-corpo" src="icons/v-corpo.png" alt=""><img class="ab-folha" src="icons/v-folha.png" alt=""></div>' +
-    '<img class="ab-logo" src="' + logo + '" alt=""><div class="ab-frase">Painel de Operação</div></div>';
+  /* a Colafix é a principal (grande, primeiro); o V da Lys vem pequeno, embaixo, ao lado de "Painel de Operação" */
+  a.innerHTML = '<div class="ab-c"><img class="ab-logo" src="' + logo + '" alt="">' +
+    '<div class="ab-ass"><div class="ab-sim"><img class="ab-corpo" src="icons/v-corpo.png" alt=""><img class="ab-folha" src="icons/v-folha.png" alt=""></div>' +
+    '<div class="ab-frase">Painel de Operação</div></div></div>';
   document.body.appendChild(a);
   setTimeout(function () { a.classList.add('sai'); }, 2150);
   setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 2650);
