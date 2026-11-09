@@ -148,7 +148,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
     return JSON.parse(decodeURIComponent(Array.from(atob(pad)).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }catch(e){ return null; } },cwU);
   const cwS=(await srv())['rh/dados/pjpag/2026-10-2'];
   ok('Enviar ao Conectwork: um botão por prestadora; o link leva período, CNPJ da prestadora, nome, horas e valor de cada PJ (sem CPF) e fica registrado',
-    /Zenith/.test(cwB)&&/Nexus/.test(cwB)&&!/Colafix/i.test(cwB)&&/^https:\/\/cavalcante-creator\.github\.io\/conectwork-app\/#medicoes\/importar\//.test(cwU)&&!/11122233344|55566677788/.test(cwU)&&!/11122233344/.test(JSON.stringify(cwR))
+    /Zenith/.test(cwB)&&/Nexus/.test(cwB)&&!/Colafix/i.test(cwB)&&/^https:\/\/conectwork\.com\.br\/#medicoes\/importar\//.test(cwU)&&!/11122233344|55566677788/.test(cwU)&&!/11122233344/.test(JSON.stringify(cwR))
     &&cwR&&cwR.v===1&&cwR.periodo==='2026-10-2'&&cwR.cnpj==='62944495000164'&&cwR.itens.length===1&&cwR.itens[0].n==='Joao Pereira Teste'&&Number.isInteger(cwR.itens[0].v)&&cwR.itens[0].v>0&&cwR.total===cwR.itens[0].v&&typeof cwR.itens[0].h==='number'
     &&cwS&&cwS.cw&&cwS.cw.ZENITH&&cwS.cw.ZENITH.total===cwR.total&&cwS.cw.ZENITH.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwR,cw:cwS&&cwS.cw}));
   const cwB2=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });

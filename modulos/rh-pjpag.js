@@ -415,7 +415,7 @@
      itens:[{n: nome, h: horas decimais ou null quando é valor fixo, v: centavos}]}): só nome, horas e valor, NUNCA CPF.
      Usa o valor fechado de cada PJ (ou o calculado agora, se ainda não foi fechado). Fica registrado no período
      (cw.{EMPRESA} = {em, por, total, n}). Endereço do Conectwork: rh/config.conectworkUrl (padrão: o do GitHub Pages). */
-  const CW_URL='https://cavalcante-creator.github.io/conectwork-app/';
+  const CW_URL='https://conectwork.com.br/';
   const b64u=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   function cwMedicao(c,pid,empK){ const p=perDe(pid), D=docP(pid), emp=(c.EMP_DOC||{})[empK]||null;
     const rs=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===empK).map(f=>{ const x=(D.pes||{})[f._id]||{}, r=calcPessoa(c,f,p,x), fe=x.st&&x.fech;
