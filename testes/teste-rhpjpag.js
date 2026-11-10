@@ -7,7 +7,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
 <valores><vServPrest><vServ>${o.valor}</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>`;
 (async()=>{ const {d}=seedManut(); const D=d.docs;
   d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
-  D['rh/config']={setores:['Produção','Manutenção']};
+  D['rh/config']={setores:['Produção','Manutenção'],conectworkMei:[]};   /* aqui o pedido de nota vai pelo link (nota.html); o pedido pelo Conectwork é testado em teste-pjpcw.js */
   D['rh/dados/funcionarios/f1']={nome:'JOAO PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',salario:5000,setor:'Produção',funcao:'Operador',status:'Ativo',telefone:'(51) 99999-0000',admissao:'2025-01-10'};
   D['rh/dados/funcionarios/f2']={nome:'MARIA OLIVEIRA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'55566677788',cnpj:'11222333000181',setor:'Manutenção',funcao:'Mecânica',status:'Ativo',telefone:'51988887777',admissao:'2025-02-01',pjPag:{vh:28.41,ini:'08:00',fim:'18:00',intv:72}};
   D['rh/dados/uniformes/u1']={nome:'Joao Pereira Teste',fid:'f1',setor:'Produção',data:'2026-10-20',itens:[{t:'Camisa',tam:'G',qtd:2}],desc:{nao:false,v:50},parc:{n:1,ini:'2026-10-31',hist:[]},st:'lancado',em:'2026-10-20T10:00:00.000Z',por:'uRH'};
@@ -139,6 +139,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Regra só desta pessoa: guarda os leitores dela no cadastro', JSON.stringify(F2)==='["REFEITORIO"]', JSON.stringify(F2));
   /* Enviar ao Conectwork (07/11): a medição da quinzena por prestadora, no link, sem CPF */
   await p.keyboard.press('Escape'); await H.dorme(300);
+  await p.evaluate(()=>window.Painel.db().doc('rh/config').set({conectworkMei:['NEXUS']},{merge:true})); await H.dorme(800);
   await p.evaluate(()=>{ window.open=()=>null; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.ab=''; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(1500);
   const cwB=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
   for(let i=0;i<2&&!(await p.evaluate(()=>window.__pjpUltimoCw));i++){ await p.click('[data-act="pjp-cw"][data-e="ZENITH"]'); await H.dorme(700); }

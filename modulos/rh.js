@@ -24,7 +24,8 @@
   const COL={terc:'rh/dados/terceiros',func:'rh/dados/funcionarios',funcoes:'rh/dados/funcoes',epis:'rh/dados/epis',fm:'rh/dados/fichasmes',modelos:'rh/dados/modelos',docs:'rh/dados/docsgerados',ferias:'rh/dados/ferias',lista:'rh/arquivos/lista',partes:'rh/arquivos/partes'};
   const ST=['Ativo','Férias','Afastado','Desligado'];
   /* empresas: todo CLT é Colafix; PJ é Zenith ou Nexus (ou outra) */
-  const EMP_PJ=[['ZENITH','Zenith'],['NEXUS','Nexus']], EMP_NOME={COLAFIX:'Colafix',ZENITH:'Zenith',NEXUS:'Nexus'};
+  const EMP_PJ=[['ZENITH','Zenith'],['NEXUS','Nexus'],['COLAFIX','Colafix (paga direto)']],   /* 10/11: PJ que a Colafix paga direto, sem prestadora no meio */
+    EMP_NOME={COLAFIX:'Colafix',ZENITH:'Zenith',NEXUS:'Nexus'};
   /* razão social e CNPJ para os documentos — os mesmos de EMPRESAS_CONHECIDAS em modulos/rh-fichas.html */
   const EMP_DOC={COLAFIX:{nome:'COLFIX INDUSTRIA E COMERCIO LTDA - EPP',cnpj:'08.813.381/0001-30'},ZENITH:{nome:'ZENITH SOLUÇÕES INDUSTRIAIS LTDA',cnpj:'62.944.495/0001-64'} /* 13/10: o certo é -64 (o -93 da planilha não é um CNPJ válido) */,NEXUS:{nome:'NEXUS MANUTENÇÕES LTDA',cnpj:'67.927.237/0001-93'}};
   const empNome=e=>EMP_NOME[e]||e||'';

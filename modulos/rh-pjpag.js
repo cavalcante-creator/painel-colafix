@@ -259,7 +259,7 @@
     if(st===''){ s=!r.fixo&&!r.vh?selo('Falta o valor da hora','crit'):!r.fixo&&!r.min?selo('Sem horas no período','crit'):(r.alerta?selo(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir','warn'):'')+(r.uPend?selo('Uniforme para confirmar','warn'):'');
       if(!s) s=selo('Pronto para fechar','info'); }
     else if(st==='fechado') s=selo('Valor fechado','info');
-    else if(st==='pedido') s=selo('Esperando a nota'+(x.ped&&x.ped.em?' desde '+brc(String(x.ped.em).slice(0,10)):''),'info');
+    else if(st==='pedido') s=selo((pedCw(x)?'Pedido no Conectwork':'Esperando a nota')+(x.ped&&x.ped.em?' desde '+brc(String(x.ped.em).slice(0,10)):''),'info');
     else if(st==='chegou') s=x.nota&&x.nota.conf==='ok'?selo('Nota chegou · bate','ok'):x.nota&&x.nota.conf==='dif'?selo('Nota chegou · com diferença','crit'):selo('Nota chegou · conferir','warn');
     else if(st==='conferida') s=selo('Nota conferida · pagar','ok');
     else if(st==='pago') s=selo('Pago','ok');
@@ -270,8 +270,9 @@
       if(!r.fixo&&!r.vh) return btn('pjp-ab','Pôr o valor da hora',fa+' data-tab="regras"','');
       if(!r.fixo&&!r.min) return btn('pjp-ab','Ver os dias',fa);
       return btn('pjp-fech','Fechar valor',fa,''); }
-    if(st==='fechado') return btn('pjp-ped','Pedir nota',fa,'')+lks(lnk('pjp-reab','mudar o valor',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
-    if(st==='pedido') return btn('pjp-env','Mandar o link de novo',fa)+lks(lnk('pjp-pedx','cancelar o pedido',fa));
+    if(st==='fechado') return btn('pjp-ped',viaCw(c,f)?'Pedir nota pelo Conectwork':'Pedir nota',fa,'')+lks(lnk('pjp-reab','mudar o valor',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
+    if(st==='pedido') return pedCw(x)?btn('pjp-cwab','Abrir o Conectwork',fa)+lks(lnk('pjp-cwok','nota conferida no Conectwork',fa),lnk('pjp-pedx','cancelar o pedido',fa))
+      :btn('pjp-env','Mandar o link de novo',fa)+lks(lnk('pjp-pedx','cancelar o pedido',fa));
     if(st==='chegou') return btn('pjp-nok','Está certa',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-nnao','pedir outra nota',fa));
     if(st==='conferida') return btn('pjp-pago','Marcar pago',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
     if(st==='pago') return btn('pjp-nver','Ver a nota',fa)+lks(lnk('pjp-pagox','desfazer',fa));
@@ -404,7 +405,7 @@
         <div>${r.uPend?`<span class="pjp-pill warn">${r.uPend} de uniforme para confirmar</span>`:''}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b></div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
-  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c);
+  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); if(M.k==='cwped') return cwPedModal(c);
     if(M.k==='cfg'){ const g=cfg(c);
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Configurar o pagamento dos PJ"><h3>Como o painel faz a conta</h3><p class="sub">Vale para todos os PJ; o horário e o valor da hora de cada pessoa ficam no detalhe dela.</p>
         <div class="pjp-box"><label>Período de pagamento</label><select id="pjp-cmodo"><option value="quinzena" ${g.modo==='quinzena'?'selected':''}>Quinzena (1 a 15 e 16 ao fim do mês)</option><option value="mes" ${g.modo==='mes'?'selected':''}>Mês inteiro</option></select>
@@ -432,24 +433,53 @@
      Usa o valor fechado de cada PJ (ou o calculado agora, se ainda não foi fechado). Fica registrado no período
      (cw.{EMPRESA} = {em, por, total, n}). Endereço do Conectwork: rh/config.conectworkUrl (padrão: o do GitHub Pages). */
   const CW_URL='https://conectwork.com.br/';
+  /* Pedido de nota pelo Conectwork (10/11, "pedir nota vai para o Conectwork"; escolha: Zenith e Nexus): para os PJ dessas
+     prestadoras o "Pedir nota" manda a medição da quinzena da empresa ao Conectwork (nome, horas, valor e o CNPJ do PJ), a
+     prestadora prepara a nota de cada PJ lá e o PJ emite pelo Conectwork. O link nota.html continua para as outras empresas.
+     Lista em rh/config.conectworkMei (padrão ['NEXUS','ZENITH']). */
+  const cwEmps=c=>(((c.R.cfg||{}).conectworkMei)||['NEXUS','ZENITH']).map(x=>String(x).toUpperCase()).filter(k=>k!=='COLAFIX'&&dig(((c.EMP_DOC||{})[k]||{}).cnpj).length===14);
+  const viaCw=(c,f)=>cwEmps(c).includes(String(f.empresa||'').toUpperCase());
+  const pedCw=x=>!!(x&&x.ped&&x.ped.via==='conectwork');
   const b64u=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   function cwMedicao(c,pid,empK){ const p=perDe(pid), D=docP(pid), emp=(c.EMP_DOC||{})[empK]||null;
     const rs=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===empK).map(f=>{ const x=(D.pes||{})[f._id]||{}, r=calcPessoa(c,f,p,x), fe=x.st&&x.fech;
       return {f,x,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,fixo:r.fixo}; });
     /* CNPJ do MEI de cada PJ (10/11/2026): só das prestadoras em rh/config.conectworkMei (padrão: só a NEXUS); no Conectwork
        cada PJ recebe o espelho da nota dele para a prestadora. CNPJ é da empresa do PJ, nunca CPF. */
-    const comCnpj=(((c.R.cfg||{}).conectworkMei)||['NEXUS']).map(x=>String(x).toUpperCase()).includes(empK);
+    const comCnpj=cwEmps(c).includes(empK);
     const itens=rs.filter(o=>o.valor>0).map(o=>{ const i={n:c.titulo(o.f.nome).slice(0,120),h:o.fixo?null:Math.round(hDec(o.min)*100)/100,v:Math.round(o.valor*100)}, cn=dig(o.f.cnpj);
       if(comCnpj&&cn.length===14) i.c=cn; return i; });
     return {emp,rs,itens,abertos:rs.filter(o=>!o.x.st).length,
       payload:{v:1,periodo:pid,cnpj:dig(emp&&emp.cnpj),nome:emp?emp.nome:empK,total:itens.reduce((a,i)=>a+i.v,0),ref:'painel-rh:'+pid+':'+empK,itens}}; }
+  /* quem da empresa entra no pedido: todos com valor; os sem valor fechado são fechados antes de mandar (a medição do período entra uma vez só) */
+  function cwPedInfo(c,k){ const M=cwMedicao(c,J.per,k), com=M.rs.filter(o=>o.valor>0);
+    return {M,com,abertos:com.filter(o=>!o.x.st),fech:com.filter(o=>o.x.st==='fechado'),ja:com.filter(o=>o.x.st&&o.x.st!=='fechado')}; }
+  function cwPedModal(c){ const M=J.mod, esc=c.esc;
+    const blocos=M.emps.map(k=>{ const I=cwPedInfo(c,k), D=docP(J.per), env=(D.cw||{})[k];
+      return `<div class="pjp-cwe" style="flex-direction:column;align-items:stretch"><div><b>${esc(c.titulo(k))}</b> · ${I.com.length} PJ · ${R$(I.M.payload.total/100)}${env?`<small>Já mandado em ${esc(quando(env.em))}${env.por?' por '+esc(env.por):''}</small>`:''}</div>
+        <ul style="margin:4px 0 0 18px;padding:0;font-size:13px">${I.com.map(o=>`<li>${esc(c.titulo(o.f.nome))} · ${R$(o.valor)}${o.x.st?'':' <span style="color:var(--crit-ink)">· valor ainda não fechado</span>'}${o.x.st&&o.x.st!=='fechado'?' · '+esc((ETAPAS[etIdx(o.x.st)]||[])[1]||o.x.st):''}${cwEmps(c).includes(k)&&dig(o.f.cnpj).length!==14?' <span style="color:var(--crit-ink)">· sem CNPJ no cadastro</span>':''}</li>`).join('')}</ul>
+        ${I.abertos.length?`<small style="color:var(--crit-ink)">${I.abertos.length===1?'1 PJ ainda está':I.abertos.length+' PJ ainda estão'} sem o valor fechado. O Conectwork recebe a quinzena da empresa uma vez só: ao mandar, o painel fecha esses valores antes.</small>`:''}
+        <div style="text-align:right">${btn('pjp-cwped',(env?'Mandar de novo ao Conectwork':I.abertos.length?(I.abertos.length===1?'Fechar o que falta e mandar ao Conectwork':'Fechar os '+I.abertos.length+' e mandar ao Conectwork'):'Mandar ao Conectwork'),'data-e="'+esc(k)+'"','')}</div></div>`; }).join('');
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Pedir nota pelo Conectwork"><h3>Pedir nota pelo Conectwork</h3>
+      <p class="sub">Vai a ${cfg(c).modo==='mes'?'medição do mês':'medição da quinzena'} da prestadora: nome, horas, valor e o CNPJ de cada PJ (nunca CPF). No Conectwork você confere e envia; a prestadora prepara a nota de cada PJ e o PJ emite por lá.</p>
+      ${blocos}${M.outros&&M.outros.length?`<p class="sub" style="margin-top:12px">${M.outros.length} PJ de outras empresas continuam pelo link no WhatsApp. ${lnk('pjp-pedlink','pedir a nota deles')}</p>`:''}
+      <div class="pjp-ac" style="margin-top:14px">${btn('pjp-modx','Fechar')}</div></div></div>`; }
+  async function cwPedir(c,k){ const P=c.P, I0=cwPedInfo(c,k);
+    for(const o of I0.abertos) await fechar(c,o.f);
+    const I=cwPedInfo(c,k); if(!I.M.itens.length) throw Object.assign(new Error('Nenhum valor para mandar de '+c.titulo(k)+'.'),{aviso:true});
+    const url=cwLink(c,I.M.payload); window.__pjpUltimoCw=url; window.open(url,'_blank','noopener');
+    const p=perDe(J.per), D=docP(J.per), reg={em:agora(),por:c.eu(),total:I.M.payload.total,n:I.M.itens.length}; D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
+    await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:reg}},{merge:true});
+    for(const o of I.com.filter(o=>o.x.st==='fechado'||!o.x.st)){ const x=pesDe(J.per,o.f._id); if(x.st!=='fechado') continue;
+      await grava(c,J.per,o.f._id,{st:'pedido',ped:{via:'conectwork',em:agora(),por:c.eu(),valor:x.fech?x.fech.valor:o.valor,mes:p.mes,emp:k}},'Nota pedida pelo Conectwork ('+R$(x.fech?x.fech.valor:o.valor)+')'); }
+    return I; }
   const quando=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
   const cwLink=(c,payload)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes/importar/'+b64u(JSON.stringify(payload));
   function cwBloco(c,pid,emps){ const esc=c.esc, D=docP(pid), ks=emps.filter(k=>k!=='COLAFIX'&&dig(((c.EMP_DOC||{})[k]||{}).cnpj).length===14); if(!ks.length) return '';
     return `<div class="pjp-cw"><div><b>Conectwork</b><small>Mande a medição da ${cfg(c).modo==='mes'?'mês':'quinzena'} de cada prestadora: nome, horas e valor de cada PJ (sem CPF). Lá você confere e envia para a prestadora.</small></div>
       ${ks.map(k=>{ const M=cwMedicao(c,pid,k), ja=(D.cw||{})[k], conf=J.cwConf===k;
         return `<div class="pjp-cwe"><span><b>${esc(c.titulo(k))}</b> · ${M.itens.length} PJ · ${R$(M.payload.total/100)}${ja?`<small>Enviado em ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''}${ja.total!==M.payload.total?' · o valor mudou depois':''}</small>`:''}
-          ${M.abertos&&!conf?`<small style="color:var(--crit-ink)">${M.abertos} ${M.abertos===1?'PJ ainda sem':'PJ ainda sem'} o valor fechado</small>`:''}${conf?`<small style="color:var(--crit-ink)">Toque de novo para enviar com ${M.abertos} sem o valor fechado (vai o valor calculado agora)</small>`:''}</span>
+          ${M.abertos&&!conf?`<small style="color:var(--crit-ink)">${M.abertos} ${M.abertos===1?'PJ ainda sem':'PJ ainda sem'} o valor fechado</small>`:''}${conf?`<small style="color:var(--crit-ink)">Toque de novo: o painel fecha os ${M.abertos} valores que faltam e manda</small>`:''}</span>
           ${M.itens.length?btn('pjp-cw',(ja?'Enviar de novo':'Enviar ao Conectwork'),'data-e="'+esc(k)+'"',conf||!ja?'':'sec'):'<small>Nenhum valor para enviar</small>'}</div>`; }).join('')}</div>`; }
 
   /* etapas (10/11, "organizar a aba e deixar funcional"): cada PJ está numa etapa; os cartões das etapas também filtram a lista */
@@ -501,10 +531,10 @@
     const chegou=rsF.filter(o=>o.x.st==='chegou'), conf=rsF.filter(o=>o.x.st==='conferida'), ped=rsF.filter(o=>o.x.st==='pedido');
     let pp;
     if(prontos.length) pp={t:prontos.length===1?'1 PJ pronto para fechar o valor':prontos.length+' PJ prontos para fechar o valor',s:nomes(prontos)+' · '+R$(soma(prontos))+'. Depois de fechar, já dá para pedir a nota.',b:prontos.length===1?btn('pjp-fech','Fechar o valor',fa(prontos[0]),''):btn('pjp-fechtodos','Fechar o valor dos '+prontos.length,'','')};
-    else if(fechados.length) pp={t:fechados.length===1?'1 valor fechado: falta pedir a nota':fechados.length+' valores fechados: falta pedir a nota',s:nomes(fechados)+' · '+R$(soma(fechados))+'. O PJ recebe o link pelo WhatsApp.',b:fechados.length===1?btn('pjp-ped','Pedir a nota',fa(fechados[0]),''):btn('pjp-pedtodos','Pedir nota aos '+fechados.length,'','')};
+    else if(fechados.length) pp={t:fechados.length===1?'1 valor fechado: falta pedir a nota':fechados.length+' valores fechados: falta pedir a nota',s:nomes(fechados)+' · '+R$(soma(fechados))+(fechados.every(o=>viaCw(c,o.f))?'. O pedido vai pelo Conectwork.':fechados.some(o=>viaCw(c,o.f))?'. Zenith e Nexus pelo Conectwork; os outros recebem o link pelo WhatsApp.':'. O PJ recebe o link pelo WhatsApp.'),b:fechados.length===1?btn('pjp-ped','Pedir a nota',fa(fechados[0]),''):btn('pjp-pedtodos','Pedir nota aos '+fechados.length,'','')};
     else if(chegou.length) pp={t:chegou.length===1?'1 nota chegou para conferir':chegou.length+' notas chegaram para conferir',s:nomes(chegou)+'. Confira o valor e o CNPJ antes de pagar.',b:btn('pjp-nver','Ver a nota de '+nm(chegou[0]).split(' ')[0],fa(chegou[0]),'')};
     else if(conf.length) pp={t:conf.length===1?'1 nota conferida: falta marcar pago':conf.length+' notas conferidas: falta marcar pago',s:nomes(conf)+' · '+R$(soma(conf))+'.',b:btn('pjp-pago','Marcar pago',fa(conf[0]),'')};
-    else if(ped.length) pp={t:'Esperando '+(ped.length===1?'1 nota':ped.length+' notas'),s:nomes(ped)+'. Quando a nota chegar pelo link, ela aparece aqui para conferir.',b:''};
+    else if(ped.length) pp={t:'Esperando '+(ped.length===1?'1 nota':ped.length+' notas'),s:nomes(ped)+(ped.every(o=>pedCw(o.x))?'. A nota é emitida e conferida no Conectwork; quando estiver certa lá, marque aqui "nota conferida no Conectwork".':'. Quando a nota chegar pelo link, ela aparece aqui para conferir.'),b:''};
     else if(rsF.length&&rsF.every(o=>o.x.st==='pago')) pp={t:'Tudo pago nesta quinzena',s:rsF.length+' PJ · '+R$(pagoV)+'.',b:'',ok:1};
     else if(!xs.length) pp={t:'Nenhum PJ nesta quinzena',s:'Cadastre em Funcionários as pessoas com vínculo PJ.',b:''};
     else pp={t:'Confira o que precisa de você',s:'Ninguém está pronto para fechar ainda. Resolva os itens abaixo.',b:''};
@@ -758,17 +788,17 @@
     const motivo=M.mot==='desl'?` <b>devido ser desligado antes da data de pagamento habitual.</b>`:'.';
     const blocos=Object.keys(G).sort().map(emp=>{ const os=G[emp], tot=Math.round(os.reduce((a,o)=>a+o.r.valor,0)*100)/100, nomeE=emp.charAt(0)+emp.slice(1).toLowerCase();
       return `<ul style="margin:8px 0 8px 24px">${os.map(o=>`<li><b>${esc(c.titulo(o.f.nome))}:</b> ${R$(o.r.valor)} de acordo com os dias trabalhados registrados.</li>`).join('')}</ul>
-        <p style="margin:10px 0"><b>ENVIAR TOTAL DE ${R$(tot)} · a nota fiscal será ${esc(emp)}.</b></p>
+        <p style="margin:10px 0"><b>ENVIAR TOTAL DE ${R$(tot)} · ${emp==='COLAFIX'?'a nota fiscal é do próprio prestador, emitida para a COLAFIX':'a nota fiscal será '+esc(emp)}.</b></p>
         <p style="margin:6px 0">${os.length>1?'As planilhas com o detalhamento dos dias trabalhados seguem':'A planilha com o detalhamento dos dias trabalhados segue'} para conferência.</p>
         ${os.map(o=>finTabela(c,o,p)).join('')}
-        <p style="margin:6px 0 18px">Depositar em conta ${esc(nomeE.toUpperCase())}.</p>`; }).join('');
+        <p style="margin:6px 0 18px">${emp==='COLAFIX'?'Depositar na conta de cada prestador (dados bancários no cadastro).':'Depositar em conta '+esc(nomeE.toUpperCase())+'.'}</p>`; }).join('');
     return `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1F2A33"><p style="margin:0 0 8px"><b>Olá,</b></p>
       <p style="margin:0 0 8px">Conforme os dias trabalhados registrados no Face ID (período de ${esc(p.txt)}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${dt}${motivo}</p>
       ${blocos}<p style="margin:0">Att.,</p><p style="margin:10px 0 0">--<br><b>${esc(c.eu())}</b><br>Gestão de Pessoas</p></div>`; }
   function finTexto(c,M,dias){ const p=perDe(J.per), G=finGrupos(c,M), L=['Olá,','',`Conforme os dias trabalhados registrados no Face ID (período de ${p.txt}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${br(M.data)}${M.mot==='desl'?' devido ser desligado antes da data de pagamento habitual.':'.'}`,''];
     Object.keys(G).sort().forEach(emp=>{ const os=G[emp], tot=Math.round(os.reduce((a,o)=>a+o.r.valor,0)*100)/100;
-      os.forEach(o=>L.push('• '+c.titulo(o.f.nome)+': '+R$(o.r.valor)+' de acordo com os dias trabalhados registrados.')); L.push('','ENVIAR TOTAL DE '+R$(tot)+' · a nota fiscal será '+emp+'.','',
-        ...os.flatMap(o=>[c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)].concat(dias?finDias(o):[])),'','Depositar em conta '+emp+'.',''); });
+      os.forEach(o=>L.push('• '+c.titulo(o.f.nome)+': '+R$(o.r.valor)+' de acordo com os dias trabalhados registrados.')); L.push('','ENVIAR TOTAL DE '+R$(tot)+' · '+(emp==='COLAFIX'?'a nota fiscal é do próprio prestador, emitida para a COLAFIX':'a nota fiscal será '+emp)+'.','',
+        ...os.flatMap(o=>[c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)].concat(dias?finDias(o):[])),'',emp==='COLAFIX'?'Depositar na conta de cada prestador (dados bancários no cadastro).':'Depositar em conta '+emp+'.',''); });
     L.push('Att.,','--',c.eu(),'Gestão de Pessoas'); return L.join('\n').replace(/ /g,' '); }
   const finAssunto=(c,M)=>{ const G=finGrupos(c,M); return 'Pagamento PJ · '+Object.keys(G).sort().join(' e ')+' · '+perDe(J.per).txt+(M.mot==='desl'?' · desligamento':''); };
   function finModal(c){ const M=J.mod, esc=c.esc, os=finPessoas(c,J.per), n=os.filter(o=>M.sel[o.f._id]).length, tot=os.filter(o=>M.sel[o.f._id]).reduce((a,o)=>a+o.r.valor,0);
@@ -1001,6 +1031,15 @@
       if(a==='pjp-fechtodos'){ const p=perDe(J.per), vis=J._vis||[], xs=pjs(c,p).filter(f=>!pesDe(J.per,f._id).st&&vis.includes(f._id)); const er=[]; b.disabled=true;
         for(const f of xs){ try{ await fechar(c,f); }catch(e){ er.push(e.message); } } P.toast(er.length?(xs.length-er.length)+' fechados. '+er.join(' '):xs.length+' valores fechados.'); P.render(); return; }
       if(a==='pjp-reab'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'',fech:null},'Reaberto para conferir'); P.render(); return; }
+      if(a==='pjp-ped'&&viaCw(c,fDe(b.dataset.f))){ J.mod={k:'cwped',emps:[String(fDe(b.dataset.f).empresa||'').toUpperCase()]}; P.render(); return; }
+      if(a==='pjp-pedtodos'){ const p=perDe(J.per), xs=pjs(c,p).filter(f=>pesDe(J.per,f._id).st==='fechado'&&(J._vis||[]).includes(f._id)), cw=xs.filter(f=>viaCw(c,f));
+        if(cw.length&&!b.dataset.link){ J.mod={k:'cwped',emps:[...new Set(cw.map(f=>String(f.empresa||'').toUpperCase()))].sort(),outros:xs.filter(f=>!viaCw(c,f)).map(f=>f._id)}; P.render(); return; } }
+      if(a==='pjp-pedlink'){ const ids=(J.mod&&J.mod.outros)||[]; const out=[]; for(const id of ids){ const f=fDe(id); try{ const ped=await pedir(c,J.per,f); out.push({fid:f._id,nome:ped.nome,valor:ped.valor,tel:f.telefone||'',msg:msgDe(c,f,ped)}); }catch(e){ P.erro(e); } }
+        J.mod={k:'lote',xs:out}; P.render(); return; }
+      if(a==='pjp-cwped'){ const k=b.dataset.e; b.disabled=true; const I=await cwPedir(c,k); P.toast('Pedido de nota de '+c.titulo(k)+' aberto no Conectwork ('+I.M.itens.length+' PJ). Confira lá e envie para a prestadora.');
+        J.mod.emps=J.mod.emps.filter(x=>x!==k); if(!J.mod.emps.length&&!(J.mod.outros||[]).length) J.mod=null; P.render(); return; }
+      if(a==='pjp-cwab'){ const u=String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes'; window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
+      if(a==='pjp-cwok'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',conf:{em:agora(),por:c.eu(),via:'conectwork'}},'Nota conferida no Conectwork'); P.render(); return; }
       if(a==='pjp-ped'||a==='pjp-env'){ const f=fDe(b.dataset.f); let ped;
         if(a==='pjp-env'){ const x=pesDe(J.per,f._id); const g=await P.db().doc(PED+'/'+x.ped.t).get(); ped=g.exists?Object.assign({t:x.ped.t},g.data()):null; if(!ped) throw new Error('Não achei o pedido. Cancele e peça de novo.'); }
         else ped=await pedir(c,J.per,f);
@@ -1011,8 +1050,8 @@
       if(a==='pjp-loteum'){ const o=J.mod.xs[+b.dataset.i], tel=dig(o.tel), u=(tel?'https://wa.me/'+(tel.length<=11?'55':'')+tel:'https://wa.me/')+'?text='+encodeURIComponent(o.msg); window.__pjpUltimoWa=u; window.open(u,'_blank','noopener'); o.feito=true; P.render(); return; }
       if(a==='pjp-copia'){ const m=document.getElementById('pjp-pmsg').value; J.mod.msg=m; try{ await navigator.clipboard.writeText(m); P.toast('Mensagem copiada.'); }catch(e){ P.toast('Não consegui copiar: selecione o texto e copie.'); } return; }
       if(a==='pjp-mail'){ const m=document.getElementById('pjp-pmsg').value, u='mailto:'+encodeURIComponent(J.mod.email)+'?subject='+encodeURIComponent('Nota fiscal · '+J.mod.ped.perTxt)+'&body='+encodeURIComponent(m); window.__pjpUltimoMail=u; location.href=u; return; }
-      if(a==='pjp-pedx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(!confirm('Cancelar o pedido de nota de '+c.titulo(f.nome)+'? O link deixa de valer.')) return;
-        if(x.ped) await P.db().doc(PED+'/'+x.ped.t).set({usado:true,cancelado:true,usadoEm:agora()},{merge:true}); await grava(c,J.per,f._id,{st:'fechado',ped:null},'Pedido de nota cancelado'); P.render(); return; }
+      if(a==='pjp-pedx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(!confirm('Cancelar o pedido de nota de '+c.titulo(f.nome)+'?'+(pedCw(x)?' No Conectwork, cancele a medição lá também.':' O link deixa de valer.'))) return;
+        if(x.ped&&x.ped.t) await P.db().doc(PED+'/'+x.ped.t).set({usado:true,cancelado:true,usadoEm:agora()},{merge:true}); await grava(c,J.per,f._id,{st:'fechado',ped:null},'Pedido de nota cancelado'); P.render(); return; }
       if(a==='pjp-nver'){ const x=pesDe(J.per,b.dataset.f); if(!x.nota) return; const g=await P.db().doc(ENV+'/'+x.nota.t).get(); const e=g.exists?g.data():null; if(!e||!e.d) return P.toast('O arquivo da nota não está mais guardado.');
         const bin=atob(e.d), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i); const url=URL.createObjectURL(new Blob([u8],{type:e.tipo||'application/octet-stream'}));
         const w=window.open(url,'_blank'); if(!w){ const l=document.createElement('a'); l.href=url; l.download=e.n||'nota'; document.body.appendChild(l); l.click(); l.remove(); } window.__pjpUltimaNota=e.n; return; }
@@ -1023,9 +1062,7 @@
       if(a==='pjp-pagox'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',pago:null},'Pago desfeito'); P.render(); return; }
       if(a==='pjp-cw'){ const k=b.dataset.e, M=cwMedicao(c,J.per,k);
         if(M.abertos&&J.cwConf!==k){ J.cwConf=k; P.render(); return; }
-        J.cwConf=''; const url=cwLink(c,M.payload); window.__pjpUltimoCw=url; window.open(url,'_blank','noopener');
-        const p=perDe(J.per), D=docP(J.per), reg={em:agora(),por:c.eu(),total:M.payload.total,n:M.itens.length}; D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
-        await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:reg}},{merge:true});
+        J.cwConf=''; await cwPedir(c,k);
         P.toast('Medição de '+c.titulo(k)+' aberta no Conectwork. Confira lá e envie para a prestadora.'); P.render(); return; }
       if(a==='pjp-xls'){ await excel(c); return; } if(a==='pjp-pdf'){ await pdf(c); return; }
     }catch(e){ if(e&&e.aviso) P.toast(e.message); else P.erro(e); } });
