@@ -105,8 +105,13 @@
   function chaveFid(c,f,dados){ const P0=(dados&&dados.pessoas)||{}, cpf=dig(f.cpf).padStart(11,'0');
     if(dig(f.cpf)&&P0[cpf]) return cpf; const n=norm(f.nome); if(!n) return cpf||'';
     const ws=n.split(' '), pu=ws[0]+' '+ws[ws.length-1]; let k1='', k2='';
-    for(const [k,p] of Object.entries(P0)){ const pn=norm(p&&p.n); if(!pn) continue; if(pn===n){ k1=k; break; } const pw=pn.split(' '); if(pw[0]+' '+pw[pw.length-1]===pu) k2=k2?'#':k; }
-    return k1||(k2&&k2!=='#'?k2:'')||(dig(f.cpf)?cpf:''); }
+    let k3='';
+    for(const [k,p] of Object.entries(P0)){ const pn=norm(p&&p.n); if(!pn) continue; if(pn===n){ k1=k; break; } const pw=pn.split(' '); if(pw[0]+' '+pw[pw.length-1]===pu) k2=k2?'#':k; else if(quase(ws,pw)) k3=k3?'#':k; }
+    return k1||(k2&&k2!=='#'?k2:'')||(k3&&k3!=='#'?k3:'')||(dig(f.cpf)?cpf:''); }
+  /* 10/11 ("tem uma diferença de uma letra no Face ID", ex.: NARCISO × NARCIZO): mesmas palavras, cada uma igual ou com 1 letra
+     diferente (só palavras de 5 letras ou mais), no máximo 2 letras no nome todo; só vale se houver um candidato */
+  function lev1(a,b){ if(a===b) return 0; if(Math.abs(a.length-b.length)>1) return 2; let i=0,j=0,d=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){ i++; j++; continue; } if(++d>1) return 2; if(a.length>b.length) i++; else if(b.length>a.length) j++; else { i++; j++; } } return d+(a.length-i)+(b.length-j); }
+  function quase(a,b){ if(a.length!==b.length||a.length<2) return false; let t=0; for(let i=0;i<a.length;i++){ if(a[i]===b[i]) continue; if(a[i].length<5||b[i].length<5) return false; const d=lev1(a[i],b[i]); if(d>1) return false; t+=d; } return t>0&&t<=2; }
   /* ---------- descontos (pedido de 04/11): aba "Descontos" da pessoa ----------
      Uniforme: as parcelas do módulo Uniformes (PJ = terceiro, desconto parcelado no dia 15 e no último dia do mês). O RH
      confirma cada parcela da quinzena ("Descontar" grava a parcela como descontada na própria entrega, x.parc.hist, igual
@@ -124,22 +129,35 @@
   const DXS=['Vale / adiantamento','Almoço ou café','Ferramenta ou equipamento','Dano ou perda de material','Multa','Outro'];
   /* feriado: o do calendário do painel (Cadastros › Feriados) aparece sozinho; o RH também marca à mão (aj[dia].fer) e diz se paga o dia */
   const ferP=d=>{ try{ return window.Painel&&window.Painel.feriadoDe?window.Painel.feriadoDe(d):null; }catch(e){ return null; } };
+  /* Fechamento no último dia útil (10/11): a quinzena é fechada e paga no último dia útil dela (ex.: dia 13 quando 14 e 15 caem
+     no fim de semana). Nesse dia, quem veio (ou o dia ainda não acabou) recebe o dia cheio da escala; se saiu mais cedo, a
+     diferença é descontada sozinha na quinzena seguinte ("Saiu mais cedo no dia do fechamento"). */
+  function fechDia(p){ for(let d=new Date(p.ate+'T12:00:00'); isoD(d)>=p.de; d.setDate(d.getDate()-1)){ const k=isoD(d), w=d.getDay(); if(w!==0&&w!==6&&!ferP(k)) return k; } return p.ate; }
+  function fechAnt(c,f,p,h){ const pp=perDe(perMove(p.pid,-1)), D=J.docs[pp.pid], xp=D&&D.pes&&D.pes[f._id], fe=xp&&xp.fech, ch=fe&&fe.cheio; if(!ch||!ch.d||fe.fixo) return null;
+    const dd=window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[ch.d.slice(0,7)]; if(!dd||ch.d>=hojeS()) return null;
+    const k=chaveFid(c,f,dd), dx=k&&dd.dias&&dd.dias[ch.d]&&dd.dias[ch.d][k]||null, LT=leitDe(c,f).l, hs=pasDe(dx).filter(q=>contaP(q,LT)).map(q=>q.h), a=(xp.aj||{})[ch.d];
+    let e=hs[0]||'', s=hs.length>1?hs[hs.length-1]:''; if(a&&(a.e||a.s||a.zero)){ e=a.zero?'':(a.e||e); s=a.zero?'':(a.s||s); }
+    if(!e||!s) return null; const real=contaDia(e,s,ch.h||h).m, falta=Math.max(0,(+ch.m||0)-real); if(falta<=0) return null;
+    return {d:ch.d,falta,v:Math.round(hDec(falta)*(+fe.vh||0)*100)/100}; }
   /* conta da pessoa no período */
   function calcPessoa(c,f,p,x){ const dados=(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes])||null, h=horDe(c,f), vh=vhDe(c,f), k=chaveFid(c,f,dados);
     const aj=(x&&x.aj)||{}, out=[], escM=contaDia(h.ini,h.fim,h).m; let tot=0, alerta=0, comFid=0;
-    const LT=leitDe(c,f).l;
+    const LT=leitDe(c,f).l, fd=fechDia(p); let cheio=null;
     diasDe(p).forEach(d=>{ const dx=k&&dados&&dados.dias&&dados.dias[d]&&dados.dias[d][k]||null;
       const ps=pasDe(dx).map(q=>Object.assign(q,{ok:contaP(q,LT)})), hs=ps.filter(q=>q.ok).map(q=>q.h), nFora=ps.length-hs.length; if(ps.length) comFid++;
       let e=hs[0]||'', s=hs.length>1?hs[hs.length-1]:''; const a=aj[d], cor=!!(a&&(a.e||a.s||a.zero)); if(cor){ e=a.zero?'':(a.e||e); s=a.zero?'':(a.s||s); }
       const fp=ferP(d), fer=a&&a.fer?{nome:a.ferNome||(fp&&fp.nome)||'Feriado',pago:!!a.pago,rh:true}:fp?{nome:fp.nome||'Feriado',pago:!!(a&&a.pago),rh:false}:null;
       const r=contaDia(e,s,h), dw=new Date(d+'T12:00:00').getDay(); let fl='', info='', m=r.m;
       if(fer&&fer.pago) m=Math.max(m,escM);
-      if(!cor){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
-      out.push({d,dw,hs,ps,nFora,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer}); tot+=m; });
+      let ehF=false; if(d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro}}; }
+      if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
+      else if(!cor){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
+      out.push({d,dw,hs,ps,nFora,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF}); tot+=m; });
+    const fa0=fechAnt(c,f,p,h);
     const uni=unifDe(c,f,p), ext=(x&&x.dsc&&Array.isArray(x.dsc.x)?x.dsc.x:[]).filter(z=>z&&!z.removido);
-    const descs=[].concat(num(x&&x.desc)>0?[{t:(x.descMot||'Desconto lançado'),v:num(x.desc),k:'leg'}]:[],uni.filter(u=>u.st==='ok').map(u=>({t:'Uniforme (entrega de '+brc(u.x.data)+')',v:u.v,k:'u'})),ext.map(z=>({t:z.t,v:num(z.v),k:'x',id:z.id})));
+    const descs=[].concat(num(x&&x.desc)>0?[{t:(x.descMot||'Desconto lançado'),v:num(x.desc),k:'leg'}]:[],uni.filter(u=>u.st==='ok').map(u=>({t:'Uniforme (entrega de '+brc(u.x.data)+')',v:u.v,k:'u'})),ext.map(z=>({t:z.t,v:num(z.v),k:'x',id:z.id})),fa0&&!(x&&x.fchX)?[{t:'Saiu mais cedo no dia do fechamento ('+brc(fa0.d)+'): '+hTxt(fa0.falta),v:fa0.v,k:'fch'}]:[]);
     const fixo=+((f.pjPag||{}).fixo)||0, desc=Math.round(descs.reduce((a,z)=>a+z.v,0)*100)/100, bruto=fixo>0?fixo:hDec(tot)*vh;
-    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,valor:Math.max(0,Math.round((bruto-desc)*100)/100),alerta,comFid,semFid:!dados||!comFid,dados:!!dados}; }
+    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,valor:Math.max(0,Math.round((bruto-desc)*100)/100),cheio,fd,alerta,comFid,semFid:!dados||!comFid,dados:!!dados}; }
   /* ---------- banco ---------- */
   function assina(c,pid){ const P=c.P; unifIni(c); if(!J.sub[pid]){ J.sub[pid]=true;
       P.inscrever('pjp-'+pid,()=>P.db().collection(COL).where('pid','==',pid).limit(1),s=>{ const d=s.docs[0]; J.docs[pid]=d?d.data():{pid,pes:{}}; P.rerender(); }); }
@@ -178,7 +196,7 @@
       let r=null; if(e.d&&/xml/i.test(e.tipo||'')){ try{ r=lerXml(decodeURIComponent(escape(atob(e.d)))); }catch(er){ try{ r=lerXml(atob(e.d)); }catch(e2){} } }
       const cf=confere(c,f,x.ped,r,num(e.valor));
       const nota={t:e._id,em:e.em||agora(),num:(r&&r.num)||String(e.num||''),valor:(r&&r.valor)||num(e.valor),tipo:e.tipo||'',n:e.n||'',xml:r||null,conf:cf.conf,probs:cf.probs,obs:e.obs||''};
-      try{ await grava(c,e.pid,e.fid,{st:'chegou',nota},'Nota '+(nota.num?'nº '+nota.num+' ':'')+'chegou pelo link'); await c.P.db().doc(PED+'/'+e._id).set({usado:true,usadoEm:agora()},{merge:true}); }catch(er){ J.proc[e._id]=false; console.warn('pjp nota',er); } } }
+      try{ const jp=((J.docs[e.pid]||{}).pes||{})[e.fid]||{}; await grava(c,e.pid,e.fid,jp.st==='pago'?{nota}:{st:'chegou',nota},'Nota '+(nota.num?'nº '+nota.num+' ':'')+'chegou pelo link'); await c.P.db().doc(PED+'/'+e._id).set({usado:true,usadoEm:agora()},{merge:true}); }catch(er){ J.proc[e._id]=false; console.warn('pjp nota',er); } } }
   /* ---------- pedido de nota ---------- */
   const linkDe=t=>location.origin+location.pathname.replace(/[^/]*$/,'')+'nota.html?c='+t;
   function msgDe(c,f,ped){ const emp=ped.tomador||{}; return String(cfg(c).msg||PAD.msg).replace(/\{NOME\}/g,c.titulo(f.nome).split(' ')[0]).replace(/\{PERIODO\}/g,ped.perTxt).replace(/\{HORAS\}/g,ped.fixo?'valor fixo':hTxt(ped.min))
@@ -272,10 +290,10 @@
       if(!r.fixo&&!r.vh) return btn('pjp-ab','Pôr o valor da hora',fa+' data-tab="regras"','');
       if(!r.fixo&&!r.min) return btn('pjp-ab','Ver os dias',fa);
       return btn('pjp-fech','Fechar valor',fa,''); }
-    if(st==='fechado') return btn('pjp-ped',viaCw(c,f)?'Pedir nota pelo Conectwork':'Pedir nota',fa,'')+lks(lnk('pjp-reab','mudar o valor',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
-    if(st==='pedido') return pedCw(x)?btn('pjp-cwab','Abrir o Conectwork',fa)+lks(lnk('pjp-cwok','nota conferida no Conectwork',fa),lnk('pjp-pedx','cancelar o pedido',fa))
-      :btn('pjp-env','Mandar o link de novo',fa)+lks(lnk('pjp-pedx','cancelar o pedido',fa));
-    if(st==='chegou') return btn('pjp-nok','Está certa',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-nnao','pedir outra nota',fa));
+    if(st==='fechado') return btn('pjp-ped',viaCw(c,f)?'Pedir nota pelo Conectwork':'Pedir nota',fa,'')+lks(lnk('pjp-pago','marcar pago',fa),lnk('pjp-reab','mudar o valor',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
+    if(st==='pedido') return pedCw(x)?btn('pjp-cwab','Abrir o Conectwork',fa)+lks(lnk('pjp-cwok','nota conferida no Conectwork',fa),lnk('pjp-pago','marcar pago',fa),lnk('pjp-pedx','cancelar o pedido',fa))
+      :btn('pjp-env','Mandar o link de novo',fa)+lks(lnk('pjp-pago','marcar pago',fa),lnk('pjp-pedx','cancelar o pedido',fa));
+    if(st==='chegou') return btn('pjp-nok','Está certa',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-pago','marcar pago',fa),lnk('pjp-nnao','pedir outra nota',fa));
     if(st==='conferida') return btn('pjp-pago','Marcar pago',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
     if(st==='pago') return btn('pjp-nver','Ver a nota',fa)+lks(lnk('pjp-pagox','desfazer',fa));
     return ''; }
@@ -346,6 +364,7 @@
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds">${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
         const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">Face ID: ${esc(d.hs.join(' · '))}</small>`:''}`
           :d.ps&&d.ps.length?`<div class="pjp-chips">${chipsP(d.ps,esc)}</div>${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
+          :d.fech?`<div class="pjp-chips"><span>dia do fechamento</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fer?`<div class="pjp-chips"><span>não trabalhou</span></div><span class="pg-tag pg-f">Feriado · ${esc(d.fer.nome)}</span>`
           :`<div class="pjp-chips"><span>sem passagem no Face ID</span></div>`;
         const ferL=d.fer&&ed?`<small class="pg-fl">${d.fer.pago?`feriado pago (${hTxt(escM)}) · <button class="lnk" data-act="pjp-dferp" data-v="0" data-d="${d.d}" ${fa}>não pagar</button>`:`<button class="lnk" data-act="pjp-dferp" data-v="1" data-d="${d.d}" ${fa}>pagar o dia (${hTxt(escM)})</button>`}${d.fer.rh?` · <button class="lnk" data-act="pjp-dferx" data-d="${d.d}" ${fa}>não é feriado</button>`:''}</small>`:d.fer&&d.fer.pago?`<small class="pg-fl">feriado pago</small>`:'';
@@ -365,7 +384,7 @@
         const sit=u.st==='ok'?`<span class="pjp-pill ok">Vai descontar</span>${ed?lnk('pjp-ux','desfazer',xa):''}`:u.st==='falta'?`<span class="pjp-pill teal">Não desta vez · fica para a próxima quinzena</span>${ed?lnk('pjp-ux','desfazer',xa):''}`
           :ed?`${btn('pjp-uok','Descontar',xa,'')}${lnk('pjp-uno','Não descontar agora',xa)}`:`<span class="pjp-pill warn">Não confirmado</span>`;
         return `<div class="pg-ds"><div><b>Uniforme · entrega de ${esc(br(u.x.data))}</b><small>${esc(unifTxt(u.x)||'peças')} · parcela ${u.k||'?'} de ${I.n} · total ${R$(I.V)}${I.rest>0.004&&u.st!=='ok'?' · falta '+R$(I.rest):''}${u.atr?' · <b style="color:var(--warn-ink,#7A5310)">parcela atrasada</b>':''}</small></div><b class="pg-dv">${u.st==='falta'?'—':R$(u.v)}</b><div class="pg-da">${sit}</div></div>`; }).join('');
-      const oL=r.descs.filter(z=>z.k!=='u').map(z=>`<div class="pg-ds"><div><b>${esc(z.t)}</b><small>${z.k==='leg'?'lançado antes da aba Descontos':'lançado pelo RH'}</small></div><b class="pg-dv">${R$(z.v)}</b><div class="pg-da">${ed?lnk('pjp-dxx','tirar',`data-id="${esc(z.id||'leg')}" ${fa}`):''}</div></div>`).join('');
+      const oL=r.descs.filter(z=>z.k!=='u').map(z=>`<div class="pg-ds"><div><b>${esc(z.t)}</b><small>${z.k==='leg'?'lançado antes da aba Descontos':z.k==='fch'?'automático: a quinzena passada pagou o dia cheio':'lançado pelo RH'}</small></div><b class="pg-dv">${R$(z.v)}</b><div class="pg-da">${ed?lnk('pjp-dxx','tirar',`data-id="${esc(z.k==='fch'?'fch':(z.id||'leg'))}" ${fa}`):''}</div></div>`).join('');
       corpo=`<div class="pjp-mini"><div><span>Total de descontos</span><b>${R$(r.desc)}</b></div><div><span>Uniforme</span><b>${R$(uT)}</b></div><div><span>Outros</span><b>${R$(oT)}</b></div><div class="${r.uPend?'pg-w':''}"><span>Para confirmar</span><b>${r.uPend}</b></div></div>
         ${!ed?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor já foi fechado. Para mudar os descontos, toque em ${lnk('pjp-reab','mudar o valor',fa).replace('class="lnk"','class="lnk" style="display:inline;margin:0"')}.</div>`:''}
         <div class="pjp-sec"><h4>Uniforme</h4>${uL||'<p class="ps" style="margin:0;color:var(--muted)">Nenhuma parcela de uniforme para esta quinzena.</p>'}
@@ -514,7 +533,7 @@
     else if(ult){ out.tom='warn'; out.tit='Face ID sem data de atualização'; out.sub='Há passagens neste período, mas não dá para saber quando foram lidas.'; }
     else { out.tom='crit'; out.tit='Sem Face ID'; out.sub='Nenhuma leitura nem importação deste mês.'; }
     out.ultTxt=ultTxt; return out; }
-  function render(c){ C=c; const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid);
+  function render(c){ C=c; const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
     const D=docP(pid), xs=pjs(c,p);
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
     const q=norm(J.q), ehAt=pid===perAtual(c), col=J.col==null?-1:J.col;
@@ -893,7 +912,7 @@
           if(h.dentro){ fD=`IF(B${r}=0,0,MAX(${tF(ini)},${fD}))`; fE=`IF(C${r}=0,0,MIN(${tF(fim)},${fE}))`; }
           row.getCell(4).value={formula:fD,result:d.E!=null&&d.m?d.E/1440:(d.e&&!d.zero?tFr(d.e):0)};
           row.getCell(5).value={formula:fE,result:d.S!=null&&d.m?d.S/1440:0};
-          row.getCell(6).value={formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`,result:d.m/1440};
+          row.getCell(6).value=d.fech||(d.fer&&d.fer.pago)?d.m/1440:{formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`,result:d.m/1440};   /* dia do fechamento e feriado pago: o dia cheio, não a conta das passagens */
           row.getCell(7).value={formula:`F${r}*24`,result:+(d.m/60).toFixed(4)};
           row.getCell(8).value=d.aj?(d.zero?'Não trabalhou':'Corrigido à mão')+(d.mot?': '+d.mot:'')+(d.hs.length?' · Face ID: '+d.hs.join(' '):''):d.fl?d.fl+' · Face ID: '+d.hs.join(' '):d.hs.length>2?'Face ID: '+d.hs.join(' '):d.info||'';
           [2,3,4,5].forEach(k=>row.getCell(k).numFmt='hh:mm'); row.getCell(6).numFmt='[h]:mm'; row.getCell(7).numFmt='0.00';
@@ -931,7 +950,7 @@
     if(!r.fixo&&!r.vh) throw Object.assign(new Error(c.titulo(f.nome)+': falta o valor da hora (abra a pessoa e preencha).'),{aviso:true});
     if(!r.fixo&&!r.min) throw Object.assign(new Error(c.titulo(f.nome)+': não tem horas neste período (confira os dias no Face ID ou corrija à mão).'),{aviso:true});
     if(r.uPend) throw Object.assign(new Error(c.titulo(f.nome)+': confirme o desconto do uniforme na aba Descontos antes de fechar.'),{aviso:true});
-    const fech={min:r.min,vh:r.vh,fixo:r.fixo,bruto:r.bruto,desc:r.desc,descMot:r.descMot,descs:r.descs.map(z=>({t:z.t,v:z.v})),valor:r.valor,dias:r.dias.map(d=>({d:d.d,e:d.E!=null?hhmm(d.E):'',s:d.S!=null?hhmm(d.S):'',m:d.m})),h:r.h,em:agora(),por:c.eu()};
+    const fech={cheio:r.cheio||null,min:r.min,vh:r.vh,fixo:r.fixo,bruto:r.bruto,desc:r.desc,descMot:r.descMot,descs:r.descs.map(z=>({t:z.t,v:z.v})),valor:r.valor,dias:r.dias.map(d=>({d:d.d,e:d.E!=null?hhmm(d.E):'',s:d.S!=null?hhmm(d.S):'',m:d.m})),h:r.h,em:agora(),por:c.eu()};
     await grava(c,pid,f._id,{st:'fechado',fech},'Valor fechado: '+(r.fixo?'fixo ':hTxt(r.min)+' × '+R$(r.vh)+' ')+(r.desc?'− '+R$(r.desc)+' ':'')+'= '+R$(r.valor)); }
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!C||!t||!t.closest) return; const P=C.P;
     try{
@@ -1029,6 +1048,7 @@
         if(!t) return P.toast('Escreva o que é o desconto.'); if(!(v>0)) return P.toast('Digite o valor do desconto (ex.: 50,00).');
         const xs=((x.dsc&&x.dsc.x)||[]).concat([{id:'d'+Date.now().toString(36),t,v,em:agora(),por:c.eu()}]); await grava(c,J.per,f._id,{dsc:{x:xs}},'Desconto acrescentado: '+t+' '+R$(v)); P.render(); return; }
       if(a==='pjp-dxx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const id=b.dataset.id;
+        if(id==='fch'){ await grava(c,J.per,f._id,{fchX:{em:agora(),por:c.eu()}},'Desconto do dia do fechamento tirado'); P.render(); return; }
         if(id==='leg'){ await grava(c,J.per,f._id,{desc:0,descMot:''},'Desconto tirado: '+(x.descMot||'desconto lançado')+' '+R$(x.desc)); P.render(); return; }
         const z=((x.dsc&&x.dsc.x)||[]).find(y=>y.id===id), xs=((x.dsc&&x.dsc.x)||[]).filter(y=>y.id!==id); await grava(c,J.per,f._id,{dsc:{x:xs}},'Desconto tirado: '+(z?z.t+' '+R$(z.v):'')); P.render(); return; }
       if(a==='pjp-diax'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id), aj=Object.assign({},x.aj||{}), o=aj[b.dataset.d]; aj[b.dataset.d]=o&&o.fer?{fer:true,ferNome:o.ferNome,pago:!!o.pago}:null; await grava(c,J.per,f._id,{aj}); P.render(); return; }
@@ -1063,8 +1083,8 @@
       if(a==='pjp-nok'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',conf:{em:agora(),por:c.eu()}},'Nota conferida'); P.render(); return; }
       if(a==='pjp-nnao'){ const f=fDe(b.dataset.f); J.mod={k:'nao',fid:f._id,nome:c.titulo(f.nome)}; P.render(); return; }
       if(a==='pjp-nnaook'){ const f=fDe(b.dataset.f), m=String(document.getElementById('pjp-nmot').value||'').trim(); await grava(c,J.per,f._id,{st:'fechado',ped:null,nota:null},'Pediu outra nota'+(m?': '+m:'')); J.mod=null; P.render(); return; }
-      if(a==='pjp-pago'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr()}},'Marcado como pago'); P.render(); return; }
-      if(a==='pjp-pagox'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',pago:null},'Pago desfeito'); P.render(); return; }
+      if(a==='pjp-pago'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(!x.st||!x.fech) return P.toast('Feche o valor antes de marcar pago.'); await grava(c,J.per,f._id,{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr(),de:x.st}},'Marcado como pago'+(x.st!=='conferida'?' (antes da nota conferida)':'')); P.render(); return; }
+      if(a==='pjp-pagox'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); await grava(c,J.per,f._id,{st:(x.pago&&x.pago.de)||'conferida',pago:null},'Pago desfeito'); P.render(); return; }
       if(a==='pjp-cw'){ const k=b.dataset.e, M=cwMedicao(c,J.per,k);
         if(M.abertos&&J.cwConf!==k){ J.cwConf=k; P.render(); return; }
         J.cwConf=''; await cwPedir(c,k);
