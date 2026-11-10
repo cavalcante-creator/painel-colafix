@@ -270,10 +270,10 @@
       if(!r.fixo&&!r.vh) return btn('pjp-ab','Pôr o valor da hora',fa+' data-tab="regras"','');
       if(!r.fixo&&!r.min) return btn('pjp-ab','Ver os dias',fa);
       return btn('pjp-fech','Fechar valor',fa,''); }
-    if(st==='fechado') return btn('pjp-ped','Pedir nota',fa,'')+lks(lnk('pjp-reab','mudar o valor',fa));
+    if(st==='fechado') return btn('pjp-ped','Pedir nota',fa,'')+lks(lnk('pjp-reab','mudar o valor',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
     if(st==='pedido') return btn('pjp-env','Mandar o link de novo',fa)+lks(lnk('pjp-pedx','cancelar o pedido',fa));
     if(st==='chegou') return btn('pjp-nok','Está certa',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-nnao','pedir outra nota',fa));
-    if(st==='conferida') return btn('pjp-pago','Marcar pago',fa,'')+lks(lnk('pjp-nver','ver a nota',fa));
+    if(st==='conferida') return btn('pjp-pago','Marcar pago',fa,'')+lks(lnk('pjp-nver','ver a nota',fa),lnk('pjp-fin','e-mail ao financeiro',fa));
     if(st==='pago') return btn('pjp-nver','Ver a nota',fa)+lks(lnk('pjp-pagox','desfazer',fa));
     return ''; }
   /* ---------- a pessoa: gaveta à direita (04/11, 3ª versão) ----------
@@ -404,7 +404,7 @@
         <div>${r.uPend?`<span class="pjp-pill warn">${r.uPend} de uniforme para confirmar</span>`:''}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b></div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
-  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return '';
+  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c);
     if(M.k==='cfg'){ const g=cfg(c);
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Configurar o pagamento dos PJ"><h3>Como o painel faz a conta</h3><p class="sub">Vale para todos os PJ; o horário e o valor da hora de cada pessoa ficam no detalhe dela.</p>
         <div class="pjp-box"><label>Período de pagamento</label><select id="pjp-cmodo"><option value="quinzena" ${g.modo==='quinzena'?'selected':''}>Quinzena (1 a 15 e 16 ao fim do mês)</option><option value="mes" ${g.modo==='mes'?'selected':''}>Mês inteiro</option></select>
@@ -557,7 +557,7 @@
       </div>`:''}${aba==='kb'?`
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver a lista dela; toque na pessoa para ver os dias</small></div>${quadros}</section>`:''}${aba==='lista'?`
       <section class="pjp-lc">
-        <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span></div>
+        <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span>${btn('pjp-fin','E-mail ao financeiro')}</div>
         <div class="pjp-lt2"><label class="pjp-busca"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pjp-q" type="search" placeholder="Buscar PJ, setor ou empresa" aria-label="Buscar PJ" value="${esc(J.q)}"></label>
           <select id="pjp-emp" aria-label="Empresa"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e)}" ${J.emp===e?'selected':''}>${esc(e)}</option>`).join('')}</select>
           ${sets.length?`<select id="pjp-set" aria-label="Setor"><option value="">Todos os setores</option>${sets.map(e=>`<option ${J.set===e?'selected':''}>${esc(e)}</option>`).join('')}</select>`:''}
@@ -704,6 +704,12 @@
   .pjp-pp .btn{height:40px!important;font-size:14px!important;padding:0 18px!important}
   @media(max-width:1100px){.pjp-bar .pjp-fid .pjp-fu{display:none}}
   @media(max-width:760px){.pjp-bar .pjp-fid{border-radius:12px;flex-wrap:wrap;white-space:normal}.pjp-bar .pjp-fid small{white-space:normal}.pjp-tbt{width:100%}}
+  .pjp-mod.pjp-fin{max-width:1100px}
+  .pjp-fing{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}@media(max-width:860px){.pjp-fing{grid-template-columns:1fr}}
+  .pjp-finl{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;margin-top:4px}
+  .pjp-finl .pjp-ck{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}.pjp-finl .pjp-ck input{width:16px;height:16px;margin:2px 0 0;flex:none}.pjp-finl .pjp-ck small{display:block}.pjp-finl small{color:var(--muted);font-size:12px}
+  .pjp-finp{min-width:0}.pjp-finpv{border:1px solid var(--line,#E1E7EB);border-radius:12px;background:#fff;color:#1F2A33;padding:16px;max-height:62vh;overflow:auto}
+  .pjp-finpv table{max-width:none}
   @media(max-width:760px){.pjp-fid{flex-basis:100%}.pjp-rs{grid-template-columns:1fr 1fr}.pjp-ppi{display:none}}
   @media(max-width:760px){
     .pjp-pp{padding:18px}.pjp-pp .btn{width:100%;justify-content:center}
@@ -717,6 +723,72 @@
     .pjp-lc .pjp-t tfoot tr{background:var(--surface-2,#F6F8FA)}
   }
   </style>`;
+  /* ---------- E-mail ao financeiro (10/11, "temos como automatizar esse e-mail que o RH manda para o financeiro?") ----------
+     O mesmo e-mail que o RH escrevia à mão: por empresa, cada PJ com o valor, "ENVIAR TOTAL DE R$ X · a nota fiscal será EMPRESA",
+     a folha de cada um igual à planilha (dia, entrada, saída, com a tolerância, total de horas, decimal e o cálculo final) e
+     "Depositar em conta EMPRESA". Motivo: pagamento da quinzena ou "desligado antes da data de pagamento habitual".
+     O painel copia o e-mail formatado (com as tabelas) e abre o Outlook na internet já com para, cópia e assunto: é só colar (Ctrl+V).
+     Para/cópia em rh/config.pjPag.finEmail {para,cc}; cada pessoa enviada ganha pes[fid].fin {em,por,data,mot} e uma linha no histórico. */
+  const mails=t=>String(t||'').split(/[;,\s]+/).map(e=>e.trim()).filter(e=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+  const DSEM=['dom','seg','ter','qua','qui','sex','sáb'];
+  const hMin=m=>{ m=Math.round(+m||0); return Math.floor(m/60)+':'+pad2(m%60); };
+  const desligadoNo=(f,p)=>f.status==='Desligado'||!!(f.desligamento&&f.desligamento>=p.de&&f.desligamento<=p.ate)||!!f.desligAgendado;
+  function finPessoas(c,pid){ const p=perDe(pid), D=docP(pid);
+    return pjs(c,p).map(f=>{ const x=(D.pes||{})[f._id]||{}; let r=calcPessoa(c,f,p,x); if(x.st&&x.fech) r=Object.assign({},r,{min:x.fech.min,vh:x.fech.vh,desc:x.fech.desc||0,valor:x.fech.valor,descMot:x.fech.descMot||r.descMot});
+      return {f,x,r,emp:String(f.empresa||'').toUpperCase()||'SEM EMPRESA'}; }); }
+  function finAbrir(c,fids){ const pid=J.per, p=perDe(pid), os=finPessoas(c,pid), g=cfg(c).finEmail||{};
+    const sel={}; (fids&&fids.length?fids:os.filter(o=>o.r.valor>0&&o.x.st!=='pago').map(o=>o.f._id)).forEach(id=>sel[id]=true);
+    const desl=os.some(o=>sel[o.f._id]&&desligadoNo(o.f,p));
+    J.mod={k:'fin',sel,mot:desl?'desl':'quinzena',data:hojeS(),para:g.para||'',cc:g.cc||''}; }
+  function finGrupos(c,M){ const os=finPessoas(c,J.per).filter(o=>M.sel[o.f._id]); const G={}; os.forEach(o=>(G[o.emp]=G[o.emp]||[]).push(o)); return G; }
+  const TD='border:1px solid #BFC9D1;padding:2px 6px;font-family:Calibri,Arial,sans-serif;font-size:11px;';
+  function finTabela(c,o,p){ const {f,r}=o, h=r.h, esc=c.esc, nm=String(f.nome||'').toUpperCase();
+    const lin=r.dias.map(d=>{ const dt=br(d.d).slice(0,5)+' '+DSEM[d.dw], cinza=d.dw===0||d.dw===6?'background:#F2F2F2;':'';
+      const e=d.e?String(d.e).slice(0,5):'00:00', sa=d.s?String(d.s).slice(0,5):'00:00', E=d.m&&d.E!=null?hhmm(d.E):'00:00', S=d.m&&d.S!=null?hhmm(d.S):'00:00';
+      return `<tr><td style="${TD}${cinza}white-space:nowrap">${dt}</td><td style="${TD}${cinza}text-align:center">${e}</td><td style="${TD}${cinza}text-align:center">${sa}</td><td style="${TD}${cinza}text-align:center">${E}</td><td style="${TD}${cinza}text-align:center">${S}</td><td style="${TD}${cinza}text-align:right">${hMin(d.m)}</td><td style="${TD}${cinza}text-align:right">${n2(hDec(d.m))}</td></tr>`; }).join('');
+    const th=t=>`<td style="${TD}background:#DCE6F1;font-weight:bold">${t}</td>`;
+    return `<table style="border-collapse:collapse;margin:6px 0 14px" cellspacing="0" cellpadding="0">
+      <tr><td colspan="7" style="${TD}background:#DCE6F1;font-weight:bold">${esc(nm)} · ${esc(String(f.setor||'').toUpperCase())} · Horário: ${esc(h.ini)}hr às ${esc(h.fim)}hr / Intervalo de ${hhmm(+h.intv||0)}</td></tr>
+      <tr>${th('Dia')}${th('Entrada')}${th('Saída')}${th('Entrada Tolerância Ajustada')}${th('Saída Tolerância Ajustada')}${th('Total de Horas (desconta '+hhmm(+h.intv||0)+')')}${th('Conversão Decimal')}</tr>${lin}
+      <tr><td style="${TD}font-weight:bold">Cálculo final</td><td style="${TD}" colspan="3"></td><td style="${TD}">Total Horas</td><td style="${TD}text-align:right">${hMin(r.min)}</td><td style="${TD}text-align:right">${n2(hDec(r.min))}</td></tr>
+      <tr><td style="${TD}" colspan="4"></td><td style="${TD}">${r.fixo?'Valor fixo':'Valor Horas'}</td><td style="${TD}text-align:right">${R$(r.fixo||r.vh)}</td><td style="${TD}"></td></tr>
+      <tr><td style="${TD}" colspan="4"></td><td style="${TD}">Desconto</td><td style="${TD}text-align:right">${R$(r.desc||0)}</td><td style="${TD}">${esc(r.desc?r.descMot||'':'')}</td></tr>
+      <tr><td style="${TD}" colspan="4"></td><td style="${TD}background:#DCE6F1;font-weight:bold">Total a Pagar</td><td style="${TD}background:#DCE6F1;font-weight:bold;text-align:right">${R$(r.valor)}</td><td style="${TD}"></td></tr></table>`; }
+  function finHtml(c,M){ const esc=c.esc, p=perDe(J.per), G=finGrupos(c,M), dt=br(M.data);
+    const motivo=M.mot==='desl'?` <b>devido ser desligado antes da data de pagamento habitual.</b>`:'.';
+    const blocos=Object.keys(G).sort().map(emp=>{ const os=G[emp], tot=Math.round(os.reduce((a,o)=>a+o.r.valor,0)*100)/100, nomeE=emp.charAt(0)+emp.slice(1).toLowerCase();
+      return `<ul style="margin:8px 0 8px 24px">${os.map(o=>`<li><b>${esc(c.titulo(o.f.nome))}:</b> ${R$(o.r.valor)} de acordo com os dias trabalhados registrados.</li>`).join('')}</ul>
+        <p style="margin:10px 0"><b>ENVIAR TOTAL DE ${R$(tot)} · a nota fiscal será ${esc(emp)}.</b></p>
+        <p style="margin:6px 0">${os.length>1?'As planilhas com o detalhamento dos dias trabalhados seguem':'A planilha com o detalhamento dos dias trabalhados segue'} para conferência.</p>
+        ${os.map(o=>finTabela(c,o,p)).join('')}
+        <p style="margin:6px 0 18px">Depositar em conta ${esc(nomeE.toUpperCase())}.</p>`; }).join('');
+    return `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1F2A33"><p style="margin:0 0 8px"><b>Olá,</b></p>
+      <p style="margin:0 0 8px">Conforme os dias trabalhados registrados no Face ID (período de ${esc(p.txt)}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${dt}${motivo}</p>
+      ${blocos}<p style="margin:0">Att.,</p><p style="margin:10px 0 0">--<br><b>${esc(c.eu())}</b><br>Gestão de Pessoas</p></div>`; }
+  function finTexto(c,M){ const p=perDe(J.per), G=finGrupos(c,M), L=['Olá,','',`Conforme os dias trabalhados registrados no Face ID (período de ${p.txt}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${br(M.data)}${M.mot==='desl'?' devido ser desligado antes da data de pagamento habitual.':'.'}`,''];
+    Object.keys(G).sort().forEach(emp=>{ const os=G[emp], tot=Math.round(os.reduce((a,o)=>a+o.r.valor,0)*100)/100;
+      os.forEach(o=>L.push('• '+c.titulo(o.f.nome)+': '+R$(o.r.valor)+' de acordo com os dias trabalhados registrados.')); L.push('','ENVIAR TOTAL DE '+R$(tot)+' · a nota fiscal será '+emp+'.','',
+        ...os.map(o=>c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)),'','Depositar em conta '+emp+'.',''); });
+    L.push('Att.,','--',c.eu(),'Gestão de Pessoas'); return L.join('\n').replace(/ /g,' '); }
+  const finAssunto=(c,M)=>{ const G=finGrupos(c,M); return 'Pagamento PJ · '+Object.keys(G).sort().join(' e ')+' · '+perDe(J.per).txt+(M.mot==='desl'?' · desligamento':''); };
+  function finModal(c){ const M=J.mod, esc=c.esc, os=finPessoas(c,J.per), n=os.filter(o=>M.sel[o.f._id]).length, tot=os.filter(o=>M.sel[o.f._id]).reduce((a,o)=>a+o.r.valor,0);
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-fin" role="dialog" aria-label="E-mail ao financeiro"><h3>E-mail ao financeiro</h3><p class="sub">O mesmo e-mail de sempre, montado pelo painel: valor de cada PJ, total por empresa e a folha de cada um. O painel copia o e-mail e abre o Outlook: é só colar (Ctrl+V) e enviar.</p>
+      <div class="pjp-fing"><div class="pjp-box">
+        <label for="pjp-fpara">Para (financeiro)</label><input id="pjp-fpara" value="${esc(M.para)}" placeholder="financeiro@…">
+        <label for="pjp-fcc">Cópia</label><input id="pjp-fcc" value="${esc(M.cc)}" placeholder="opcional">
+        <label for="pjp-fdata">Pagamento no dia</label><input id="pjp-fdata" type="date" value="${esc(M.data)}">
+        <label for="pjp-fmot">Motivo</label><select id="pjp-fmot"><option value="quinzena" ${M.mot==='quinzena'?'selected':''}>Pagamento da quinzena</option><option value="desl" ${M.mot==='desl'?'selected':''}>Desligado antes da data de pagamento habitual</option></select>
+        <label>Quem entra no e-mail · ${n} PJ · ${R$(tot)}</label><div class="pjp-finl">${os.map(o=>`<label class="pjp-ck"><input type="checkbox" data-pjp-fsel="${esc(o.f._id)}" ${M.sel[o.f._id]?'checked':''}><span>${esc(c.titulo(o.f.nome))} <small>${esc(o.emp)} · ${R$(o.r.valor)}${o.x.st==='pago'?' · pago':''}${desligadoNo(o.f,perDe(J.per))?' · desligado':''}</small></span></label>`).join('')}</div>
+      </div><div class="pjp-finp"><div class="pjp-lbl">Como vai sair · ${esc(finAssunto(c,M))}</div><div class="pjp-finpv" id="pjp-finpv">${n?finHtml(c,M):'<p class="sub">Marque pelo menos um PJ.</p>'}</div></div></div>
+      <div class="pjp-ac" style="margin-top:14px">${btn('pjp-modx','Fechar')}${btn('pjp-fincp','Só copiar o e-mail',n?'':'disabled')}${btn('pjp-finok','Copiar e abrir o Outlook',n?'':'disabled','')}</div></div></div>`; }
+  async function finCopia(c,M){ const html=finHtml(c,M), txt=finTexto(c,M);
+    try{ if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})]); return 'html'; } }catch(e){}
+    try{ await navigator.clipboard.writeText(txt); return 'texto'; }catch(e){}
+    return ''; }
+  async function finRegistra(c,M){ const pid=J.per, ids=Object.keys(M.sel).filter(k=>M.sel[k]);
+    const g=Object.assign({},cfg(c).finEmail||{}), nv={para:M.para,cc:M.cc}; if(g.para!==nv.para||g.cc!==nv.cc){ c.R.cfg.pjPag=Object.assign({},(c.R.cfg||{}).pjPag||{},{finEmail:nv}); await c.P.db().doc('rh/config').set({pjPag:{finEmail:nv}},{merge:true}); }
+    for(const id of ids) await grava(c,pid,id,{fin:{em:agora(),por:c.eu(),data:M.data,mot:M.mot}},'E-mail ao financeiro: pagamento em '+br(M.data)+(M.mot==='desl'?' (desligamento)':'')); }
+  function finOwa(c,M){ const q=['to='+encodeURIComponent(mails(M.para).join(';'))]; if(mails(M.cc).length) q.push('cc='+encodeURIComponent(mails(M.cc).join(';'))); q.push('subject='+encodeURIComponent(finAssunto(c,M))); return 'https://outlook.office.com/mail/deeplink/compose?'+q.join('&'); }
   /* ---------- relatórios ---------- */
   function linhasRel(c){ const pid=J.per, p=perDe(pid), D=docP(pid);
     return pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,descMot:fe?(fe.descMot||x.descMot||''):r.descMot,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh}; }); }
@@ -818,6 +890,9 @@
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!C||!t||!t.closest) return; const P=C.P;
     try{
       if(t.id==='pjp-emp'){ J.emp=t.value; P.render(); return; }
+      if(J.mod&&J.mod.k==='fin'&&(t.dataset.pjpFsel||['pjp-fmot','pjp-fdata','pjp-fpara','pjp-fcc'].includes(t.id))){ const M=J.mod;
+        if(t.dataset.pjpFsel) M.sel[t.dataset.pjpFsel]=t.checked; else if(t.id==='pjp-fmot') M.mot=t.value; else if(t.id==='pjp-fdata') M.data=t.value||M.data; else if(t.id==='pjp-fpara'){ M.para=t.value; return; } else { M.cc=t.value; return; }
+        P.render(); return; }
       if(t.id==='pjp-set'){ J.set=t.value; P.render(); return; }
       if(t.id==='pjp-sit'){ J.sit=t.value; P.render(); return; }
       if(t.dataset.pjpDia){ const f=fDe(t.dataset.f), d=t.dataset.d, x=pesDe(J.per,f._id); if(x.st) return; const aj=Object.assign({},x.aj||{}), cur=Object.assign({},aj[d]||{});
@@ -837,6 +912,14 @@
       if(a==='pjp-ab'){ J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
       if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
+      if(a==='pjp-fin'){ finAbrir(c,b.dataset.f?[b.dataset.f]:null); P.render(); return; }
+      if(a==='pjp-fincp'||a==='pjp-finok'){ const M=J.mod; if(!M||M.k!=='fin') return; const g=id=>(document.getElementById(id)||{}).value; M.para=g('pjp-fpara')||''; M.cc=g('pjp-fcc')||''; M.data=g('pjp-fdata')||M.data;
+        if(a==='pjp-finok'&&!mails(M.para).length) return P.toast('Escreva o e-mail do financeiro em "Para".');
+        const jan=a==='pjp-finok'?(()=>{ try{ return window.open('','_blank'); }catch(e){ return null; } })():null;
+        const cp=await finCopia(c,M); await finRegistra(c,M); window.__pjpFin={html:finHtml(c,M),txt:finTexto(c,M),assunto:finAssunto(c,M),url:finOwa(c,M),cp};
+        if(jan){ try{ jan.location=finOwa(c,M); }catch(e){} }
+        P.toast(cp==='html'?'E-mail copiado com as tabelas. No Outlook, clique no corpo do e-mail e cole (Ctrl+V).':cp?'E-mail copiado (sem as tabelas). Cole no Outlook (Ctrl+V).':'Não deu para copiar sozinho: selecione o e-mail na prévia e copie (Ctrl+C).');
+        J.mod=null; P.render(); return; }
       if(a==='pjp-aba'){ J.aba=b.dataset.v; P.render(); return; }
       if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; if(J.col>=0) J.aba='lista'; P.render(); return; }
       if(a==='pjp-gx'){ J.ab=''; J.edDia=null; P.render(); return; }
@@ -919,5 +1002,5 @@
     }catch(e){ if(e&&e.aviso) P.toast(e.message); else P.erro(e); } });
   document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!C) return; if(J.mod){ J.mod=null; C.P.render(); } else if(J.edDia){ J.edDia=null; C.P.render(); } else if(J.ab){ J.ab=''; C.P.render(); } });
   document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&C&&J.edDia&&ev.target&&['pjp-ce','pjp-cs','pjp-cm'].includes(ev.target.id)){ ev.preventDefault(); const b=document.querySelector('[data-act="pjp-dsalva"]'); if(b) b.click(); } });
-  window.RHPJPag={render,avisos,_J:J,_calc:{contaDia,perDe,perMove,lerXml,qsDe}};
+  window.RHPJPag={_fin:{finAbrir,finHtml,finTexto,finAssunto},render,avisos,_J:J,_calc:{contaDia,perDe,perMove,lerXml,qsDe}};
 })();
