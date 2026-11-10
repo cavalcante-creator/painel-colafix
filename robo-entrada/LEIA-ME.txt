@@ -1,0 +1,27 @@
+ROBÔ DO FACE ID DA ENTRADA DA FÁBRICA
+=====================================
+Lê o 2º iDSecure (o da entrada da fábrica) de hora em hora e manda as passagens para o painel
+(RH › Pagamento dos PJ). O robô do Face ID de sempre (refeitório) continua como está.
+
+O que precisa
+- Um computador da fábrica que fique ligado e que consiga abrir o iDSecure da entrada no navegador.
+- Node.js instalado (o mesmo do outro robô serve).
+- A chave de serviço do Firebase (o mesmo arquivo do outro robô): copie para esta pasta com o nome chave-servico.json.
+
+Como instalar
+1. Copie esta pasta para o computador (ex.: C:\robo-entrada).
+2. Copie config.exemplo.json para config.json e preencha:
+   - idsecure.url: o endereço do iDSecure da entrada, como aparece no navegador (ex.: https://192.168.x.x:30443)
+   - idsecure.usuario / senha: um usuário do iDSecure que possa tirar o relatório "Acessos Gerais"
+   - pasta: (opcional) uma pasta onde dá para deixar CSV exportados à mão; o robô manda e move para "enviados"
+3. Clique em 2-ler-agora.bat e confira a mensagem. No painel, a barra do Pagamento dos PJ mostra
+   "Entrada da fábrica em dia · Robô leu há …".
+4. Clique em 1-instalar-agendador.bat para rodar sozinho de hora em hora.
+   3-refazer-ultimo-mes.bat busca os últimos 31 dias (use uma vez na instalação).
+
+Se der problema
+- O erro aparece na barra do painel ("Robô da entrada com problema: …") e no arquivo robo-entrada.log.
+- "O certificado do iDSecure mudou": se o iDSecure foi reinstalado, apague entrada-certificado.txt e rode de novo.
+- Sem a API do iDSecure, dá para exportar o "Acessos Gerais" à mão e deixar o CSV na pasta do config.
+
+Nunca mande o config.json nem a chave-servico.json por e-mail ou WhatsApp.

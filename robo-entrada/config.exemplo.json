@@ -1,0 +1,13 @@
+{
+  "idsecure": {
+    "url": "https://ENDERECO-DO-IDSECURE-DA-ENTRADA:30443",
+    "usuario": "usuario-do-idsecure",
+    "senha": "senha-do-idsecure"
+  },
+  "pasta": "C:\\FaceIDEntrada",
+  "dias": 7,
+  "firebase": {
+    "projeto": "painel-colafix-2",
+    "chave": "chave-servico.json"
+  }
+}

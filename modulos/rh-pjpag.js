@@ -550,8 +550,14 @@
     else { out.tom='crit'; out.tit='Sem Face ID'; out.sub='Nenhuma leitura nem importação deste mês.'; }
     out.ultTxt=ultTxt; return out; }
   /* situação do Face ID da entrada da fábrica (o CSV importado aqui) */
-  function ptoInfo(c,p){ const D=ptoMes(p.mes); let ult=''; if(D&&D.dias) Object.keys(D.dias).filter(d=>d>=p.de&&d<=p.ate).sort().reverse().some(d=>{ let mx=''; Object.values(D.dias[d]||{}).forEach(x=>((x&&x.t)||[]).forEach(t=>{ const h=String(t).slice(0,5); if(/^\d\d:\d\d$/.test(h)&&h>mx) mx=h; })); if(mx){ ult=d+'T'+mx; return true; } return false; });
+  function ptoInfo(c,p){ if(!J.roboSub){ J.roboSub=true; try{ c.P.db().doc('rh/dados/robo/entrada').onSnapshot(g=>{ J.robo=g.exists?g.data():null; c.P.rerender(); },()=>{}); }catch(e){} }
+    const D=ptoMes(p.mes); let ult=''; if(D&&D.dias) Object.keys(D.dias).filter(d=>d>=p.de&&d<=p.ate).sort().reverse().some(d=>{ let mx=''; Object.values(D.dias[d]||{}).forEach(x=>((x&&x.t)||[]).forEach(t=>{ const h=String(t).slice(0,5); if(/^\d\d:\d\d$/.test(h)&&h>mx) mx=h; })); if(mx){ ult=d+'T'+mx; return true; } return false; });
     const imp=D&&D.imp&&D.imp.length?D.imp.slice().sort((a,b)=>String(a.em).localeCompare(String(b.em))).slice(-1)[0]:null;
+    const R=J.robo, ultTx=ult?'última passagem '+brc(ult.slice(0,10))+' às '+ult.slice(11,16):'';
+    if(R&&R.ultima){ const mr=(Date.now()-new Date(R.ultima).getTime())/60000;  /* robô da entrada (robo-entrada/), de hora em hora */
+      if(mr>130) return {tom:'crit',tit:'Robô da entrada parado',sub:'Leu pela última vez '+hm(R.ultima)+' ('+haTxt(mr)+'). Confira o computador do robô ou importe o CSV.'+(ultTx?' · '+ultTx:''),ult,imp};
+      if(R.ok===false) return {tom:'warn',tit:'Robô da entrada com problema',sub:String(R.erro||'erro').slice(0,140)+(ultTx?' · '+ultTx:''),ult,imp};
+      return {tom:'ok',tit:'Entrada da fábrica em dia',sub:'Robô leu '+haTxt(mr)+(ultTx?' · '+ultTx:''),ult,imp}; }
     if(!imp&&!ult) return {tom:'warn',tit:'Entrada da fábrica sem importar',sub:'Sem o CSV da entrada, as horas saem do Face ID de sempre.',ult,imp};
     const mi=imp&&imp.em?(Date.now()-new Date(imp.em).getTime())/60000:null;
     return {tom:mi!=null&&mi>36*60?'warn':'ok',tit:'Entrada da fábrica',sub:(imp?'CSV importado '+haTxt(mi)+(imp.por?' por '+imp.por:''):'')+(ult?' · última passagem '+brc(ult.slice(0,10))+' às '+ult.slice(11,16):''),ult,imp}; }
