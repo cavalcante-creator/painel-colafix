@@ -24,8 +24,8 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   const pr=await p.evaluate(()=>{ const c=window.RHPJPag._calc; return [c.perDe('2026-10-2').de,c.perDe('2026-10-2').ate,c.perDe('2026-11-1').ate,c.perMove('2026-10-2',1),c.perMove('2026-10-1',-1)]; });
   ok('Quinzenas: 16 ao fim do mês, 1 a 15, e a navegação', JSON.stringify(pr)==='["2026-10-16","2026-10-31","2026-11-15","2026-11-1","2026-09-2"]', JSON.stringify(pr));
   /* menu */
-  const menu=await p.evaluate(()=>{ const b=document.querySelector('#navlist .gxg-gr[data-go="rhrelmes"]'); if(b) b.click(); return new Promise(r=>setTimeout(()=>r([...document.querySelectorAll('#navlist .gxg-si')].map(x=>x.dataset.go)),500)); });
-  ok('Menu do RH: "Pagamento dos PJ" em Relatórios', menu.includes('rhpjpag'), menu.join(','));
+  const menu=await p.evaluate(()=>{ const b=document.querySelector('#navlist .gxg-gr[data-go="rhrelmes"]'); if(b) b.click(); return new Promise(r=>setTimeout(()=>r({sub:[...document.querySelectorAll('#navlist .gxg-si')].map(x=>x.dataset.go),fixo:[...document.querySelectorAll('#navlist > .navbtn:not(.gxg-si)')].some(x=>x.dataset.go==='rhpjpag'&&/Pagamento dos PJ/.test(x.innerText)&&!!x.querySelector('svg'))}),500)); });
+  ok('Menu do RH: "Pagamento dos PJ" fixo na lateral, com ícone, fora de Relatórios', menu.fixo&&!menu.sub.includes('rhpjpag'), JSON.stringify(menu));
   await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(1800); /* as ações por pessoa ficam na aba Todos os PJ */
   let s=await view();
   ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,00/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
