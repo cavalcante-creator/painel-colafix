@@ -58,5 +58,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   const cel=await p.evaluate(()=>{ const tr=document.querySelector('.pjp-lc .pjp-t tbody tr'); const r=tr.getBoundingClientRect(); return {w:document.documentElement.scrollWidth,dis:getComputedStyle(tr).display,cw:r.width,ini:!!tr.querySelector('.pc-ini'),st:!!tr.querySelector('.pjp-sl')}; });
   ok('Celular: cada PJ vira um cartão (com as iniciais e a situação), sem rolagem para o lado', cel.dis==='grid'&&cel.w<=392&&cel.cw<=392&&cel.ini&&cel.st, JSON.stringify(cel));
   if(process.env.SHOT){ await p.screenshot({path:'/tmp/pjp-cel.png',fullPage:true}); }
+  await p.setViewportSize({width:1440,height:950}); await H.dorme(300);
+  await p.evaluate(()=>{ window.RHPJPag._J.ab='f1'; window.RHPJPag._J.aba='lista'; window.Painel.render(); }); await H.dorme(600);
+  await p.click('.pjp-gcad'); await H.dorme(1000);
+  const cad=await p.evaluate(()=>({tela:__T.S.view,txt:document.body.innerText.includes('Editar funcionário'),nome:[...document.querySelectorAll('input')].some(i=>/JOAO PEREIRA TESTE/i.test(i.value)),gav:window.RHPJPag._J.ab}));
+  ok('"Abrir o cadastro" no painel da pessoa leva ao cadastro dela em Funcionários (e fecha o painel)', cad.txt&&cad.nome&&!cad.gav, JSON.stringify(cad));
   const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
   console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
