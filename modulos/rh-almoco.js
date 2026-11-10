@@ -891,7 +891,7 @@
   /* ---------- presença para a Visão do gestor (22/10): resumo SEM CPF em presenca/{dia} ----------
      Quem tem o RH (ou a administradora) publica sozinho, só quando muda. O gestor lê presenca/ (regra própria). */
   const PR={map:{},sub:false,ult:0,ocupado:false};
-  const ehSaida=s=>/SAIDA/.test(nrm(s));
+  const ehSaida=s=>/SAIDA/.test(nrm(s)); const ehEst=s=>/ESTACIONAMENTO/.test(nrm(s));
   function prEmp(f,x){ const e=nrm((f&&f.empresa)||(x&&x.e)||''); if(/ZENITH/.test(e)) return 'Zenith'; if(/NEXUS/.test(e)) return 'Nexus'; if(/COLAFIX|FIXCOL/.test(e)) return 'Colafix'; return e?'Terceiros':'Colafix'; }
   function prHash(o){ const s=JSON.stringify(o); let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36)+'.'+s.length; }
   const prMenos=(d,n)=>{ const x=new Date(d+'T12:00'); x.setDate(x.getDate()-n); return x.toISOString().slice(0,10); };
@@ -911,9 +911,10 @@
     const tur=((P.S&&P.S.cfg&&P.S.cfg.turnos)||[])[0], ini=hm((tur&&tur.ini)||'07:30'), lim=Math.min(23*60,ini+30), limT=pad(Math.floor(lim/60))+':'+pad(lim%60);
     const ps=[], vistos=new Set();
     Object.keys(dia).forEach(k=>{ const x=dia[k]||{}, pp=P0[k]||{}; let f=fx[k]||null; if(!f&&pp.n){ const cs=(R.func||[]).filter(y=>prMesma(pp.n,y.nome)); if(cs.length===1) f=cs[0]; } const t=(x.t||[]).map(z=>{ const mm=String(z).match(/^(\d{2}:\d{2})(:\d{2})?\s*(.*)$/); return mm?{h:mm[1],d:mm[3]}:null; }).filter(Boolean).sort((a,b)=>a.h.localeCompare(b.h));
-      if(!t.length) return; const g=[]; let ab=null; t.forEach(z=>{ if(ehSaida(z.d)){ if(ab!=null){ g.push(ab+'-'+z.h); ab=null; } } else if(ab==null) ab=z.h; }); if(ab!=null) g.push(ab+'-');
+      /* trechos na empresa: leitor de SAÍDA fecha; leitor do ESTACIONAMENTO (um só para os dois sentidos) fecha se a pessoa estava dentro e abre se estava fora (10/11, "considerar saídas pelo estacionamento"); os outros abrem */
+      if(!t.length) return; const g=[]; let ab=null; t.forEach(z=>{ const fecha=ehSaida(z.d)||(ehEst(z.d)&&ab!=null); if(fecha){ if(ab!=null){ g.push(ab+'-'+z.h); ab=null; } } else if(ab==null) ab=z.h; }); const saiu=ab==null; if(ab!=null) g.push(ab+'-');
       const u=t[t.length-1]; vistos.add(k); if(f) vistos.add('f:'+f._id);
-      ps.push({n:titulo(f?f.nome:(pp.n||'Sem nome')),s:(f&&f.setor)||'',e:prEmp(f,pp),c:t[0].h,a:x.a||'',u:u.h,sa:ehSaida(u.d)?1:0,g}); });
+      ps.push({n:titulo(f?f.nome:(pp.n||'Sem nome')),s:(f&&f.setor)||'',e:prEmp(f,pp),c:t[0].h,a:x.a||'',u:u.h,sa:saiu?1:0,g}); });
     ps.sort((a,b)=>a.n.localeCompare(b.n,'pt-BR'));
     const wd=new Date(d+'T12:00').getDay(); let fer=false; try{ fer=!!(P.feriadoDe&&P.feriadoDe(d)); }catch(e){}
     const exp=d===P.hojeStr()?(wd>0&&wd<6&&!fer):ps.length>=Math.max(5,.4*maxP);

@@ -9,10 +9,11 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
  D['rh/dados/funcionarios/f3']={nome:'CARLA DIAS',cpf:'333.333.333-33',setor:'Linha 2',empresa:'COLAFIX',vinculo:'CLT',status:'Ativo',admissao:'2020-01-01'};
  D['rh/dados/funcionarios/f4']={nome:'DIEGO ROCHA',cpf:'444.444.444-44',setor:'Linha 3',empresa:'ZENITH',vinculo:'PJ',status:'Ativo',admissao:'2020-01-01'};
  D['rh/dados/ferias/x1']={funcId:'f4',inicio:hj,fim:hj,status:'marcada'};
- D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ANA SOUZA',e:'FIXCOL INDUSTRIA E COMERCIO LTDA'},'22222222222':{n:'BRUNO LIMA'},'55555555555':{n:'IVAN MOTORISTA',e:'TRANSPORTES XYZ'}},
+ D['rh/dados/almoco/'+m]={mes:m,pessoas:{'11111111111':{n:'ANA SOUZA',e:'FIXCOL INDUSTRIA E COMERCIO LTDA'},'22222222222':{n:'BRUNO LIMA'},'55555555555':{n:'IVAN MOTORISTA',e:'TRANSPORTES XYZ'},'66666666666':{n:'ELIAS ESTAC TESTE',e:'TRANSPORTES XYZ'}},
   dias:{[hj]:{'11111111111':{p:1,a:'11:40',t:['07:10:00 Estacionamento Entrada','07:12:00 Portaria Entrada','11:40:00 REFEITÓRIO']},
              '22222222222':{p:1,t:['08:20:00 Portaria Entrada','12:30:00 Portaria Saida']},
-             '55555555555':{p:1,t:['06:40:00 Portaria Entrada']}}},imp:[{em:new Date().toISOString(),por:'Teste'}]};
+             '55555555555':{p:1,t:['06:40:00 Portaria Entrada']},
+             '66666666666':{p:1,t:['07:30:00 Estacionamento','10:00:00 Estacionamento','10:15:00 Estacionamento','17:30:00 Estacionamento']}}},imp:[{em:new Date().toISOString(),por:'Teste'}]};
  /* 1) administradora (tem o RH): o painel publica a presença sozinho */
  let B=await H.abrir({viewport:{width:1440,height:1000}}); let p=B.page; await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'iasmyn','senha123');
  let doc=null; for(let i=0;i<60&&!doc;i++){ await H.dorme(500); doc=await p.evaluate(x=>__T.S().db.doc('presenca/'+x).get().then(g=>g.exists?g.data():null),hj); }
@@ -20,6 +21,8 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
  ok('O painel do RH publica presenca/'+hj+' sozinho, sem CPF', !!doc&&!/111\.?111|11111111111|22222222222|cpf/i.test(js), js.slice(0,200));
  const pa=doc&&doc.p.find(x=>x.n==='Ana Souza'), pb=doc&&doc.p.find(x=>x.n==='Bruno Lima'), pi=doc&&doc.p.find(x=>/Ivan/.test(x.n));
  ok('Ana: chegou 07:10, almoço 11:40, na empresa; Bruno: chegou 08:20 e saiu 12:30; motorista = Terceiros', pa&&pa.c==='07:10'&&pa.a==='11:40'&&!pa.sa&&pa.e==='Colafix'&&pb&&pb.sa===1&&pb.u==='12:30'&&pb.g[0]==='08:20-12:30'&&pi&&pi.e==='Terceiros', JSON.stringify({pa,pb,pi}));
+ const pe=doc&&doc.p.find(x=>/Elias/.test(x.n));
+ ok('Leitor do estacionamento (um só para entrar e sair): sai e volta vira dois trechos', pe&&pe.g.join()==='07:30-10:00,10:15-17:30'&&pe.sa===1, JSON.stringify(pe));
  const fc=doc&&doc.f.find(x=>x.n==='Carla Dias'), fd=doc&&doc.f.find(x=>x.n==='Diego Rocha');
  ok('Não vieram: Carla sem registro e Diego de férias (Zenith)', fc&&fc.m==='Sem registro'&&fd&&fd.m==='Férias'&&fd.e==='Zenith', JSON.stringify(doc&&doc.f));
  const em1=doc&&doc.em; await H.dorme(22000); const em2=await p.evaluate(x=>__T.S().db.doc('presenca/'+x).get().then(g=>g.data().em),hj);
@@ -34,7 +37,7 @@ const n=new Date(), hj=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'
  let t=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Início novo: saudação, meta do dia e "Pessoas hoje" com o Face ID', /Marcelo/.test(t)&&/Pessoas hoje/.test(t)&&/Na empresa agora/.test(t)&&/Precisa de você|Tudo em ordem/.test(t), t.slice(0,300).replace(/\n/g,'|'));
  await p.click('#navlist [data-go="gxpres"]'); await H.dorme(1200); t=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Quem está na empresa: 3 vieram de 5, nomes, "Saiu 12:30", férias e sem registro', /Quem está na empresa/.test(t)&&/Ana Souza/.test(t)&&/Saiu 12:30/.test(t)&&/De férias/.test(t)&&/sem registro/i.test(t)&&/3\s*de 5/.test(t), t.slice(0,500).replace(/\n/g,'|'));
+ ok('Quem está na empresa: 4 vieram de 6, nomes, "Saiu 12:30", férias e sem registro', /Quem está na empresa/.test(t)&&/Ana Souza/.test(t)&&/Saiu 12:30/.test(t)&&/De férias/.test(t)&&/sem registro/i.test(t)&&/4\s*de 6/.test(t), t.slice(0,500).replace(/\n/g,'|'));
  const vis=()=>p.evaluate(()=>[...document.querySelectorAll('.gxp-row[data-b]')].filter(r=>!r.hidden).map(r=>r.querySelector('.gxp-nm').innerText));
  await p.click('.gxp-tab[data-v="f"]'); await H.dorme(300); let v=await vis();
  ok('Filtro "Não vieram" mostra Carla e Diego', v.length===2&&v.includes('Carla Dias')&&v.includes('Diego Rocha'), v.join(', '));
