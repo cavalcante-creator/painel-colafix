@@ -544,14 +544,14 @@
         ${FI?`<div class="pjp-fid ${FI.tom}" role="status"><span class="pjp-fdot" aria-hidden="true"></span><div><b>${esc(FI.tit)}</b><small>${esc(FI.sub)}</small><small>${esc(FI.ultTxt)}${FI.imp&&FI.robo?' · último CSV '+esc(hm(FI.imp.em)):''}</small></div><button class="lnk" data-act="pjp-fidir" type="button">Ver no Almoço/café</button></div>`:''}</div>`;
     return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
       `<div class="pjp">${barra}${avFid}
-      <section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
-      <div class="pjp-g2">
+      <div class="pjp-2c"><aside class="pjp-esq"><section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
+
         <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>
         <section class="pjp-cx"><div class="pjp-ch"><h3>Resumo da quinzena</h3></div><div class="pjp-rs">
           <div class="pjp-tl pri"><span>${icn('grafico',16)}Total a pagar</span><b class="n">${R$(totV)}</b></div><div class="pjp-tl ok"><span>${icn('check',16)}Já pago</span><b class="n">${R$(pagoV)}</b></div>
           <div class="pjp-tl warn"><span>${icn('relogio',16)}Falta pagar</span><b class="n">${R$(totV-pagoV)}</b></div><div class="pjp-tl"><span>${icn('equipe',16)}PJ · horas</span><b class="n">${rsF.length} · ${hTxt(totM)}</b></div></div>
           <div class="pjp-rsb">${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF')}${btn('pjp-cfg','Como é feita a conta')}</div></section>
-      </div>
+      </aside><div class="pjp-dir">
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver só ela na lista</small></div>${quadros}</section>
       <section class="pjp-lc">
         <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span></div>
@@ -563,7 +563,7 @@
         ${rs.length?`<div class="pjp-tw"><table class="pjp-t"><thead><tr><th>PJ <small>· toque no nome para ver os dias</small></th><th>Situação</th><th class="n">Total a pagar</th><th class="pjp-qa"><span class="pjp-sr">Ações</span></th></tr></thead><tbody>${linhas}</tbody>
           <tfoot><tr><td>Total · ${rs.length} PJ</td><td></td><td class="n pjp-tt" data-r="Total a pagar">${R$(soma(rs))}</td><td></td></tr></tfoot></table></div>`
           :(U?U.vazio({tit:vazio[0],txt:vazio[1]}):`<div class="empty">${esc(vazio[0])}</div>`)}
-      </section>
+      </section></div></div>
       ${cwBloco(c,pid,emps)}
       </div>`+gaveta(c,pid,rsT)+modal(c); }
   const css3=`<style id="pjp-css3">
@@ -655,6 +655,21 @@
   .pjp-kc.on{background:var(--kt);border-color:var(--kc);border-top-width:4px}
   .pjp-kc .pjp-kcard{background:var(--surface-2,#F6F8FA);border-color:transparent}.pjp-kc .pjp-kcard:hover{border-color:var(--kc)}
   .pjp-kc .pjp-kcard .pc-ini{background:var(--kc)}
+  /* lado a lado (10/11, "não ser um módulo abaixo do outro, teria que ser lado a lado"): à esquerda o que fazer, à direita onde cada PJ está e a lista */
+  .pjp-2c{display:grid;grid-template-columns:minmax(330px,390px) minmax(0,1fr);gap:18px;align-items:start}
+  .pjp-esq{display:flex;flex-direction:column;gap:16px;position:sticky;top:76px;min-width:0}
+  .pjp-dir{display:flex;flex-direction:column;gap:18px;min-width:0}
+  .pjp-esq .pjp-pp{flex-direction:column;align-items:stretch;gap:12px;padding:20px}.pjp-esq .pjp-pp>div{flex:none}.pjp-esq .pjp-pp .btn{width:100%;justify-content:center}
+  .pjp-esq .pjp-ppi{width:40px;height:40px}.pjp-esq .pjp-pp h3{font-size:19px}
+  .pjp-esq .pjp-pvi .pjp-qa{width:100%;text-align:left;min-width:0}.pjp-esq .pjp-pvi .pjp-lks{justify-content:flex-start}.pjp-esq .pjp-pvi .pjp-pvt{flex-basis:100%}
+  .pjp-esq .pjp-pvi{position:relative;padding-left:58px}.pjp-esq .pjp-pvi>span:first-child{position:absolute;left:18px;top:13px}
+  .pjp-dir .pjp-kb{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .pjp-dir .pjp-kh{flex-wrap:wrap;row-gap:0}.pjp-dir .pjp-kh b{font-size:13.5px}.pjp-dir .pjp-kh em{flex-basis:100%;margin-left:0;font-size:12.5px}
+  .pjp-dir .pjp-kcard{padding:9px 10px;gap:8px}.pjp-dir .pjp-kcard .pc-ini{display:none}
+  @media(max-width:1350px) and (min-width:1181px){.pjp-dir .pjp-kb{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:1180px){.pjp-dir .pjp-kb{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:560px){.pjp-dir .pjp-kb{grid-template-columns:1fr}}
+  @media(max-width:1180px){.pjp-2c{grid-template-columns:1fr}.pjp-esq{position:static}.pjp-esq .pjp-pp{flex-direction:row;flex-wrap:wrap;align-items:center}.pjp-esq .pjp-pp .btn{width:auto}.pjp-esq .pjp-pp>div{flex:1 1 240px;min-width:0}}
   @media(max-width:760px){.pjp-fid{flex-basis:100%}.pjp-rs{grid-template-columns:1fr 1fr}.pjp-ppi{display:none}}
   @media(max-width:760px){
     .pjp-pp{padding:18px}.pjp-pp .btn{width:100%;justify-content:center}
