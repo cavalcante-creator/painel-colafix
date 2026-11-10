@@ -15,11 +15,11 @@
      rh/dados/pjpag/{pid}.cw  {EMPRESA:{em,por,total (centavos),n}} — medição mandada ao Conectwork ("Enviar ao Conectwork")
    Usado pelo rh.js: window.RHPJPag.render(ctx) · .avisos(ctx). Prefixo `pjp`. */
 (function(){
-  const COL='rh/dados/pjpag', PED='rh/dados/pjnotaped', ENV='rh/dados/pjnotaenv';
+  const PTO='rh/dados/ponto', COL='rh/dados/pjpag', PED='rh/dados/pjnotaped', ENV='rh/dados/pjnotaenv';
   const PAD={modo:'quinzena',tol:5,dentro:false,ini:'07:30',fim:'17:18',intv:60,horasMes:220,dias:30,
     msg:'Olá, {NOME}! Fechamos {PERIODO}: {HORAS} trabalhadas, total de {VALOR}.\nPor favor, emita a nota fiscal de serviço para {EMPRESA} (CNPJ {CNPJ}) e mande por este link:\n{LINK}'};
   const ST={'':['Conferir as horas','warn'],fechado:['Valor fechado','teal'],pedido:['Nota pedida','teal'],chegou:['Nota chegou · conferir','warn'],conferida:['Nota conferida','ok'],pago:['Pago','ok']};
-  const J={per:'',docs:{},sub:{},envSub:false,env:{},ab:'',q:'',emp:'',cfgAb:false,mod:null,proc:{},fid:{},carr:{}};
+  const J={per:'',docs:{},sub:{},envSub:false,env:{},ab:'',q:'',emp:'',cfgAb:false,mod:null,proc:{},fid:{},carr:{},pto:{},ptoSub:{}};
   let C=null;
   /* ---------- utilidades ---------- */
   const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
@@ -80,7 +80,7 @@
   /* fichas das passagens do dia: hora + leitor; a que não conta fica riscada */
   const chipsP=(ps,esc)=>{ const ok=ps.filter(q=>q.ok), varios=new Set(ps.map(q=>norm(leitNome(q)))).size>1;
     return ps.map(q=>{ const nm=leitNome(q), ex=q===ok[0]||q===ok[ok.length-1];
-      return `<span class="${q.ok?(ex?'pe':'pm'):'fo'}" title="${esc(nm)}${q.ok?'':' · não conta para o horário'}">${esc(q.h)}${varios&&nm?`<small>${esc(nm.slice(0,18))}</small>`:''}</span>`; }).join(''); };
+      return `<span class="${q.ok?(ex?'pe':'pm'):'fo'}" title="${q.pto?'Entrada da fábrica · ':''}${esc(nm)}${q.ok?'':q.sec?' · não conta: vale a entrada da fábrica':' · não conta para o horário'}">${esc(q.h)}${(varios||q.pto)&&nm?`<small>${q.pto?'entrada · ':''}${esc(nm.slice(0,18))}</small>`:''}</span>`; }).join(''); };
   const dadosMes=pid=>{ const p=perDe(pid); return p&&window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes]||null; };
   /* caixinhas dos leitores: os vistos no Face ID do mês + os que já estão escolhidos */
   function leitCaixas(esc,vis,sel,nome){ const ks=vis.map(v=>v.k), xs=vis.concat(sel.filter(k=>!ks.includes(k)).map(k=>({k,n:k,tipo:'?',q:0})));
@@ -134,17 +134,30 @@
      diferença é descontada sozinha na quinzena seguinte ("Saiu mais cedo no dia do fechamento"). */
   function fechDia(p){ for(let d=new Date(p.ate+'T12:00:00'); isoD(d)>=p.de; d.setDate(d.getDate()-1)){ const k=isoD(d), w=d.getDay(); if(w!==0&&w!==6&&!ferP(k)) return k; } return p.ate; }
   function fechAnt(c,f,p,h){ const pp=perDe(perMove(p.pid,-1)), D=J.docs[pp.pid], xp=D&&D.pes&&D.pes[f._id], fe=xp&&xp.fech, ch=fe&&fe.cheio; if(!ch||!ch.d||fe.fixo) return null;
-    const dd=window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[ch.d.slice(0,7)]; if(!dd||ch.d>=hojeS()) return null;
-    const k=chaveFid(c,f,dd), dx=k&&dd.dias&&dd.dias[ch.d]&&dd.dias[ch.d][k]||null, LT=leitDe(c,f).l, hs=pasDe(dx).filter(q=>contaP(q,LT)).map(q=>q.h), a=(xp.aj||{})[ch.d];
+    const dd=window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[ch.d.slice(0,7)]; if((!dd&&!ptoMes(ch.d.slice(0,7)))||ch.d>=hojeS()) return null;
+    const LT=leitDe(c,f).l, hs=diaPas(c,f,ch.d,LT).hs, a=(xp.aj||{})[ch.d];
     let e=hs[0]||'', s=hs.length>1?hs[hs.length-1]:''; if(a&&(a.e||a.s||a.zero)){ e=a.zero?'':(a.e||e); s=a.zero?'':(a.s||s); }
     if(!e||!s) return null; const real=contaDia(e,s,ch.h||h).m, falta=Math.max(0,(+ch.m||0)-real); if(falta<=0) return null;
     return {d:ch.d,falta,v:Math.round(hDec(falta)*(+fe.vh||0)*100)/100}; }
+  /* ---------- Face ID da entrada da fábrica (10/11, "existe um controle de Face ID paralelo, onde o pessoal entra na fábrica para
+     trabalhar; o horário de trabalho é por esse e, se não tiver marcação dele, verificar no Face ID"): outro iDSecure, importado
+     aqui como CSV "Acessos Gerais" em rh/dados/ponto/{AAAA-MM} (mesmo formato do Face ID do almoço: dias.{dia}.{cpf}={p,t,ar}).
+     No dia: 2+ passagens na entrada = vale só a entrada; 1 = junta com o Face ID; nenhuma = vale o Face ID de sempre. ---------- */
+  const ptoMes=m=>J.pto[m]||null;
+  function diaPas(c,f,d,LT,K){ const m=d.slice(0,7), dF=window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[m]||null, dP=ptoMes(m);
+    K=K||{}; if(!('kf' in K)) K.kf=dF?chaveFid(c,f,dF):''; if(!('kp' in K)) K.kp=dP?chaveFid(c,f,dP):'';
+    const xF=K.kf&&dF&&dF.dias&&dF.dias[d]&&dF.dias[d][K.kf]||null, xP=K.kp&&dP&&dP.dias&&dP.dias[d]&&dP.dias[d][K.kp]||null;
+    const pP=pasDe(xP).map(q=>Object.assign(q,{ok:true,pto:true})), pF=pasDe(xF).map(q=>Object.assign(q,{ok:contaP(q,LT)}));
+    let ps, src; if(pP.length>=2){ src='pto'; ps=pP.concat(pF.map(q=>Object.assign(q,{ok:false,sec:true}))); } else if(pP.length===1){ src='mix'; ps=pP.concat(pF); } else { src=pF.length?'fid':''; ps=pF; }
+    ps.sort((a,b)=>a.h.localeCompare(b.h)); const hs=ps.filter(q=>q.ok).map(q=>q.h);
+    return {ps,hs,src,nFora:ps.filter(q=>!q.ok&&!q.sec).length,pP:pP.length,pF:pF.length}; }
+  const SRC_T={pto:'Entrada da fábrica',mix:'Entrada da fábrica + Face ID',fid:'Face ID (sem marcação na entrada)'};
   /* conta da pessoa no período */
   function calcPessoa(c,f,p,x){ const dados=(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes])||null, h=horDe(c,f), vh=vhDe(c,f), k=chaveFid(c,f,dados);
     const aj=(x&&x.aj)||{}, out=[], escM=contaDia(h.ini,h.fim,h).m; let tot=0, alerta=0, comFid=0;
     const LT=leitDe(c,f).l, fd=fechDia(p); let cheio=null;
-    diasDe(p).forEach(d=>{ const dx=k&&dados&&dados.dias&&dados.dias[d]&&dados.dias[d][k]||null;
-      const ps=pasDe(dx).map(q=>Object.assign(q,{ok:contaP(q,LT)})), hs=ps.filter(q=>q.ok).map(q=>q.h), nFora=ps.length-hs.length; if(ps.length) comFid++;
+    const pto=ptoMes(p.mes), K={kf:k,kp:pto?chaveFid(c,f,pto):''}; let comPto=0;
+    diasDe(p).forEach(d=>{ const DP=diaPas(c,f,d,LT,K), ps=DP.ps, hs=DP.hs, nFora=DP.nFora; if(ps.length) comFid++; if(DP.pP) comPto++;
       let e=hs[0]||'', s=hs.length>1?hs[hs.length-1]:''; const a=aj[d], cor=!!(a&&(a.e||a.s||a.zero)); if(cor){ e=a.zero?'':(a.e||e); s=a.zero?'':(a.s||s); }
       const fp=ferP(d), fer=a&&a.fer?{nome:a.ferNome||(fp&&fp.nome)||'Feriado',pago:!!a.pago,rh:true}:fp?{nome:fp.nome||'Feriado',pago:!!(a&&a.pago),rh:false}:null;
       const r=contaDia(e,s,h), dw=new Date(d+'T12:00:00').getDay(); let fl='', info='', m=r.m;
@@ -152,17 +165,18 @@
       let ehF=false; if(d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro}}; }
       if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
       else if(!cor){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
-      out.push({d,dw,hs,ps,nFora,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF}); tot+=m; });
+      out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF}); tot+=m; });
     const fa0=fechAnt(c,f,p,h);
     const uni=unifDe(c,f,p), ext=(x&&x.dsc&&Array.isArray(x.dsc.x)?x.dsc.x:[]).filter(z=>z&&!z.removido);
     const descs=[].concat(num(x&&x.desc)>0?[{t:(x.descMot||'Desconto lançado'),v:num(x.desc),k:'leg'}]:[],uni.filter(u=>u.st==='ok').map(u=>({t:'Uniforme (entrega de '+brc(u.x.data)+')',v:u.v,k:'u'})),ext.map(z=>({t:z.t,v:num(z.v),k:'x',id:z.id})),fa0&&!(x&&x.fchX)?[{t:'Saiu mais cedo no dia do fechamento ('+brc(fa0.d)+'): '+hTxt(fa0.falta),v:fa0.v,k:'fch'}]:[]);
     const fixo=+((f.pjPag||{}).fixo)||0, desc=Math.round(descs.reduce((a,z)=>a+z.v,0)*100)/100, bruto=fixo>0?fixo:hDec(tot)*vh;
-    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,valor:Math.max(0,Math.round((bruto-desc)*100)/100),cheio,fd,alerta,comFid,semFid:!dados||!comFid,dados:!!dados}; }
+    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,valor:Math.max(0,Math.round((bruto-desc)*100)/100),cheio,fd,alerta,comFid,comPto,kp:K.kp,semFid:!(dados||pto)||!comFid,dados:!!(dados||pto)}; }
   /* ---------- banco ---------- */
   function assina(c,pid){ const P=c.P; unifIni(c); if(!J.sub[pid]){ J.sub[pid]=true;
       P.inscrever('pjp-'+pid,()=>P.db().collection(COL).where('pid','==',pid).limit(1),s=>{ const d=s.docs[0]; J.docs[pid]=d?d.data():{pid,pes:{}}; P.rerender(); }); }
     if(!J.envSub){ J.envSub=true;
       P.inscrever('pjp-env',()=>P.db().collection(ENV).orderBy('em','desc').limit(80),s=>{ s.docs.forEach(d=>{ J.env[d.id]=Object.assign({_id:d.id},d.data()); }); processa(c); P.rerender(); }); }
+    const p0=perDe(pid); if(p0&&!J.ptoSub[p0.mes]){ const m=p0.mes; J.ptoSub[m]=true; P.inscrever('pjp-pto-'+m,()=>P.db().collection(PTO).where('mes','==',m).limit(1),s=>{ const d=s.docs[0]; J.pto[m]=d?d.data():null; P.rerender(); }); }
     const p=perDe(pid); if(p&&!J.carr[p.mes]&&window.RHAlmoco){ J.carr[p.mes]=true; window.RHAlmoco.carregar(c.alm(),p.mes).then(()=>P.rerender()); } }
   const docP=pid=>J.docs[pid]||{pid,pes:{}};
   const pesDe=(pid,fid)=>(docP(pid).pes||{})[fid]||{};
@@ -331,6 +345,8 @@
   .pjp-d.pg-al{background:var(--warn-tint,#FBF1DC)}.pjp-d.pg-aj{box-shadow:inset 3px 0 var(--teal)}.pjp-d.pg-sp .pjp-chips span{background:none;color:var(--muted);font-weight:400;padding:0}
   .pjp-d .pg-tag{font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;display:inline-block;margin-top:3px}
   .pjp-d .pg-tag.pg-w{background:#fff;color:var(--warn-ink,#7A5310)}.pjp-d .pg-tag.pg-t{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-m{background:var(--ground);color:var(--muted)}
+  .pjp-d .pg-tag.pg-src{margin-left:4px}.pjp-d .pg-tag.pg-pto{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-mix{background:var(--ground);color:var(--teal-strong)}.pjp-d .pg-tag.pg-fid{background:var(--warn-tint,#FBF1DD);color:var(--warn-ink,#7A5310)}
+  .pjp-fid.pto .pjp-imp{cursor:pointer;color:var(--teal-strong);font-weight:600;font-size:12.5px;text-decoration:underline}.pjp-fid.pto .pjp-imp input{display:none}
   .pjp-ed{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--teal);border-radius:10px;padding:10px 12px;margin-top:6px}
   .pjp-ed label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}
   .pjp-ed input{height:36px;border:1px solid var(--line,#E1E7EB);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:inherit}
@@ -362,8 +378,8 @@
     if(tab==='horas'){
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds">${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
-        const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">Face ID: ${esc(d.hs.join(' · '))}</small>`:''}`
-          :d.ps&&d.ps.length?`<div class="pjp-chips">${chipsP(d.ps,esc)}</div>${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
+        const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">${d.src==='pto'||d.src==='mix'?'Entrada da fábrica':'Face ID'}: ${esc(d.hs.join(' · '))}</small>`:''}`
+          :d.ps&&d.ps.length?`<div class="pjp-chips">${chipsP(d.ps,esc)}</div>${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${d.src==='fid'?'Sem marcação no Face ID da entrada da fábrica neste dia: vale o Face ID de sempre':d.src==='mix'?'Só uma marcação na entrada da fábrica: juntou com o Face ID de sempre':'Vale o Face ID da entrada da fábrica'}">${SRC_T[d.src]}</span>`:''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
           :d.fech?`<div class="pjp-chips"><span>dia do fechamento</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fer?`<div class="pjp-chips"><span>não trabalhou</span></div><span class="pg-tag pg-f">Feriado · ${esc(d.fer.nome)}</span>`
           :`<div class="pjp-chips"><span>sem passagem no Face ID</span></div>`;
@@ -404,7 +420,7 @@
           <div class="pjp-dw" style="margin-top:6px">${[1,2,3,4,5,6,0].map(i=>`<label><input type="checkbox" data-pjp-dw="${i}" ${h.dias.includes(i)?'checked':''}><span>${DNL[i]}</span></label>`).join('')}</div>
           <label class="pjp-ck" style="margin-top:12px"><input type="checkbox" id="pjp-rdentro" ${h.dentro?'checked':''}> Não contar o tempo antes da entrada nem depois da saída</label></div>
         ${(()=>{ const vis=leitVistos(dadosMes(pid)), lt=leitDe(c,f), gl=Array.isArray(g.leit)?g.leit:[], nomes=l=>l.length?l.map(k=>(vis.find(v=>v.k===k)||{n:k}).n).join(', '):'todos os leitores';
-          return `<div class="pjp-sec"><h4>Leitores do Face ID que contam</h4><small style="color:var(--muted);display:block;margin:-4px 0 8px">A entrada é a 1ª passagem e a saída é a última, só nos leitores que contam. Ex.: tirar o refeitório.</small>
+          return `<div class="pjp-sec"><h4>Leitores do Face ID que contam</h4><small style="color:var(--muted);display:block;margin:-4px 0 8px">A entrada é a 1ª passagem e a saída é a última, só nos leitores que contam. Ex.: tirar o refeitório. Quando o Face ID da entrada da fábrica (importado no alto da tela) tem marcação no dia, vale ele; sem marcação, vale este.</small>
           <label class="pjp-ck"><input type="radio" name="pjp-rlm" value="pad" ${lt.de==='pad'?'checked':''}> Usar o padrão (${esc(nomes(gl))})</label>
           <label class="pjp-ck"><input type="radio" name="pjp-rlm" value="sel" ${lt.de==='pj'?'checked':''}> Só estes, para esta pessoa:</label>
           ${leitCaixas(esc,vis,lt.de==='pj'?lt.l:gl,'pjp-rlt')}</div>`; })()}
@@ -533,6 +549,28 @@
     else if(ult){ out.tom='warn'; out.tit='Face ID sem data de atualização'; out.sub='Há passagens neste período, mas não dá para saber quando foram lidas.'; }
     else { out.tom='crit'; out.tit='Sem Face ID'; out.sub='Nenhuma leitura nem importação deste mês.'; }
     out.ultTxt=ultTxt; return out; }
+  /* situação do Face ID da entrada da fábrica (o CSV importado aqui) */
+  function ptoInfo(c,p){ const D=ptoMes(p.mes); let ult=''; if(D&&D.dias) Object.keys(D.dias).filter(d=>d>=p.de&&d<=p.ate).sort().reverse().some(d=>{ let mx=''; Object.values(D.dias[d]||{}).forEach(x=>((x&&x.t)||[]).forEach(t=>{ const h=String(t).slice(0,5); if(/^\d\d:\d\d$/.test(h)&&h>mx) mx=h; })); if(mx){ ult=d+'T'+mx; return true; } return false; });
+    const imp=D&&D.imp&&D.imp.length?D.imp.slice().sort((a,b)=>String(a.em).localeCompare(String(b.em))).slice(-1)[0]:null;
+    if(!imp&&!ult) return {tom:'warn',tit:'Entrada da fábrica sem importar',sub:'Sem o CSV da entrada, as horas saem do Face ID de sempre.',ult,imp};
+    const mi=imp&&imp.em?(Date.now()-new Date(imp.em).getTime())/60000:null;
+    return {tom:mi!=null&&mi>36*60?'warn':'ok',tit:'Entrada da fábrica',sub:(imp?'CSV importado '+haTxt(mi)+(imp.por?' por '+imp.por:''):'')+(ult?' · última passagem '+brc(ult.slice(0,10))+' às '+ult.slice(11,16):''),ult,imp}; }
+  function ptoPil(c,p){ const esc=c.esc, I=ptoInfo(c,p);
+    return `<div class="pjp-fid pto ${I.tom}" role="status" title="${esc(I.sub)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(I.tit)}</b><small>${esc(I.sub)}</small><label class="pjp-imp">${J.ptoLendo?'lendo…':'importar CSV'}<input type="file" accept=".csv,text/csv" data-pjp-pto="1" ${J.ptoLendo?'disabled':''}></label></div>`; }
+  /* importar o CSV "Acessos Gerais" do iDSecure da entrada da fábrica: junta as passagens com as que já estavam (não apaga nada) */
+  async function ptoImporta(c,file){ const P=c.P; J.ptoLendo=true; P.rerender();
+    try{ if(!window.RHAlmoco||!window.RHAlmoco.interpretar) throw new Error('O módulo do Face ID ainda não carregou. Tente de novo.');
+      const buf=await file.arrayBuffer(); let txt=new TextDecoder('utf-8',{fatal:false}).decode(buf); if(/\uFFFD/.test(txt)) txt=new TextDecoder('iso-8859-1').decode(buf);
+      const I=window.RHAlmoco.interpretar(txt), porMes={}; Object.keys(I.dias).forEach(d=>{ (porMes[d.slice(0,7)]=porMes[d.slice(0,7)]||[]).push(d); }); let nd=0;
+      for(const m of Object.keys(porMes)){ const q=await P.db().collection(PTO).where('mes','==',m).limit(1).get(); const ref=q.docs[0]?q.docs[0].ref:P.db().doc(PTO+'/'+m), cur=q.docs[0]?q.docs[0].data():{mes:m,dias:{},pessoas:{},imp:[]};
+        const dias=Object.assign({},cur.dias||{}); porMes[m].forEach(d=>{ const a=dias[d]||{}, b=I.dias[d]||{}, o={}; nd++;
+          new Set(Object.keys(a).concat(Object.keys(b))).forEach(k=>{ const x=a[k]||{}, y=b[k]||{}, t=[...new Set((x.t||[]).concat(y.t||[]))].sort(), z={p:1,t}; if(x.ar||y.ar) z.ar=Object.assign({},x.ar||{},y.ar||{}); o[k]=z; }); dias[d]=o; });
+        const pessoas=Object.assign({},cur.pessoas||{}); Object.keys(I.pessoas).forEach(k=>{ if(porMes[m].some(d=>I.dias[d]&&I.dias[d][k])) pessoas[k]=I.pessoas[k]; });
+        const imp=(cur.imp||[]).concat([{em:new Date().toISOString(),por:c.eu(),arq:file.name,de:porMes[m].sort()[0],ate:porMes[m].sort().slice(-1)[0],n:I.lidos}]).slice(-40);
+        const doc={mes:m,dias,pessoas,imp,alteradoEm:new Date().toISOString()}; await ref.set(doc); J.pto[m]=doc; }
+      P.toast('Entrada da fábrica importada: '+nd+' '+(nd===1?'dia':'dias')+' ('+br(I.de)+' a '+br(I.ate)+').'); }
+    catch(e){ console.warn('[pjpag ponto]',e); P.toast(e&&e.message?e.message:'Não consegui ler o arquivo.'); }
+    finally{ J.ptoLendo=false; P.rerender(); } }
   function render(c){ C=c; const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
     const D=docP(pid), xs=pjs(c,p);
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
@@ -595,6 +633,7 @@
           <div><b>${cfg(c).modo==='mes'?'Mês ':''}${esc(p.txt)}</b>${ehAt?'':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
           <button class="pjp-nb" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
         ${FI?`<div class="pjp-fid ${FI.tom}" role="status" title="${esc(fidT)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(FI.tit)}</b><small>${esc(FI.sub)}</small><small class="pjp-fu">${esc(FI.ultTxt)}${FI.imp&&FI.robo?' · último CSV '+esc(hm(FI.imp.em)):''}</small><button class="lnk" data-act="pjp-fidir" type="button">ver</button></div>`:''}
+        ${ptoPil(c,p)}
         <span class="pjp-sp"></span><div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','PDF')}${btn('pjp-cfg','Como é feita a conta')}</div></div>`;
     return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
       `<div class="pjp">${barra}${avFid}
@@ -953,6 +992,7 @@
     const fech={cheio:r.cheio||null,min:r.min,vh:r.vh,fixo:r.fixo,bruto:r.bruto,desc:r.desc,descMot:r.descMot,descs:r.descs.map(z=>({t:z.t,v:z.v})),valor:r.valor,dias:r.dias.map(d=>({d:d.d,e:d.E!=null?hhmm(d.E):'',s:d.S!=null?hhmm(d.S):'',m:d.m})),h:r.h,em:agora(),por:c.eu()};
     await grava(c,pid,f._id,{st:'fechado',fech},'Valor fechado: '+(r.fixo?'fixo ':hTxt(r.min)+' × '+R$(r.vh)+' ')+(r.desc?'− '+R$(r.desc)+' ':'')+'= '+R$(r.valor)); }
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!C||!t||!t.closest) return; const P=C.P;
+    if(t.matches&&t.matches('[data-pjp-pto]')){ const fl=t.files&&t.files[0]; t.value=''; if(fl) await ptoImporta(C,fl); return; }
     try{
       if(t.id==='pjp-emp'){ J.emp=t.value; P.render(); return; }
       if(J.mod&&J.mod.k==='fin'&&(t.dataset.pjpFsel||['pjp-fmot','pjp-fdata','pjp-fpara','pjp-fcc'].includes(t.id))){ const M=J.mod;
@@ -1093,5 +1133,5 @@
     }catch(e){ if(e&&e.aviso) P.toast(e.message); else P.erro(e); } });
   document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!C) return; if(J.mod){ J.mod=null; C.P.render(); } else if(J.edDia){ J.edDia=null; C.P.render(); } else if(J.ab){ J.ab=''; C.P.render(); } });
   document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&C&&J.edDia&&ev.target&&['pjp-ce','pjp-cs','pjp-cm'].includes(ev.target.id)){ ev.preventDefault(); const b=document.querySelector('[data-act="pjp-dsalva"]'); if(b) b.click(); } });
-  window.RHPJPag={_fin:{finAbrir,finHtml,finTexto,finAssunto},render,avisos,_J:J,_calc:{contaDia,perDe,perMove,lerXml,qsDe}};
+  window.RHPJPag={_fin:{finAbrir,finHtml,finTexto,finAssunto},render,avisos,_J:J,_calc:{contaDia,perDe,perMove,lerXml,qsDe,ptoImporta:(f)=>ptoImporta(C,f),diaPas:(f,d)=>diaPas(C,f,d,leitDe(C,f).l)}};
 })();
