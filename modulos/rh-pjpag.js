@@ -420,7 +420,11 @@
   function cwMedicao(c,pid,empK){ const p=perDe(pid), D=docP(pid), emp=(c.EMP_DOC||{})[empK]||null;
     const rs=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===empK).map(f=>{ const x=(D.pes||{})[f._id]||{}, r=calcPessoa(c,f,p,x), fe=x.st&&x.fech;
       return {f,x,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,fixo:r.fixo}; });
-    const itens=rs.filter(o=>o.valor>0).map(o=>({n:c.titulo(o.f.nome).slice(0,120),h:o.fixo?null:Math.round(hDec(o.min)*100)/100,v:Math.round(o.valor*100)}));
+    /* CNPJ do MEI de cada PJ (10/11/2026): só das prestadoras em rh/config.conectworkMei (padrão: só a NEXUS); no Conectwork
+       cada PJ recebe o espelho da nota dele para a prestadora. CNPJ é da empresa do PJ, nunca CPF. */
+    const comCnpj=(((c.R.cfg||{}).conectworkMei)||['NEXUS']).map(x=>String(x).toUpperCase()).includes(empK);
+    const itens=rs.filter(o=>o.valor>0).map(o=>{ const i={n:c.titulo(o.f.nome).slice(0,120),h:o.fixo?null:Math.round(hDec(o.min)*100)/100,v:Math.round(o.valor*100)}, cn=dig(o.f.cnpj);
+      if(comCnpj&&cn.length===14) i.c=cn; return i; });
     return {emp,rs,itens,abertos:rs.filter(o=>!o.x.st).length,
       payload:{v:1,periodo:pid,cnpj:dig(emp&&emp.cnpj),nome:emp?emp.nome:empK,total:itens.reduce((a,i)=>a+i.v,0),ref:'painel-rh:'+pid+':'+empK,itens}}; }
   const quando=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };

@@ -9,7 +9,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
   D['rh/config']={setores:['Produção','Manutenção']};
   D['rh/dados/funcionarios/f1']={nome:'JOAO PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',salario:5000,setor:'Produção',funcao:'Operador',status:'Ativo',telefone:'(51) 99999-0000',admissao:'2025-01-10'};
-  D['rh/dados/funcionarios/f2']={nome:'MARIA OLIVEIRA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'55566677788',setor:'Manutenção',funcao:'Mecânica',status:'Ativo',telefone:'51988887777',admissao:'2025-02-01',pjPag:{vh:28.41,ini:'08:00',fim:'18:00',intv:72}};
+  D['rh/dados/funcionarios/f2']={nome:'MARIA OLIVEIRA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'55566677788',cnpj:'11222333000181',setor:'Manutenção',funcao:'Mecânica',status:'Ativo',telefone:'51988887777',admissao:'2025-02-01',pjPag:{vh:28.41,ini:'08:00',fim:'18:00',intv:72}};
   D['rh/dados/uniformes/u1']={nome:'Joao Pereira Teste',fid:'f1',setor:'Produção',data:'2026-10-20',itens:[{t:'Camisa',tam:'G',qtd:2}],desc:{nao:false,v:50},parc:{n:1,ini:'2026-10-31',hist:[]},st:'lancado',em:'2026-10-20T10:00:00.000Z',por:'uRH'};
   D['rh/dados/funcionarios/f3']={nome:'CARLOS CLT TESTE',tipo:'CLT',empresa:'COLAFIX',cpf:'99988877766',status:'Ativo'};
   const dias={}, uteis=['16','19','20','21','22','23','26','27','28','29','30'];
@@ -151,6 +151,13 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
     /Zenith/.test(cwB)&&/Nexus/.test(cwB)&&!/Colafix/i.test(cwB)&&/^https:\/\/conectwork\.com\.br\/#medicoes\/importar\//.test(cwU)&&!/11122233344|55566677788/.test(cwU)&&!/11122233344/.test(JSON.stringify(cwR))
     &&cwR&&cwR.v===1&&cwR.periodo==='2026-10-2'&&cwR.cnpj==='62944495000164'&&cwR.itens.length===1&&cwR.itens[0].n==='Joao Pereira Teste'&&Number.isInteger(cwR.itens[0].v)&&cwR.itens[0].v>0&&cwR.total===cwR.itens[0].v&&typeof cwR.itens[0].h==='number'
     &&cwS&&cwS.cw&&cwS.cw.ZENITH&&cwS.cw.ZENITH.total===cwR.total&&cwS.cw.ZENITH.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwR,cw:cwS&&cwS.cw}));
+  /* 10/11/2026: só a NEXUS manda o CNPJ do MEI de cada PJ (o Conectwork prepara a nota do PJ para a prestadora); a Zenith não */
+  await p.evaluate(()=>{ window.__pjpUltimoCw=''; });
+  for(let i=0;i<2&&!(await p.evaluate(()=>window.__pjpUltimoCw));i++){ await p.click('[data-act="pjp-cw"][data-e="NEXUS"]'); await H.dorme(700); }
+  const cwN=await p.evaluate(u=>{ try{ const t=u.split('#medicoes/importar/')[1], b64=t.replace(/-/g,'+').replace(/_/g,'/'), pad=b64+'==='.slice((b64.length+3)%4);
+    return JSON.parse(decodeURIComponent(Array.from(atob(pad)).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }catch(e){ return null; } },await p.evaluate(()=>window.__pjpUltimoCw||''));
+  ok('Enviar ao Conectwork: a NEXUS leva o CNPJ do MEI de cada PJ (nunca CPF); a Zenith não leva',
+    cwN&&cwN.itens.length===1&&cwN.itens[0].c==='11222333000181'&&!/55566677788/.test(JSON.stringify(cwN))&&cwR&&!('c' in cwR.itens[0]), JSON.stringify({cwN,z:cwR&&cwR.itens}));
   const cwB2=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
   ok('Depois de enviar, mostra quando e por quem e o botão vira "Enviar de novo"', /Enviado em \d{2}\/\d{2} às \d{2}:\d{2} por Stefani RH/.test(cwB2)&&/Enviar de novo/.test(cwB2), cwB2.slice(0,300));
   const e=erros.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
