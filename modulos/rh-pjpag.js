@@ -461,6 +461,26 @@
   const COLS=[{t:'Conferir e fechar',st:['']},{t:'Nota',st:['fechado','pedido','chegou']},{t:'Para pagar',st:['conferida']},{t:'Pago',st:['pago']}];
   const colDe=st=>Math.max(0,COLS.findIndex(c=>c.st.includes(st||'')));
   const diasDesde=iso=>{ if(!iso) return 0; return Math.floor((Date.now()-new Date(iso).getTime())/864e5); };
+  /* Face ID atualizado? (10/11, "preciso incluir a última verificação do Face ID para saber se está atualizado")
+     robô (rh/dados/robo/faceid: ultima, ok, dispositivos) + última passagem gravada no período + última importação do CSV */
+  const hm=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
+  const haTxt=min=>min<1?'agora':min<60?'há '+Math.round(min)+' min':min<48*60?'há '+Math.floor(min/60)+' h'+(Math.round(min%60)?' '+pad2(Math.round(min%60)):''):'há '+Math.floor(min/1440)+' dias';
+  function fidInfo(c,p){ const A=window.RHAlmoco&&window.RHAlmoco._A; if(!A) return null;
+    if(!A.roboSub){ A.roboSub=true; try{ c.P.db().doc('rh/dados/robo/faceid').onSnapshot(g=>{ A.robo=g.exists?g.data():null; c.P.rerender(); },()=>{}); }catch(e){} }
+    const D=A.dados[p.mes]; let ult='';
+    if(D&&D.dias) Object.keys(D.dias).filter(d=>d>=p.de&&d<=p.ate).sort().reverse().some(d=>{ let mx=''; Object.values(D.dias[d]||{}).forEach(x=>((x&&x.t)||[]).forEach(t=>{ const h=String(t).slice(0,5); if(/^\d\d:\d\d$/.test(h)&&h>mx) mx=h; })); if(mx){ ult=d+'T'+mx; return true; } return false; });
+    const imp=D&&D.imp&&D.imp.length?D.imp.slice().sort((a,b)=>String(a.em).localeCompare(String(b.em))).slice(-1)[0]:null;
+    const R=A.robo, out={ult,imp,robo:R,tom:'ok',tit:'',sub:''};
+    const minR=R&&R.ultima?(Date.now()-new Date(R.ultima).getTime())/60000:null, fora=R?Object.entries(R.dispositivos||{}).filter(([,x])=>x&&!x.ok).map(([n])=>n):[];
+    const ultTxt=ult?'Última passagem registrada: '+brc(ult.slice(0,10))+' às '+ult.slice(11,16):'Nenhuma passagem neste período';
+    if(R&&R.ultima){
+      if(minR>130){ out.tom='crit'; out.tit='Face ID parado'; out.sub='O robô leu pela última vez '+hm(R.ultima)+' ('+haTxt(minR)+'). Confira o computador do robô ou importe o CSV.'; }
+      else if(R.ok===false){ out.tom='warn'; out.tit='Face ID com problema'; out.sub='Leitura '+haTxt(minR)+(fora.length?' · fora do ar: '+fora.join(', '):R.erro?' · '+String(R.erro).slice(0,60):''); }
+      else { out.tit='Face ID em dia'; out.sub='Robô leu '+haTxt(minR)+' ('+hm(R.ultima).split(' às ')[1]+')'; }
+    } else if(imp&&imp.em){ const mi=(Date.now()-new Date(imp.em).getTime())/60000; out.tom=mi>36*60?'warn':'ok'; out.tit=mi>36*60?'Face ID desatualizado':'Face ID importado'; out.sub='CSV importado '+haTxt(mi)+(imp.por?' por '+imp.por:''); }
+    else if(ult){ out.tom='warn'; out.tit='Face ID sem data de atualização'; out.sub='Há passagens neste período, mas não dá para saber quando foram lidas.'; }
+    else { out.tom='crit'; out.tit='Sem Face ID'; out.sub='Nenhuma leitura nem importação deste mês.'; }
+    out.ultTxt=ultTxt; return out; }
   function render(c){ C=c; const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid);
     const D=docP(pid), xs=pjs(c,p);
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
@@ -507,7 +527,7 @@
       :dias[dias.length-1]<p.ate&&p.ate<c.P.hojeStr()&&diasDe(p).some(d=>d>dias[dias.length-1]&&![0,6].includes(new Date(d+'T12:00:00').getDay()))?av('O Face ID importado vai até '+brc(dias[dias.length-1])+'; a quinzena vai até '+brc(p.ate)+'. Importe o resto antes de fechar.'):'';
     /* 3) quadros por etapa */
     const quadros=`<div class="pjp-kb">${COLS.map((cl,i)=>{ const ys=rsF.filter(o=>cl.st.includes(o.x.st||''));
-      return `<div class="pjp-kc ${col===i?'on':''}"><button type="button" class="pjp-kh" data-act="pjp-col" data-v="${i}" aria-pressed="${col===i}" title="Mostrar só esta etapa na lista"><b>${esc(cl.t)}</b><span>${ys.length}</span><em class="n">${ys.length?R$(soma(ys)):''}</em></button>
+      return `<div class="pjp-kc k${i} ${col===i?'on':''}"><button type="button" class="pjp-kh" data-act="pjp-col" data-v="${i}" aria-pressed="${col===i}" title="Mostrar só esta etapa na lista"><b>${esc(cl.t)}</b><span>${ys.length}</span><em class="n">${ys.length?R$(soma(ys)):''}</em></button>
         ${ys.length?ys.map(o=>`<button type="button" class="pjp-kcard" data-act="pjp-ab" ${fa(o)}>${ini(o)}<span class="pjp-kn"><b>${esc(nm(o))}</b><small>${esc(String(o.f.empresa||'').toUpperCase())}${o.r.fixo?' · valor fixo':' · '+hTxt(o.r.min)}</small><span class="pjp-kv n">${R$(o.r.valor)}</span>${situ(c,o.x,o.r).replace(/<span class="pjp-pg"[\s\S]*$/,'')}</span></button>`).join(''):'<div class="pjp-kvz">Ninguém aqui</div>'}</div>`; }).join('')}</div>`;
     /* 4) lista (detalhe) */
     const linhas=rs.map(({f,x,r})=>{ const st=x.st||'', o={f,x,r};
@@ -517,15 +537,19 @@
         <td class="pjp-qa">${acoes(c,pid,f,x,r)}</td></tr>`; }).join('');
     const filtros=J.emp||J.set||J.conf||J.q||col>=0;
     const vazio=!xs.length?['Nenhum PJ ativo','Cadastre em Funcionários as pessoas com vínculo PJ.']:col>=0&&rsF.length?['Ninguém nesta etapa','Toque em "ver todos" para a lista inteira.']:['Nenhum PJ com esse filtro','Mude a busca ou toque em "Limpar filtros".'];
-    return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.',`<div class="pjp-nav"><button class="btn sec pjp-sm" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
+    const FI=fidInfo(c,p), icn=(n,t)=>U?U.ic(n,t||18):'';
+    const barra=`<div class="pjp-bar"><div class="pjp-nav"><button class="btn sec pjp-sm" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
           <div><span>${cfg(c).modo==='mes'?'Mês':'Quinzena'}</span><b>${esc(p.txt)}</b>${ehAt?'<small>a quinzena para pagar agora</small>':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
-          <button class="btn sec pjp-sm" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>`,'RH · PAGAMENTO DOS PJ')+
-      `<div class="pjp">${avFid}
-      <section class="pjp-pp ${pp.ok?'ok':''}"><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
+          <button class="btn sec pjp-sm" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
+        ${FI?`<div class="pjp-fid ${FI.tom}" role="status"><span class="pjp-fdot" aria-hidden="true"></span><div><b>${esc(FI.tit)}</b><small>${esc(FI.sub)}</small><small>${esc(FI.ultTxt)}${FI.imp&&FI.robo?' · último CSV '+esc(hm(FI.imp.em)):''}</small></div><button class="lnk" data-act="pjp-fidir" type="button">Ver no Almoço/café</button></div>`:''}</div>`;
+    return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
+      `<div class="pjp">${barra}${avFid}
+      <section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
       <div class="pjp-g2">
         <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>
-        <section class="pjp-cx"><div class="pjp-ch"><h3>Resumo da quinzena</h3></div><dl class="pjp-rs">
-          <div><dt>Total a pagar</dt><dd class="n">${R$(totV)}</dd></div><div><dt>Já pago</dt><dd class="n">${R$(pagoV)}</dd></div><div><dt>Falta pagar</dt><dd class="n">${R$(totV-pagoV)}</dd></div><div><dt>PJ · horas</dt><dd class="n">${rsF.length} · ${hTxt(totM)}</dd></div></dl>
+        <section class="pjp-cx"><div class="pjp-ch"><h3>Resumo da quinzena</h3></div><div class="pjp-rs">
+          <div class="pjp-tl pri"><span>${icn('grafico',16)}Total a pagar</span><b class="n">${R$(totV)}</b></div><div class="pjp-tl ok"><span>${icn('check',16)}Já pago</span><b class="n">${R$(pagoV)}</b></div>
+          <div class="pjp-tl warn"><span>${icn('relogio',16)}Falta pagar</span><b class="n">${R$(totV-pagoV)}</b></div><div class="pjp-tl"><span>${icn('equipe',16)}PJ · horas</span><b class="n">${rsF.length} · ${hTxt(totM)}</b></div></div>
           <div class="pjp-rsb">${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF')}${btn('pjp-cfg','Como é feita a conta')}</div></section>
       </div>
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver só ela na lista</small></div>${quadros}</section>
@@ -606,6 +630,32 @@
   .pjp-lks{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;margin-top:5px;font-size:12.5px;color:var(--muted)}.pjp-lks .lnk{display:inline!important;margin:0!important}
   .pjp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   .pjp-lc .pc-vazio{margin:8px 18px 22px}
+  /* cara de app (10/11): barra com a quinzena e o Face ID, cores por etapa, quadros de número */
+  .pjp{--k0:#B7791F;--k0t:#FBF1DC;--k1:#2B6CB0;--k1t:#E3EDF8;--k2:#0F766E;--k2t:#DDF1EE;--k3:#2F7A4E;--k3t:#E3F0E8}
+  :root[data-theme="dark"] .pjp{--k0:#E3B66A;--k0t:#3A2E17;--k1:#7FB0E6;--k1t:#1B2C40;--k2:#5CC4B6;--k2t:#15312E;--k3:#7FC79E;--k3t:#18332A}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pjp{--k0:#E3B66A;--k0t:#3A2E17;--k1:#7FB0E6;--k1t:#1B2C40;--k2:#5CC4B6;--k2t:#15312E;--k3:#7FC79E;--k3t:#18332A}}
+  .pjp-bar{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap}
+  .pjp-bar .pjp-nav{background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:6px 8px;box-shadow:var(--shadow)}
+  .pjp-fid{flex:1 1 360px;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:10px 16px;box-shadow:var(--shadow);min-width:0}
+  .pjp-fid>div{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}.pjp-fid b{font-size:14.5px}.pjp-fid small{font-size:12.5px;color:var(--muted)}
+  .pjp-fid .lnk{background:none;border:0;color:var(--teal);cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+  .pjp-fdot{width:12px;height:12px;border-radius:50%;flex:none;background:var(--ok,#3E7D5A);box-shadow:0 0 0 4px var(--ok-tint,#E3F0E8)}
+  .pjp-fid.warn .pjp-fdot{background:var(--warn,#C28A1E);box-shadow:0 0 0 4px var(--warn-tint,#FBF1DC)}.pjp-fid.crit .pjp-fdot{background:var(--crit,#B5473F);box-shadow:0 0 0 4px var(--crit-tint,#F6E3E1)}
+  .pjp-fid.crit{border-color:var(--crit,#B5473F)}.pjp-fid.crit b{color:var(--crit-ink,#8E3A33)}.pjp-fid.warn b{color:var(--warn-ink,#7A5310)}
+  .pjp-pp{background:linear-gradient(135deg,var(--teal-strong),#1E5A75)}
+  .pjp-ppi{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.14);display:grid;place-items:center;flex:none;color:#fff}
+  .pjp-rs{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px}
+  .pjp-tl,.pjp-rs .pjp-tl{background:var(--surface-2,#F6F8FA);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;justify-content:flex-start;gap:4px;min-width:0;border-bottom:0}
+  .pjp-tl span{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}.pjp-tl b{font-size:18px;font-weight:600}
+  .pjp-tl.pri{background:var(--teal-tint,#E2ECF1)}.pjp-tl.pri span,.pjp-tl.pri b{color:var(--teal-strong)}
+  .pjp-tl.ok span{color:var(--ok-ink,#2F6047)}.pjp-tl.warn span{color:var(--warn-ink,#7A5310)}
+  .pjp-kc{background:var(--surface);border:1px solid var(--line,#E1E7EB);border-top:4px solid var(--kc,var(--line));box-shadow:var(--shadow)}
+  .pjp-kc.k0{--kc:var(--k0);--kt:var(--k0t)}.pjp-kc.k1{--kc:var(--k1);--kt:var(--k1t)}.pjp-kc.k2{--kc:var(--k2);--kt:var(--k2t)}.pjp-kc.k3{--kc:var(--k3);--kt:var(--k3t)}
+  .pjp-kc .pjp-kh span{background:var(--kt);color:var(--kc);border-radius:999px;padding:0 8px;font-size:12.5px}
+  .pjp-kc.on{background:var(--kt);border-color:var(--kc);border-top-width:4px}
+  .pjp-kc .pjp-kcard{background:var(--surface-2,#F6F8FA);border-color:transparent}.pjp-kc .pjp-kcard:hover{border-color:var(--kc)}
+  .pjp-kc .pjp-kcard .pc-ini{background:var(--kc)}
+  @media(max-width:760px){.pjp-fid{flex-basis:100%}.pjp-rs{grid-template-columns:1fr 1fr}.pjp-ppi{display:none}}
   @media(max-width:760px){
     .pjp-pp{padding:18px}.pjp-pp .btn{width:100%;justify-content:center}
     .pjp-busca{min-width:0;flex:1 1 100%}.pjp-lt2 select{flex:1 1 45%;min-width:0}.pjp-lt1,.pjp-lt2{padding-left:12px;padding-right:12px}
@@ -737,6 +787,7 @@
       if(a==='pjp-per'){ const v=+b.dataset.v; J.per=v===0?perAtual(c):perMove(J.per,v); J.ab=''; P.render(); return; }
       if(a==='pjp-ab'){ J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
+      if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
       if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; P.render(); return; }
       if(a==='pjp-gx'){ J.ab=''; J.edDia=null; P.render(); return; }
       if(a==='pjp-tab'){ J.tab=b.dataset.v; J.edDia=null; P.render(); return; }

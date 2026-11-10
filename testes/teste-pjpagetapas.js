@@ -41,6 +41,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await p.click('.pjp-pp [data-act="pjp-fechtodos"]'); await H.dorme(1500); const S=await srv(), pes=S['rh/dados/pjpag/2026-10-2'].pes;
   ok('Fechar pelo próximo passo fecha os dois prontos e não fecha quem está sem valor/sem horas', pes.f1&&pes.f1.st==='fechado'&&pes.f2&&pes.f2.st==='fechado'&&!(pes.f7&&pes.f7.st)&&!(pes.f8&&pes.f8.st), JSON.stringify(Object.fromEntries(Object.entries(pes).map(([k,v])=>[k,v.st]))));
   pp=await txt('.pjp-pp'); ok('Depois de fechar, o próximo passo vira "pedir a nota"', /3 valores fechados: falta pedir a nota/.test(pp)&&/Pedir nota aos 3/.test(pp), pp.replace(/\n/g,' | '));
+  /* Face ID: última verificação */
+  let fd=await txt('.pjp-fid'); ok('Face ID sem robô nem CSV, mas com passagens: avisa que não sabe quando foi lido e mostra a última passagem', /sem data de atualização/.test(fd)&&/Última passagem registrada: 30\/10 às 17:2/.test(fd), fd.replace(/\n/g,' | '));
+  await p.evaluate(()=>{ window.RHAlmoco._A.robo={ultima:new Date(Date.now()-12*60000).toISOString(),ok:true}; window.Painel.render(); }); await H.dorme(400);
+  fd=await txt('.pjp-fid'); const fc=await p.evaluate(()=>document.querySelector('.pjp-fid').className);
+  ok('Robô leu há 12 min: "Face ID em dia" (verde)', /Face ID em dia/.test(fd)&&/há 12 min/.test(fd)&&/ ok/.test(fc), fd.replace(/\n/g,' | '));
+  await p.evaluate(()=>{ window.RHAlmoco._A.robo={ultima:new Date(Date.now()-5*3600000).toISOString(),ok:true}; window.Painel.render(); }); await H.dorme(400);
+  fd=await txt('.pjp-fid'); ok('Robô parado há 5 h: "Face ID parado" (vermelho) com o que fazer', /Face ID parado/.test(fd)&&/há 5 h/.test(fd)&&/importe o CSV/.test(fd)&&/crit/.test(await p.evaluate(()=>document.querySelector('.pjp-fid').className)), fd.replace(/\n/g,' | '));
   await p.setViewportSize({width:390,height:844}); await H.dorme(900);
   const cel=await p.evaluate(()=>{ const tr=document.querySelector('.pjp-lc .pjp-t tbody tr'); const r=tr.getBoundingClientRect(); return {w:document.documentElement.scrollWidth,dis:getComputedStyle(tr).display,cw:r.width,ini:!!tr.querySelector('.pc-ini'),st:!!tr.querySelector('.pjp-sl')}; });
   ok('Celular: cada PJ vira um cartão (com as iniciais e a situação), sem rolagem para o lado', cel.dis==='grid'&&cel.w<=392&&cel.cw<=392&&cel.ini&&cel.st, JSON.stringify(cel));
