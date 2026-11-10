@@ -780,7 +780,7 @@
         <label for="pjp-fmot">Motivo</label><select id="pjp-fmot"><option value="quinzena" ${M.mot==='quinzena'?'selected':''}>Pagamento da quinzena</option><option value="desl" ${M.mot==='desl'?'selected':''}>Desligado antes da data de pagamento habitual</option></select>
         <label>Quem entra no e-mail · ${n} PJ · ${R$(tot)}</label><div class="pjp-finl">${os.map(o=>`<label class="pjp-ck"><input type="checkbox" data-pjp-fsel="${esc(o.f._id)}" ${M.sel[o.f._id]?'checked':''}><span>${esc(c.titulo(o.f.nome))} <small>${esc(o.emp)} · ${R$(o.r.valor)}${o.x.st==='pago'?' · pago':''}${desligadoNo(o.f,perDe(J.per))?' · desligado':''}</small></span></label>`).join('')}</div>
       </div><div class="pjp-finp"><div class="pjp-lbl">Como vai sair · ${esc(finAssunto(c,M))}</div><div class="pjp-finpv" id="pjp-finpv">${n?finHtml(c,M):'<p class="sub">Marque pelo menos um PJ.</p>'}</div></div></div>
-      <div class="pjp-ac" style="margin-top:14px">${btn('pjp-modx','Fechar')}${btn('pjp-fincp','Só copiar o e-mail',n?'':'disabled')}${btn('pjp-finok','Copiar e abrir o Outlook',n?'':'disabled','')}</div></div></div>`; }
+      <div class="pjp-ac" style="margin-top:14px">${btn('pjp-modx','Fechar')}${btn('pjp-fincp','Só copiar o e-mail',n?'':'disabled')}${btn('pjp-finok','Copiar e abrir o Outlook',n?'':'disabled','')}</div>${M.semJan?`<p class="sub" style="margin-top:10px">O e-mail já foi copiado. <a href="${esc(M.semJan)}" target="_blank" rel="noopener">Abrir o Outlook</a> e colar (Ctrl+V).</p>`:''}</div></div>`; }
   async function finCopia(c,M){ const html=finHtml(c,M), txt=finTexto(c,M);
     try{ if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})]); return 'html'; } }catch(e){}
     try{ await navigator.clipboard.writeText(txt); return 'texto'; }catch(e){}
@@ -915,9 +915,10 @@
       if(a==='pjp-fin'){ finAbrir(c,b.dataset.f?[b.dataset.f]:null); P.render(); return; }
       if(a==='pjp-fincp'||a==='pjp-finok'){ const M=J.mod; if(!M||M.k!=='fin') return; const g=id=>(document.getElementById(id)||{}).value; M.para=g('pjp-fpara')||''; M.cc=g('pjp-fcc')||''; M.data=g('pjp-fdata')||M.data;
         if(a==='pjp-finok'&&!mails(M.para).length) return P.toast('Escreva o e-mail do financeiro em "Para".');
-        const jan=a==='pjp-finok'?(()=>{ try{ return window.open('','_blank'); }catch(e){ return null; } })():null;
-        const cp=await finCopia(c,M); await finRegistra(c,M); window.__pjpFin={html:finHtml(c,M),txt:finTexto(c,M),assunto:finAssunto(c,M),url:finOwa(c,M),cp};
-        if(jan){ try{ jan.location=finOwa(c,M); }catch(e){} }
+        const url=finOwa(c,M), cp=await finCopia(c,M); window.__pjpFin={html:finHtml(c,M),txt:finTexto(c,M),assunto:finAssunto(c,M),url,cp};
+        if(a==='pjp-finok'){ let w=null; try{ w=window.open(url,'_blank'); }catch(e){}
+          if(!w){ J.mod.semJan=url; P.render(); P.toast('O navegador bloqueou a janela do Outlook. Toque em "Abrir o Outlook" na janela do e-mail.'); finRegistra(c,M).catch(e=>console.warn(e)); return; } }
+        finRegistra(c,M).catch(e=>{ console.warn(e); P.toast('O e-mail foi copiado, mas não deu para guardar no histórico: '+(e&&e.message||e)); });
         P.toast(cp==='html'?'E-mail copiado com as tabelas. No Outlook, clique no corpo do e-mail e cole (Ctrl+V).':cp?'E-mail copiado (sem as tabelas). Cole no Outlook (Ctrl+V).':'Não deu para copiar sozinho: selecione o e-mail na prévia e copie (Ctrl+C).');
         J.mod=null; P.render(); return; }
       if(a==='pjp-aba'){ J.aba=b.dataset.v; P.render(); return; }

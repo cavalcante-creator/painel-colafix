@@ -23,11 +23,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Desmarcar tira a pessoa e a empresa do e-mail', !/NEXUS/.test(m)&&!/Maria/.test(m)&&/Pedro/.test(m), m.slice(0,200));
   await p.selectOption('#pjp-fmot','quinzena'); await H.dorme(400); m=await p.evaluate(()=>document.getElementById('pjp-finpv').innerText);
   ok('Motivo "pagamento da quinzena" tira a frase do desligamento', !/desligado antes/.test(m));
-  await p.evaluate(()=>{ window.open=()=>({location:''}); }); await p.click('[data-act="pjp-finok"]'); await H.dorme(800);
+  await p.evaluate(()=>{ window.open=(u)=>{ window.__abriu=u; return {}; }; }); await p.click('[data-act="pjp-finok"]'); await H.dorme(800);
   ok('Sem e-mail em "Para" não abre o Outlook', await p.$('.pjp-fin'));
   await p.fill('#pjp-fpara','financeiro@exemplo.com.br'); await p.fill('#pjp-fcc','rh@exemplo.com.br'); await p.click('[data-act="pjp-finok"]'); await H.dorme(1500);
   const F=await p.evaluate(()=>window.__pjpFin);
   ok('Copiar e abrir o Outlook: link do Outlook com para, cópia e assunto', F&&/outlook\.office\.com\/mail\/deeplink\/compose\?to=financeiro%40exemplo\.com\.br&cc=rh%40exemplo\.com\.br&subject=Pagamento%20PJ/.test(F.url), F&&F.url);
+  ok('A janela do Outlook abre direto no endereço do e-mail (não em branco)', await p.evaluate(()=>window.__abriu)===(F&&F.url), await p.evaluate(()=>window.__abriu));
+  await H.dorme(800);
   const S=await srv(), pes=(S['rh/dados/pjpag/2026-10-2']||{}).pes||{};
   ok('Guarda para/cópia e marca nas pessoas que o e-mail foi feito', ((S['rh/config'].pjPag||{}).finEmail||{}).para==='financeiro@exemplo.com.br'&&pes.f1&&pes.f1.fin&&pes.f3&&pes.f3.fin&&!(pes.f2&&pes.f2.fin), JSON.stringify(S['rh/config'].pjPag));
   await p.click('.pjp-lt1 [data-act="pjp-fin"]'); await H.dorme(600);
