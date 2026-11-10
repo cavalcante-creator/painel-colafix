@@ -780,7 +780,16 @@
         <label for="pjp-fmot">Motivo</label><select id="pjp-fmot"><option value="quinzena" ${M.mot==='quinzena'?'selected':''}>Pagamento da quinzena</option><option value="desl" ${M.mot==='desl'?'selected':''}>Desligado antes da data de pagamento habitual</option></select>
         <label>Quem entra no e-mail · ${n} PJ · ${R$(tot)}</label><div class="pjp-finl">${os.map(o=>`<label class="pjp-ck"><input type="checkbox" data-pjp-fsel="${esc(o.f._id)}" ${M.sel[o.f._id]?'checked':''}><span>${esc(c.titulo(o.f.nome))} <small>${esc(o.emp)} · ${R$(o.r.valor)}${o.x.st==='pago'?' · pago':''}${desligadoNo(o.f,perDe(J.per))?' · desligado':''}</small></span></label>`).join('')}</div>
       </div><div class="pjp-finp"><div class="pjp-lbl">Como vai sair · ${esc(finAssunto(c,M))}</div><div class="pjp-finpv" id="pjp-finpv">${n?finHtml(c,M):'<p class="sub">Marque pelo menos um PJ.</p>'}</div></div></div>
-      <div class="pjp-ac" style="margin-top:14px">${btn('pjp-modx','Fechar')}${btn('pjp-fincp','Só copiar o e-mail',n?'':'disabled')}${btn('pjp-finok','Copiar e abrir o Outlook',n?'':'disabled','')}</div>${M.semJan?`<p class="sub" style="margin-top:10px">O e-mail já foi copiado. <a href="${esc(M.semJan)}" target="_blank" rel="noopener">Abrir o Outlook</a> e colar (Ctrl+V).</p>`:''}</div></div>`; }
+      <div class="pjp-ac" style="margin-top:14px">${finOlBts(c,n)}</div>${M.semJan?`<p class="sub" style="margin-top:10px">O e-mail já foi copiado. <a href="${esc(M.semJan)}" target="_blank" rel="noopener">Abrir o Outlook</a> e colar (Ctrl+V).</p>`:''}</div></div>`; }
+  /* Criar no Outlook pelo login da Microsoft (Graph): o rascunho já sai com as tabelas, sem colar nada */
+  const finOl=()=>window.OneDrive&&OneDrive.mail&&OneDrive.mail.ativo()?OneDrive.mail:null;
+  function finOlBts(c,n){ const ol=finOl(), d=n?'':'disabled';
+    if(!ol) return btn('pjp-modx','Fechar')+btn('pjp-fincp','Só copiar o e-mail',d)+btn('pjp-finok','Copiar e abrir o Outlook',d,'');
+    const con=ol.conectado();
+    return btn('pjp-modx','Fechar')+btn('pjp-fincp','Só copiar',d)+btn('pjp-finok','Abrir o Outlook e colar',d)
+      +(con?btn('pjp-finol','Criar o e-mail no Outlook (com as tabelas)',d,''):btn('pjp-finolc','Conectar o Outlook (uma vez só)','',''))
+      +(con?`<div class="sub" style="flex-basis:100%;text-align:right;font-size:12px">Outlook conectado${ol.conta()?' como '+c.esc(ol.conta()):''} · ${lnk('pjp-finols','desconectar')}</div>`
+        :`<div class="sub" style="flex-basis:100%;text-align:right;font-size:12px">Conectando o Outlook, o painel cria o e-mail pronto na sua caixa, com as tabelas. Você só confere e clica em Enviar.</div>`); }
   async function finCopia(c,M){ const html=finHtml(c,M), txt=finTexto(c,M);
     try{ if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){ await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})]); return 'html'; } }catch(e){}
     try{ await navigator.clipboard.writeText(txt); return 'texto'; }catch(e){}
@@ -917,6 +926,21 @@
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
       if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
       if(a==='pjp-fin'){ finAbrir(c,b.dataset.f?[b.dataset.f]:null); P.render(); return; }
+      if(a==='pjp-finolc'||a==='pjp-finols'){ const M=J.mod, ol=finOl(); if(!ol) return; const g=id=>(document.getElementById(id)||{}).value; if(M&&M.k==='fin'){ M.para=g('pjp-fpara')??M.para; M.cc=g('pjp-fcc')??M.cc; }
+        if(a==='pjp-finols'){ ol.sair(); P.render(); return; }
+        try{ await ol.conectar(); P.toast('Outlook conectado'+(ol.conta()?' como '+ol.conta():'')+'. Agora toque em "Criar o e-mail no Outlook".'); }
+        catch(e){ P.toast(e.message||String(e)); } P.render(); return; }
+      if(a==='pjp-finol'){ const M=J.mod, ol=finOl(); if(!M||M.k!=='fin'||!ol) return; const g=id=>(document.getElementById(id)||{}).value; M.para=g('pjp-fpara')||''; M.cc=g('pjp-fcc')||''; M.data=g('pjp-fdata')||M.data;
+        if(!mails(M.para).length) return P.toast('Escreva o e-mail do financeiro em "Para".');
+        let w=null; try{ w=window.open('','_blank'); if(w) w.document.write('<p style="font:16px sans-serif;margin:40px">Montando o e-mail no Outlook…</p>'); }catch(e){}
+        try{ const r=await ol.rascunho({para:mails(M.para).join(';'),cc:mails(M.cc).join(';'),assunto:finAssunto(c,M),html:finHtml(c,M)});
+          window.__pjpFin={html:finHtml(c,M),assunto:finAssunto(c,M),rascunho:r};
+          if(w) w.location=r.link; else { M.semJan=r.link; P.render(); P.toast('O e-mail foi criado no Outlook (em Rascunhos). Toque em "Abrir o Outlook" para ver.'); }
+          finRegistra(c,M).catch(e=>console.warn(e));
+          if(w){ P.toast('E-mail criado no Outlook, com as tabelas. Confira e clique em Enviar.'); J.mod=null; P.render(); }
+        }catch(e){ try{ w&&w.close(); }catch(_){}
+          const t=String(e&&e.message||e); P.toast(/403|Access|denied|consent|Authorization/i.test(t)?'A Microsoft não deixou o painel criar e-mails nesta conta. Peça para liberar a permissão "Mail.ReadWrite" no aplicativo do painel (Microsoft Entra) ou use "Abrir o Outlook e colar".':'Não deu para criar o e-mail no Outlook: '+t); }
+        return; }
       if(a==='pjp-fincp'||a==='pjp-finok'){ const M=J.mod; if(!M||M.k!=='fin') return; const g=id=>(document.getElementById(id)||{}).value; M.para=g('pjp-fpara')||''; M.cc=g('pjp-fcc')||''; M.data=g('pjp-fdata')||M.data;
         if(a==='pjp-finok'&&!mails(M.para).length) return P.toast('Escreva o e-mail do financeiro em "Para".');
         const url=finOwa(c,M), cp=await finCopia(c,M); window.__pjpFin={html:finHtml(c,M),txt:finTexto(c,M),assunto:finAssunto(c,M),url,cp};

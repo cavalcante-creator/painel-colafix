@@ -36,6 +36,18 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Guarda para/cópia e marca nas pessoas que o e-mail foi feito', ((S['rh/config'].pjPag||{}).finEmail||{}).para==='financeiro@exemplo.com.br'&&pes.f1&&pes.f1.fin&&pes.f3&&pes.f3.fin&&!(pes.f2&&pes.f2.fin), JSON.stringify(S['rh/config'].pjPag));
   await p.click('.pjp-lt1 [data-act="pjp-fin"]'); await H.dorme(600);
   ok('Na próxima vez, o "Para" já vem preenchido', await p.inputValue('#pjp-fpara')==='financeiro@exemplo.com.br');
+  /* Criar no Outlook pelo login da Microsoft (Graph simulado) */
+  await p.evaluate(()=>{ window.__ol={con:false,raw:null}; window.OneDrive=window.OneDrive||{}; window.OneDrive.mail={ativo:()=>true,conectado:()=>__ol.con,conta:()=>'rh@exemplo.com.br',
+    conectar:async()=>{ __ol.con=true; return true; }, sair:()=>{ __ol.con=false; }, rascunho:async o=>{ __ol.raw=o; return {id:'m1',link:'https://outlook.office.com/mail/drafts/id/m1'}; }};
+    window.open=(u)=>{ const w={document:{write(){}},close(){},_loc:u}; Object.defineProperty(w,'location',{set(v){ window.__olAbriu=v; },get(){ return ''; }}); return w; }; window.Painel.render(); });
+  await H.dorme(400);
+  ok('Com o login da Microsoft configurado: aparece "Conectar o Outlook (uma vez só)"', await p.$('[data-act="pjp-finolc"]'));
+  await p.click('[data-act="pjp-finolc"]'); await H.dorme(500);
+  ok('Depois de conectar: "Criar o e-mail no Outlook (com as tabelas)" e a conta conectada', await p.$('[data-act="pjp-finol"]')&&/Outlook conectado como rh@exemplo/.test(await p.evaluate(()=>document.querySelector('.pjp-fin').innerText)));
+  if(process.env.SHOT2) await p.screenshot({path:process.env.SHOT2});
+  await p.click('[data-act="pjp-finol"]'); await H.dorme(1200);
+  const RW=await p.evaluate(()=>({raw:__ol.raw,abriu:window.__olAbriu,mod:!!document.querySelector('.pjp-fin')}));
+  ok('Cria o rascunho no Outlook já com as tabelas (HTML), para e assunto, e abre o rascunho', RW.raw&&/<table/.test(RW.raw.html)&&/ENVIAR TOTAL DE R\$/.test(RW.raw.html)&&RW.raw.para==='financeiro@exemplo.com.br'&&/^Pagamento PJ/.test(RW.raw.assunto)&&RW.abriu==='https://outlook.office.com/mail/drafts/id/m1'&&!RW.mod, JSON.stringify({abriu:RW.abriu,mod:RW.mod,para:RW.raw&&RW.raw.para}));
   if(process.env.SHOT){ await p.screenshot({path:process.env.SHOT}); }
   const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
   console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });

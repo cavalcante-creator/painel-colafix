@@ -8,13 +8,17 @@
    O login fica guardado só neste aparelho (localStorage 'od.sessao'). */
 (function(){ const P=window.Painel; if(!P) return;
   const ESCOPO='offline_access User.Read Files.ReadWrite.All';
+  /* Login separado para o e-mail (10/11): só pede a permissão do Outlook quando alguém usa "Criar no Outlook";
+     quem só usa o OneDrive continua com o login de sempre. */
+  const SES={od:{k:'od.sessao',esc:ESCOPO,nome:'OneDrive'},mail:{k:'od.mail',esc:'offline_access User.Read Mail.ReadWrite',nome:'Outlook'}};
+
   const GRAPH='https://graph.microsoft.com/v1.0';
   const cfg=()=>((P.S.cfg||{}).onedrive)||{};
   const retorno=()=>location.origin+location.pathname.replace(/[^/]*$/,'')+'modulos/onedrive.html';
   const autoridade=()=>'https://login.microsoftonline.com/'+(cfg().tenant||'organizations')+'/oauth2/v2.0';
   const b64u=buf=>btoa(String.fromCharCode.apply(null,new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  const ler=()=>{ try{ return JSON.parse(localStorage.getItem('od.sessao')||'null'); }catch(e){ return null; } };
-  const grava=s=>{ try{ s?localStorage.setItem('od.sessao',JSON.stringify(s)):localStorage.removeItem('od.sessao'); }catch(e){} };
+  const ler=(SX=SES.od)=>{ try{ return JSON.parse(localStorage.getItem(SX.k)||'null'); }catch(e){ return null; } };
+  const grava=(s,SX=SES.od)=>{ try{ s?localStorage.setItem(SX.k,JSON.stringify(s)):localStorage.removeItem(SX.k); }catch(e){} };
   const erro=(msg,code)=>{ const e=new Error(msg); e.code=code||'onedrive'; return e; };
   let baseCache=null;
   /* SHA-256 (para o PKCE): usa o do navegador e, se não houver (página sem https), uma implementação própria */
@@ -29,17 +33,17 @@
     const out=new Uint8Array(32); H.forEach((v,i)=>{ out[4*i]=v>>>24; out[4*i+1]=v>>>16; out[4*i+2]=v>>>8; out[4*i+3]=v; }); return out.buffer; }
   const sha256=async bytes=>(window.crypto&&crypto.subtle)?crypto.subtle.digest('SHA-256',bytes):sha256js(bytes);
 
-  async function trocarToken(params){ const c=cfg();
-    const r=await fetch(autoridade()+'/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(Object.assign({client_id:c.clientId,scope:ESCOPO},params)).toString()});
+  async function trocarToken(params,SX=SES.od){ const c=cfg();
+    const r=await fetch(autoridade()+'/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(Object.assign({client_id:c.clientId,scope:SX.esc},params)).toString()});
     const j=await r.json().catch(()=>({})); if(!r.ok||!j.access_token) throw erro('A Microsoft recusou o login: '+(j.error_description||j.error||r.status),'login');
-    const s=Object.assign(ler()||{},{access:j.access_token,refresh:j.refresh_token||(ler()||{}).refresh,exp:Date.now()+(+j.expires_in||3600)*1000}); grava(s); return s; }
-  async function token(){ let s=ler(); if(!s||!s.access) throw erro('Conecte o OneDrive (botão no topo da tela das fichas).','nao-conectado');
-    if(Date.now()>s.exp-90000){ if(!s.refresh){ grava(null); throw erro('A conexão com o OneDrive expirou. Conecte de novo.','nao-conectado'); }
-      try{ s=await trocarToken({grant_type:'refresh_token',refresh_token:s.refresh}); }catch(e){ grava(null); throw erro('A conexão com o OneDrive expirou. Conecte de novo.','nao-conectado'); } }
+    const s=Object.assign(ler(SX)||{},{access:j.access_token,refresh:j.refresh_token||(ler(SX)||{}).refresh,exp:Date.now()+(+j.expires_in||3600)*1000}); grava(s,SX); return s; }
+  async function token(SX=SES.od){ let s=ler(SX); if(!s||!s.access) throw erro(SX===SES.mail?'Conecte o Outlook primeiro.':'Conecte o OneDrive (botão no topo da tela das fichas).','nao-conectado');
+    if(Date.now()>s.exp-90000){ if(!s.refresh){ grava(null,SX); throw erro('A conexão com o '+SX.nome+' expirou. Conecte de novo.','nao-conectado'); }
+      try{ s=await trocarToken({grant_type:'refresh_token',refresh_token:s.refresh},SX); }catch(e){ grava(null,SX); throw erro('A conexão com o '+SX.nome+' expirou. Conecte de novo.','nao-conectado'); } }
     return s.access; }
-  async function g(caminho,op,tentou){ op=op||{}; const r=await fetch(caminho.startsWith('http')?caminho:GRAPH+caminho,Object.assign({},op,{headers:Object.assign({},op.headers||{},{Authorization:'Bearer '+await token()})}));
-    if(r.status===401&&!tentou){ const s=ler(); if(s){ s.exp=0; grava(s); } return g(caminho,op,true); }
-    if(r.status===404) return null; if(!r.ok) throw erro('OneDrive respondeu '+r.status+': '+(await r.text()).slice(0,160));
+  async function g(caminho,op,tentou,SX=SES.od){ op=op||{}; const r=await fetch(caminho.startsWith('http')?caminho:GRAPH+caminho,Object.assign({},op,{headers:Object.assign({},op.headers||{},{Authorization:'Bearer '+await token(SX)})}));
+    if(r.status===401&&!tentou){ const s=ler(SX); if(s){ s.exp=0; grava(s,SX); } return g(caminho,op,true,SX); }
+    if(r.status===404) return null; if(!r.ok) throw erro(SX.nome+' respondeu '+r.status+': '+(await r.text()).slice(0,160));
     return r.status===204?{}:r.json(); }
   const enc=p=>String(p).split('/').filter(Boolean).map(encodeURIComponent).join('/');
   /* endereço de um item pela pasta configurada (pasta do usuário ou pasta compartilhada pelo link) */
@@ -54,19 +58,22 @@
     conectado:()=>{ const s=ler(); return !!(s&&s.access); },
     conta:()=>(ler()||{}).conta||'',
     retorno,
-    async conectar(){ const c=cfg(); if(!c.clientId) throw erro('O OneDrive ainda não foi configurado.');
+    conectar(){ return conectar0(SES.od); },
+    sair(){ grava(null); baseCache=null; },
+  };
+  async function conectar0(SX){ const c=cfg(); if(!c.clientId) throw erro('O login da Microsoft (OneDrive) ainda não foi configurado no painel.');
       const w=window.open('about:blank','od-login','width=520,height=680'); if(!w) throw erro('O navegador bloqueou a janela de login. Permita janelas deste site e tente de novo.');
       const verif=b64u(crypto.getRandomValues(new Uint8Array(32))), estado=b64u(crypto.getRandomValues(new Uint8Array(16)));
       const desafio=b64u(await sha256(new TextEncoder().encode(verif)));
-      w.location=autoridade()+'/authorize?'+new URLSearchParams({client_id:c.clientId,response_type:'code',redirect_uri:retorno(),scope:ESCOPO,state:estado,code_challenge:desafio,code_challenge_method:'S256',prompt:'select_account'}).toString();
+      w.location=autoridade()+'/authorize?'+new URLSearchParams({client_id:c.clientId,response_type:'code',redirect_uri:retorno(),scope:SX.esc,state:estado,code_challenge:desafio,code_challenge_method:'S256',prompt:'select_account'}).toString();
       const code=await new Promise((ok,er)=>{ const t0=Date.now(); const t=setInterval(()=>{ let h=''; try{ h=w.location.href; }catch(e){}
           if(h&&h.startsWith(retorno())){ clearInterval(t); const q=new URLSearchParams(h.split('?')[1]||''); w.close();
             if(q.get('state')!==estado) return er(erro('Resposta de login inválida. Tente de novo.')); if(q.get('error')) return er(erro('Login cancelado: '+(q.get('error_description')||q.get('error')))); ok(q.get('code')); }
           else if(w.closed){ clearInterval(t); er(erro('Login cancelado.')); } else if(Date.now()-t0>300000){ clearInterval(t); try{ w.close(); }catch(e){} er(erro('O login demorou demais. Tente de novo.')); } },400); });
-      await trocarToken({grant_type:'authorization_code',code,redirect_uri:retorno(),code_verifier:verif});
-      try{ const eu=await g('/me?$select=userPrincipalName,displayName'); const s=ler(); s.conta=(eu&&(eu.userPrincipalName||eu.displayName))||''; grava(s); }catch(e){}
-      baseCache=null; return true; },
-    sair(){ grava(null); baseCache=null; },
+      await trocarToken({grant_type:'authorization_code',code,redirect_uri:retorno(),code_verifier:verif},SX);
+      try{ const eu=await g('/me?$select=userPrincipalName,displayName',null,false,SX); const s=ler(SX); s.conta=(eu&&(eu.userPrincipalName||eu.displayName))||''; grava(s,SX); }catch(e){}
+      baseCache=null; return true; }
+  Object.assign(window.OneDrive,{
     /* envia bytes (base64) para pasta/subpasta; arquivos grandes vão em partes */
     async enviar(rel,b64,mime){ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
       if(u.length<=3.5*1024*1024) return g((await item(rel))+'/content',{method:'PUT',headers:{'Content-Type':mime||'application/octet-stream'},body:u});
@@ -76,6 +83,18 @@
         if(!r.ok&&r.status!==202) throw erro('Falha ao enviar para o OneDrive ('+r.status+').'); if(r.status===200||r.status===201) res=await r.json(); }
       return res; },
     async listar(rel){ const r=await g((await item(rel)).replace(/:$/,'')+(rel?':':'')+'/children?$select=name,webUrl,lastModifiedDateTime,file&$top=999'); return (r&&r.value)||[]; },
-    async buscar(q){ const base=(await item('')).replace(/:$/,''); const r=await g(base+(cfg().link?'':':')+"/search(q='"+encodeURIComponent(String(q).replace(/'/g,"''"))+"')?$top=200"); return (r&&r.value)||[]; }
-  };
+    async buscar(q){ const base=(await item('')).replace(/:$/,''); const r=await g(base+(cfg().link?'':':')+"/search(q='"+encodeURIComponent(String(q).replace(/'/g,"''"))+"')?$top=200"); return (r&&r.value)||[]; },
+    /* E-mail pelo Outlook (Microsoft Graph, permissão Mail.ReadWrite delegada): cria o rascunho na caixa de quem conectou,
+       já com o corpo em HTML (tabelas), para/cópia/assunto, e devolve o link para abrir e enviar. */
+    mail:{
+      ativo:()=>!!cfg().clientId,
+      conectado:()=>{ const s=ler(SES.mail); return !!(s&&s.access); },
+      conta:()=>(ler(SES.mail)||{}).conta||'',
+      conectar:()=>conectar0(SES.mail),
+      sair:()=>grava(null,SES.mail),
+      async rascunho(o){ const ends=t=>String(t||'').split(/[;,\s]+/).filter(e=>/@/.test(e)).map(e=>({emailAddress:{address:e}}));
+        const m=await g('/me/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:o.assunto||'',body:{contentType:'HTML',content:o.html||''},toRecipients:ends(o.para),ccRecipients:ends(o.cc)})},false,SES.mail);
+        if(!m||!m.id) throw erro('O Outlook não criou o rascunho.'); return {id:m.id,link:m.webLink||'https://outlook.office.com/mail/drafts'}; }
+    }
+  });
 })();
