@@ -13,6 +13,10 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await p.evaluate(()=>{ window.open=(u)=>{ window.__abriu=(window.__abriu||[]).concat([u]); return {}; }; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(2500);
   const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
   const linha=id=>p.evaluate(id=>{ const b=document.querySelector('.pjp-lc [data-f="'+id+'"]'); const tr=b&&b.closest('tr'); return tr?tr.innerText:''; },id);
+  const so2=await p.evaluate(()=>[...document.querySelectorAll('.pjp-lc .pjp-nm')].map(b=>b.textContent.split(' ')[0]).sort().join(','));
+  ok('Por padrão o Pagamento dos PJ só mostra os PJ da Zenith e da Nexus', so2==='Ana,Joao,Maria', so2);
+  await p.evaluate(()=>window.Painel.db().doc('rh/config').set({pjPag:{emps:['ZENITH','NEXUS','OUTRA','COLAFIX']}},{merge:true})); await H.dorme(900);
+  await p.evaluate(()=>window.Painel.render()); await H.dorme(400);
   const ler=u=>{ const t=u.split('#medicoes/importar/')[1], b64=t.replace(/-/g,'+').replace(/_/g,'/'), pad=b64+'==='.slice((b64.length+3)%4); return JSON.parse(decodeURIComponent(Array.from(Buffer.from(pad,'base64').toString('binary')).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); };
   await p.click('[data-act="pjp-fech"][data-f="f1"]'); await H.dorme(900);
   ok('PJ da Zenith com valor fechado: o botão é "Pedir nota pelo Conectwork"', /Pedir nota pelo Conectwork/.test(await linha('f1')), await linha('f1'));

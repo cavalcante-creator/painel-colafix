@@ -91,7 +91,9 @@
       [['disp',p.disp],['area',p.area]].forEach(([tp,n])=>{ if(!n) return; const k=norm(n); if(!M[k]) M[k]={k,n,tipo:tp,q:0}; M[k].q++; if(tp==='area') M[k].tipo='area'; }); })));
     return Object.values(M).sort((a,b)=>a.tipo===b.tipo?a.n.localeCompare(b.n,'pt-BR'):a.tipo==='area'?-1:1); }
   /* ---------- pessoas ---------- */
-  const pjs=(c,p)=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.nome&&(f.status!=='Desligado'||(f.desligamento&&f.desligamento>=p.de))&&(!f.admissao||f.admissao<=p.ate))
+  /* 10/11 ("por enquanto só os Zenith e Nexus"): o Pagamento dos PJ só conta os PJ dessas empresas; para pôr outras, rh/config.pjPag.emps */
+  const pjEmps=c=>((((c.R.cfg||{}).pjPag)||{}).emps||['ZENITH','NEXUS']).map(x=>String(x).toUpperCase());
+  const pjs=(c,p)=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.nome&&pjEmps(c).includes(String(f.empresa||'').toUpperCase())&&(f.status!=='Desligado'||(f.desligamento&&f.desligamento>=p.de))&&(!f.admissao||f.admissao<=p.ate))
     .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
   /* regras da pessoa: as do Pagamento dos PJ (funcionarios.pjPag) valem antes; senão o "Horário diferente" do cadastro (horEsp); senão o padrão */
   const horDe=(c,f)=>{ const g=cfg(c), x=f.pjPag||{}, he=f.horEsp||{}, tem=v=>v!=null&&v!=='';
