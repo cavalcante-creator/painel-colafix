@@ -30,6 +30,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Copiar e abrir o Outlook: link do Outlook com para, cópia e assunto', F&&/outlook\.office\.com\/mail\/deeplink\/compose\?to=financeiro%40exemplo\.com\.br&cc=rh%40exemplo\.com\.br&subject=Pagamento%20PJ/.test(F.url), F&&F.url);
   ok('A janela do Outlook abre direto no endereço do e-mail (não em branco)', await p.evaluate(()=>window.__abriu)===(F&&F.url), await p.evaluate(()=>window.__abriu));
   await H.dorme(800);
+  const bd=decodeURIComponent(((F&&F.url||'').split('&body=')[1]||''));
+  ok('O e-mail já vai escrito no Outlook (corpo no link): valor, total, nota, dias e depósito', /Olá,/.test(bd)&&/ENVIAR TOTAL DE R\$/.test(bd)&&/a nota fiscal será ZENITH/.test(bd)&&/16\/10 sex/.test(bd)&&/Depositar em conta ZENITH/.test(bd)&&/Gestão de Pessoas/.test(bd)&&F.url.length<=7800, bd.slice(0,300));
   const S=await srv(), pes=(S['rh/dados/pjpag/2026-10-2']||{}).pes||{};
   ok('Guarda para/cópia e marca nas pessoas que o e-mail foi feito', ((S['rh/config'].pjPag||{}).finEmail||{}).para==='financeiro@exemplo.com.br'&&pes.f1&&pes.f1.fin&&pes.f3&&pes.f3.fin&&!(pes.f2&&pes.f2.fin), JSON.stringify(S['rh/config'].pjPag));
   await p.click('.pjp-lt1 [data-act="pjp-fin"]'); await H.dorme(600);

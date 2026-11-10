@@ -765,14 +765,14 @@
     return `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1F2A33"><p style="margin:0 0 8px"><b>Olá,</b></p>
       <p style="margin:0 0 8px">Conforme os dias trabalhados registrados no Face ID (período de ${esc(p.txt)}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${dt}${motivo}</p>
       ${blocos}<p style="margin:0">Att.,</p><p style="margin:10px 0 0">--<br><b>${esc(c.eu())}</b><br>Gestão de Pessoas</p></div>`; }
-  function finTexto(c,M){ const p=perDe(J.per), G=finGrupos(c,M), L=['Olá,','',`Conforme os dias trabalhados registrados no Face ID (período de ${p.txt}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${br(M.data)}${M.mot==='desl'?' devido ser desligado antes da data de pagamento habitual.':'.'}`,''];
+  function finTexto(c,M,dias){ const p=perDe(J.per), G=finGrupos(c,M), L=['Olá,','',`Conforme os dias trabalhados registrados no Face ID (período de ${p.txt}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${br(M.data)}${M.mot==='desl'?' devido ser desligado antes da data de pagamento habitual.':'.'}`,''];
     Object.keys(G).sort().forEach(emp=>{ const os=G[emp], tot=Math.round(os.reduce((a,o)=>a+o.r.valor,0)*100)/100;
       os.forEach(o=>L.push('• '+c.titulo(o.f.nome)+': '+R$(o.r.valor)+' de acordo com os dias trabalhados registrados.')); L.push('','ENVIAR TOTAL DE '+R$(tot)+' · a nota fiscal será '+emp+'.','',
-        ...os.map(o=>c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)),'','Depositar em conta '+emp+'.',''); });
+        ...os.flatMap(o=>[c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)].concat(dias?finDias(o):[])),'','Depositar em conta '+emp+'.',''); });
     L.push('Att.,','--',c.eu(),'Gestão de Pessoas'); return L.join('\n').replace(/ /g,' '); }
   const finAssunto=(c,M)=>{ const G=finGrupos(c,M); return 'Pagamento PJ · '+Object.keys(G).sort().join(' e ')+' · '+perDe(J.per).txt+(M.mot==='desl'?' · desligamento':''); };
   function finModal(c){ const M=J.mod, esc=c.esc, os=finPessoas(c,J.per), n=os.filter(o=>M.sel[o.f._id]).length, tot=os.filter(o=>M.sel[o.f._id]).reduce((a,o)=>a+o.r.valor,0);
-    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-fin" role="dialog" aria-label="E-mail ao financeiro"><h3>E-mail ao financeiro</h3><p class="sub">O mesmo e-mail de sempre, montado pelo painel: valor de cada PJ, total por empresa e a folha de cada um. O painel copia o e-mail e abre o Outlook: é só colar (Ctrl+V) e enviar.</p>
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-fin" role="dialog" aria-label="E-mail ao financeiro"><h3>E-mail ao financeiro</h3><p class="sub">O mesmo e-mail de sempre, montado pelo painel: valor de cada PJ, total por empresa e a folha de cada um. O Outlook abre com o e-mail já escrito. As tabelas formatadas ficam copiadas: se quiser, clique no corpo do e-mail, Ctrl+A e Ctrl+V.</p>
       <div class="pjp-fing"><div class="pjp-box">
         <label for="pjp-fpara">Para (financeiro)</label><input id="pjp-fpara" value="${esc(M.para)}" placeholder="financeiro@…">
         <label for="pjp-fcc">Cópia</label><input id="pjp-fcc" value="${esc(M.cc)}" placeholder="opcional">
@@ -788,7 +788,11 @@
   async function finRegistra(c,M){ const pid=J.per, ids=Object.keys(M.sel).filter(k=>M.sel[k]);
     const g=Object.assign({},cfg(c).finEmail||{}), nv={para:M.para,cc:M.cc}; if(g.para!==nv.para||g.cc!==nv.cc){ c.R.cfg.pjPag=Object.assign({},(c.R.cfg||{}).pjPag||{},{finEmail:nv}); await c.P.db().doc('rh/config').set({pjPag:{finEmail:nv}},{merge:true}); }
     for(const id of ids) await grava(c,pid,id,{fin:{em:agora(),por:c.eu(),data:M.data,mot:M.mot}},'E-mail ao financeiro: pagamento em '+br(M.data)+(M.mot==='desl'?' (desligamento)':'')); }
-  function finOwa(c,M){ const q=['to='+encodeURIComponent(mails(M.para).join(';'))]; if(mails(M.cc).length) q.push('cc='+encodeURIComponent(mails(M.cc).join(';'))); q.push('subject='+encodeURIComponent(finAssunto(c,M))); return 'https://outlook.office.com/mail/deeplink/compose?'+q.join('&'); }
+  const finDias=o=>(o.r.dias||[]).filter(d=>d.m>0).map(d=>'   '+br(d.d).slice(0,5)+' '+DSEM[d.dw]+'   '+(d.e?String(d.e).slice(0,5):'--:--')+' às '+(d.s?String(d.s).slice(0,5):'--:--')+'   conta '+hhmm(d.E)+' às '+hhmm(d.S)+'   '+hMin(d.m)+' ('+n2(hDec(d.m))+')');
+  function finOwa(c,M){ const q=['to='+encodeURIComponent(mails(M.para).join(';'))]; if(mails(M.cc).length) q.push('cc='+encodeURIComponent(mails(M.cc).join(';'))); q.push('subject='+encodeURIComponent(finAssunto(c,M)));
+    const base='https://outlook.office.com/mail/deeplink/compose?'+q.join('&');
+    for(const dias of [true,false]){ const u=base+'&body='+encodeURIComponent(finTexto(c,M,dias)); if(u.length<=7800) return u; }
+    return 'https://outlook.office.com/mail/deeplink/compose?'+q.join('&'); }
   /* ---------- relatórios ---------- */
   function linhasRel(c){ const pid=J.per, p=perDe(pid), D=docP(pid);
     return pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,descMot:fe?(fe.descMot||x.descMot||''):r.descMot,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh}; }); }
@@ -919,7 +923,7 @@
         if(a==='pjp-finok'){ let w=null; try{ w=window.open(url,'_blank'); }catch(e){}
           if(!w){ J.mod.semJan=url; P.render(); P.toast('O navegador bloqueou a janela do Outlook. Toque em "Abrir o Outlook" na janela do e-mail.'); finRegistra(c,M).catch(e=>console.warn(e)); return; } }
         finRegistra(c,M).catch(e=>{ console.warn(e); P.toast('O e-mail foi copiado, mas não deu para guardar no histórico: '+(e&&e.message||e)); });
-        P.toast(cp==='html'?'E-mail copiado com as tabelas. No Outlook, clique no corpo do e-mail e cole (Ctrl+V).':cp?'E-mail copiado (sem as tabelas). Cole no Outlook (Ctrl+V).':'Não deu para copiar sozinho: selecione o e-mail na prévia e copie (Ctrl+C).');
+        P.toast(a==='pjp-finok'?(cp==='html'?'O e-mail já vai escrito no Outlook. Para trocar pelas tabelas formatadas: clique no corpo, Ctrl+A e Ctrl+V.':'O e-mail já vai escrito no Outlook (texto simples).'):(cp==='html'?'E-mail copiado com as tabelas. Cole no Outlook (Ctrl+V).':cp?'E-mail copiado (sem as tabelas). Cole no Outlook (Ctrl+V).':'Não deu para copiar sozinho: selecione o e-mail na prévia e copie (Ctrl+C).'));
         J.mod=null; P.render(); return; }
       if(a==='pjp-aba'){ J.aba=b.dataset.v; P.render(); return; }
       if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; if(J.col>=0) J.aba='lista'; P.render(); return; }
