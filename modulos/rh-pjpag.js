@@ -537,22 +537,23 @@
         <td class="pjp-qa">${acoes(c,pid,f,x,r)}</td></tr>`; }).join('');
     const filtros=J.emp||J.set||J.conf||J.q||col>=0;
     const vazio=!xs.length?['Nenhum PJ ativo','Cadastre em Funcionários as pessoas com vínculo PJ.']:col>=0&&rsF.length?['Ninguém nesta etapa','Toque em "ver todos" para a lista inteira.']:['Nenhum PJ com esse filtro','Mude a busca ou toque em "Limpar filtros".'];
-    const FI=fidInfo(c,p), icn=(n,t)=>U?U.ic(n,t||18):'';
+    const FI=fidInfo(c,p), icn=(n,t)=>U?U.ic(n,t||18):'', aba=J.aba||'pv';
     const barra=`<div class="pjp-bar"><div class="pjp-nav"><button class="btn sec pjp-sm" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
           <div><span>${cfg(c).modo==='mes'?'Mês':'Quinzena'}</span><b>${esc(p.txt)}</b>${ehAt?'<small>a quinzena para pagar agora</small>':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
           <button class="btn sec pjp-sm" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
         ${FI?`<div class="pjp-fid ${FI.tom}" role="status"><span class="pjp-fdot" aria-hidden="true"></span><div><b>${esc(FI.tit)}</b><small>${esc(FI.sub)}</small><small>${esc(FI.ultTxt)}${FI.imp&&FI.robo?' · último CSV '+esc(hm(FI.imp.em)):''}</small></div><button class="lnk" data-act="pjp-fidir" type="button">Ver no Almoço/café</button></div>`:''}</div>`;
-    return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
+    return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.',`<div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF')}${btn('pjp-cfg','Como é feita a conta')}</div>`,'RH · PAGAMENTO DOS PJ')+
       `<div class="pjp">${barra}${avFid}
-      <div class="pjp-2c"><aside class="pjp-esq"><section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
+      <div class="pjp-abas" role="tablist" aria-label="Partes da tela">${[['pv','Precisa de você',pv.length,'alerta'],['kb','Onde cada PJ está',null,'grid'],['lista','Todos os PJ',rsF.length,'lista']].map(([k,t,n,ic])=>`<button type="button" role="tab" class="pjp-aba" data-act="pjp-aba" data-v="${k}" aria-selected="${aba===k}">${icn(ic,18)}<span>${t}</span>${n!=null?`<b class="${k==='pv'&&n?'al':''}">${n}</b>`:''}</button>`).join('')}</div>
+      ${aba==='pv'?`<section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
 
-        <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>
+      <div class="pjp-g2"><section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>
         <section class="pjp-cx"><div class="pjp-ch"><h3>Resumo da quinzena</h3></div><div class="pjp-rs">
           <div class="pjp-tl pri"><span>${icn('grafico',16)}Total a pagar</span><b class="n">${R$(totV)}</b></div><div class="pjp-tl ok"><span>${icn('check',16)}Já pago</span><b class="n">${R$(pagoV)}</b></div>
           <div class="pjp-tl warn"><span>${icn('relogio',16)}Falta pagar</span><b class="n">${R$(totV-pagoV)}</b></div><div class="pjp-tl"><span>${icn('equipe',16)}PJ · horas</span><b class="n">${rsF.length} · ${hTxt(totM)}</b></div></div>
-          <div class="pjp-rsb">${btn('pjp-xls','Excel')}${btn('pjp-pdf','Baixar PDF')}${btn('pjp-cfg','Como é feita a conta')}</div></section>
-      </aside><div class="pjp-dir">
-      <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver só ela na lista</small></div>${quadros}</section>
+          </section>
+      </div>`:''}${aba==='kb'?`
+      <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver a lista dela; toque na pessoa para ver os dias</small></div>${quadros}</section>`:''}${aba==='lista'?`
       <section class="pjp-lc">
         <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span></div>
         <div class="pjp-lt2"><label class="pjp-busca"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pjp-q" type="search" placeholder="Buscar PJ, setor ou empresa" aria-label="Buscar PJ" value="${esc(J.q)}"></label>
@@ -563,8 +564,8 @@
         ${rs.length?`<div class="pjp-tw"><table class="pjp-t"><thead><tr><th>PJ <small>· toque no nome para ver os dias</small></th><th>Situação</th><th class="n">Total a pagar</th><th class="pjp-qa"><span class="pjp-sr">Ações</span></th></tr></thead><tbody>${linhas}</tbody>
           <tfoot><tr><td>Total · ${rs.length} PJ</td><td></td><td class="n pjp-tt" data-r="Total a pagar">${R$(soma(rs))}</td><td></td></tr></tfoot></table></div>`
           :(U?U.vazio({tit:vazio[0],txt:vazio[1]}):`<div class="empty">${esc(vazio[0])}</div>`)}
-      </section></div></div>
-      ${cwBloco(c,pid,emps)}
+      </section>${cwBloco(c,pid,emps)}`:''}
+
       </div>`+gaveta(c,pid,rsT)+modal(c); }
   const css3=`<style id="pjp-css3">
   .pjp{gap:18px}.pjp .n{font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -670,6 +671,17 @@
   @media(max-width:1180px){.pjp-dir .pjp-kb{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:560px){.pjp-dir .pjp-kb{grid-template-columns:1fr}}
   @media(max-width:1180px){.pjp-2c{grid-template-columns:1fr}.pjp-esq{position:static}.pjp-esq .pjp-pp{flex-direction:row;flex-wrap:wrap;align-items:center}.pjp-esq .pjp-pp .btn{width:auto}.pjp-esq .pjp-pp>div{flex:1 1 240px;min-width:0}}
+  /* abas (10/11, "a primeira visão do Precisa de você e um botão lá em cima com Precisa de você / Onde cada PJ está / Todos os PJ") */
+  .pjp-tbt{display:flex;gap:8px;flex-wrap:wrap}
+  .pjp-abas{display:flex;gap:6px;background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:16px;padding:6px;box-shadow:var(--shadow);overflow-x:auto}
+  .pjp-aba{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:10px;border:0;background:none;font:inherit;font-size:15px;font-weight:600;color:var(--muted);padding:12px 16px;border-radius:12px;cursor:pointer;white-space:nowrap;min-width:max-content}
+  .pjp-aba:hover{background:var(--surface-2,#F6F8FA);color:var(--ink,inherit)}
+  .pjp-aba[aria-selected="true"]{background:var(--teal-strong);color:#fff}
+  .pjp-aba b{font-size:12.5px;background:var(--surface-2,#EEF2F5);color:var(--muted);border-radius:999px;padding:1px 9px}
+  .pjp-aba b.al{background:var(--crit-tint,#F6E3E1);color:var(--crit-ink,#8E3A33)}
+  .pjp-aba[aria-selected="true"] b{background:rgba(255,255,255,.2);color:#fff}
+  .pjp-aba:focus-visible{outline:3px solid #9FBFCF;outline-offset:2px}
+  @media(max-width:760px){.pjp-aba{flex:0 0 auto;font-size:14px;padding:10px 12px}}
   @media(max-width:760px){.pjp-fid{flex-basis:100%}.pjp-rs{grid-template-columns:1fr 1fr}.pjp-ppi{display:none}}
   @media(max-width:760px){
     .pjp-pp{padding:18px}.pjp-pp .btn{width:100%;justify-content:center}
@@ -803,7 +815,8 @@
       if(a==='pjp-ab'){ J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
       if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
-      if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; P.render(); return; }
+      if(a==='pjp-aba'){ J.aba=b.dataset.v; P.render(); return; }
+      if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; if(J.col>=0) J.aba='lista'; P.render(); return; }
       if(a==='pjp-gx'){ J.ab=''; J.edDia=null; P.render(); return; }
       if(a==='pjp-tab'){ J.tab=b.dataset.v; J.edDia=null; P.render(); return; }
       if(a==='pjp-confx'){ J.conf=!J.conf; P.render(); return; }

@@ -26,7 +26,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   /* menu */
   const menu=await p.evaluate(()=>{ const b=document.querySelector('#navlist .gxg-gr[data-go="rhrelmes"]'); if(b) b.click(); return new Promise(r=>setTimeout(()=>r([...document.querySelectorAll('#navlist .gxg-si')].map(x=>x.dataset.go)),500)); });
   ok('Menu do RH: "Pagamento dos PJ" em Relatórios', menu.includes('rhpjpag'), menu.join(','));
-  await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; __T.go('rhpjpag'); }); await H.dorme(1800);
+  await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(1800); /* as ações por pessoa ficam na aba Todos os PJ */
   let s=await view();
   ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,00/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
   ok('Avisa o dia com só uma passagem', /1 dia para conferir/.test(s));
@@ -139,7 +139,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Regra só desta pessoa: guarda os leitores dela no cadastro', JSON.stringify(F2)==='["REFEITORIO"]', JSON.stringify(F2));
   /* Enviar ao Conectwork (07/11): a medição da quinzena por prestadora, no link, sem CPF */
   await p.keyboard.press('Escape'); await H.dorme(300);
-  await p.evaluate(()=>{ window.open=()=>null; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.ab=''; __T.go('rhpjpag'); }); await H.dorme(1500);
+  await p.evaluate(()=>{ window.open=()=>null; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.ab=''; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(1500);
   const cwB=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
   for(let i=0;i<2&&!(await p.evaluate(()=>window.__pjpUltimoCw));i++){ await p.click('[data-act="pjp-cw"][data-e="ZENITH"]'); await H.dorme(700); }
   const cwU=await p.evaluate(()=>window.__pjpUltimoCw||'');
