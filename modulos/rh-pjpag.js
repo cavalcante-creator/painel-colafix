@@ -351,7 +351,7 @@
   .pjp-d .pg-tag{font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;display:inline-block;margin-top:3px}
   .pjp-d .pg-tag.pg-w{background:#fff;color:var(--warn-ink,#7A5310)}.pjp-d .pg-tag.pg-t{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-m{background:var(--ground);color:var(--muted)}
   .pjp-d .pg-tag.pg-src{margin-left:4px}.pjp-d .pg-tag.pg-pto{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-mix{background:var(--ground);color:var(--teal-strong)}.pjp-d .pg-tag.pg-fid{background:var(--warn-tint,#FBF1DD);color:var(--warn-ink,#7A5310)}
-  .pjp-fid.pto .pjp-imp{cursor:pointer;color:var(--teal-strong);font-weight:600;font-size:12.5px;text-decoration:underline}.pjp-fid.pto .pjp-imp input{display:none}
+  .pjp-fid.pto .pjp-imp{cursor:pointer;color:var(--teal-strong);font-weight:600;font-size:12.5px;text-decoration:underline}.pjp-fid.pto .pjp-imp input{display:none!important}
   .pjp-ed{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--teal);border-radius:10px;padding:10px 12px;margin-top:6px}
   .pjp-ed label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}
   .pjp-ed input{height:36px;border:1px solid var(--line,#E1E7EB);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:inherit}
@@ -549,10 +549,10 @@
     const minR=R&&R.ultima?(Date.now()-new Date(R.ultima).getTime())/60000:null, fora=R?Object.entries(R.dispositivos||{}).filter(([,x])=>x&&!x.ok).map(([n])=>n):[];
     const ultTxt=ult?'Última passagem registrada: '+brc(ult.slice(0,10))+' às '+ult.slice(11,16):'Nenhuma passagem neste período';
     if(R&&R.ultima){
-      if(minR>130){ out.tom='crit'; out.tit='Face ID parado'; out.sub='O robô leu pela última vez '+hm(R.ultima)+' ('+haTxt(minR)+'). Confira o computador do robô ou importe o CSV.'; }
-      else if(R.ok===false){ out.tom='warn'; out.tit='Face ID com problema'; out.sub='Leitura '+haTxt(minR)+(fora.length?' · fora do ar: '+fora.join(', '):R.erro?' · '+String(R.erro).slice(0,60):''); }
-      else { out.tit='Face ID em dia'; out.sub='Robô leu '+haTxt(minR)+' ('+hm(R.ultima).split(' às ')[1]+')'; }
-    } else if(imp&&imp.em){ const mi=(Date.now()-new Date(imp.em).getTime())/60000; out.tom=mi>36*60?'warn':'ok'; out.tit=mi>36*60?'Face ID desatualizado':'Face ID importado'; out.sub='CSV importado '+haTxt(mi)+(imp.por?' por '+imp.por:''); }
+      if(minR>130){ out.tom='crit'; out.tit='Face ID parado'; out.sub='O robô leu pela última vez '+hm(R.ultima)+' ('+haTxt(minR)+'). Confira o computador do robô ou importe o CSV.'; out.curto='leu '+haTxt(minR); }
+      else if(R.ok===false){ out.tom='warn'; out.tit='Face ID com problema'; out.curto=fora.length?'fora do ar: '+fora.join(', '):'leu '+haTxt(minR); out.sub='Leitura '+haTxt(minR)+(fora.length?' · fora do ar: '+fora.join(', '):R.erro?' · '+String(R.erro).slice(0,60):''); }
+      else { out.tit='Face ID em dia'; out.sub='Robô leu '+haTxt(minR)+' ('+hm(R.ultima).split(' às ')[1]+')'; out.curto='leu '+haTxt(minR); }
+    } else if(imp&&imp.em){ const mi=(Date.now()-new Date(imp.em).getTime())/60000; out.tom=mi>36*60?'warn':'ok'; out.tit=mi>36*60?'Face ID desatualizado':'Face ID importado'; out.sub='CSV importado '+haTxt(mi)+(imp.por?' por '+imp.por:''); out.curto='CSV '+haTxt(mi); }
     else if(ult){ out.tom='warn'; out.tit='Face ID sem data de atualização'; out.sub='Há passagens neste período, mas não dá para saber quando foram lidas.'; }
     else { out.tom='crit'; out.tit='Sem Face ID'; out.sub='Nenhuma leitura nem importação deste mês.'; }
     out.ultTxt=ultTxt; return out; }
@@ -569,7 +569,8 @@
     const mi=imp&&imp.em?(Date.now()-new Date(imp.em).getTime())/60000:null;
     return {tom:mi!=null&&mi>36*60?'warn':'ok',tit:'Entrada da fábrica',sub:(imp?'CSV importado '+haTxt(mi)+(imp.por?' por '+imp.por:''):'')+(ult?' · última passagem '+brc(ult.slice(0,10))+' às '+ult.slice(11,16):''),ult,imp}; }
   function ptoPil(c,p){ const esc=c.esc, I=ptoInfo(c,p);
-    return `<div class="pjp-fid pto ${I.tom}" role="status" title="${esc(I.sub)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(I.tit)}</b><small>${esc(I.sub)}</small><label class="pjp-imp">${J.ptoLendo?'lendo…':'importar CSV'}<input type="file" accept=".csv,text/csv" data-pjp-pto="1" ${J.ptoLendo?'disabled':''}></label></div>`; }
+    const tit=I.tom==='ok'?'Entrada em dia':/parado/.test(I.tit)?'Entrada parada':/problema/.test(I.tit)?'Entrada com problema':I.imp||I.ult?'Entrada desatualizada':'Entrada sem importar';
+    return `<div class="pjp-fid pto ${I.tom}" role="status" title="${esc(I.tit+' · '+I.sub)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(tit)}</b><label class="pjp-imp">${J.ptoLendo?'lendo…':'importar CSV'}<input type="file" accept=".csv,text/csv" data-pjp-pto="1" hidden ${J.ptoLendo?'disabled':''}></label></div>`; }
   /* importar o CSV "Acessos Gerais" do iDSecure da entrada da fábrica: junta as passagens com as que já estavam (não apaga nada) */
   async function ptoImporta(c,file){ const P=c.P; J.ptoLendo=true; P.rerender();
     try{ if(!window.RHAlmoco||!window.RHAlmoco.interpretar) throw new Error('O módulo do Face ID ainda não carregou. Tente de novo.');
@@ -645,7 +646,7 @@
     const barra=`<div class="pjp-bar"><div class="pjp-nav"><button class="pjp-nb" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
           <div><b>${cfg(c).modo==='mes'?'Mês ':''}${esc(p.txt)}</b>${ehAt?'':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
           <button class="pjp-nb" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
-        ${FI?`<div class="pjp-fid ${FI.tom}" role="status" title="${esc(fidT)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(FI.tit)}</b><small>${esc(FI.sub)}</small><small class="pjp-fu">${esc(FI.ultTxt)}${FI.imp&&FI.robo?' · último CSV '+esc(hm(FI.imp.em)):''}</small><button class="lnk" data-act="pjp-fidir" type="button">ver</button></div>`:''}
+        ${FI?`<div class="pjp-fid ${FI.tom}" role="status" title="${esc(fidT)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(FI.tit)}</b>${FI.curto?`<small>${esc(FI.curto)}</small>`:''}<button class="lnk" data-act="pjp-fidir" type="button">ver</button></div>`:''}
         ${ptoPil(c,p)}
         <span class="pjp-sp"></span><div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','PDF')}${btn('pjp-cfg','Como é feita a conta')}</div></div>`;
     return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
@@ -807,6 +808,8 @@
   .pjp-pp{padding:16px 20px;border-radius:16px;gap:16px}.pjp-pp h3{font-size:18px}.pjp-pp p{font-size:13.5px}.pjp-ppi{width:38px;height:38px;border-radius:11px}
   .pjp-pp .btn{height:40px!important;font-size:14px!important;padding:0 18px!important}
   @media(max-width:1100px){.pjp-bar .pjp-fid .pjp-fu{display:none}}
+  .pjp-bar .pjp-fid{padding:5px 11px;gap:7px}.pjp-bar .pjp-fid b{font-size:12.5px}.pjp-bar .pjp-fid small{font-size:12px}.pjp-bar .pjp-fid.crit{background:var(--crit-tint,#F6E3E1)}.pjp-bar .pjp-fid.warn{background:var(--warn-tint,#FBF1DC);border-color:transparent}
+  .pjp-bar .pjp-fid.pto .pjp-imp{font-size:12px;margin-left:2px}
   @media(max-width:760px){.pjp-bar .pjp-fid{border-radius:12px;flex-wrap:wrap;white-space:normal}.pjp-bar .pjp-fid small{white-space:normal}.pjp-tbt{width:100%}}
   .pjp-mod.pjp-fin{max-width:1100px}
   .pjp-fing{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}@media(max-width:860px){.pjp-fing{grid-template-columns:1fr}}

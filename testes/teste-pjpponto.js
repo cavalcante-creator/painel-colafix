@@ -17,7 +17,7 @@ const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHO
   let r=await pas('2026-10-27'); ok('Dia com entrada e saída na entrada da fábrica: vale só ela (07:45–17:00), o Face ID de sempre fica de fora', r.src==='pto'&&r.hs.join()==='07:45,17:00', JSON.stringify(r));
   r=await pas('2026-10-28'); ok('Só a entrada marcada na fábrica: junta com o Face ID para achar a saída', r.src==='mix'&&r.hs[0]==='07:40'&&r.hs[r.hs.length-1]==='18:00', JSON.stringify(r));
   r=await pas('2026-10-29'); ok('Sem marcação na entrada da fábrica: vale o Face ID de sempre', r.src==='fid'&&r.hs[0]==='08:00'&&r.hs[r.hs.length-1]==='18:00', JSON.stringify(r));
-  const bar=await p.evaluate(()=>(document.querySelector('.pjp-bar')||{}).innerText||'');
+  const bar=await p.evaluate(()=>[...document.querySelectorAll('.pjp-bar,.pjp-bar [title]')].map(e=>e.innerText+' '+(e.title||'')).join(' '));
   ok('A barra mostra a situação da entrada da fábrica com "importar CSV"', /Entrada da fábrica/.test(bar)&&/importar CSV/.test(bar)&&/última passagem 28\/10 às 07:40/.test(bar), bar);
   await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab='f1'; J.tab='horas'; window.Painel.render(); }); await H.dorme(1200);
   const g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
@@ -36,10 +36,10 @@ const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHO
   ok('Importar o CSV junta o dia novo e mantém os que já estavam (só os autorizados)', P0.dias&&P0.dias['2026-10-30']&&P0.dias['2026-10-30']['11122233344'].t.length===2&&P0.dias['2026-10-27']&&P0.imp.length===2, JSON.stringify(P0.dias&&P0.dias['2026-10-30']));
   r=await pas('2026-10-30'); ok('Depois de importar, o dia 30 passa a valer pela entrada da fábrica', r.src==='pto'&&r.hs.join()==='07:33,17:22', JSON.stringify(r));
   await p.evaluate(()=>{ const db=window.Painel.db(); return db.doc('rh/dados/robo/entrada').set({ultima:new Date(Date.now()-20*60000).toISOString(),ok:true,passagens:40,origem:'iDSecure'}); }); await H.dorme(1500);
-  let b2=await p.evaluate(()=>(document.querySelector('.pjp-fid.pto')||{}).innerText||'');
-  ok('Com o robô da entrada rodando, a barra mostra "Entrada da fábrica em dia · Robô leu há 20 min"', /Entrada da fábrica em dia/.test(b2)&&/Robô leu há 20 min/.test(b2), b2);
+  let b2=await p.evaluate(()=>((e=>e?e.innerText+' '+e.title:'')(document.querySelector('.pjp-fid.pto'))));
+  ok('Com o robô da entrada rodando, a barra mostra "Entrada da fábrica em dia · Robô leu há 20 min"', /Entrada em dia/.test(b2)&&/Robô leu há 20 min/.test(b2), b2);
   await p.evaluate(()=>window.Painel.db().doc('rh/dados/robo/entrada').set({ultima:new Date().toISOString(),ok:false,erro:'Não entrou no iDSecure: login recusado (401).'})); await H.dorme(1500);
-  b2=await p.evaluate(()=>(document.querySelector('.pjp-fid.pto')||{}).innerText||'');
+  b2=await p.evaluate(()=>((e=>e?e.innerText+' '+e.title:'')(document.querySelector('.pjp-fid.pto'))));
   ok('Robô com erro aparece na barra com o motivo', /Robô da entrada com problema/.test(b2)&&/login recusado/.test(b2), b2);
   const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
   console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });

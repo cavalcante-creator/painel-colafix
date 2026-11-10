@@ -13,7 +13,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
   await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; __T.go('rhpjpag'); }); await H.dorme(2500);
   const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
-  const txt=sel=>p.evaluate(s=>{ const e=document.querySelector(s); return e?e.innerText:''; },sel);
+  const txt=sel=>p.evaluate(s=>{ const e=document.querySelector(s); return e?e.innerText+' '+(e.title||''):''; },sel);
   const nomes=()=>p.evaluate(()=>[...document.querySelectorAll('.pjp-lc .pjp-t tbody .pjp-nm')].map(b=>b.textContent.split(' ')[0]));
   const abas=await p.evaluate(()=>[...document.querySelectorAll('.pjp-aba')].map(b=>b.innerText.replace(/\s+/g,' ').trim()+(b.getAttribute('aria-selected')==='true'?'*':'')));
   ok('Abas no alto: Precisa de você (abre primeiro, com a quantidade) · Onde cada PJ está · Todos os PJ', abas.join('|')==='Precisa de você 3*|Onde cada PJ está|Todos os PJ 7', abas.join('|'));
