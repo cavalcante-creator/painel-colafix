@@ -1,0 +1,43 @@
+/* Pagamento dos PJ organizado (10/11): etapas que filtram, lista em ordem de etapa, PJ sem valor da hora ou sem horas
+   mostra o que falta (e não fecha com R$ 0), "Fechar o valor dos N" só fecha quem está na lista, celular em cartões. Dados inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed'); const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Produção','Manutenção']};
+  const P=[['f1','JOAO PEREIRA TESTE','ZENITH','11122233344',5000,'Produção'],['f2','MARIA OLIVEIRA TESTE','NEXUS','55566677788',4000,'Manutenção'],['f4','ANA SOUZA TESTE','ZENITH','22233344455',4400,'Produção'],['f5','BRUNO LIMA TESTE','NEXUS','33344455566',6000,'Manutenção'],['f6','CARLA DIAS TESTE','ZENITH','44455566677',3800,'Expedição'],['f7','DIEGO ROCHA TESTE','ZENITH','66677788899',0,'Produção'],['f8','EVA MOURA TESTE','ZENITH','77788899900',3000,'Produção']];
+  P.forEach(([id,n,e,cpf,s,set],i)=>{ D['rh/dados/funcionarios/'+id]={nome:n,tipo:'PJ',empresa:e,cpf,cnpj:'1234567800019'+i,salario:s,setor:set,funcao:'Operador',status:'Ativo',admissao:'2025-01-10'}; });
+  const dias={}; ['16','19','20','21','22','23','26','27','28','29','30'].forEach(x=>{ const k='2026-10-'+x; dias[k]={}; P.forEach(([id,n,e,cpf],i)=>{ if(id==='f7'||id==='f8') return; dias[k][cpf]={p:1,a:1,t:['07:2'+i+':10 PORTARIA','12:01:00 REFEITÓRIO','17:2'+i+':00 PORTARIA']}; }); });
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias,pessoas:Object.fromEntries(P.map(([id,n,e,cpf])=>[cpf,{n,e}])),imp:[]};
+  D['rh/dados/pjpag/2026-10-2']={pid:'2026-10-2',de:'2026-10-16',ate:'2026-10-31',pes:{f4:{st:'pedido',fech:{min:5000,vh:20,valor:1666.67,bruto:1666.67}},f5:{st:'pago',fech:{min:5200,vh:27.27,valor:2363.4,bruto:2363.4}},f6:{st:'fechado',fech:{min:5100,vh:17.27,valor:1468,bruto:1468}}}};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ window.RHPJPag._J.per='2026-10-2'; __T.go('rhpjpag'); }); await H.dorme(2500);
+  const srv=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+  const et=()=>p.evaluate(()=>[...document.querySelectorAll('.pjp-ec')].map(b=>b.querySelector('.pjp-et1').textContent+'='+b.querySelector('b').textContent));
+  const nomes=()=>p.evaluate(()=>[...document.querySelectorAll('.pjp-t tbody .pjp-nm')].map(b=>b.textContent.split(' ')[0]));
+  let e=await et(); ok('Etapas com a quantidade de PJ em cada uma', e.join('|')==='Conferir as horas=4|Pedir a nota=1|Esperando a nota=1|Conferir a nota=0|Para pagar=0|Pago=1', e.join('|'));
+  let n=await nomes(); ok('Lista em ordem de etapa (conferir primeiro, pago por último)', n.join(',')==='Diego,Eva,Joao,Maria,Carla,Ana,Bruno', n.join(','));
+  const tot=await p.evaluate(()=>document.querySelector('.pjp-tot1').innerText); ok('Total da quinzena com o que já foi pago', /7 PJ/.test(tot)&&/pago R\$\s?2\.363,40/.test(tot), tot.replace(/\n/g,' | '));
+  await p.click('[data-act="pjp-et"][data-v="fechado"]'); await H.dorme(500); n=await nomes();
+  ok('Tocar numa etapa filtra a lista', n.join(',')==='Carla'&&await p.evaluate(()=>document.querySelector('.pjp-ec.on .pjp-et1').textContent==='Pedir a nota'), n.join(','));
+  await p.click('[data-act="pjp-et"][data-v="fechado"]'); await H.dorme(500); n=await nomes(); ok('Tocar de novo volta a mostrar todos', n.length===7, n.join(','));
+  const dg=await p.evaluate(()=>{ const tr=[...document.querySelectorAll('.pjp-t tbody tr')].find(t=>/Diego/.test(t.innerText)); return tr.querySelector('.pjp-qa').innerText; });
+  ok('Sem valor da hora: mostra o que falta e o botão para pôr (não "Fechar valor")', /Falta o valor da hora/.test(dg)&&/Pôr o valor da hora/.test(dg)&&!/Fechar valor/.test(dg), dg);
+  await p.click('[data-act="pjp-ab"][data-f="f7"][data-tab="regras"]'); await H.dorme(700);
+  const aba=await p.evaluate(()=>(document.querySelector('.pjp-tabs .on')||{}).textContent); ok('"Pôr o valor da hora" abre a pessoa nas regras', /Regras/.test(aba), aba);
+  await p.keyboard.press('Escape'); await p.click('[data-act="pjp-gx"]').catch(()=>{}); await H.dorme(400);
+  const ev=await p.evaluate(()=>{ const tr=[...document.querySelectorAll('.pjp-t tbody tr')].find(t=>/Eva/.test(t.innerText)); return tr.querySelector('.pjp-qa').innerText; });
+  ok('Sem horas no período: avisa e não oferece fechar', /Sem horas no período/.test(ev)&&!/Fechar valor/.test(ev), ev);
+  await p.selectOption('#pjp-emp','NEXUS'); await H.dorme(600);
+  const lt=await p.evaluate(()=>(document.querySelector('[data-act="pjp-fechtodos"]')||{}).textContent||'');
+  ok('Com filtro, o lote só conta quem está na lista', lt===''||/dos 1$/.test(lt), lt);
+  await p.selectOption('#pjp-emp',''); await H.dorme(600);
+  const lt2=await p.evaluate(()=>document.querySelector('[data-act="pjp-fechtodos"]').textContent); ok('"Fechar o valor dos N" conta só quem pode fechar (com horas e valor da hora)', /dos 2$/.test(lt2), lt2);
+  await p.click('[data-act="pjp-fechtodos"]'); await H.dorme(1500); const S=await srv(), pes=S['rh/dados/pjpag/2026-10-2'].pes;
+  ok('Fechar todos fecha os dois e não fecha quem está sem valor/sem horas', pes.f1&&pes.f1.st==='fechado'&&pes.f2&&pes.f2.st==='fechado'&&!(pes.f7&&pes.f7.st)&&!(pes.f8&&pes.f8.st), JSON.stringify(Object.fromEntries(Object.entries(pes).map(([k,v])=>[k,v.st]))));
+  await p.setViewportSize({width:390,height:844}); await H.dorme(900);
+  const cel=await p.evaluate(()=>{ const tr=document.querySelector('.pjp-t tbody tr:not(.pjp-gr)'); const r=tr.getBoundingClientRect(); return {w:document.documentElement.scrollWidth,dis:getComputedStyle(tr).display,cw:r.width}; });
+  ok('Celular: cada PJ vira um cartão, sem rolagem para o lado', cel.dis==='grid'&&cel.w<=392&&cel.cw<=392, JSON.stringify(cel));
+  if(process.env.SHOT){ await p.screenshot({path:'/tmp/pjp-cel.png',fullPage:true}); }
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
