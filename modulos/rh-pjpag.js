@@ -98,7 +98,14 @@
   /* ---------- pessoas ---------- */
   /* 10/11 ("por enquanto só os Zenith e Nexus"): o Pagamento dos PJ só conta os PJ dessas empresas; para pôr outras, rh/config.pjPag.emps */
   const pjEmps=c=>((((c.R.cfg||{}).pjPag)||{}).emps||['ZENITH','NEXUS']).map(x=>String(x).toUpperCase());
-  const pjs=(c,p)=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.nome&&pjEmps(c).includes(String(f.empresa||'').toUpperCase())&&(f.status!=='Desligado'||(f.desligamento&&f.desligamento>=p.de))&&(!f.admissao||f.admissao<=p.ate))
+  /* 11/11 ("essa pessoa foi desligada, por que está aqui?"): saiu = situação Desligado/Inativo/Encerrado/Demitido ou desligamento agendado.
+     Fica na quinzena só se o último dia é dentro dela ou depois do começo E (passou no Face ID até o último dia, ou o RH já mexeu no pagamento);
+     os dias depois do desligamento não contam. Sem data de desligamento não aparece. */
+  const SAIU_ST=['DESLIGADO','INATIVO','ENCERRADO','DEMITIDO'];
+  const saiuEm=f=>{ const st=String(f.status||'').toUpperCase(); return SAIU_ST.includes(st)||(f.desligAgendado&&f.desligamento)?(f.desligamento||'-'):''; };
+  const pjBase=(c,p)=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.nome&&pjEmps(c).includes(String(f.empresa||'').toUpperCase())&&(!f.admissao||f.admissao<=p.ate));
+  const pjs=(c,p)=>pjBase(c,p).filter(f=>{ const sd=saiuEm(f); if(!sd) return true; if(sd==='-'||sd<p.de) return false;
+      const x=(docP(p.pid).pes||{})[f._id]||{}; if(x.st) return true; const r=calcPessoa(c,f,p,x); return r.comFid>0||r.fil||!!r.fixo; })
     .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
   /* regras da pessoa: as do Pagamento dos PJ (funcionarios.pjPag) valem antes; senão o "Horário diferente" do cadastro (horEsp); senão o padrão */
   /* antes/depois: true = conta; o "dentro" antigo (não conta nenhum dos dois) continua valendo onde não foi escolhido */
@@ -210,7 +217,8 @@
     const aj=(x&&x.aj)||{}, out=[], escM=contaDia(h.ini,h.fim,h).m; let tot=0, alerta=0, comFid=0;
     const LT=leitDe(c,f).l, fd=fechDia(p), fil=ehFil(c,f); let cheio=null;
     const pto=ptoMes(p.mes), K={kf:k,kp:pto?chaveFid(c,f,pto):''}; let comPto=0;
-    diasDe(p).forEach(d=>{ const DP=diaPas(c,f,d,LT,K), ps=DP.ps, hs=DP.hs, nFora=DP.nFora; if(ps.length) comFid++; if(DP.pP) comPto++;
+    const sdia=saiuEm(f), sdF=sdia&&sdia!=='-'?sdia:'';
+    diasDe(p).filter(d=>!sdF||d<=sdF).forEach(d=>{ const DP=diaPas(c,f,d,LT,K), ps=DP.ps, hs=DP.hs, nFora=DP.nFora; if(ps.length) comFid++; if(DP.pP) comPto++;
       let e=hs[0]||'', s=hs.length>1?hs[hs.length-1]:''; const a=aj[d], cor=!!(a&&(a.e||a.s||a.zero)); if(cor){ e=a.zero?'':(a.e||e); s=a.zero?'':(a.s||s); }
       const fp=ferP(d), fer=a&&a.fer?{nome:a.ferNome||(fp&&fp.nome)||'Feriado',pago:!!a.pago,rh:true}:fp?{nome:fp.nome||'Feriado',pago:!!(a&&a.pago),rh:false}:null;
       const r=contaDia(e,s,h), dw=new Date(d+'T12:00:00').getDay(); let fl='', info='', m=r.m;
@@ -232,7 +240,7 @@
     const descs=[].concat(num(x&&x.desc)>0?[{t:(x.descMot||'Desconto lançado'),v:num(x.desc),k:'leg'}]:[],uni.filter(u=>u.st==='ok').map(u=>({t:'Uniforme (entrega de '+brc(u.x.data)+')',v:u.v,k:'u'})),ext.map(z=>({t:z.t,v:num(z.v),k:'x',id:z.id})),fa0&&!(x&&x.fchX)?[{t:'Saiu mais cedo no dia do fechamento ('+brc(fa0.d)+'): '+hTxt(fa0.falta),v:fa0.v,k:'fch'}]:[]);
     const acrs=(x&&x.dsc&&Array.isArray(x.dsc.a)?x.dsc.a:[]).filter(z=>z&&!z.removido).map(z=>({t:z.t,v:num(z.v),id:z.id})), acr=Math.round(acrs.reduce((a,z)=>a+z.v,0)*100)/100;
     const fixo=+((f.pjPag||{}).fixo)||0, desc=Math.round(descs.reduce((a,z)=>a+z.v,0)*100)/100, bruto=fixo>0?fixo:hDec(tot)*vh;
-    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,acr,acrs,acrMot:acrs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),valor:Math.max(0,Math.round((bruto-desc+acr)*100)/100),horCurto,cheio,fd,alerta,comFid,comPto,kp:K.kp,fil,semFid:!fil&&(!(dados||pto)||!comFid),dados:!!(dados||pto)}; }
+    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,acr,acrs,acrMot:acrs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),valor:Math.max(0,Math.round((bruto-desc+acr)*100)/100),saiu:sdF,horCurto,cheio,fd,alerta,comFid,comPto,kp:K.kp,fil,semFid:!fil&&(!(dados||pto)||!comFid),dados:!!(dados||pto)}; }
   /* ---------- banco ---------- */
   function assina(c,pid){ const P=c.P; unifIni(c); if(!J.sub[pid]){ J.sub[pid]=true;
       P.inscrever('pjp-'+pid,()=>P.db().collection(COL).where('pid','==',pid).limit(1),s=>{ const d=s.docs[0]; J.docs[pid]=d?d.data():{pid,pes:{}}; P.rerender(); }); }
@@ -352,6 +360,7 @@
   const selo=(t,tom)=>`<span class="pjp-sl ${tom||''}">${t}</span>`;
   /* situação de cada PJ (padrão do Conectwork: selo com ponto + barrinha das etapas) */
   function situ(c,x,r){ const st=x.st||'', i=etIdx(st); let s='';
+    const sDs=r.saiu?selo('Desligado em '+brc(r.saiu)+' · conta até esse dia','warn'):'';
     if(st===''&&r.horCurto) s=selo('Horário até '+r.horCurto.fim+'? Sai às '+r.horCurto.sai,'warn'); else if(st===''){ s=!r.fixo&&!r.vh?selo('Falta o valor da hora','crit'):!r.fixo&&!r.min?selo('Sem horas no período','crit'):(r.alerta?selo(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir','warn'):'')+(r.uPend?selo('Uniforme para confirmar','warn'):'');
       if(!s) s=selo('Pronto para fechar','info'); }
     else if(st==='fechado') s=selo('Valor fechado','info');
@@ -360,7 +369,7 @@
     else if(st==='conferida') s=selo('Nota conferida · pagar','ok');
     else if(st==='pago') s=selo('Pago','ok');
     const n=st==='pago'?6:i;
-    return s+`<span class="pjp-pg" title="Etapa ${i+1} de 6 · ${c.esc(ETAPAS[i][1])}">${ETAPAS.map((e,k)=>`<i class="${k<n?'f':k===n?'a':''}"></i>`).join('')}</span>`; }
+    return sDs+s+`<span class="pjp-pg" title="Etapa ${i+1} de 6 · ${c.esc(ETAPAS[i][1])}">${ETAPAS.map((e,k)=>`<i class="${k<n?'f':k===n?'a':''}"></i>`).join('')}</span>`; }
   function acoes(c,pid,f,x,r){ const fa=`data-f="${c.esc(f._id)}"`, st=x.st||'';
     if(st===''){
       if(!r.fixo&&!r.vh) return btn('pjp-ab','Pôr o valor da hora',fa+' data-tab="regras"','');
@@ -480,6 +489,7 @@
           <div class="pg-cor">${ed?(d.aj?`<button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>${r.fil?'desfazer':'voltar ao Face ID'}</button>`:d.fil?`<button class="lnk" data-act="pjp-dzero" data-mot="Faltou (o gestor avisou)" data-d="${d.d}" ${fa}><b>Faltou</b></button>`:`<button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>${d.fl?'<b>Corrigir</b>':'Corrigir'}</button>`):''}</div>${edit}</div>`; }).join('');
       corpo=`<div class="pjp-mini"><div><span>Dias com passagem</span><b>${comP}</b></div><div><span>Horas</span><b>${r.fixo?'fixo':hTxt(r.min)}</b></div><div class="${r.alerta?'pg-w':''}"><span>Para conferir</span><b>${r.alerta}</b></div><div><span>Corrigidos</span><b>${nAj}</b></div></div>
         ${r.alerta&&ed?(()=>{ const n1=r.dias.filter(d=>d.fl&&!d.aj).length, n2=r.alerta-n1, t=[]; if(n1) t.push(n1+' dia'+(n1>1?'s':'')+' com uma passagem só (falta a saída): toque em <b>Corrigir</b> e digite a hora certa'); if(n2) t.push(n2+' dia'+(n2>1?'s':'')+' em que saiu e voltou ou o dia ficou sem a entrada/saída: <b>Descontar</b> o tempo fora ou <b>Está certo</b>'); return `<div class="pjp-av pjp-avw">${t.join('.<br>')}. <button class="lnk" data-act="pjp-dk" data-v="conf" style="display:inline;margin:0">Ver só esses dias</button></div>`; })():''}
+        ${r.saiu?`<div class="pjp-av pjp-avw"><b>Desligado em ${esc(brc(r.saiu))}.</b> Só contam os dias até essa data; os dias depois não aparecem.</div>`:''}
         ${r.horCurto?`<div class="pjp-av pjp-hc"><b>O horário desta pessoa está ${esc(r.horCurto.ini)} às ${esc(r.horCurto.fim)}</b> (${r.horCurto.de==='pj'?'nas Regras desta pessoa':r.horCurto.de==='cad'?'no "Horário diferente" do cadastro':'no horário padrão dos Parâmetros'}), mas ela costuma sair por volta das ${esc(r.horCurto.sai)}. Por isso o dia do fechamento conta só até ${esc(r.horCurto.fim)}. ${btn('pjp-tab','Corrigir o horário','data-v="regras"','')}</div>`:''}
         ${r.fil?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">Trabalha na Fixcol: não passa no Face ID. Cada dia da escala conta cheio; quando o gestor avisar que faltou, toque em <b>Faltou</b> no dia.</div>`:''}
         ${!ed?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor já foi fechado. Para corrigir alguma hora, toque em ${lnk('pjp-reab','mudar o valor',fa).replace('class="lnk"','class="lnk" style="display:inline;margin:0"')} (volta para conferir).</div>`:''}

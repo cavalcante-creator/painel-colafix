@@ -1,0 +1,34 @@
+/* Pagamento dos PJ (11/11, "essa pessoa foi desligada, por que está aqui?"): desligado só aparece na quinzena em que ainda tem dias
+   para receber (último dia dentro dela e passou no Face ID até lá); os dias depois do desligamento não contam. Dados inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed');
+const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Expedição'],pjPag:{ini:'07:30',fim:'17:18',intv:60,tol:5}};
+  const F=(id,nome,cpf,x)=>{ D['rh/dados/funcionarios/'+id]=Object.assign({nome,tipo:'PJ',empresa:'ZENITH',cpf,cnpj:'1234567800019'+id.slice(1),salario:4400,setor:'Expedição',funcao:'Ajudante',status:'Ativo',admissao:'2025-01-10'},x); };
+  F('f1','ANA ATIVA TESTE','11111111111',{});
+  F('f2','BRUNO SAIU ANTES TESTE','22222222222',{status:'Desligado',desligamento:'2026-10-10'});
+  F('f3','CAIO SAIU NO MEIO TESTE','33333333333',{status:'Desligado',desligamento:'2026-10-21'});
+  F('f4','DORA SEM PASSAGEM TESTE','44444444444',{status:'Desligado',desligamento:'2026-10-20'});
+  F('f5','EDU SEM DATA TESTE','55555555555',{status:'Desligado'});
+  F('f6','FABIO INATIVO TESTE','66666666666',{status:'Inativo',desligamento:'2026-10-05'});
+  const dia=(cpfs)=>{ const o={}; cpfs.forEach(c=>o[c]={p:1,t:['07:30:00 PORTARIA','17:18:00 PORTARIA']}); return o; };
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias:{'2026-10-19':dia(['11111111111','33333333333']),'2026-10-20':dia(['11111111111','33333333333']),'2026-10-22':dia(['11111111111','33333333333'])},pessoas:{},imp:[]};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.per='2026-10-2'; J.aba='lista'; __T.go('rhpjpag'); window.Painel.render(); }); await H.dorme(2500);
+  const txt=await p.evaluate(()=>document.querySelector('#view').innerText);
+  ok('Ativa aparece', /Ana Ativa/i.test(txt));
+  ok('Desligado antes da quinzena não aparece', !/Bruno Saiu/i.test(txt));
+  ok('Desligado sem data não aparece', !/Edu Sem Data/i.test(txt));
+  ok('Inativo antes da quinzena não aparece', !/Fabio Inativo/i.test(txt));
+  ok('Desligado na quinzena sem passar no Face ID não aparece', !/Dora Sem/i.test(txt));
+  const lin=n=>p.evaluate(n=>{ const t=[...document.querySelectorAll('tr,[data-r]')].map(x=>x.innerText).filter(x=>new RegExp(n,'i').test(x)); return t.sort((a,b)=>a.length-b.length)[0]||''; },n);
+  const c3=await lin('Caio Saiu');
+  ok('Desligado no meio aparece com o selo e só os dias até 21/10 (2 dias, R$ 352,00)', /Desligado em 21\/10/.test(c3)&&/352,00/.test(c3), c3);
+  const a1=await lin('Ana Ativa'); ok('A ativa conta os 3 dias (R$ 528,00)', /528,00/.test(a1), a1);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab='f3'; J.tab='horas'; window.Painel.render(); }); await H.dorme(1200);
+  const g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
+  ok('A folha avisa o desligamento e não tem o dia 22', /Desligado em 21\/10/.test(g)&&!/22\/10/.test(g), g.slice(0,300));
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
