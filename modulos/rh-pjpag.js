@@ -444,7 +444,7 @@
         return `<button type="button" class="pjp-cd ${st}${k.includes('cor')?' cr':''}" data-act="pjp-dcal" data-v="${d.d}" aria-pressed="${J.dsel===d.d}" title="${DLX[d.dw]} ${br(d.d)} · ${tt}${d.m?' · '+hTxt(d.m):''}"><b>${+d.d.slice(8,10)}</b><small>${d.m?hTxt(d.m):st==='sm'?'falta':st==='cf'?'conferir':''}</small></button>`; };
       const pd=r.dias[0]?new Date(r.dias[0].d+'T12:00:00').getDay():1, vaz=(pd+6)%7;
       const filtro=`<div class="pjp-cal"><div class="pjp-calh"><b>Procurar o dia</b><span>toque no dia para ver só ele</span>${J.dsel?`<button type="button" class="lnk" data-act="pjp-dcal" data-v="" style="margin:0 0 0 auto">ver todos os dias</button>`:''}</div>
-        <div class="pjp-calg">${['seg','ter','qua','qui','sex','sáb','dom'].map(x=>`<span class="pjp-cw">${x}</span>`).join('')}${'<span></span>'.repeat(vaz)}${r.dias.map(cel).join('')}</div>
+        <div class="pjp-calg">${['seg','ter','qua','qui','sex','sáb','dom'].map(x=>`<span class="pjp-cwd">${x}</span>`).join('')}${'<span></span>'.repeat(vaz)}${r.dias.map(cel).join('')}</div>
         <div class="pjp-call"><span><i class="ok"></i>trabalhou</span><span><i class="cf"></i>para conferir</span><span><i class="sm"></i>sem passagem</span><span><i class="fd"></i>fim de semana / fora da escala</span></div></div>
       <div class="pjp-dfil">        <div class="pjp-dks">${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div></div>
         <p class="pjp-dv" id="pjp-dv" hidden>Nenhum dia com esse filtro.</p>`;
@@ -913,7 +913,7 @@
   .pjp-cal{border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:12px 14px;background:var(--surface)}
   .pjp-calh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}.pjp-calh b{font-size:14px}.pjp-calh span{font-size:12.5px;color:var(--muted)}
   .pjp-calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
-  .pjp-cw{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:2px}
+  .pjp-cwd{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:2px}
   .pjp-cd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:46px;border-radius:10px;border:1px solid transparent;background:var(--ground);color:inherit;font:inherit;cursor:pointer;padding:3px 2px;font-variant-numeric:tabular-nums}
   .pjp-cd b{font-size:15px;font-weight:600;line-height:1.1}.pjp-cd small{font-size:10.5px;color:var(--muted);white-space:nowrap}
   .pjp-cd.ok{background:var(--ok-tint,#E3F0E8)}.pjp-cd.ok small{color:var(--ok-ink,#2F6B47)}
