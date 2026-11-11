@@ -179,12 +179,16 @@
       if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
       else if(!cor&&!dFil&&!fil){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
       out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil,mR,fF:mR!=null?fF:null}); tot+=m; });
+    /* horário que não bate (11/11, foto: horário 08:00 às 12:00 e a pessoa sai às 18h → o dia cheio do fechamento dava 2h48):
+       saída mais comum nos dias de semana com entrada e saída; se passa 2 h do fim do horário, avisa */
+    const sais=out.filter(d=>!d.aj&&!d.fil&&d.esc&&d.dw>0&&d.dw<6&&d.hs.length>=2).map(d=>min(d.hs[d.hs.length-1])).filter(v=>v!=null).sort((a,b)=>a-b);
+    const saiT=sais.length>=2?sais[Math.floor(sais.length/2)]:null, fimM=min(h.fim), horCurto=!fil&&saiT!=null&&fimM!=null&&saiT-fimM>120?{fim:h.fim,ini:h.ini,sai:hhmm(saiT),de:h.de.fim}:null;
     const fa0=fechAnt(c,f,p,h);
     const uni=unifDe(c,f,p), ext=(x&&x.dsc&&Array.isArray(x.dsc.x)?x.dsc.x:[]).filter(z=>z&&!z.removido);
     const descs=[].concat(num(x&&x.desc)>0?[{t:(x.descMot||'Desconto lançado'),v:num(x.desc),k:'leg'}]:[],uni.filter(u=>u.st==='ok').map(u=>({t:'Uniforme (entrega de '+brc(u.x.data)+')',v:u.v,k:'u'})),ext.map(z=>({t:z.t,v:num(z.v),k:'x',id:z.id})),fa0&&!(x&&x.fchX)?[{t:'Saiu mais cedo no dia do fechamento ('+brc(fa0.d)+'): '+hTxt(fa0.falta),v:fa0.v,k:'fch'}]:[]);
     const acrs=(x&&x.dsc&&Array.isArray(x.dsc.a)?x.dsc.a:[]).filter(z=>z&&!z.removido).map(z=>({t:z.t,v:num(z.v),id:z.id})), acr=Math.round(acrs.reduce((a,z)=>a+z.v,0)*100)/100;
     const fixo=+((f.pjPag||{}).fixo)||0, desc=Math.round(descs.reduce((a,z)=>a+z.v,0)*100)/100, bruto=fixo>0?fixo:hDec(tot)*vh;
-    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,acr,acrs,acrMot:acrs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),valor:Math.max(0,Math.round((bruto-desc+acr)*100)/100),cheio,fd,alerta,comFid,comPto,kp:K.kp,fil,semFid:!fil&&(!(dados||pto)||!comFid),dados:!!(dados||pto)}; }
+    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,acr,acrs,acrMot:acrs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),valor:Math.max(0,Math.round((bruto-desc+acr)*100)/100),horCurto,cheio,fd,alerta,comFid,comPto,kp:K.kp,fil,semFid:!fil&&(!(dados||pto)||!comFid),dados:!!(dados||pto)}; }
   /* ---------- banco ---------- */
   function assina(c,pid){ const P=c.P; unifIni(c); if(!J.sub[pid]){ J.sub[pid]=true;
       P.inscrever('pjp-'+pid,()=>P.db().collection(COL).where('pid','==',pid).limit(1),s=>{ const d=s.docs[0]; J.docs[pid]=d?d.data():{pid,pes:{}}; P.rerender(); }); }
@@ -304,7 +308,7 @@
   const selo=(t,tom)=>`<span class="pjp-sl ${tom||''}">${t}</span>`;
   /* situação de cada PJ (padrão do Conectwork: selo com ponto + barrinha das etapas) */
   function situ(c,x,r){ const st=x.st||'', i=etIdx(st); let s='';
-    if(st===''){ s=!r.fixo&&!r.vh?selo('Falta o valor da hora','crit'):!r.fixo&&!r.min?selo('Sem horas no período','crit'):(r.alerta?selo(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir','warn'):'')+(r.uPend?selo('Uniforme para confirmar','warn'):'');
+    if(st===''&&r.horCurto) s=selo('Horário até '+r.horCurto.fim+'? Sai às '+r.horCurto.sai,'warn'); else if(st===''){ s=!r.fixo&&!r.vh?selo('Falta o valor da hora','crit'):!r.fixo&&!r.min?selo('Sem horas no período','crit'):(r.alerta?selo(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir','warn'):'')+(r.uPend?selo('Uniforme para confirmar','warn'):'');
       if(!s) s=selo('Pronto para fechar','info'); }
     else if(st==='fechado') s=selo('Valor fechado','info');
     else if(st==='pedido') s=selo((pedCw(x)?'Pedido no Conectwork':'Esperando a nota')+(x.ped&&x.ped.em?' desde '+brc(String(x.ped.em).slice(0,10)):''),'info');
@@ -407,6 +411,7 @@
           <div class="pg-cor">${ed?(d.aj?`<button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>${r.fil?'desfazer':'voltar ao Face ID'}</button>`:d.fil?`<button class="lnk" data-act="pjp-dzero" data-mot="Faltou (o gestor avisou)" data-d="${d.d}" ${fa}><b>Faltou</b></button>`:`<button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>${d.fl?'<b>Corrigir</b>':'Corrigir'}</button>`):''}</div>${edit}</div>`; }).join('');
       corpo=`<div class="pjp-mini"><div><span>Dias com passagem</span><b>${comP}</b></div><div><span>Horas</span><b>${r.fixo?'fixo':hTxt(r.min)}</b></div><div class="${r.alerta?'pg-w':''}"><span>Para conferir</span><b>${r.alerta}</b></div><div><span>Corrigidos</span><b>${nAj}</b></div></div>
         ${r.alerta&&ed?`<div class="pjp-av">${r.alerta} dia${r.alerta>1?'s':''} com uma passagem só no Face ID (falta a saída). Toque em <b>Corrigir</b> no dia e digite a hora certa.</div>`:''}
+        ${r.horCurto?`<div class="pjp-av pjp-hc"><b>O horário desta pessoa está ${esc(r.horCurto.ini)} às ${esc(r.horCurto.fim)}</b> (${r.horCurto.de==='pj'?'nas Regras desta pessoa':r.horCurto.de==='cad'?'no "Horário diferente" do cadastro':'no horário padrão dos Parâmetros'}), mas ela costuma sair por volta das ${esc(r.horCurto.sai)}. Por isso o dia do fechamento conta só até ${esc(r.horCurto.fim)}. ${btn('pjp-tab','Corrigir o horário','data-v="regras"','')}</div>`:''}
         ${r.fil?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">Trabalha na Fixcol: não passa no Face ID. Cada dia da escala conta cheio; quando o gestor avisar que faltou, toque em <b>Faltou</b> no dia.</div>`:''}
         ${!ed?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor já foi fechado. Para corrigir alguma hora, toque em ${lnk('pjp-reab','mudar o valor',fa).replace('class="lnk"','class="lnk" style="display:inline;margin:0"')} (volta para conferir).</div>`:''}
         <div class="pjp-dl">${lin}</div>
@@ -618,7 +623,7 @@
       .sort((A,B)=>etIdx(A.x.st)-etIdx(B.x.st)||String(A.f.nome).localeCompare(String(B.f.nome),'pt-BR'));
     const rs=rsF.filter(({x})=>col<0||COLS[col].st.includes(x.st||''));
     const okFech=o=>!o.x.st&&(o.r.fixo||(o.r.vh&&o.r.min))&&!o.r.uPend;
-    const prontos=rsF.filter(o=>okFech(o)&&!o.r.alerta), abrir=rsF.filter(okFech), fechados=rsF.filter(o=>o.x.st==='fechado');
+    const prontos=rsF.filter(o=>okFech(o)&&!o.r.alerta&&!o.r.horCurto), abrir=rsF.filter(okFech), fechados=rsF.filter(o=>o.x.st==='fechado');
     J._vis=prontos.map(o=>o.f._id).concat(fechados.map(o=>o.f._id));
     const soma=a=>a.reduce((t,o)=>t+o.r.valor,0), totV=soma(rsF), pagoV=soma(rsF.filter(o=>o.x.st==='pago')), totM=rsF.reduce((t,o)=>t+o.r.min,0);
     const nm=o=>c.titulo(o.f.nome), fa=o=>`data-f="${esc(o.f._id)}"`, ini=o=>U?U.ini(nm(o),{p:1}):'';
@@ -638,7 +643,7 @@
     const pv=[];
     rsF.forEach(o=>{ const {x,r}=o, st=x.st||''; let t='', tom='';
       if(st===''){ if(!r.fixo&&!r.vh){ t='Sem valor da hora'+(r.semFid?' e sem passagem no Face ID':''); tom='crit'; } else if(!r.fixo&&!r.min){ t='Sem horas no período'+(r.semFid?' (não passou no Face ID)':''); tom='crit'; }
-        else { const a=[]; if(r.alerta) a.push(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir (só uma passagem)'); if(r.uPend) a.push('desconto do uniforme para confirmar'); if(a.length){ t=a.join(' · '); tom='warn'; } } }
+        else { const a=[]; if(r.alerta) a.push(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir (só uma passagem)'); if(r.uPend) a.push('desconto do uniforme para confirmar'); if(r.horCurto) a.push('horário até '+r.horCurto.fim+', mas sai por volta das '+r.horCurto.sai+' · confira as Regras'); if(a.length){ t=a.join(' · '); tom='warn'; } } }
       else if(st==='chegou'){ t=x.nota&&x.nota.conf==='dif'?'Nota chegou com diferença':'Nota chegou · conferir'; tom=x.nota&&x.nota.conf==='dif'?'crit':'warn'; }
       else if(st==='conferida'){ t='Nota conferida · falta marcar pago'; tom='info'; }
       else if(st==='pedido'&&x.ped&&diasDesde(x.ped.em)>=(+cfg(c).avisaNota||3)){ t='Pedimos a nota há '+diasDesde(x.ped.em)+' dias e ainda não chegou'; tom='warn'; }
@@ -846,6 +851,7 @@
   .pjp-par .pjp-emps .pjp-ck small{white-space:nowrap;color:var(--muted)}.pjp-mod .pjp-box label.pjp-ck{margin-top:10px}
   .pjp-par .pjp-lt{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:6px}.pjp-mod.pjp-par .pjp-box .pjp-lt label{border:1px solid var(--line,#E1E7EB);border-radius:10px;padding:9px 12px;gap:10px;align-items:flex-start;font-size:14px}.pjp-par .pjp-lt label span{display:flex;flex-direction:column}.pjp-par .pjp-lt input{margin-top:2px!important}
   .pjp-d .pg-hh .pg-fds{display:block;font-size:11px;font-weight:500;color:var(--warn-ink,#7A5310)}
+  .pjp-av.pjp-hc{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pjp-av.pjp-hc .btn{height:32px;font-size:13px}
   .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
   .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
   .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}

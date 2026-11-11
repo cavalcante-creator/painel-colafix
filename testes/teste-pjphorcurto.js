@@ -1,0 +1,26 @@
+/* Pagamento dos PJ (11/11): horário cadastrado 08:00 às 12:00 mas a pessoa sai às 18h → aviso e "Corrigir o horário"; corrigido, o dia do fechamento vale o dia cheio. Dados inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed');
+const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Expedição'],pjPag:{ini:'08:00',fim:'18:00',intv:72,tol:5,fds:1}};
+  D['rh/dados/funcionarios/f1']={nome:'CARLOS PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',setor:'Expedição',funcao:'Ajudante',status:'Ativo',admissao:'2025-01-10',pjPag:{vh:20,fim:'12:00'}};
+  const dias={}; ['2026-10-19','2026-10-20','2026-10-21','2026-10-22','2026-10-23','2026-10-30'].forEach(k=>{ dias[k]={'11122233344':{p:1,t:['08:00:00 PORTARIA','18:02:00 PORTARIA']}}; });
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias,pessoas:{'11122233344':{n:'CARLOS PEREIRA TESTE',e:'ZENITH'}},imp:[]};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.per='2026-10-2'; J.aba='lista'; __T.go('rhpjpag'); window.Painel.render(); }); await H.dorme(2500);
+  const lin=await p.evaluate(()=>[...document.querySelectorAll('tr')].map(x=>x.innerText).find(x=>/Carlos/i.test(x))||'');
+  ok('Na lista: "Horário até 12:00? Sai às 18:02"', /Horário até 12:00\? Sai às 18:02/.test(lin), lin.replace(/\n/g,' | '));
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab='f1'; J.tab='horas'; window.Painel.render(); }); await H.dorme(1000);
+  let g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
+  ok('Na folha da pessoa: aviso do horário com "Corrigir o horário"', /está 08:00 às 12:00/.test(g)&&/nas Regras desta pessoa/.test(g)&&/Corrigir o horário/.test(g), g.slice(0,400).replace(/\n/g,' | '));
+  await p.click('.pjp-hc [data-act=pjp-tab]'); await H.dorme(600);
+  ok('"Corrigir o horário" abre as Regras', await p.evaluate(()=>window.RHPJPag._J.tab==='regras'&&!!document.getElementById('pjp-rf')));
+  await p.fill('#pjp-rf','18:00'); await p.click('[data-act=pjp-psalva]'); await H.dorme(1200);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.tab='horas'; window.Painel.render(); }); await H.dorme(800);
+  g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
+  const sx=(g.match(/Sex 30\/10[\s\S]{0,220}/)||[''])[0];
+  ok('Corrigido: some o aviso e o dia do fechamento vale o dia cheio (8h48)', !/está 08:00 às 12:00/.test(g)&&/8h48/.test(sx), sx.replace(/\n/g,' | '));
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
