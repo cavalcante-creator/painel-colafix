@@ -82,3 +82,5 @@ const PCU={
     return {el:d, fechar}; }
 };
 try{ window.Painel.ui=PCU; }catch(e){}
+/* ícone novo vindo de um módulo (arquivo separado não enxerga o mapa P): Painel.icone('nome','<path …/>') */
+try{ window.Painel.icone=(n,d)=>{ if(n&&d&&!P[n]) P[n]=d; }; }catch(e){}

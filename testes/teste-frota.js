@@ -28,10 +28,10 @@ const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU '
  await p.setInputFiles('#fr-impf',arq); await H.dorme(800); s=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Trazer de novo: tudo "já estava" (não repete)', /Caminhões\s+2\s+0\s+2/.test(s), (s.match(/O QUÊ[\s\S]{0,200}/)||[''])[0].replace(/\n/g,' | ')); await p.click('[data-act="fr-imp-x"]');
  await p.evaluate(()=>__T.go('frota')); await H.dorme(800); s=await p.evaluate(()=>document.getElementById('view').innerText);
- ok('Painel: saldo COLAFIX 2.800 L, FIXCOL 949,5 L e total 3.749,5 L', /Saldo COLAFIX\s*2\.800 L/.test(s)&&/Saldo FIXCOL\s*949,5 L/.test(s)&&/3\.749,5 L/.test(s), s.slice(0,400).replace(/\n/g,' | '));
+ ok('Painel: saldo COLAFIX 2.800 L, FIXCOL 949,5 L e total 3.749,5 L', /Saldo COLAFIX\s*2\.800 L/.test(s)&&/Saldo FIXCOL\s*949,5 L/.test(s)&&/3\.749,5\s*L/.test(s), s.slice(0,400).replace(/\n/g,' | '));
  ok('Painel: média do AAA-1111 = 300 km ÷ 100 L = 3,00 km/L', /3,00 km\/L/.test(s), (s.match(/MÉDIA[\s\S]{0,120}/)||[''])[0].replace(/\n/g,' '));
  /* novo abastecimento */
- await p.evaluate(()=>__T.go('frotaabs')); await H.dorme(800);
+ await p.evaluate(()=>__T.go('frotaabs')); await H.dorme(800); await p.click('[data-act="fr-novo"][data-v="abs"]'); await H.dorme(400);
  await p.selectOption('[data-fr="fa.caminhaoId"]','i1'); await H.dorme(400);
  const km=await p.inputValue('[data-fr="fa.kmCaminhao"]'); ok('Escolher o caminhão sugere o último km (100300)', km==='100300', km);
  await p.selectOption('[data-fr="fa.motoristaId"]','i11'); await p.selectOption('[data-fr="fa.abastecedorId"]','i21'); await H.dorme(300);
@@ -44,12 +44,12 @@ const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU '
  /* tanque */
  await p.evaluate(()=>__T.go('frotatq')); await H.dorme(800); s=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Tanque: saldo COLAFIX 2.599,5 L e extrato com o abastecimento', /Saldo COLAFIX\s*2\.599,5 L/.test(s)&&/Saída · abastecimento/.test(s), s.slice(0,300).replace(/\n/g,' | '));
- await p.fill('[data-fr="fc.litrosCaminhoes"]','5000'); await p.click('[data-act="fr-cp-ok"]'); await H.dorme(700); ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
+ await p.click('[data-act="fr-novo"][data-v="cp"]'); await H.dorme(400); await p.fill('[data-fr="fc.litrosCaminhoes"]','5000'); await p.click('[data-act="fr-cp-ok"]'); await H.dorme(700); ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
  ok('Compra que passa dos 8.000 L do tanque é recusada', fr('compras').length===1);
  await p.fill('[data-fr="fc.litrosCaminhoes"]','4000'); await p.fill('[data-fr="fc.observacao"]','Nota 123'); await p.click('[data-act="fr-cp-ok"]'); await H.dorme(900); ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
  ok('Compra de 4.000 L lançada', fr('compras').length===2&&fr('compras').some(([,x])=>x.litrosCaminhoes===4000&&x.observacao==='Nota 123'));
  /* caminhão */
- await p.evaluate(()=>__T.go('frotacam')); await H.dorme(700); await p.fill('[data-fr="fk.placa"]','xx1'); await p.fill('[data-fr="fk.modelo"]','Novo'); await p.click('[data-act="fr-cam-ok"]'); await H.dorme(500);
+ await p.evaluate(()=>__T.go('frotacam')); await H.dorme(700); await p.click('[data-act="fr-novo"][data-v="cam"]'); await H.dorme(400); await p.fill('[data-fr="fk.placa"]','xx1'); await p.fill('[data-fr="fk.modelo"]','Novo'); await p.click('[data-act="fr-cam-ok"]'); await H.dorme(500);
  ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); ok('Placa inválida é recusada', fr('caminhoes').length===2);
  await p.fill('[data-fr="fk.placa"]','cdd1e23'); await p.click('[data-act="fr-cam-ok"]'); await H.dorme(900); ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs);
  ok('Caminhão CDD1E23 (placa Mercosul) cadastrado', fr('caminhoes').some(([,x])=>x.placa==='CDD1E23'));
@@ -57,7 +57,7 @@ const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU '
  /* manutenção */
  await p.evaluate(()=>__T.go('frotaman')); await H.dorme(700); s=await p.evaluate(()=>document.getElementById('view').innerText);
  ok('Manutenção importada aparece com os serviços separados', /Troca de óleo/.test(s)&&/Filtro/.test(s));
- await p.selectOption('[data-fr="fm.caminhaoId"]','i1'); await p.fill('[data-fr="fm.km"]','100700'); await p.click('[data-act="fr-man-sv"][data-v="Pneus"]'); await H.dorme(200); await p.click('[data-act="fr-man-ok"]'); await H.dorme(900);
+ await p.click('[data-act="fr-novo"][data-v="man"]'); await H.dorme(400); await p.selectOption('[data-fr="fm.caminhaoId"]','i1'); await p.fill('[data-fr="fm.km"]','100700'); await p.click('[data-act="fr-man-sv"][data-v="Pneus"]'); await H.dorme(200); await p.click('[data-act="fr-man-ok"]'); await H.dorme(900);
  ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); const mn=fr('manutencoes').map(x=>x[1]).find(x=>!x.imp);
  ok('Manutenção registrada com Troca de óleo e Pneus', mn&&mn.servicos.join(',')==='Troca de oleo,Pneus'&&mn.caminhao.startsWith('AAA-1111'), JSON.stringify(mn));
  /* relatórios */
