@@ -180,6 +180,7 @@
     const ini=dd[0].d==='s'&&dd[0].m<=(E!=null?E:dd[0].m)+5, fim=dd[dd.length-1].d==='e'&&dd[dd.length-1].m>=(S!=null?S:dd[dd.length-1].m)-5;
     return out.length||ini||fim?{sai:out,min:out.reduce((t,z)=>t+z.m,0),ini,fim,alm}:(alm?{sai:[],min:0,ini:false,fim:false,alm,soAlm:true}:null); }
   /* linha do dia (11/11, "melhore o visual"): entrada → saída em destaque, a barra do dia (na empresa, saídas no meio e almoço) e as passagens recolhidas */
+  const CALSVG='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>';
   function diaVis(d,h,esc){ const ok=d.ps.filter(q=>q.ok), e=ok[0], sa=ok.length>1?ok[ok.length-1]:null, n=d.ps.length;
     const cab=`<div class="pg-es"><span class="pg-e1"><small>entrou</small>${esc(e?e.h:'—')}</span><span class="pg-ar" aria-hidden="true">→</span><span class="pg-e1"><small>saiu</small>${esc(sa?sa.h:'—')}</span>${n>2?`<span class="pg-np">${n} passagens</span>`:''}</div>`;
     let bar=''; const E=d.E, S=d.S;
@@ -396,7 +397,7 @@
   .pjp-d.pg-fds{grid-template-columns:82px 1fr;padding:6px 12px;background:var(--surface-2,#F6F8FA);color:var(--muted);font-size:13px}
   .pjp-lt{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;margin-top:6px}.pjp-lt label{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line,#E1E7EB);border-radius:10px;background:var(--surface);cursor:pointer;font-size:13.5px;font-weight:400}.pjp-lt input{width:18px;height:18px;margin-top:2px}.pjp-lt b{display:block;font-weight:600}.pjp-lt small{display:block;font-size:11.5px;color:var(--muted)}
   .pjp-chips span.pm,.pjp-chips span.fo{background:var(--ground);color:inherit;font-weight:400}.pjp-chips span.pe{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong);font-weight:600}.pjp-chips span.fo{background:none;color:var(--muted);text-decoration:line-through;border:1px dashed var(--line,#E1E7EB)}.pjp-chips span small{display:block;font-size:10px;font-weight:400;opacity:.8;line-height:1.1;text-decoration:none}
-  .pjp-d.pg-al{background:var(--warn-tint,#FBF1DC)}.pjp-d.pg-aj{box-shadow:inset 3px 0 var(--teal)}.pjp-d.pg-sp .pjp-chips span{background:none;color:var(--muted);font-weight:400;padding:0}
+  .pjp-d.pg-al{background:none;box-shadow:inset 3px 0 var(--warn,#C28A1E)}.pjp-d.pg-aj{box-shadow:inset 3px 0 var(--teal)}.pjp-d.pg-sp .pjp-chips span{background:none;color:var(--muted);font-weight:400;padding:0}
   .pjp-d .pg-tag{font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;display:inline-block;margin-top:3px}
   .pjp-d .pg-tag.pg-w{background:#fff;color:var(--warn-ink,#7A5310)}.pjp-d .pg-tag.pg-t{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-m{background:var(--ground);color:var(--muted)}
   .pjp-d .pg-tag.pg-src{margin-left:4px}.pjp-d .pg-tag.pg-pto{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-mix{background:var(--ground);color:var(--teal-strong)}.pjp-d .pg-tag.pg-fid{background:var(--warn-tint,#FBF1DD);color:var(--warn-ink,#7A5310)}
@@ -443,10 +444,13 @@
         const tt={cf:'para conferir',sm:'sem passagem',fe:'feriado',fd:'fora da escala',fu:'ainda não chegou',ok:'trabalhou',nd:'sem horas'}[st];
         return `<button type="button" class="pjp-cd ${st}${k.includes('cor')?' cr':''}" data-act="pjp-dcal" data-v="${d.d}" aria-pressed="${J.dsel===d.d}" title="${DLX[d.dw]} ${br(d.d)} · ${tt}${d.m?' · '+hTxt(d.m):''}"><b>${+d.d.slice(8,10)}</b><small>${d.m?hTxt(d.m):st==='sm'?'falta':st==='cf'?'conferir':''}</small></button>`; };
       const pd=r.dias[0]?new Date(r.dias[0].d+'T12:00:00').getDay():1, vaz=(pd+6)%7;
-      const filtro=`<div class="pjp-cal"><div class="pjp-calh"><b>Procurar o dia</b><span>toque no dia para ver só ele</span>${J.dsel?`<button type="button" class="lnk" data-act="pjp-dcal" data-v="" style="margin:0 0 0 auto">ver todos os dias</button>`:''}</div>
-        <div class="pjp-calg">${['seg','ter','qua','qui','sex','sáb','dom'].map(x=>`<span class="pjp-cwd">${x}</span>`).join('')}${'<span></span>'.repeat(vaz)}${r.dias.map(cel).join('')}</div>
-        <div class="pjp-call"><span><i class="ok"></i>trabalhou</span><span><i class="cf"></i>para conferir</span><span><i class="sm"></i>sem passagem</span><span><i class="fd"></i>fim de semana / fora da escala</span></div></div>
-      <div class="pjp-dfil">        <div class="pjp-dks">${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div></div>
+      /* escolher o dia no filtro (11/11, "no filtro, em vez de pesquisar, aperto e escolho o dia"): pílula "Escolher o dia" que abre o calendário */
+      const pop=J.calAb?`<div class="pjp-calpop" role="dialog" aria-label="Escolher o dia"><div class="pjp-calh"><b>Escolher o dia</b><button type="button" class="pjp-calx" data-act="pjp-calab" aria-label="Fechar">✕</button></div>
+          <div class="pjp-calg">${['seg','ter','qua','qui','sex','sáb','dom'].map(x=>`<span class="pjp-cwd">${x}</span>`).join('')}${'<span></span>'.repeat(vaz)}${r.dias.map(cel).join('')}</div>
+          <div class="pjp-call"><span><i class="ok"></i>trabalhou</span><span><i class="cf"></i>conferir</span><span><i class="sm"></i>sem passagem</span><span><i class="fd"></i>fim de semana</span></div></div>`:'';
+      const diaBt=J.dsel?`<span class="pjp-dk pjp-dia on"><button type="button" data-act="pjp-calab">${CALSVG} ${DNL[new Date(J.dsel+'T12:00:00').getDay()]} ${brc(J.dsel)}</button><button type="button" class="pjp-diax" data-act="pjp-dcal" data-v="" aria-label="Ver todos os dias">✕</button></span>`
+        :`<button type="button" class="pjp-dk pjp-dia" data-act="pjp-calab" aria-expanded="${!!J.calAb}">${CALSVG} Escolher o dia</button>`;
+      const filtro=`<div class="pjp-dfil"><div class="pjp-dks">${diaBt}${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${!J.dsel&&(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div>${pop}</div>
         <p class="pjp-dv" id="pjp-dv" hidden>Nenhum dia com esse filtro.</p>`;
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds" ${at(d)}>${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
@@ -464,7 +468,7 @@
         return `<div class="pjp-d ${d.fl&&!d.aj?'pg-al':''} ${d.sp&&!d.sp.soAlm&&!d.descF&&!d.okFora?'pg-al':''} ${d.aj?'pg-aj':''} ${!d.hs.length&&!d.aj&&!d.fil?'pg-sp':''}" ${at(d)}>${dd}<div>${ch}${ferL}</div><div class="pg-cc">${d.m&&d.E!=null?'conta '+hhmm(d.E)+'–'+hhmm(d.S):''}</div><div class="pg-hh">${d.m?hTxt(d.m):'—'}${d.mR!=null?`<small class="pg-fds" title="Sábado e domingo valem ${String(d.fF).replace('.',',')} hora">${hTxt(d.mR)} × ${String(d.fF).replace('.',',')}</small>`:''}</div>
           <div class="pg-cor">${ed?(d.aj?`<button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>${r.fil?'desfazer':'voltar ao Face ID'}</button>`:d.fil?`<button class="lnk" data-act="pjp-dzero" data-mot="Faltou (o gestor avisou)" data-d="${d.d}" ${fa}><b>Faltou</b></button>`:`<button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>${d.fl?'<b>Corrigir</b>':'Corrigir'}</button>`):''}</div>${edit}</div>`; }).join('');
       corpo=`<div class="pjp-mini"><div><span>Dias com passagem</span><b>${comP}</b></div><div><span>Horas</span><b>${r.fixo?'fixo':hTxt(r.min)}</b></div><div class="${r.alerta?'pg-w':''}"><span>Para conferir</span><b>${r.alerta}</b></div><div><span>Corrigidos</span><b>${nAj}</b></div></div>
-        ${r.alerta&&ed?(()=>{ const n1=r.dias.filter(d=>d.fl&&!d.aj).length, n2=r.alerta-n1, t=[]; if(n1) t.push(n1+' dia'+(n1>1?'s':'')+' com uma passagem só (falta a saída): toque em <b>Corrigir</b> e digite a hora certa'); if(n2) t.push(n2+' dia'+(n2>1?'s':'')+' em que saiu e voltou ou o dia ficou sem a entrada/saída: <b>Descontar</b> o tempo fora ou <b>Está certo</b>'); return `<div class="pjp-av">${t.join('.<br>')}. <button class="lnk" data-act="pjp-dk" data-v="conf" style="display:inline;margin:0">Ver só esses dias</button></div>`; })():''}
+        ${r.alerta&&ed?(()=>{ const n1=r.dias.filter(d=>d.fl&&!d.aj).length, n2=r.alerta-n1, t=[]; if(n1) t.push(n1+' dia'+(n1>1?'s':'')+' com uma passagem só (falta a saída): toque em <b>Corrigir</b> e digite a hora certa'); if(n2) t.push(n2+' dia'+(n2>1?'s':'')+' em que saiu e voltou ou o dia ficou sem a entrada/saída: <b>Descontar</b> o tempo fora ou <b>Está certo</b>'); return `<div class="pjp-av pjp-avw">${t.join('.<br>')}. <button class="lnk" data-act="pjp-dk" data-v="conf" style="display:inline;margin:0">Ver só esses dias</button></div>`; })():''}
         ${r.horCurto?`<div class="pjp-av pjp-hc"><b>O horário desta pessoa está ${esc(r.horCurto.ini)} às ${esc(r.horCurto.fim)}</b> (${r.horCurto.de==='pj'?'nas Regras desta pessoa':r.horCurto.de==='cad'?'no "Horário diferente" do cadastro':'no horário padrão dos Parâmetros'}), mas ela costuma sair por volta das ${esc(r.horCurto.sai)}. Por isso o dia do fechamento conta só até ${esc(r.horCurto.fim)}. ${btn('pjp-tab','Corrigir o horário','data-v="regras"','')}</div>`:''}
         ${r.fil?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">Trabalha na Fixcol: não passa no Face ID. Cada dia da escala conta cheio; quando o gestor avisar que faltou, toque em <b>Faltou</b> no dia.</div>`:''}
         ${!ed?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor já foi fechado. Para corrigir alguma hora, toque em ${lnk('pjp-reab','mudar o valor',fa).replace('class="lnk"','class="lnk" style="display:inline;margin:0"')} (volta para conferir).</div>`:''}
@@ -910,7 +914,11 @@
   .pjp-d .pg-hh .pg-fds{display:block;font-size:11px;font-weight:500;color:var(--warn-ink,#7A5310)}
   .pjp-av.pjp-hc{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pjp-av.pjp-hc .btn{height:32px;font-size:13px}
   .pjp-d .pg-tag.pg-sp2{white-space:normal;line-height:1.35}
-  .pjp-cal{border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:12px 14px;background:var(--surface)}
+  .pjp-dfil{position:relative}
+  .pjp-calpop{position:absolute;top:calc(100% + 6px);left:0;z-index:20;width:min(380px,100%);border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:12px 14px;background:var(--surface);box-shadow:0 12px 32px rgba(15,35,50,.18)}
+  .pjp-calx{margin-left:auto;width:28px;height:28px;border:0;border-radius:8px;background:var(--ground);color:inherit;cursor:pointer}
+  .pjp-dia{gap:6px}.pjp-dia svg{flex:none}.pjp-dia.on{padding:0;background:var(--teal-strong,#143F54);border-color:var(--teal-strong,#143F54);color:#fff;overflow:hidden}
+  .pjp-dia.on button{border:0;background:none;color:inherit;font:inherit;font-size:13px;height:100%;padding:0 6px 0 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.pjp-dia.on .pjp-diax{padding:0 10px 0 6px;opacity:.85}
   .pjp-calh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}.pjp-calh b{font-size:14px}.pjp-calh span{font-size:12.5px;color:var(--muted)}
   .pjp-calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
   .pjp-cwd{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:2px}
@@ -939,7 +947,8 @@
   .pjp-d .pg-bar i.al{background:repeating-linear-gradient(45deg,#fff 0 3px,var(--line,#C9D3DA) 3px 6px)}.pjp-d .pg-bar i.sx{background:var(--warn,#C28A1E)}.pjp-d .pg-bar i.sd{background:var(--crit,#B5473F)}.pjp-d .pg-bar i.so{background:#9FBFCF}
   .pjp-d details.pg-ps summary{cursor:pointer;font-size:12.5px;color:var(--teal);list-style:none;display:inline-block}.pjp-d details.pg-ps summary::-webkit-details-marker{display:none}.pjp-d details.pg-ps summary::before{content:'▸ '}.pjp-d details.pg-ps[open] summary::before{content:'▾ '}
   .pjp-d details.pg-ps .pjp-chips{margin-top:6px}.pjp-d .pg-c2{margin-top:4px}
-  .pjp-d .pg-tag.pg-sp2{display:block;width:fit-content;max-width:100%}
+  .pjp-d .pg-tag.pg-sp2{display:block;width:fit-content;max-width:100%;background:none;padding:0;font-weight:600}
+  .pjp-g .pjp-av.pjp-avw{background:none;border:1px solid var(--line,#E1E7EB);border-left:3px solid var(--warn,#C28A1E);padding:8px 12px;font-size:13px}
   .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
   .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
   .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}
@@ -1170,6 +1179,8 @@
         await grava(C,J.per,f._id,{aj}); P.render(); return; }
       if(t.dataset.pjpC){ const f=fDe(t.dataset.f); if(pesDe(J.per,f._id).st) return; const k=t.dataset.pjpC; await grava(C,J.per,f._id,{[k]:k==='desc'?num(t.value):String(t.value||'').slice(0,120)}); P.render(); return; }
     }catch(e){ P.erro(e); } });
+  document.addEventListener('click',ev=>{ if(!J.calAb||!C) return; const t=ev.target; if(t.closest&&(t.closest('.pjp-calpop')||t.closest('[data-act=pjp-calab]'))) return; J.calAb=false; C.P.render(); },true);
+  document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&J.calAb&&C){ J.calAb=false; C.P.render(); ev.stopPropagation(); } },true);
   function dFiltra(){ const q=norm(J.dq||''), k=J.dk||'*', ws=q?q.split(' '):[]; let n=0;
     document.querySelectorAll('.pjp-dl [data-pjpd]').forEach(el=>{ const b=(el.dataset.b||'').split(' '), ks=(el.dataset.k||'').split(' ');
       const ok=(!J.dsel||el.dataset.pjpd===J.dsel)&&(k==='*'||ks.includes(k))&&ws.every(w=>b.some(x=>x===w||(w.length>1&&x.startsWith(w))||(w.includes('/')&&x.startsWith(w)))); el.hidden=!ok; if(ok) n++; });
@@ -1186,7 +1197,7 @@
     ev.preventDefault();
     try{
       if(a==='pjp-per'){ const v=+b.dataset.v; J.per=v===0?perAtual(c):perMove(J.per,v); J.ab=''; P.render(); return; }
-      if(a==='pjp-ab'){ if(J.ab!==b.dataset.f){ J.dq=''; J.dk='*'; J.dsel=''; } J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
+      if(a==='pjp-ab'){ if(J.ab!==b.dataset.f){ J.dq=''; J.dk='*'; J.dsel=''; J.calAb=false; } J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
       if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
       if(a==='pjp-fin'){ finAbrir(c,b.dataset.f?[b.dataset.f]:null); P.render(); return; }
@@ -1217,11 +1228,9 @@
       if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; if(J.col>=0) J.aba='lista'; P.render(); return; }
       if(a==='pjp-gx'){ J.ab=''; J.edDia=null; P.render(); return; }
       if(a==='pjp-tab'){ J.tab=b.dataset.v; J.edDia=null; P.render(); return; }
-      if(a==='pjp-dcal'){ const v=b.dataset.v||''; J.dsel=J.dsel===v?'':v; if(J.dsel){ J.dk='*'; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v==='*'))); }
-        document.querySelectorAll('[data-act=pjp-dcal][data-v]').forEach(x=>x.setAttribute('aria-pressed',String(!!J.dsel&&x.dataset.v===J.dsel)));
-        const h=document.querySelector('.pjp-calh'); if(h){ let l=h.querySelector('[data-v=""]'); if(J.dsel&&!l){ h.insertAdjacentHTML('beforeend','<button type="button" class="lnk" data-act="pjp-dcal" data-v="" style="margin:0 0 0 auto">ver todos os dias</button>'); } else if(!J.dsel&&l) l.remove(); }
-        dFiltra(); const el=J.dsel&&document.querySelector('.pjp-dl [data-pjpd="'+J.dsel+'"]'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); return; }
-      if(a==='pjp-dk'){ J.dsel=''; J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
+      if(a==='pjp-calab'){ J.calAb=!J.calAb; P.render(); return; }
+      if(a==='pjp-dcal'){ const v=b.dataset.v||''; J.dsel=v; J.calAb=false; if(v) J.dk='*'; P.render(); setTimeout(()=>{ const el=v&&document.querySelector('.pjp-dl [data-pjpd="'+v+'"]'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); },60); return; }
+      if(a==='pjp-dk'){ if(J.dsel||J.calAb){ J.dsel=''; J.calAb=false; J.dk=b.dataset.v; P.render(); return; } J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
       if(a==='pjp-confx'){ J.conf=!J.conf; P.render(); return; }
       if(a==='pjp-flimpa'){ J.emp=''; J.set=''; J.sit='*'; J.col=-1; J.conf=false; J.q=''; P.render(); return; }
       if(a==='pjp-dcor'){ J.edDia=b.dataset.d; P.render(); setTimeout(()=>{ const i=document.getElementById(document.getElementById('pjp-ce')&&!document.getElementById('pjp-ce').value?'pjp-ce':'pjp-cs'); if(i) i.focus(); },30); return; }
