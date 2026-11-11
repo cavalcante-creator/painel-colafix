@@ -1,0 +1,37 @@
+/* Pagamento dos PJ (11/11): conferido com a planilha de 16 a 30/10 — sábado e domingo valem ×1,5 e acréscimos (vale-transporte).
+   Horários de uma pessoa da planilha (só as horas), nome inventado. Planilha: 81,57 h × 28,41 − 32,90 = R$ 2.284,60. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed');
+const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Manutenção'],pjPag:{ini:'08:00',fim:'18:00',intv:72,tol:5}};
+  D['rh/dados/funcionarios/f1']={nome:'MARCOS TESTE DA SILVA',tipo:'PJ',empresa:'NEXUS',cpf:'11122233344',cnpj:'12345678000190',setor:'Manutenção',funcao:'Mecânico',status:'Ativo',admissao:'2025-01-10',pjPag:{vh:28.41}};
+  const H0={'2026-10-19':['07:55:00','17:17:00'],'2026-10-20':['07:55:00','17:35:00'],'2026-10-21':['07:55:00','18:03:00'],'2026-10-23':['07:56:00','17:48:24'],'2026-10-24':['08:09:00','17:41:00'],'2026-10-27':['07:58:00','18:01:00'],'2026-10-28':['07:57:00','17:58:00'],'2026-10-29':['07:58:00','18:00:51'],'2026-10-30':['08:00:00','18:00:00']};
+  const dias={}; Object.entries(H0).forEach(([k,[e,s]])=>{ dias[k]={'11122233344':{p:1,t:[e+' PORTARIA',s+' PORTARIA']}}; });
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias,pessoas:{'11122233344':{n:'MARCOS TESTE DA SILVA',e:'NEXUS'}},imp:[]};
+  D['rh/dados/pjpag/2026-10-2']={pid:'2026-10-2',pes:{f1:{dsc:{x:[{id:'d1',t:'Uniforme',v:32.9}]}}}};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.per='2026-10-2'; J.aba='lista'; __T.go('rhpjpag'); window.Painel.render(); }); await H.dorme(2500);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab='f1'; J.tab='horas'; window.Painel.render(); }); await H.dorme(1200);
+  let g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
+  const sab=(g.match(/Sáb 24\/10[\s\S]{0,200}/)||[''])[0];
+  ok('Sábado 24/10 (08:09 às 17:41, intervalo 1h12): 8h20 × 1,5 = 12h30', /12h30/.test(sab)&&/8h20 × 1,5/.test(sab), sab.replace(/\n/g,' | '));
+  const tot=(g.match(/Total a pagar\s*R\$\s*([\d.,]+)/)||[])[1]||''; const v=+tot.replace(/\./g,'').replace(',','.');
+  ok('Total igual à planilha (R$ 2.284,60; diferença só dos segundos)', Math.abs(v-2284.60)<1, tot);
+  await p.evaluate(()=>{ window.RHPJPag._J.tab='desc'; window.Painel.render(); }); await H.dorme(800);
+  await p.fill('#pjp-axt','Vale-transporte'); await p.fill('#pjp-axv','5 x 40'); await p.click('[data-act=pjp-axadd]'); await H.dorme(1200);
+  g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
+  const tot2=(g.match(/Total a pagar\s*R\$\s*([\d.,]+)/)||[])[1]||''; const v2=+tot2.replace(/\./g,'').replace(',','.');
+  ok('Vale-transporte "5 x 40" soma R$ 200,00 no total', Math.abs(v2-v-200)<0.01&&/Vale-transporte/.test(g)&&/\+ R\$\s*200,00/.test(g), tot+' → '+tot2);
+  const S=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs, x=((S['rh/dados/pjpag/2026-10-2']||{}).pes||{}).f1||{};
+  ok('O desconto que já estava continua junto com o acréscimo', x.dsc&&x.dsc.x&&x.dsc.x.length===1&&x.dsc.a&&x.dsc.a.length===1&&x.dsc.a[0].v===200, JSON.stringify(x.dsc));
+  await p.click('.pjp-g [data-act=pjp-fech]'); await H.dorme(1200);
+  const S2=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs, fe=(((S2['rh/dados/pjpag/2026-10-2']||{}).pes||{}).f1||{}).fech||{};
+  ok('Fechar o valor guarda o acréscimo e o total com ele', fe.acr===200&&Math.abs(fe.valor-v2)<0.01, JSON.stringify({acr:fe.acr,valor:fe.valor}));
+  await p.evaluate(()=>{ window.RHPJPag._J.ab=''; window.Painel.render(); }); await H.dorme(600);
+  await p.click('[data-act=pjp-cfg]'); await H.dorme(500); await p.fill('#pjp-cfds','1'); await p.click('[data-act=pjp-cfgok]'); await H.dorme(1000);
+  const v3=await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab='f1'; J.tab='horas'; window.Painel.render(); const t=(document.querySelector('.pjp-g')||{}).innerText||''; return (t.match(/Sáb 24\/10[\s\S]{0,120}/)||[''])[0]; });
+  ok('Com "Sábado e domingo valem 1" nos Parâmetros, o sábado conta hora normal (8h20)', /8h20/.test(v3)&&!/× 1/.test(v3), v3.replace(/\n/g,' | '));
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });

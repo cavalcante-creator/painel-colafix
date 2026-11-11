@@ -7,7 +7,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
 <valores><vServPrest><vServ>${o.valor}</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>`;
 (async()=>{ const {d}=seedManut(); const D=d.docs;
   d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
-  D['rh/config']={setores:['Produção','Manutenção'],conectworkMei:[]};   /* aqui o pedido de nota vai pelo link (nota.html); o pedido pelo Conectwork é testado em teste-pjpcw.js */
+  D['rh/config']={setores:['Produção','Manutenção'],conectworkMei:[],pjPag:{fds:1}};   /* fim de semana × 1,5 é testado em teste-pjpfds.js */   /* aqui o pedido de nota vai pelo link (nota.html); o pedido pelo Conectwork é testado em teste-pjpcw.js */
   D['rh/dados/funcionarios/f1']={nome:'JOAO PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',salario:5000,setor:'Produção',funcao:'Operador',status:'Ativo',telefone:'(51) 99999-0000',admissao:'2025-01-10'};
   D['rh/dados/funcionarios/f2']={nome:'MARIA OLIVEIRA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'55566677788',cnpj:'11222333000181',setor:'Manutenção',funcao:'Mecânica',status:'Ativo',telefone:'51988887777',admissao:'2025-02-01',pjPag:{vh:28.41,ini:'08:00',fim:'18:00',intv:72}};
   D['rh/dados/uniformes/u1']={nome:'Joao Pereira Teste',fid:'f1',setor:'Produção',data:'2026-10-20',itens:[{t:'Camisa',tam:'G',qtd:2}],desc:{nao:false,v:50},parc:{n:1,ini:'2026-10-31',hist:[]},st:'lancado',em:'2026-10-20T10:00:00.000Z',por:'uRH'};
@@ -38,7 +38,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   /* descontos: uniforme para confirmar + outro desconto */
   await p.click('[data-act="pjp-tab"][data-v="desc"]'); await H.dorme(600);
   let gd=await p.evaluate(()=>document.querySelector('.pjp-g').innerText);
-  ok('Aba Descontos: mostra a parcela do uniforme da quinzena para o RH confirmar (ainda não conta)', /Descontos \(1\)/.test(gd)&&/Uniforme · entrega de 20\/10\/2026/.test(gd)&&/2× Camisa G/.test(gd)&&/Descontar/.test(gd)&&/Para confirmar\s*1/i.test(gd), gd.replace(/\n/g,' | ').slice(0,500));
+  ok('Aba Descontos: mostra a parcela do uniforme da quinzena para o RH confirmar (ainda não conta)', /Descontos e acréscimos \(1\)/.test(gd)&&/Uniforme · entrega de 20\/10\/2026/.test(gd)&&/2× Camisa G/.test(gd)&&/Descontar/.test(gd)&&/Para confirmar\s*1/i.test(gd), gd.replace(/\n/g,' | ').slice(0,500));
   let fe0=await p.evaluate(()=>{ const b=document.querySelector('.pjp-g [data-act="pjp-fech"]'); if(b) b.click(); return new Promise(r=>setTimeout(()=>r(document.getElementById('toast')?document.getElementById('toast').innerText:''),700)); });
   ok('Não deixa fechar o valor com o uniforme sem confirmar', /confirme o desconto do uniforme/i.test(fe0), fe0);
   await p.click('[data-act="pjp-uok"]'); await H.dorme(1000);

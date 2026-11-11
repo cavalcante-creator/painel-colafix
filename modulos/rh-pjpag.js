@@ -16,7 +16,7 @@
    Usado pelo rh.js: window.RHPJPag.render(ctx) · .avisos(ctx). Prefixo `pjp`. */
 (function(){
   const PTO='rh/dados/ponto', COL='rh/dados/pjpag', PED='rh/dados/pjnotaped', ENV='rh/dados/pjnotaenv';
-  const PAD={modo:'quinzena',corte:15,pagDias:5,avisaNota:3,tol:5,dentro:false,ini:'07:30',fim:'17:18',intv:60,horasMes:220,dias:30,
+  const PAD={modo:'quinzena',corte:15,fds:1.5,pagDias:5,avisaNota:3,tol:5,dentro:false,ini:'07:30',fim:'17:18',intv:60,horasMes:220,dias:30,
     msg:'Olá, {NOME}! Fechamos {PERIODO}: {HORAS} trabalhadas, total de {VALOR}.\nPor favor, emita a nota fiscal de serviço para {EMPRESA} (CNPJ {CNPJ}) e mande por este link:\n{LINK}'};
   const ST={'':['Conferir as horas','warn'],fechado:['Valor fechado','teal'],pedido:['Nota pedida','teal'],chegou:['Nota chegou · conferir','warn'],conferida:['Nota conferida','ok'],pago:['Pago','ok']};
   const J={per:'',docs:{},sub:{},envSub:false,env:{},ab:'',q:'',emp:'',cfgAb:false,mod:null,proc:{},fid:{},carr:{},pto:{},ptoSub:{}};
@@ -160,6 +160,9 @@
      Cada dia da escala conta cheio; o RH marca "Faltou" no dia quando o gestor avisar (aj[dia].zero). */
   const ehFil=(c,f)=>{ const sF=(((c.R.cfg)||{}).setoresFilial||[]).map(norm); return f.filial==='FIXCOL'||!!(f.setor&&sF.includes(norm(f.setor))); };
   const SRC_T={pto:'Entrada da fábrica',mix:'Entrada da fábrica + Face ID',fid:'Face ID (sem marcação na entrada)'};
+  /* sábado e domingo trabalhados valem N vezes (Parâmetros, padrão 1,5; 1 = hora normal) */
+  const fdsF=c=>{ const v=+cfg(c).fds; return v>=1&&v<=3?v:1.5; };
+  const ACX=['Vale-transporte','Ajuda de custo','Diferença da quinzena passada','Outro'];
   /* conta da pessoa no período */
   function calcPessoa(c,f,p,x){ const dados=(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes])||null, h=horDe(c,f), vh=vhDe(c,f), k=chaveFid(c,f,dados);
     const aj=(x&&x.aj)||{}, out=[], escM=contaDia(h.ini,h.fim,h).m; let tot=0, alerta=0, comFid=0;
@@ -171,15 +174,17 @@
       const r=contaDia(e,s,h), dw=new Date(d+'T12:00:00').getDay(); let fl='', info='', m=r.m;
       if(fer&&fer.pago) m=Math.max(m,escM);
       const dFil=fil&&!cor&&!fer&&h.dias.includes(dw); if(dFil){ m=escM; info='Fixcol · sem Face ID · dia cheio da escala'; }
+      const fF=fdsF(c); let mR=null; if((dw===0||dw===6)&&m>0&&fF!==1&&!dFil){ mR=m; m=Math.round(m*fF); }
       let ehF=false; if(!fil&&d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro}}; }
       if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
       else if(!cor&&!dFil&&!fil){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
-      out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil}); tot+=m; });
+      out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil,mR,fF:mR!=null?fF:null}); tot+=m; });
     const fa0=fechAnt(c,f,p,h);
     const uni=unifDe(c,f,p), ext=(x&&x.dsc&&Array.isArray(x.dsc.x)?x.dsc.x:[]).filter(z=>z&&!z.removido);
     const descs=[].concat(num(x&&x.desc)>0?[{t:(x.descMot||'Desconto lançado'),v:num(x.desc),k:'leg'}]:[],uni.filter(u=>u.st==='ok').map(u=>({t:'Uniforme (entrega de '+brc(u.x.data)+')',v:u.v,k:'u'})),ext.map(z=>({t:z.t,v:num(z.v),k:'x',id:z.id})),fa0&&!(x&&x.fchX)?[{t:'Saiu mais cedo no dia do fechamento ('+brc(fa0.d)+'): '+hTxt(fa0.falta),v:fa0.v,k:'fch'}]:[]);
+    const acrs=(x&&x.dsc&&Array.isArray(x.dsc.a)?x.dsc.a:[]).filter(z=>z&&!z.removido).map(z=>({t:z.t,v:num(z.v),id:z.id})), acr=Math.round(acrs.reduce((a,z)=>a+z.v,0)*100)/100;
     const fixo=+((f.pjPag||{}).fixo)||0, desc=Math.round(descs.reduce((a,z)=>a+z.v,0)*100)/100, bruto=fixo>0?fixo:hDec(tot)*vh;
-    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,valor:Math.max(0,Math.round((bruto-desc)*100)/100),cheio,fd,alerta,comFid,comPto,kp:K.kp,fil,semFid:!fil&&(!(dados||pto)||!comFid),dados:!!(dados||pto)}; }
+    return {f,k,h,vh,dias:out,min:tot,fixo,bruto,desc,descs,descMot:descs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),uni,uPend:uni.filter(u=>!u.st).length,acr,acrs,acrMot:acrs.map(z=>z.t+' '+R$(z.v)).join(' · ').replace(/\u00a0/g,' '),valor:Math.max(0,Math.round((bruto-desc+acr)*100)/100),cheio,fd,alerta,comFid,comPto,kp:K.kp,fil,semFid:!fil&&(!(dados||pto)||!comFid),dados:!!(dados||pto)}; }
   /* ---------- banco ---------- */
   function assina(c,pid){ const P=c.P; unifIni(c); if(!J.sub[pid]){ J.sub[pid]=true;
       P.inscrever('pjp-'+pid,()=>P.db().collection(COL).where('pid','==',pid).limit(1),s=>{ const d=s.docs[0]; J.docs[pid]=d?d.data():{pid,pes:{}}; P.rerender(); }); }
@@ -398,7 +403,7 @@
             <label class="pg-mot">Motivo<input id="pjp-cm" list="pjp-mots" value="${esc(d.mot&&d.aj?d.mot:d.fl?'Esqueceu de passar no Face ID':'')}" maxlength="80" placeholder="por que corrigiu"></label>
             <datalist id="pjp-mots">${MOTS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
             <span style="display:flex;gap:6px;flex-wrap:wrap">${btn('pjp-dsalva','Salvar','data-d="'+d.d+'" '+fa,'')}${btn('pjp-dzero','Não trabalhou (0 h)','data-d="'+d.d+'" '+fa)}${d.fer?'':btn('pjp-dfer','É feriado','data-d="'+d.d+'" '+fa)}${btn('pjp-dcanc','Cancelar')}</span></div>`:'';
-        return `<div class="pjp-d ${d.fl&&!d.aj?'pg-al':''} ${d.aj?'pg-aj':''} ${!d.hs.length&&!d.aj&&!d.fil?'pg-sp':''}">${dd}<div>${ch}${ferL}</div><div class="pg-cc">${d.m&&d.E!=null?'conta '+hhmm(d.E)+'–'+hhmm(d.S):''}</div><div class="pg-hh">${d.m?hTxt(d.m):'—'}</div>
+        return `<div class="pjp-d ${d.fl&&!d.aj?'pg-al':''} ${d.aj?'pg-aj':''} ${!d.hs.length&&!d.aj&&!d.fil?'pg-sp':''}">${dd}<div>${ch}${ferL}</div><div class="pg-cc">${d.m&&d.E!=null?'conta '+hhmm(d.E)+'–'+hhmm(d.S):''}</div><div class="pg-hh">${d.m?hTxt(d.m):'—'}${d.mR!=null?`<small class="pg-fds" title="Sábado e domingo valem ${String(d.fF).replace('.',',')} hora">${hTxt(d.mR)} × ${String(d.fF).replace('.',',')}</small>`:''}</div>
           <div class="pg-cor">${ed?(d.aj?`<button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>${r.fil?'desfazer':'voltar ao Face ID'}</button>`:d.fil?`<button class="lnk" data-act="pjp-dzero" data-mot="Faltou (o gestor avisou)" data-d="${d.d}" ${fa}><b>Faltou</b></button>`:`<button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>${d.fl?'<b>Corrigir</b>':'Corrigir'}</button>`):''}</div>${edit}</div>`; }).join('');
       corpo=`<div class="pjp-mini"><div><span>Dias com passagem</span><b>${comP}</b></div><div><span>Horas</span><b>${r.fixo?'fixo':hTxt(r.min)}</b></div><div class="${r.alerta?'pg-w':''}"><span>Para conferir</span><b>${r.alerta}</b></div><div><span>Corrigidos</span><b>${nAj}</b></div></div>
         ${r.alerta&&ed?`<div class="pjp-av">${r.alerta} dia${r.alerta>1?'s':''} com uma passagem só no Face ID (falta a saída). Toque em <b>Corrigir</b> no dia e digite a hora certa.</div>`:''}
@@ -412,13 +417,17 @@
           :ed?`${btn('pjp-uok','Descontar',xa,'')}${lnk('pjp-uno','Não descontar agora',xa)}`:`<span class="pjp-pill warn">Não confirmado</span>`;
         return `<div class="pg-ds"><div><b>Uniforme · entrega de ${esc(br(u.x.data))}</b><small>${esc(unifTxt(u.x)||'peças')} · parcela ${u.k||'?'} de ${I.n} · total ${R$(I.V)}${I.rest>0.004&&u.st!=='ok'?' · falta '+R$(I.rest):''}${u.atr?' · <b style="color:var(--warn-ink,#7A5310)">parcela atrasada</b>':''}</small></div><b class="pg-dv">${u.st==='falta'?'—':R$(u.v)}</b><div class="pg-da">${sit}</div></div>`; }).join('');
       const oL=r.descs.filter(z=>z.k!=='u').map(z=>`<div class="pg-ds"><div><b>${esc(z.t)}</b><small>${z.k==='leg'?'lançado antes da aba Descontos':z.k==='fch'?'automático: a quinzena passada pagou o dia cheio':'lançado pelo RH'}</small></div><b class="pg-dv">${R$(z.v)}</b><div class="pg-da">${ed?lnk('pjp-dxx','tirar',`data-id="${esc(z.k==='fch'?'fch':(z.id||'leg'))}" ${fa}`):''}</div></div>`).join('');
+      const aL=r.acrs.map(z=>`<div class="pg-ds"><div><b>${esc(z.t)}</b><small>lançado pelo RH</small></div><b class="pg-dv" style="color:var(--ok,#2F7A4E)">+ ${R$(z.v)}</b><div class="pg-da">${ed?lnk('pjp-axx','tirar',`data-id="${esc(z.id)}" ${fa}`):''}</div></div>`).join('');
       corpo=`<div class="pjp-mini"><div><span>Total de descontos</span><b>${R$(r.desc)}</b></div><div><span>Uniforme</span><b>${R$(uT)}</b></div><div><span>Outros</span><b>${R$(oT)}</b></div><div class="${r.uPend?'pg-w':''}"><span>Para confirmar</span><b>${r.uPend}</b></div></div>
         ${!ed?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor já foi fechado. Para mudar os descontos, toque em ${lnk('pjp-reab','mudar o valor',fa).replace('class="lnk"','class="lnk" style="display:inline;margin:0"')}.</div>`:''}
         <div class="pjp-sec"><h4>Uniforme</h4>${uL||'<p class="ps" style="margin:0;color:var(--muted)">Nenhuma parcela de uniforme para esta quinzena.</p>'}
           <p class="ps" style="margin:8px 0 0;color:var(--muted);font-size:12.5px">Vem das entregas de uniforme desta pessoa (RH › Uniformes), em parcelas descontadas no dia 15 e no último dia do mês. Só entra no valor depois que você confirma.</p></div>
         <div class="pjp-sec"><h4>Outros descontos</h4>${oL||'<p class="ps" style="margin:0;color:var(--muted)">Nenhum.</p>'}
           ${ed?`<div class="pjp-ed" style="border-color:var(--line,#E1E7EB)"><label class="pg-mot">O que é<input id="pjp-dxt" list="pjp-dxs" maxlength="80" placeholder="ex.: Vale / adiantamento"></label><datalist id="pjp-dxs">${DXS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
-            <label>Valor (R$)<input id="pjp-dxv" inputmode="decimal" placeholder="0,00" style="width:110px"></label>${btn('pjp-dxadd','Acrescentar',fa,'')}</div>`:''}</div>`; }
+            <label>Valor (R$)<input id="pjp-dxv" inputmode="decimal" placeholder="0,00" style="width:110px"></label>${btn('pjp-dxadd','Acrescentar',fa,'')}</div>`:''}</div>
+        <div class="pjp-sec"><h4>Acréscimos · somam no valor ${r.acr?`<span style="font-weight:600;color:var(--ok,#2F7A4E)">+ ${R$(r.acr)}</span>`:''}</h4>${aL||'<p class="ps" style="margin:0;color:var(--muted)">Nenhum.</p>'}
+          ${ed?`<div class="pjp-ed" style="border-color:var(--line,#E1E7EB)"><label class="pg-mot">O que é<input id="pjp-axt" list="pjp-axs" maxlength="80" placeholder="ex.: Vale-transporte"></label><datalist id="pjp-axs">${ACX.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
+            <label>Valor (R$)<input id="pjp-axv" inputmode="decimal" placeholder="ex.: 5 x 40" style="width:120px"></label>${btn('pjp-axadd','Somar',fa,'')}</div><p class="ps" style="margin:4px 0 0;color:var(--muted);font-size:12.5px">Vale-transporte: pode escrever dias × valor (ex.: 5 x 40 = R$ 200,00).</p>`:''}</div>`; }
     else if(tab==='regras'){ const pj=f.pjPag||{}, he=f.horEsp||{}, tem=v=>v!=null&&v!=='';
       const pad=(v,orig)=>`<small>${orig==='cad'?'do cadastro (horário diferente)':orig==='pj'?'só desta pessoa':'padrão: '+esc(v)}</small>`;
       corpo=`${x.st?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor desta quinzena já foi fechado: as regras novas valem quando reabrir ou na próxima quinzena.</div>`:''}
@@ -447,10 +456,10 @@
     return css2+`<div class="pjp-gf" data-pjp-gf><aside class="pjp-g" role="dialog" aria-label="${esc(c.titulo(f.nome))}">
       <div class="pjp-gh"><div class="pjp-av2">${esc(ini2(f.nome))}</div><div><h2>${esc(c.titulo(f.nome))}</h2><small>${esc([emp,f.setor,f.funcao?c.cargo(f.funcao):''].filter(Boolean).join(' · '))}${f.cnpj?' · CNPJ '+esc(fCNPJ(f.cnpj)):''}</small></div><button class="btn sec pjp-sm pjp-gcad" data-act="rh-ed" data-id="${esc(f._id)}" data-go-func="1" title="Abre o cadastro desta pessoa em Funcionários">Abrir o cadastro</button><button class="pjp-gx" data-act="pjp-gx" aria-label="Fechar">✕</button></div>
       <div class="pjp-gs"><span class="pjp-pill ${stC}">${stT}</span><small style="color:var(--muted)">${esc(h.ini)} às ${esc(h.fim)} · intervalo ${h.intv} min · ${h.dias.map(i=>DN[i]).join(', ')}</small></div>
-      <div class="pjp-tabs" role="tablist">${[['horas','Horas'],['desc','Descontos'+(r.uPend?' ('+r.uPend+')':'')],['regras','Regras desta pessoa'],['hist','Histórico']].map(([k,t])=>`<button role="tab" class="${tab===k?'on':''}" aria-selected="${tab===k}" data-act="pjp-tab" data-v="${k}">${t}</button>`).join('')}</div>
+      <div class="pjp-tabs" role="tablist">${[['horas','Horas'],['desc','Descontos e acréscimos'+(r.uPend?' ('+r.uPend+')':'')],['regras','Regras desta pessoa'],['hist','Histórico']].map(([k,t])=>`<button role="tab" class="${tab===k?'on':''}" aria-selected="${tab===k}" data-act="pjp-tab" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="pjp-gb">${corpo}</div>
       ${tab==='horas'||tab==='desc'?`<div class="pjp-tot"><div>Horas (decimal)<b>${r.fixo?'fixo':n2(hDec(r.min))+' h'}</b>${r.fixo?'':`<small>${hTxt(r.min)}</small>`}</div><div>× Valor da hora<b>${r.fixo?'—':r.vh?R$(r.vh):'falta'}</b></div>
-        <div>− Descontos<b>${r.desc?R$(r.desc):'—'}</b>${tab==='horas'?`<button class="lnk" data-act="pjp-tab" data-v="desc" style="display:inline;margin:0;font-size:12.5px">ver descontos</button>`:''}</div>
+        ${r.acr?`<div>+ Acréscimos<b>${R$(r.acr)}</b></div>`:''}<div>− Descontos<b>${r.desc?R$(r.desc):'—'}</b>${tab==='horas'?`<button class="lnk" data-act="pjp-tab" data-v="desc" style="display:inline;margin:0;font-size:12.5px">ver descontos</button>`:''}</div>
         <div>${r.uPend?`<span class="pjp-pill warn">${r.uPend} de uniforme para confirmar</span>`:''}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b></div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
@@ -466,7 +475,7 @@
         <div class="pjp-box"><h4>Quem entra no pagamento</h4><div class="pjp-emps">${emT.map(e=>`<label class="pjp-ck"><input type="checkbox" data-pjp-cemp="${esc(e)}" ${emV.includes(e)?'checked':''}> ${esc(e==='COLAFIX'?'Colafix (paga direto)':e.charAt(0)+e.slice(1).toLowerCase())} <small>${nEmp(e)} PJ</small></label>`).join('')}</div><small>Só aparecem na tela, nos números e nos relatórios os PJ das empresas marcadas.</small></div>
         <div class="pjp-box"><h4>Horas</h4>
           <div class="pjp-g3"><div><label for="pjp-cini">Horário padrão: entra</label><input type="time" id="pjp-cini" value="${esc(g.ini)}"></div><div><label for="pjp-cfim">Sai</label><input type="time" id="pjp-cfim" value="${esc(g.fim)}"></div><div><label for="pjp-cintv">Intervalo (min)</label><input id="pjp-cintv" inputmode="numeric" value="${esc(g.intv)}"></div></div>
-          <div class="pjp-g3"><div><label for="pjp-ctol">Tolerância (min)</label><input id="pjp-ctol" inputmode="numeric" value="${esc(g.tol)}"><small>até esses minutos vira o horário certo</small></div><div><label for="pjp-chm">Horas por mês</label><input id="pjp-chm" inputmode="numeric" value="${esc(g.horasMes)}"><small>valor da hora = salário ÷ horas</small></div><div></div></div>
+          <div class="pjp-g3"><div><label for="pjp-ctol">Tolerância (min)</label><input id="pjp-ctol" inputmode="numeric" value="${esc(g.tol)}"><small>até esses minutos vira o horário certo</small></div><div><label for="pjp-chm">Horas por mês</label><input id="pjp-chm" inputmode="numeric" value="${esc(g.horasMes)}"><small>valor da hora = salário ÷ horas</small></div><div><label for="pjp-cfds">Sábado e domingo valem</label><input id="pjp-cfds" inputmode="decimal" value="${esc(String(fdsF(c)).replace('.',','))}"><small>vezes a hora (1,5 = 50% a mais; 1 = normal)</small></div></div>
           <label class="pjp-ck" style="margin-top:10px"><input type="checkbox" id="pjp-cdentro" ${g.dentro?'checked':''}> Não contar o tempo antes do início nem depois do fim do horário</label>
           <label style="margin-top:12px">Leitores do Face ID que contam para a entrada e a saída <small style="font-weight:400;color:var(--muted)">(nenhum marcado = todos; ex.: deixe o refeitório de fora)</small></label>${leitCaixas(esc,leitVistos(dadosMes(J.per)),Array.isArray(g.leit)?g.leit:[],'pjp-clt')}</div>
         <div class="pjp-box"><h4>Nota fiscal</h4>
@@ -836,6 +845,7 @@
   .pjp-mod .pjp-box .pjp-lt label{display:flex;margin-top:0;color:inherit}.pjp-mod .pjp-box .pjp-lt label small{display:block}
   .pjp-par .pjp-emps .pjp-ck small{white-space:nowrap;color:var(--muted)}.pjp-mod .pjp-box label.pjp-ck{margin-top:10px}
   .pjp-par .pjp-lt{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:6px}.pjp-mod.pjp-par .pjp-box .pjp-lt label{border:1px solid var(--line,#E1E7EB);border-radius:10px;padding:9px 12px;gap:10px;align-items:flex-start;font-size:14px}.pjp-par .pjp-lt label span{display:flex;flex-direction:column}.pjp-par .pjp-lt input{margin-top:2px!important}
+  .pjp-d .pg-hh .pg-fds{display:block;font-size:11px;font-weight:500;color:var(--warn-ink,#7A5310)}
   .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
   .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
   .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}
@@ -900,6 +910,7 @@
       <tr>${th('Dia')}${th('Entrada')}${th('Saída')}${th('Entrada Tolerância Ajustada')}${th('Saída Tolerância Ajustada')}${th('Total de Horas (desconta '+hhmm(+h.intv||0)+')')}${th('Conversão Decimal')}</tr>${lin}
       <tr><td style="${TD}font-weight:bold">Cálculo final</td><td style="${TD}" colspan="3"></td><td style="${TD}">Total Horas</td><td style="${TD}text-align:right">${hMin(r.min)}</td><td style="${TD}text-align:right">${n2(hDec(r.min))}</td></tr>
       <tr><td style="${TD}" colspan="4"></td><td style="${TD}">${r.fixo?'Valor fixo':'Valor Horas'}</td><td style="${TD}text-align:right">${R$(r.fixo||r.vh)}</td><td style="${TD}"></td></tr>
+      ${r.acr?`<tr><td style="${TD}" colspan="4"></td><td style="${TD}">Acréscimo</td><td style="${TD}text-align:right">${R$(r.acr)}</td><td style="${TD}">${esc(r.acrMot||'')}</td></tr>`:''}
       <tr><td style="${TD}" colspan="4"></td><td style="${TD}">Desconto</td><td style="${TD}text-align:right">${R$(r.desc||0)}</td><td style="${TD}">${esc(r.desc?r.descMot||'':'')}</td></tr>
       <tr><td style="${TD}" colspan="4"></td><td style="${TD}background:#DCE6F1;font-weight:bold">Total a Pagar</td><td style="${TD}background:#DCE6F1;font-weight:bold;text-align:right">${R$(r.valor)}</td><td style="${TD}"></td></tr></table>`; }
   function finHtml(c,M){ const esc=c.esc, p=perDe(J.per), G=finGrupos(c,M), dt=br(M.data);
@@ -916,7 +927,7 @@
   function finTexto(c,M,dias){ const p=perDe(J.per), G=finGrupos(c,M), L=['Olá,','',`Conforme os dias trabalhados registrados no Face ID (período de ${p.txt}), segue o valor ${Object.values(G).flat().length>1?'dos prestadores PJ':'do prestador PJ'} para pagamento no dia ${br(M.data)}${M.mot==='desl'?' devido ser desligado antes da data de pagamento habitual.':'.'}`,''];
     Object.keys(G).sort().forEach(emp=>{ const os=G[emp], tot=Math.round(os.reduce((a,o)=>a+o.r.valor,0)*100)/100;
       os.forEach(o=>L.push('• '+c.titulo(o.f.nome)+': '+R$(o.r.valor)+' de acordo com os dias trabalhados registrados.')); L.push('','ENVIAR TOTAL DE '+R$(tot)+' · '+(emp==='COLAFIX'?'a nota fiscal é do próprio prestador, emitida para a COLAFIX':'a nota fiscal será '+emp)+'.','',
-        ...os.flatMap(o=>[c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)].concat(dias?finDias(o):[])),'',emp==='COLAFIX'?'Depositar na conta de cada prestador (dados bancários no cadastro).':'Depositar em conta '+emp+'.',''); });
+        ...os.flatMap(o=>[c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.acr?' + '+(o.r.acrMot||'acréscimo '+R$(o.r.acr)):'')+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)].concat(dias?finDias(o):[])),'',emp==='COLAFIX'?'Depositar na conta de cada prestador (dados bancários no cadastro).':'Depositar em conta '+emp+'.',''); });
     L.push('Att.,','--',c.eu(),'Gestão de Pessoas'); return L.join('\n').replace(/ /g,' '); }
   const finAssunto=(c,M)=>{ const G=finGrupos(c,M); return 'Pagamento PJ · '+Object.keys(G).sort().join(' e ')+' · '+perDe(J.per).txt+(M.mot==='desl'?' · desligamento':''); };
   function finModal(c){ const M=J.mod, esc=c.esc, os=finPessoas(c,J.per), n=os.filter(o=>M.sel[o.f._id]).length, tot=os.filter(o=>M.sel[o.f._id]).reduce((a,o)=>a+o.r.valor,0);
@@ -952,7 +963,7 @@
     return 'https://outlook.office.com/mail/deeplink/compose?'+q.join('&'); }
   /* ---------- relatórios ---------- */
   function linhasRel(c){ const pid=J.per, p=perDe(pid), D=docP(pid);
-    return pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,descMot:fe?(fe.descMot||x.descMot||''):r.descMot,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh}; }); }
+    return pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,descMot:fe?(fe.descMot||x.descMot||''):r.descMot,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh,acr:fe?fe.acr||0:r.acr,acrMot:fe?(fe.acrMot||''):r.acrMot}; }); }
   /* ---------- Excel igual à planilha do RH (04/11) ----------
      Uma aba por empresa ("Horas Trabalhadas Zenith", "NEXUS"…), um bloco por pessoa como na planilha original:
      NOME | SETOR | Horário…, depois Dia · Entrada · Saída · Entrada Tolerância Ajustada · Saída Tolerância Ajustada ·
@@ -1008,17 +1019,18 @@
           if(h.dentro){ fD=`IF(B${r}=0,0,MAX(${tF(ini)},${fD}))`; fE=`IF(C${r}=0,0,MIN(${tF(fim)},${fE}))`; }
           row.getCell(4).value={formula:fD,result:d.E!=null&&d.m?d.E/1440:(d.e&&!d.zero?tFr(d.e):0)};
           row.getCell(5).value={formula:fE,result:d.S!=null&&d.m?d.S/1440:0};
-          row.getCell(6).value=d.fech||d.fil||(d.fer&&d.fer.pago)?d.m/1440:{formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`,result:d.m/1440};   /* dia do fechamento e feriado pago: o dia cheio, não a conta das passagens */
+          row.getCell(6).value=d.fech||d.fil||(d.fer&&d.fer.pago)?d.m/1440:{formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`+(d.mR!=null?'*'+d.fF:''),result:d.m/1440};   /* dia do fechamento e feriado pago: o dia cheio, não a conta das passagens */
           row.getCell(7).value={formula:`F${r}*24`,result:+(d.m/60).toFixed(4)};
-          row.getCell(8).value=d.aj?(d.zero?'Não trabalhou':'Corrigido à mão')+(d.mot?': '+d.mot:'')+(d.hs.length?' · Face ID: '+d.hs.join(' '):''):d.fil?'Fixcol · dia cheio (sem Face ID)':d.fl?d.fl+' · Face ID: '+d.hs.join(' '):d.hs.length>2?'Face ID: '+d.hs.join(' '):d.info||'';
+          row.getCell(8).value=d.aj?(d.zero?'Não trabalhou':'Corrigido à mão')+(d.mot?': '+d.mot:'')+(d.hs.length?' · Face ID: '+d.hs.join(' '):''):d.fil?'Fixcol · dia cheio (sem Face ID)':d.mR!=null?'Fim de semana × '+String(d.fF).replace('.',','):d.fl?d.fl+' · Face ID: '+d.hs.join(' '):d.hs.length>2?'Face ID: '+d.hs.join(' '):d.info||'';
           [2,3,4,5].forEach(k=>row.getCell(k).numFmt='hh:mm'); row.getCell(6).numFmt='[h]:mm'; row.getCell(7).numFmt='0.00';
           row.eachCell({includeEmpty:true},cl=>{ cl.border=bd; if(d.dw===0||d.dw===6) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF7F7F7'}}; if(d.fl&&!d.aj) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFBF1DC'}}; if(d.aj) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEAF2F6'}}; }); r++; });
         const d1=r-1, cf=(lab,k,v,fmt,bold)=>{ const row=W.getRow(r); row.getCell(5).value=lab; row.getCell(k).value=v; if(fmt) row.getCell(k).numFmt=fmt; [5,6,7].forEach(j=>{ row.getCell(j).border=bd; if(bold){ row.getCell(j).font={bold:true}; row.getCell(j).fill={type:'pattern',pattern:'solid',fgColor:{argb:CZ}}; } }); return r++; };
         const rT=r; W.getCell('A'+r).value='Cálculo final'; W.getCell('A'+r).font={bold:true};
         cf('Total Horas',6,{formula:`SUM(F${d0}:F${d1})`,result:o.min/1440},'[h]:mm'); W.getCell('G'+rT).value={formula:`F${rT}*24`,result:+(o.min/60).toFixed(4)}; W.getCell('G'+rT).numFmt='0.00'; W.getCell('G'+rT).border=bd;
         const rV=cf(o.r.fixo?'Valor fixo':'Valor Horas',6,o.r.fixo?o.r.fixo:(o.vh||0),FR);
+        const rA=o.acr?cf('Acréscimo',6,o.acr,FR):null; if(rA&&o.acrMot) W.getCell('H'+rA).value=o.acrMot;
         const rD=cf('Desconto',6,o.desc||0,FR); if(o.descMot) W.getCell('H'+rD).value=o.descMot;
-        cf('Total a Pagar',6,{formula:o.r.fixo?`F${rV}-F${rD}`:`F${rV}*G${rT}-F${rD}`,result:o.valor},FR,true);
+        cf('Total a Pagar',6,{formula:(o.r.fixo?`F${rV}`:`F${rV}*G${rT}`)+(rA?`+F${rA}`:'')+`-F${rD}`,result:o.valor},FR,true);
         r+=1; });
     }
     const buf=await wb.xlsx.writeBuffer(), arq='Pagamento-PJ-'+J.per+'.xlsx', blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -1046,8 +1058,8 @@
     if(!r.fixo&&!r.vh) throw Object.assign(new Error(c.titulo(f.nome)+': falta o valor da hora (abra a pessoa e preencha).'),{aviso:true});
     if(!r.fixo&&!r.min) throw Object.assign(new Error(c.titulo(f.nome)+': não tem horas neste período (confira os dias no Face ID ou corrija à mão).'),{aviso:true});
     if(r.uPend) throw Object.assign(new Error(c.titulo(f.nome)+': confirme o desconto do uniforme na aba Descontos antes de fechar.'),{aviso:true});
-    const fech={cheio:r.cheio||null,min:r.min,vh:r.vh,fixo:r.fixo,bruto:r.bruto,desc:r.desc,descMot:r.descMot,descs:r.descs.map(z=>({t:z.t,v:z.v})),valor:r.valor,dias:r.dias.map(d=>({d:d.d,e:d.E!=null?hhmm(d.E):'',s:d.S!=null?hhmm(d.S):'',m:d.m})),h:r.h,em:agora(),por:c.eu()};
-    await grava(c,pid,f._id,{st:'fechado',fech},'Valor fechado: '+(r.fixo?'fixo ':hTxt(r.min)+' × '+R$(r.vh)+' ')+(r.desc?'− '+R$(r.desc)+' ':'')+'= '+R$(r.valor)); }
+    const fech={cheio:r.cheio||null,min:r.min,vh:r.vh,fixo:r.fixo,bruto:r.bruto,desc:r.desc,descMot:r.descMot,descs:r.descs.map(z=>({t:z.t,v:z.v})),acr:r.acr,acrMot:r.acrMot,acrs:r.acrs.map(z=>({t:z.t,v:z.v})),valor:r.valor,dias:r.dias.map(d=>({d:d.d,e:d.E!=null?hhmm(d.E):'',s:d.S!=null?hhmm(d.S):'',m:d.m})),h:r.h,em:agora(),por:c.eu()};
+    await grava(c,pid,f._id,{st:'fechado',fech},'Valor fechado: '+(r.fixo?'fixo ':hTxt(r.min)+' × '+R$(r.vh)+' ')+(r.desc?'− '+R$(r.desc)+' ':'')+(r.acr?'+ '+R$(r.acr)+' ':'')+'= '+R$(r.valor)); }
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!C||!t||!t.closest) return; const P=C.P;
     if(t.id==='pjp-cmodo'){ const k=document.getElementById('pjp-ccorte'); if(k) k.disabled=t.value==='mes'; return; }
     if(t.matches&&t.matches('[data-pjp-qsel]')){ if(t.value&&perDe(t.value)){ J.per=t.value; J.ab=''; C.P.render(); } return; }
@@ -1121,7 +1133,7 @@
       if(a==='pjp-cfg'){ J.mod={k:'cfg'}; P.render(); return; }
       if(a==='pjp-cfgok'){ const g=id=>document.getElementById(id), o={modo:g('pjp-cmodo').value,ini:g('pjp-cini').value||PAD.ini,fim:g('pjp-cfim').value||PAD.fim,intv:Math.max(0,parseInt(g('pjp-cintv').value,10)||0),tol:Math.max(0,parseInt(g('pjp-ctol').value,10)||0),
           horasMes:Math.max(1,parseInt(g('pjp-chm').value,10)||220),dias:Math.max(2,Math.min(90,parseInt(g('pjp-cdias').value,10)||30)),
-          corte:Math.max(10,Math.min(20,parseInt(g('pjp-ccorte').value,10)||15)),pagDias:Math.max(0,Math.min(60,parseInt(g('pjp-cpag').value,10)||0)),avisaNota:Math.max(1,Math.min(30,parseInt(g('pjp-caviso').value,10)||3)),
+          corte:Math.max(10,Math.min(20,parseInt(g('pjp-ccorte').value,10)||15)),fds:(v=>v>=1&&v<=3?v:1.5)(num(g('pjp-cfds').value)),pagDias:Math.max(0,Math.min(60,parseInt(g('pjp-cpag').value,10)||0)),avisaNota:Math.max(1,Math.min(30,parseInt(g('pjp-caviso').value,10)||3)),
           emps:(e=>e.length?e:['ZENITH','NEXUS'])([...document.querySelectorAll('[data-pjp-cemp]')].filter(i=>i.checked).map(i=>i.dataset.pjpCemp)),dentro:g('pjp-cdentro').checked,leit:[...document.querySelectorAll('[data-pjp-clt]')].filter(i=>i.checked).map(i=>i.dataset.pjpClt),msg:String(g('pjp-cmsg').value||'').slice(0,800)||PAD.msg};
         const ant=cfg(c).modo, antK=corteQ(); o.finEmail=cfg(c).finEmail||null; if(!o.finEmail) delete o.finEmail; c.R.cfg.pjPag=Object.assign({},(c.R.cfg||{}).pjPag||{},o); await P.db().doc('rh/config').set({pjPag:o},{merge:true}); if(ant!==o.modo||antK!==o.corte) J.per=perAtual(c); J.mod=null; P.toast('Parâmetros do pagamento salvos.'); P.render(); return; }
       if(a==='pjp-psalva'){ const f=fDe(b.dataset.f), g=id=>(document.getElementById(id)||{}).value||'', n0=v=>v===''?null:Math.max(0,parseInt(v,10)||0);
@@ -1147,11 +1159,17 @@
         await grava(c,J.per,f._id,{},a==='pjp-uok'?'Desconto do uniforme confirmado: '+R$(u?u.v:0)+' (entrega de '+brc(ux.data)+')':a==='pjp-uno'?'Uniforme (entrega de '+brc(ux.data)+') não descontado nesta quinzena':'Desfez a escolha do uniforme (entrega de '+brc(ux.data)+')'); P.render(); return; }
       if(a==='pjp-dxadd'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const t=String((document.getElementById('pjp-dxt')||{}).value||'').trim().slice(0,80), v=Math.round(num((document.getElementById('pjp-dxv')||{}).value)*100)/100;
         if(!t) return P.toast('Escreva o que é o desconto.'); if(!(v>0)) return P.toast('Digite o valor do desconto (ex.: 50,00).');
-        const xs=((x.dsc&&x.dsc.x)||[]).concat([{id:'d'+Date.now().toString(36),t,v,em:agora(),por:c.eu()}]); await grava(c,J.per,f._id,{dsc:{x:xs}},'Desconto acrescentado: '+t+' '+R$(v)); P.render(); return; }
+        const xs=((x.dsc&&x.dsc.x)||[]).concat([{id:'d'+Date.now().toString(36),t,v,em:agora(),por:c.eu()}]); await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{x:xs})},'Desconto acrescentado: '+t+' '+R$(v)); P.render(); return; }
+      if(a==='pjp-axadd'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const t=String((document.getElementById('pjp-axt')||{}).value||'').trim().slice(0,80)||'Vale-transporte', raw=String((document.getElementById('pjp-axv')||{}).value||'');
+        const mm=raw.match(/^\s*(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*$/i), v=Math.round((mm?num(mm[1])*num(mm[2]):num(raw))*100)/100;
+        if(!(v>0)) return P.toast('Digite o valor do acréscimo (ex.: 200,00 ou 5 x 40).');
+        const as=((x.dsc&&x.dsc.a)||[]).concat([{id:'a'+Date.now().toString(36),t,v,em:agora(),por:c.eu()}]); await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{a:as})},'Acréscimo: '+t+' '+R$(v)); P.render(); return; }
+      if(a==='pjp-axx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const id=b.dataset.id, z=((x.dsc&&x.dsc.a)||[]).find(y=>y.id===id), as=((x.dsc&&x.dsc.a)||[]).filter(y=>y.id!==id);
+        await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{a:as})},'Acréscimo tirado: '+(z?z.t+' '+R$(z.v):'')); P.render(); return; }
       if(a==='pjp-dxx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const id=b.dataset.id;
         if(id==='fch'){ await grava(c,J.per,f._id,{fchX:{em:agora(),por:c.eu()}},'Desconto do dia do fechamento tirado'); P.render(); return; }
         if(id==='leg'){ await grava(c,J.per,f._id,{desc:0,descMot:''},'Desconto tirado: '+(x.descMot||'desconto lançado')+' '+R$(x.desc)); P.render(); return; }
-        const z=((x.dsc&&x.dsc.x)||[]).find(y=>y.id===id), xs=((x.dsc&&x.dsc.x)||[]).filter(y=>y.id!==id); await grava(c,J.per,f._id,{dsc:{x:xs}},'Desconto tirado: '+(z?z.t+' '+R$(z.v):'')); P.render(); return; }
+        const z=((x.dsc&&x.dsc.x)||[]).find(y=>y.id===id), xs=((x.dsc&&x.dsc.x)||[]).filter(y=>y.id!==id); await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{x:xs})},'Desconto tirado: '+(z?z.t+' '+R$(z.v):'')); P.render(); return; }
       if(a==='pjp-diax'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id), aj=Object.assign({},x.aj||{}), o=aj[b.dataset.d]; aj[b.dataset.d]=o&&o.fer?{fer:true,ferNome:o.ferNome,pago:!!o.pago}:null; await grava(c,J.per,f._id,{aj}); P.render(); return; }
       if(a==='pjp-fech'){ await fechar(c,fDe(b.dataset.f)); P.render(); return; }
       if(a==='pjp-fechtodos'){ const p=perDe(J.per), vis=J._vis||[], xs=pjs(c,p).filter(f=>!pesDe(J.per,f._id).st&&vis.includes(f._id)); const er=[]; b.disabled=true;
