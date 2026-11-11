@@ -433,11 +433,20 @@
       const kOf=d=>{ const k=[]; if((d.fl&&!d.aj)||(d.sp&&!d.sp.soAlm&&!d.descF&&!d.okFora)) k.push('conf'); if(d.sp&&d.sp.sai&&d.sp.sai.length) k.push('sai'); if(d.aj||d.descF||d.okFora) k.push('cor'); if(!d.hs.length&&d.esc&&!d.fil&&!d.fer&&d.d<=hojeS()) k.push('sem'); return k; };
       const DLX=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
       const busca=d=>norm([DNL[d.dw],DLX[d.dw],brc(d.d),br(d.d),String(+d.d.slice(8,10)),d.d].join(' '));
-      const vis=d=>{ const k=kOf(d), q=norm(J.dq||''); if(J.dk&&J.dk!=='*'&&!k.includes(J.dk)) return false; return !q||q.split(' ').every(w=>busca(d).split(' ').some(b=>b===w||(w.length>1&&b.startsWith(w))||(w.includes('/')&&b.startsWith(w)))); };
+      const vis=d=>{ if(J.dsel&&d.d!==J.dsel) return false; const k=kOf(d), q=norm(J.dq||''); if(J.dk&&J.dk!=='*'&&!k.includes(J.dk)) return false; return !q||q.split(' ').every(w=>busca(d).split(' ').some(b=>b===w||(w.length>1&&b.startsWith(w))||(w.includes('/')&&b.startsWith(w)))); };
       const at=d=>`data-pjpd="${d.d}" data-k="${kOf(d).join(' ')}" data-b="${esc(busca(d))}"${vis(d)?'':' hidden'}`;
       const nK=k=>r.dias.filter(d=>kOf(d).includes(k)).length;
-      const filtro=`<div class="pjp-dfil"><label class="pjp-dq"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pjp-dq" type="search" placeholder="Procurar o dia (ex.: 16, 16/10 ou sexta)" value="${esc(J.dq||'')}" autocomplete="off"></label>
-        <div class="pjp-dks">${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div></div>
+      /* procurar o dia em calendário (11/11, "procurar dia pode ser em formato calendário?"): um quadradinho por dia do período,
+         na cor da situação; tocar mostra só aquele dia (tocar de novo ou "ver todos" volta) */
+      const cel=d=>{ const k=kOf(d), fds=!d.esc&&!d.hs.length&&!d.aj, fut=d.d>hojeS()&&!d.hs.length;
+        const st=k.includes('conf')?'cf':k.includes('sem')?'sm':d.fer&&!d.hs.length?'fe':fds?'fd':fut?'fu':d.m>0?'ok':'nd';
+        const tt={cf:'para conferir',sm:'sem passagem',fe:'feriado',fd:'fora da escala',fu:'ainda não chegou',ok:'trabalhou',nd:'sem horas'}[st];
+        return `<button type="button" class="pjp-cd ${st}${k.includes('cor')?' cr':''}" data-act="pjp-dcal" data-v="${d.d}" aria-pressed="${J.dsel===d.d}" title="${DLX[d.dw]} ${br(d.d)} · ${tt}${d.m?' · '+hTxt(d.m):''}"><b>${+d.d.slice(8,10)}</b><small>${d.m?hTxt(d.m):st==='sm'?'falta':st==='cf'?'conferir':''}</small></button>`; };
+      const pd=r.dias[0]?new Date(r.dias[0].d+'T12:00:00').getDay():1, vaz=(pd+6)%7;
+      const filtro=`<div class="pjp-cal"><div class="pjp-calh"><b>Procurar o dia</b><span>toque no dia para ver só ele</span>${J.dsel?`<button type="button" class="lnk" data-act="pjp-dcal" data-v="" style="margin:0 0 0 auto">ver todos os dias</button>`:''}</div>
+        <div class="pjp-calg">${['seg','ter','qua','qui','sex','sáb','dom'].map(x=>`<span class="pjp-cw">${x}</span>`).join('')}${'<span></span>'.repeat(vaz)}${r.dias.map(cel).join('')}</div>
+        <div class="pjp-call"><span><i class="ok"></i>trabalhou</span><span><i class="cf"></i>para conferir</span><span><i class="sm"></i>sem passagem</span><span><i class="fd"></i>fim de semana / fora da escala</span></div></div>
+      <div class="pjp-dfil">        <div class="pjp-dks">${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div></div>
         <p class="pjp-dv" id="pjp-dv" hidden>Nenhum dia com esse filtro.</p>`;
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds" ${at(d)}>${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
@@ -901,6 +910,21 @@
   .pjp-d .pg-hh .pg-fds{display:block;font-size:11px;font-weight:500;color:var(--warn-ink,#7A5310)}
   .pjp-av.pjp-hc{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pjp-av.pjp-hc .btn{height:32px;font-size:13px}
   .pjp-d .pg-tag.pg-sp2{white-space:normal;line-height:1.35}
+  .pjp-cal{border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:12px 14px;background:var(--surface)}
+  .pjp-calh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}.pjp-calh b{font-size:14px}.pjp-calh span{font-size:12.5px;color:var(--muted)}
+  .pjp-calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+  .pjp-cw{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:2px}
+  .pjp-cd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:46px;border-radius:10px;border:1px solid transparent;background:var(--ground);color:inherit;font:inherit;cursor:pointer;padding:3px 2px;font-variant-numeric:tabular-nums}
+  .pjp-cd b{font-size:15px;font-weight:600;line-height:1.1}.pjp-cd small{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .pjp-cd.ok{background:var(--ok-tint,#E3F0E8)}.pjp-cd.ok small{color:var(--ok-ink,#2F6B47)}
+  .pjp-cd.cf{background:var(--warn-tint,#FBF1DC)}.pjp-cd.cf small{color:var(--warn-ink,#7A5310);font-weight:600}
+  .pjp-cd.sm{background:var(--crit-tint,#F6E3E1)}.pjp-cd.sm small{color:var(--crit-ink,#8E3A33);font-weight:600}
+  .pjp-cd.fd,.pjp-cd.fu,.pjp-cd.nd{background:transparent;border-color:var(--line,#E1E7EB)}.pjp-cd.fd b,.pjp-cd.fu b{color:var(--muted);font-weight:500}
+  .pjp-cd.fe{background:#EDE7F6}.pjp-cd.cr{box-shadow:inset 0 -3px 0 var(--teal,#2C6E8A)}
+  .pjp-cd:hover{border-color:var(--teal,#2C6E8A)}.pjp-cd[aria-pressed=true]{border:2px solid var(--teal-strong,#143F54);box-shadow:0 0 0 3px rgba(20,63,84,.12)}
+  .pjp-call{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--muted)}.pjp-call i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;background:var(--ground)}
+  .pjp-call i.ok{background:var(--ok-tint,#E3F0E8);border:1px solid var(--ok,#2F7A4E)}.pjp-call i.cf{background:var(--warn-tint,#FBF1DC);border:1px solid var(--warn,#C28A1E)}.pjp-call i.sm{background:var(--crit-tint,#F6E3E1);border:1px solid var(--crit,#B5473F)}.pjp-call i.fd{background:transparent;border:1px solid var(--line,#C9D3DA)}
+  @media(max-width:640px){.pjp-cd{min-height:40px}.pjp-cd small{display:none}}
   .pjp-dfil{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .pjp-dq{flex:1 1 240px;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line,#E1E7EB);border-radius:10px;background:var(--surface);color:var(--muted)}
   .pjp-dq:focus-within{outline:3px solid #9FBFCF;outline-offset:1px}.pjp-dq input{border:0;outline:0;background:none;flex:1;min-width:0;font:inherit;font-size:14px;color:var(--ink,inherit)}
@@ -1148,7 +1172,7 @@
     }catch(e){ P.erro(e); } });
   function dFiltra(){ const q=norm(J.dq||''), k=J.dk||'*', ws=q?q.split(' '):[]; let n=0;
     document.querySelectorAll('.pjp-dl [data-pjpd]').forEach(el=>{ const b=(el.dataset.b||'').split(' '), ks=(el.dataset.k||'').split(' ');
-      const ok=(k==='*'||ks.includes(k))&&ws.every(w=>b.some(x=>x===w||(w.length>1&&x.startsWith(w))||(w.includes('/')&&x.startsWith(w)))); el.hidden=!ok; if(ok) n++; });
+      const ok=(!J.dsel||el.dataset.pjpd===J.dsel)&&(k==='*'||ks.includes(k))&&ws.every(w=>b.some(x=>x===w||(w.length>1&&x.startsWith(w))||(w.includes('/')&&x.startsWith(w)))); el.hidden=!ok; if(ok) n++; });
     const v=document.getElementById('pjp-dv'); if(v) v.hidden=!!n; }
   document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='pjp-dq'){ J.dq=t.value; dFiltra(); return; } });
   document.addEventListener('input',ev=>{ const t=ev.target; if(!C||!t||t.id!=='pjp-q') return; J.q=t.value; clearTimeout(J._qt); J._qt=setTimeout(()=>{ C.P.render(); setTimeout(()=>{ const i=document.getElementById('pjp-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },0); },350); });
@@ -1162,7 +1186,7 @@
     ev.preventDefault();
     try{
       if(a==='pjp-per'){ const v=+b.dataset.v; J.per=v===0?perAtual(c):perMove(J.per,v); J.ab=''; P.render(); return; }
-      if(a==='pjp-ab'){ if(J.ab!==b.dataset.f){ J.dq=''; J.dk='*'; } J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
+      if(a==='pjp-ab'){ if(J.ab!==b.dataset.f){ J.dq=''; J.dk='*'; J.dsel=''; } J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
       if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
       if(a==='pjp-fin'){ finAbrir(c,b.dataset.f?[b.dataset.f]:null); P.render(); return; }
@@ -1193,7 +1217,11 @@
       if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; if(J.col>=0) J.aba='lista'; P.render(); return; }
       if(a==='pjp-gx'){ J.ab=''; J.edDia=null; P.render(); return; }
       if(a==='pjp-tab'){ J.tab=b.dataset.v; J.edDia=null; P.render(); return; }
-      if(a==='pjp-dk'){ J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
+      if(a==='pjp-dcal'){ const v=b.dataset.v||''; J.dsel=J.dsel===v?'':v; if(J.dsel){ J.dk='*'; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v==='*'))); }
+        document.querySelectorAll('[data-act=pjp-dcal][data-v]').forEach(x=>x.setAttribute('aria-pressed',String(!!J.dsel&&x.dataset.v===J.dsel)));
+        const h=document.querySelector('.pjp-calh'); if(h){ let l=h.querySelector('[data-v=""]'); if(J.dsel&&!l){ h.insertAdjacentHTML('beforeend','<button type="button" class="lnk" data-act="pjp-dcal" data-v="" style="margin:0 0 0 auto">ver todos os dias</button>'); } else if(!J.dsel&&l) l.remove(); }
+        dFiltra(); const el=J.dsel&&document.querySelector('.pjp-dl [data-pjpd="'+J.dsel+'"]'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); return; }
+      if(a==='pjp-dk'){ J.dsel=''; J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
       if(a==='pjp-confx'){ J.conf=!J.conf; P.render(); return; }
       if(a==='pjp-flimpa'){ J.emp=''; J.set=''; J.sit='*'; J.col=-1; J.conf=false; J.q=''; P.render(); return; }
       if(a==='pjp-dcor'){ J.edDia=b.dataset.d; P.render(); setTimeout(()=>{ const i=document.getElementById(document.getElementById('pjp-ce')&&!document.getElementById('pjp-ce').value?'pjp-ce':'pjp-cs'); if(i) i.focus(); },30); return; }
