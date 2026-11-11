@@ -8,6 +8,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   P.forEach(([id,n,e,cpf,s,set],i)=>{ D['rh/dados/funcionarios/'+id]={nome:n,tipo:'PJ',empresa:e,cpf,cnpj:'1234567800019'+i,salario:s,setor:set,funcao:'Operador',status:'Ativo',admissao:'2025-01-10'}; });
   const dias={}; ['16','19','20','21','22','23','26','27','28','29','30'].forEach(x=>{ const k='2026-10-'+x; dias[k]={}; P.forEach(([id,n,e,cpf],i)=>{ if(id==='f7'||id==='f8') return; dias[k][cpf]={p:1,a:1,t:['07:2'+i+':10 PORTARIA','12:01:00 REFEITÓRIO','17:2'+i+':00 PORTARIA']}; }); });
   D['rh/dados/almoco/2026-10']={mes:'2026-10',dias,pessoas:Object.fromEntries(P.map(([id,n,e,cpf])=>[cpf,{n,e}])),imp:[]};
+  D['rh/dados/pjpag/2026-10-1']={pid:'2026-10-1',de:'2026-10-01',ate:'2026-10-15',pes:{f4:{st:'pago',fech:{min:4800,vh:20,valor:1600}},f5:{st:'pago',fech:{min:5000,vh:27.27,valor:2272.5}}}};
   D['rh/dados/pjpag/2026-10-2']={pid:'2026-10-2',de:'2026-10-16',ate:'2026-10-31',pes:{f4:{st:'pedido',fech:{min:5000,vh:20,valor:1666.67,bruto:1666.67}},f5:{st:'pago',fech:{min:5200,vh:27.27,valor:2363.4,bruto:2363.4}},f6:{st:'fechado',fech:{min:5100,vh:17.27,valor:1468,bruto:1468}}}};
   const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
@@ -27,6 +28,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   const pv=await txt('.pjp-dash + .pjp-cx'); ok('Precisa de você: sem valor da hora, sem horas e o valor fechado que falta pedir a nota', /Diego Rocha Teste[\s\S]*Sem valor da hora/.test(pv)&&/Eva Moura Teste[\s\S]*Sem horas no período/.test(pv)&&/Carla Dias Teste[\s\S]*falta pedir a nota/.test(pv)&&!/Maria Oliveira/.test(pv), pv.replace(/\n/g,' | '));
   const rsm=await txt('.pjp-kpi'); ok('Painel com o já pago e quantos PJ', /Já pago\s*R\$\s?2\.363,40/.test(rsm)&&/7 PJ/.test(rsm), rsm.replace(/\n/g,' | '));
   const dsh=await txt('.pjp-dash'); ok('Painel com horas por dia, por empresa e etapas', /Horas por dia/.test(dsh)&&/Por empresa/.test(dsh)&&/ZENITH/.test(dsh)&&/Conferir e fechar/.test(dsh), dsh.replace(/\n/g,' | ').slice(0,300));
+  await H.dorme(800); const d2=await txt('.pjp-dash2'); ok('Últimas quinzenas (com a fechada de 1 a 15/10) e Quem mais trabalhou', /Últimas quinzenas/.test(d2)&&/R\$\s?3\.872/.test(d2)&&/Quem mais trabalhou/.test(d2)&&/quinzena passada|h/.test(d2), d2.replace(/\n/g,' | ').slice(0,400));
   await p.screenshot({path:'/tmp/claude-0/-home-user/15bb035f-7714-5477-8bc7-c84733f0e797/scratchpad/dash.png',fullPage:true});
   await aba('lista'); let n=await nomes(); ok('Lista do detalhe em ordem de etapa (conferir primeiro, pago por último)', n.join(',')==='Diego,Eva,Joao,Maria,Carla,Ana,Bruno', n.join(','));
   const pg=await p.evaluate(()=>{ const tr=[...document.querySelectorAll('.pjp-lc .pjp-t tbody tr')].find(t=>/Bruno/.test(t.innerText)); return {ini:tr.querySelector('.pc-ini').textContent,sl:tr.querySelector('.pjp-sl').textContent,f:tr.querySelectorAll('.pjp-pg i.f').length}; });

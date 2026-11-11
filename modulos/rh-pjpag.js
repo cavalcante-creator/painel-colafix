@@ -756,6 +756,24 @@
     const etN=COLS.map((cl,i)=>({i,t:cl.t,n:rsF.filter(o=>cl.st.includes(o.x.st||'')).length}));
     const gEt=rsF.length?`<div class="pjp-etb" role="img" aria-label="${esc(etN.map(x=>x.t+': '+x.n).join(', '))}">${etN.filter(x=>x.n).map(x=>`<i class="k${x.i}" style="flex:${x.n}" title="${esc(x.t)}: ${x.n}"></i>`).join('')}</div>
       <div class="pjp-etl">${etN.map(x=>`<button type="button" class="pjp-etx" data-act="pjp-col" data-v="${x.i}"><i class="k${x.i}"></i><span>${esc(x.t)}</span><b>${x.n}</b></button>`).join('')}</div>`:'<div class="pjp-kvz">Nenhum PJ</div>';
+    /* 11/11 (2) últimas quinzenas por empresa: 1 leitura das 6 quinzenas, guardada na memória */
+    const hPids=(()=>{ const a=[pid]; for(let n=1;n<6;n++) a.unshift(perMove(a[0],-1)); return a; })(), hK=hPids.join(',');
+    if(!J.hist) J.hist={}; if(!J.hist[hK]){ J.hist[hK]={carr:true}; c.P.db().collection(COL).where('pid','in',hPids.slice(0,-1)).get().then(sn=>{ const o={}; sn.docs.forEach(d=>{ const x=d.data(); o[x.pid]=x; }); J.hist[hK]={o}; c.P.rerender(); }).catch(()=>{ J.hist[hK]={o:{},erro:1}; c.P.rerender(); }); }
+    const HD=J.hist[hK], empOf=fid=>{ const f=(c.R.func||[]).find(y=>y._id===fid); return f?String(f.empresa||'').toUpperCase()||'OUTRA':'OUTRA'; };
+    const hCols=hPids.map(k=>{ const q=perDe(k), por={}; let n=0;
+      if(k===pid){ rsF.forEach(o=>{ const e=String(o.f.empresa||'').toUpperCase()||'OUTRA'; por[e]=(por[e]||0)+o.r.valor; }); n=rsF.length; }
+      else { const d=HD&&HD.o&&HD.o[k]; Object.entries((d&&d.pes)||{}).forEach(([fid,x])=>{ if(x&&x.fech&&x.st){ const e=empOf(fid); por[e]=(por[e]||0)+(+x.fech.valor||0); n++; } }); }
+      return {k,q,por,n,tot:Object.values(por).reduce((a,b)=>a+b,0),atual:k===pid}; });
+    const hEmps=[...new Set(hCols.flatMap(x=>Object.keys(x.por)))].sort((a,b)=>a==='OUTRA'?1:b==='OUTRA'?-1:a.localeCompare(b));
+    const hMaxV=Math.max(1,...hCols.map(x=>x.tot)), EC=['e0','e1','e2','e3'];
+    const gHist=HD&&HD.carr?'<div class="pjp-kvz">Carregando as quinzenas…</div>':`<div class="pjp-qb2" role="img" aria-label="Total pago por quinzena">${hCols.map(x=>`<div class="pjp-qc ${x.atual?'at':''}" title="${esc(x.q.curto)}: ${R$(x.tot)}${x.n?' · '+x.n+' PJ':''}${x.atual&&cedo?' (até agora)':''}${hEmps.map(e=>x.por[e]?' · '+e+' '+R$(x.por[e]):'').join('')}">
+        <span class="pjp-qv2 n">${x.tot?esc(R$(x.tot).replace(/,\d\d$/,'')):'—'}</span><div class="pjp-qst" style="height:${x.tot?Math.max(3,Math.round(x.tot/hMaxV*100)):0}%">${hEmps.map((e,i)=>x.por[e]?`<i class="${EC[i%4]}" style="flex:${x.por[e]}"></i>`:'').join('')}</div><small>${esc(x.q.curto.replace(/\/\d{4}/g,''))}${x.atual?'<br>'+(cedo?'até agora':'esta'):''}</small></div>`).join('')}</div>
+      <div class="pjp-lg">${hEmps.map((e,i)=>`<span><i class="${EC[i%4]}"></i>${esc(e==='OUTRA'?'Outra':e)}</span>`).join('')}<span class="pjp-lgs">quinzenas passadas: só os valores fechados</span></div>`;
+    /* 11/11 (3) quem mais trabalhou: 5 com mais horas, com a passada */
+    const top=rsF.filter(o=>o.r.min>0).sort((a,b)=>b.r.min-a.r.min).slice(0,5), tMax=Math.max(1,...top.map(o=>o.r.min));
+    const gTop=top.length?top.map(o=>{ const xa=DA&&DA.pes&&DA.pes[o.f._id], am=xa&&xa.fech?+xa.fech.min||0:null;
+        return `<button type="button" class="pjp-tp" data-act="pjp-ab" ${fa(o)}><span class="pjp-tpn">${ini(o)}<b>${esc(nm(o))}</b><span class="n">${hTxt(o.r.min)}</span></span><span class="pjp-ebb"><i style="width:${Math.max(2,Math.round(o.r.min/tMax*100))}%"></i></span><small>${esc(String(o.f.empresa||'').toUpperCase())}${am!=null?' · quinzena passada '+hTxt(am):''}</small></button>`; }).join('')
+      :'<div class="pjp-kvz">Ninguém com horas ainda</div>';
     const pvH=pv.length?pv.map(({o,t,tom})=>`<div class="pjp-pvi"><span>${ini(o)}</span><div class="pjp-pvt"><button class="pjp-nm" data-act="pjp-ab" ${fa(o)}>${esc(nm(o))}</button><small class="pjp-pvm ${tom}">${esc(t)}</small></div><div class="pjp-qa">${cedo&&!(o.x.st)?btn('pjp-ab','Ver os dias',fa(o)):acoes(c,pid,o.f,o.x,o.r)}</div></div>`).join('')
       :`<div class="pjp-pvok">${U?U.ic('ok',18):''} Nada esperando por você agora.</div>`;
     const dadosOk=!!(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes]);
@@ -805,6 +823,10 @@
         <section class="pjp-cx pjp-dw"><div class="pjp-ch"><h3>Horas por dia</h3><small>todos os PJ juntos</small></div><div class="pjp-db">${gHoras}</div></section>
         <section class="pjp-cx"><div class="pjp-ch"><h3>Por empresa</h3></div><div class="pjp-db">${gEmp}</div></section>
         <section class="pjp-cx"><div class="pjp-ch"><h3>Em que etapa</h3></div><div class="pjp-db">${gEt}</div></section>
+      </div>
+      <div class="pjp-dash pjp-dash2">
+        <section class="pjp-cx"><div class="pjp-ch"><h3>Últimas quinzenas</h3><small>total por empresa</small></div><div class="pjp-db">${gHist}</div></section>
+        <section class="pjp-cx"><div class="pjp-ch"><h3>Quem mais trabalhou</h3><small>horas nesta quinzena</small></div><div class="pjp-db">${gTop}</div></section>
       </div>
       <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}${pp.ok?'':`<div class="pjp-ppl" title="${esc(pp.s)}"><small>${esc(pp.t)}</small>${pp.b}</div>`}</div>${pvH}</section>`:''}${aba==='kb'?`
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver a lista dela; toque na pessoa para ver os dias</small></div>${quadros}</section>`:''}${aba==='lista'?`
@@ -887,6 +909,18 @@
   .pjp-lc .pc-vazio{margin:8px 18px 22px}
   /* cara de app (10/11): barra com a quinzena e o Face ID, cores por etapa, quadros de número */
   .pjp-ppl{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.pjp-ppl small{color:var(--muted);font-size:12.5px}
+  .pjp-dash.pjp-dash2{grid-template-columns:1fr 1fr;margin-top:0;align-items:start}
+  .pjp-qb2{display:flex;align-items:flex-end;gap:10px;height:170px;padding-top:18px}.pjp-qc{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+  .pjp-qst{width:100%;max-width:46px;display:flex;flex-direction:column-reverse;gap:2px;border-radius:4px 4px 0 0;overflow:hidden}.pjp-qst i{display:block;width:100%;min-height:2px}
+  .pjp-qc.at .pjp-qst{outline:2px solid var(--teal,#1F6F78);outline-offset:2px}.pjp-qc small{font-size:11px;color:var(--muted);margin-top:6px;text-align:center;line-height:1.25}
+  .pjp-qv2{font-size:11.5px;font-weight:600;margin-bottom:4px;white-space:nowrap}
+  .pjp .e0{background:#2B6CB0}.pjp .e1{background:#0F766E}.pjp .e2{background:#8A6BBE}.pjp .e3{background:#8A94A0}
+  :root[data-theme="dark"] .pjp .e0{background:#7FB0E6}:root[data-theme="dark"] .pjp .e1{background:#5CC4B6}:root[data-theme="dark"] .pjp .e2{background:#B9A3E3}
+  .pjp-lg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12.5px;align-items:center}.pjp-lg span{display:inline-flex;align-items:center;gap:6px}.pjp-lg i{width:10px;height:10px;border-radius:3px}.pjp-lgs{color:var(--muted);margin-left:auto}
+  .pjp-tp{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 6px 8px;border-radius:10px;font:inherit;color:inherit;cursor:pointer}.pjp-tp:hover{background:var(--surface-2,#F2F5F7)}
+  .pjp-tpn{display:flex;align-items:center;gap:8px;font-size:13.5px}.pjp-tpn b{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pjp-tpn .n{font-weight:600}
+  .pjp-tp .pjp-ebb{display:block;margin:5px 0 3px}.pjp-tp small{color:var(--muted);font-size:12px}
+  @media(max-width:1100px){.pjp-dash.pjp-dash2{grid-template-columns:1fr}}
   .pjp-kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.pjp-kpi .pjp-tl{background:var(--surface,#fff);border:1px solid var(--line,#E1E7EB);padding:12px 14px}
   .pjp-kpi .pjp-tl b{font-size:20px}.pjp-kpi .pjp-tl small{color:var(--muted);font-size:12px}
   .pjp-dash{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:12px 0}.pjp-db{padding:12px 16px 14px}.pjp-ch small{color:var(--muted);font-size:12px;margin-left:6px}
@@ -1230,6 +1264,7 @@
   function avisos(c){ C=C||c; try{ const pid=J.per||perAtual(c); assina(c,pid); const D=docP(pid), p=perDe(pid), xs=Object.entries(D.pes||{}); const out=[];
       const ch=xs.filter(([,x])=>x.st==='chegou').length; if(ch) out.push({nivel:'warn',rotulo:'PJ',titulo:ch+(ch>1?' notas de PJ chegaram':' nota de PJ chegou')+' para conferir',texto:p.txt,go:'rhpjpag'});
       const at=xs.filter(([,x])=>x.st==='pedido'&&x.ped&&Date.now()-new Date(x.ped.em)>(+cfg(c).avisaNota||3)*864e5).length; if(at) out.push({nivel:'warn',rotulo:'PJ',titulo:at+' PJ ainda não mandaram a nota',texto:'Pedida há mais de '+(+cfg(c).avisaNota||3)+' dias · '+p.txt,go:'rhpjpag'});
+      { const pa=perDe(perAtual(c)), fd=fechDia(pa); if(c.P.hojeStr()===fd){ assina(c,pa.pid); const fz=pjs(c,pa).filter(f=>!((docP(pa.pid).pes||{})[f._id]||{}).st).length; if(fz) out.push({nivel:'warn',rotulo:'PJ',titulo:'Hoje é o dia de fechar a quinzena dos PJ',texto:pa.curto+' · '+fz+' PJ com o valor ainda não fechado',go:'rhpjpag'}); } }
       if(c.P.hojeStr()>p.ate){ const fz=pjs(c,p).filter(f=>!((D.pes||{})[f._id]||{}).st).length; if(fz) out.push({nivel:'warn',rotulo:'PJ',titulo:'Fechar o pagamento dos PJ de '+p.curto,texto:fz+' PJ com o valor ainda não fechado',go:'rhpjpag'}); }
       return out; }catch(e){ return []; } }
   /* ---------- ações ---------- */
