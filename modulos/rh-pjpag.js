@@ -169,14 +169,26 @@
      (uma saída entre 11:00 e 14:30 de até intervalo + 30 min), cada saída de 5 min ou mais vira "para conferir", com
      "Descontar N min" (aj[dia].descF) ou "Está certo" (aj[dia].okFora). Também desconfia de dia que começa numa saída ou termina numa entrada. */
   const dirP=q=>{ const t=norm((q.disp||'')+' '+(q.area||'')); if(/SAIDA/.test(t)) return 's'; if(/\bENT(RADA)?\b/.test(t)) return 'e'; return ''; };
-  function suspDia(ps,h,E,S){ const xs=(ps||[]).filter(q=>q.ok!==false).map(q=>({h:q.h,m:min(q.h),d:dirP(q)})).filter(q=>q.m!=null&&q.d); if(xs.length<2) return null;
-    const out=[], iv=+h.intv||0; let alm=false;
-    for(let i=0;i<xs.length;i++){ if(xs[i].d!=='s') continue; const j=xs.findIndex((q,k)=>k>i&&q.d==='e'); if(j<0) continue;
-      const a=Math.max(xs[i].m,E!=null?E:-1), b=Math.min(xs[j].m,S!=null?S:1e9), g=b-a; if(g<5) continue;
-      if(!alm&&a<14*60+30&&b>11*60&&g<=iv+30){ alm=true; continue; }
-      out.push({a:xs[i].h,b:xs[j].h,m:g}); i=j-1; }
-    const ini=xs[0].d==='s', fim=xs[xs.length-1].d==='e';
-    return out.length||ini||fim?{sai:out,min:out.reduce((t,z)=>t+z.m,0),ini,fim}:null; }
+  function suspDia(ps,h,E,S){ const xs=(ps||[]).filter(q=>q.ok!==false).map(q=>({h:q.h,m:min(q.h),d:dirP(q)})).filter(q=>q.m!=null); const dd=xs.filter(q=>q.d); if(dd.length<2) return null;
+    /* 11/11 (foto: "09:17 Estacionamento Ent · 09:17 Saída estacionamento · 11:55 REFEITÓRIO"): só vale a saída seguida LOGO DEPOIS
+       de uma entrada (a passagem seguinte, de qualquer leitor); saída e entrada no mesmo minuto é a pessoa passando pelo portão */
+    const out=[], iv=+h.intv||0; let alm=null;
+    for(let i=0;i<xs.length-1;i++){ if(xs[i].d!=='s'||xs[i+1].d!=='e') continue;
+      const a=Math.max(xs[i].m,E!=null?E:-1), b=Math.min(xs[i+1].m,S!=null?S:1e9), g=b-a; if(g<5) continue;
+      if(!alm&&a<14*60+30&&b>11*60&&g<=iv+30){ alm={a:xs[i].h,b:xs[i+1].h,m:g}; continue; }
+      out.push({a:xs[i].h,b:xs[i+1].h,m:g}); }
+    const ini=dd[0].d==='s'&&dd[0].m<=(E!=null?E:dd[0].m)+5, fim=dd[dd.length-1].d==='e'&&dd[dd.length-1].m>=(S!=null?S:dd[dd.length-1].m)-5;
+    return out.length||ini||fim?{sai:out,min:out.reduce((t,z)=>t+z.m,0),ini,fim,alm}:(alm?{sai:[],min:0,ini:false,fim:false,alm,soAlm:true}:null); }
+  /* linha do dia (11/11, "melhore o visual"): entrada → saída em destaque, a barra do dia (na empresa, saídas no meio e almoço) e as passagens recolhidas */
+  function diaVis(d,h,esc){ const ok=d.ps.filter(q=>q.ok), e=ok[0], sa=ok.length>1?ok[ok.length-1]:null, n=d.ps.length;
+    const cab=`<div class="pg-es"><span class="pg-e1"><small>entrou</small>${esc(e?e.h:'—')}</span><span class="pg-ar" aria-hidden="true">→</span><span class="pg-e1"><small>saiu</small>${esc(sa?sa.h:'—')}</span>${n>2?`<span class="pg-np">${n} passagens</span>`:''}</div>`;
+    let bar=''; const E=d.E, S=d.S;
+    if(E!=null&&S!=null&&S>E){ const i0=Math.min(min(h.ini)||E,E)-30, i1=Math.max(min(h.fim)||S,S)+30, W=i1-i0, x=v=>Math.max(0,Math.min(100,(v-i0)/W*100));
+      const seg=(a,b,c,t)=>`<i class="${c}" style="left:${x(a).toFixed(2)}%;width:${Math.max(.6,x(b)-x(a)).toFixed(2)}%" title="${esc(t)}"></i>`;
+      const sp=d.sp||{}, alm=sp.alm, sai=sp.sai||[];
+      bar=`<div class="pg-bar" aria-hidden="true">${seg(min(h.ini),min(h.fim),'hz','Horário '+h.ini+' às '+h.fim)}${seg(E,S,'in','Conta '+hhmm(E)+' às '+hhmm(S))}${alm?seg(min(alm.a),min(alm.b),'al','Almoço '+alm.a+' às '+alm.b):''}${sai.map(z=>seg(min(z.a),min(z.b),d.descF?'sd':d.okFora?'so':'sx','Fora '+z.a+' às '+z.b)).join('')}</div>`; }
+    const todas=n>2?`<details class="pg-ps"><summary>ver as ${n} passagens</summary><div class="pjp-chips">${chipsP(d.ps,esc)}</div></details>`:d.ps.some(q=>!q.ok)?`<div class="pjp-chips pg-c2">${chipsP(d.ps,esc)}</div>`:'';
+    return cab+bar+todas; }
   function spHtml(d,ed,fa,esc){ const z=d.sp, t=[]; if(z.sai.length) t.push('Saiu e voltou '+(z.sai.length>1?z.sai.length+'×':'')+' · '+hTxt(z.min)+' fora ('+z.sai.map(q=>q.a+'–'+q.b).join(', ')+')'); if(z.ini) t.push('o dia começa numa saída: falta a entrada?'); if(z.fim) t.push('o dia termina numa entrada: falta a saída?');
     const cls=d.descF?'pg-t':d.okFora?'pg-m':'pg-w', st=d.descF?' · descontado '+hTxt(d.descF):d.okFora?' · conferido: está certo':'';
     const bt=!ed?'':d.descF||d.okFora?` <button class="lnk" data-act="pjp-spx" data-d="${d.d}" ${fa} style="display:inline;margin:0">desfazer</button>`
@@ -201,7 +213,7 @@
       const fF=fdsF(c); let mR=null; if((dw===0||dw===6)&&m>0&&fF!==1&&!dFil){ mR=m; m=Math.round(m*fF); }
       let ehF=false; if(!fil&&d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro,antes:cAntes(h),depois:cDepois(h)}}; }
       if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
-      else if(!cor&&!dFil&&!fil){ if(sp&&!descF&&!okFora) alerta++; if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
+      else if(!cor&&!dFil&&!fil){ if(sp&&!sp.soAlm&&!descF&&!okFora) alerta++; if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
       out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil,mR,fF:mR!=null?fF:null,sp,descF,okFora}); tot+=m; });
     /* horário que não bate (11/11, foto: horário 08:00 às 12:00 e a pessoa sai às 18h → o dia cheio do fechamento dava 2h48):
        saída mais comum nos dias de semana com entrada e saída; se passa 2 h do fim do horário, avisa */
@@ -418,10 +430,19 @@
     const comP=r.dias.filter(d=>d.hs.length||d.aj).length, nAj=r.dias.filter(d=>d.aj).length, escM=contaDia(h.ini,h.fim,h).m;
     let corpo='';
     if(tab==='horas'){
+      const kOf=d=>{ const k=[]; if((d.fl&&!d.aj)||(d.sp&&!d.sp.soAlm&&!d.descF&&!d.okFora)) k.push('conf'); if(d.sp&&d.sp.sai&&d.sp.sai.length) k.push('sai'); if(d.aj||d.descF||d.okFora) k.push('cor'); if(!d.hs.length&&d.esc&&!d.fil&&!d.fer&&d.d<=hojeS()) k.push('sem'); return k; };
+      const DLX=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+      const busca=d=>norm([DNL[d.dw],DLX[d.dw],brc(d.d),br(d.d),String(+d.d.slice(8,10)),d.d].join(' '));
+      const vis=d=>{ const k=kOf(d), q=norm(J.dq||''); if(J.dk&&J.dk!=='*'&&!k.includes(J.dk)) return false; return !q||q.split(' ').every(w=>busca(d).split(' ').some(b=>b===w||(w.length>1&&b.startsWith(w))||(w.includes('/')&&b.startsWith(w)))); };
+      const at=d=>`data-pjpd="${d.d}" data-k="${kOf(d).join(' ')}" data-b="${esc(busca(d))}"${vis(d)?'':' hidden'}`;
+      const nK=k=>r.dias.filter(d=>kOf(d).includes(k)).length;
+      const filtro=`<div class="pjp-dfil"><label class="pjp-dq"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pjp-dq" type="search" placeholder="Procurar o dia (ex.: 16, 16/10 ou sexta)" value="${esc(J.dq||'')}" autocomplete="off"></label>
+        <div class="pjp-dks">${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div></div>
+        <p class="pjp-dv" id="pjp-dv" hidden>Nenhum dia com esse filtro.</p>`;
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
-        if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds">${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
+        if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds" ${at(d)}>${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
         const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">${d.src==='pto'||d.src==='mix'?'Entrada da fábrica':'Face ID'}: ${esc(d.hs.join(' · '))}</small>`:''}`
-          :d.ps&&d.ps.length?`<div class="pjp-chips">${chipsP(d.ps,esc)}</div>${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${d.src==='fid'?'Sem marcação no Face ID da entrada da fábrica neste dia: vale o Face ID de sempre':d.src==='mix'?'Só uma marcação na entrada da fábrica: juntou com o Face ID de sempre':'Vale o Face ID da entrada da fábrica'}">${SRC_T[d.src]}</span>`:''}${d.sp?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
+          :d.ps&&d.ps.length?`${diaVis(d,h,esc)}${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${d.src==='fid'?'Sem marcação no Face ID da entrada da fábrica neste dia: vale o Face ID de sempre':d.src==='mix'?'Só uma marcação na entrada da fábrica: juntou com o Face ID de sempre':'Vale o Face ID da entrada da fábrica'}">${SRC_T[d.src]}</span>`:''}${d.sp&&!d.sp.soAlm?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
           :d.fil?`<div class="pjp-chips"><span>dia cheio</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fech?`<div class="pjp-chips"><span>dia do fechamento</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fer?`<div class="pjp-chips"><span>não trabalhou</span></div><span class="pg-tag pg-f">Feriado · ${esc(d.fer.nome)}</span>`
@@ -431,14 +452,14 @@
             <label class="pg-mot">Motivo<input id="pjp-cm" list="pjp-mots" value="${esc(d.mot&&d.aj?d.mot:d.fl?'Esqueceu de passar no Face ID':'')}" maxlength="80" placeholder="por que corrigiu"></label>
             <datalist id="pjp-mots">${MOTS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist>
             <span style="display:flex;gap:6px;flex-wrap:wrap">${btn('pjp-dsalva','Salvar','data-d="'+d.d+'" '+fa,'')}${btn('pjp-dzero','Não trabalhou (0 h)','data-d="'+d.d+'" '+fa)}${d.fer?'':btn('pjp-dfer','É feriado','data-d="'+d.d+'" '+fa)}${btn('pjp-dcanc','Cancelar')}</span></div>`:'';
-        return `<div class="pjp-d ${d.fl&&!d.aj?'pg-al':''} ${d.aj?'pg-aj':''} ${!d.hs.length&&!d.aj&&!d.fil?'pg-sp':''}">${dd}<div>${ch}${ferL}</div><div class="pg-cc">${d.m&&d.E!=null?'conta '+hhmm(d.E)+'–'+hhmm(d.S):''}</div><div class="pg-hh">${d.m?hTxt(d.m):'—'}${d.mR!=null?`<small class="pg-fds" title="Sábado e domingo valem ${String(d.fF).replace('.',',')} hora">${hTxt(d.mR)} × ${String(d.fF).replace('.',',')}</small>`:''}</div>
+        return `<div class="pjp-d ${d.fl&&!d.aj?'pg-al':''} ${d.sp&&!d.sp.soAlm&&!d.descF&&!d.okFora?'pg-al':''} ${d.aj?'pg-aj':''} ${!d.hs.length&&!d.aj&&!d.fil?'pg-sp':''}" ${at(d)}>${dd}<div>${ch}${ferL}</div><div class="pg-cc">${d.m&&d.E!=null?'conta '+hhmm(d.E)+'–'+hhmm(d.S):''}</div><div class="pg-hh">${d.m?hTxt(d.m):'—'}${d.mR!=null?`<small class="pg-fds" title="Sábado e domingo valem ${String(d.fF).replace('.',',')} hora">${hTxt(d.mR)} × ${String(d.fF).replace('.',',')}</small>`:''}</div>
           <div class="pg-cor">${ed?(d.aj?`<button class="lnk" data-act="pjp-diax" data-d="${d.d}" ${fa}>${r.fil?'desfazer':'voltar ao Face ID'}</button>`:d.fil?`<button class="lnk" data-act="pjp-dzero" data-mot="Faltou (o gestor avisou)" data-d="${d.d}" ${fa}><b>Faltou</b></button>`:`<button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>${d.fl?'<b>Corrigir</b>':'Corrigir'}</button>`):''}</div>${edit}</div>`; }).join('');
       corpo=`<div class="pjp-mini"><div><span>Dias com passagem</span><b>${comP}</b></div><div><span>Horas</span><b>${r.fixo?'fixo':hTxt(r.min)}</b></div><div class="${r.alerta?'pg-w':''}"><span>Para conferir</span><b>${r.alerta}</b></div><div><span>Corrigidos</span><b>${nAj}</b></div></div>
-        ${r.alerta&&ed?`<div class="pjp-av">${r.alerta} dia${r.alerta>1?'s':''} com uma passagem só no Face ID (falta a saída). Toque em <b>Corrigir</b> no dia e digite a hora certa.</div>`:''}
+        ${r.alerta&&ed?(()=>{ const n1=r.dias.filter(d=>d.fl&&!d.aj).length, n2=r.alerta-n1, t=[]; if(n1) t.push(n1+' dia'+(n1>1?'s':'')+' com uma passagem só (falta a saída): toque em <b>Corrigir</b> e digite a hora certa'); if(n2) t.push(n2+' dia'+(n2>1?'s':'')+' em que saiu e voltou ou o dia ficou sem a entrada/saída: <b>Descontar</b> o tempo fora ou <b>Está certo</b>'); return `<div class="pjp-av">${t.join('.<br>')}. <button class="lnk" data-act="pjp-dk" data-v="conf" style="display:inline;margin:0">Ver só esses dias</button></div>`; })():''}
         ${r.horCurto?`<div class="pjp-av pjp-hc"><b>O horário desta pessoa está ${esc(r.horCurto.ini)} às ${esc(r.horCurto.fim)}</b> (${r.horCurto.de==='pj'?'nas Regras desta pessoa':r.horCurto.de==='cad'?'no "Horário diferente" do cadastro':'no horário padrão dos Parâmetros'}), mas ela costuma sair por volta das ${esc(r.horCurto.sai)}. Por isso o dia do fechamento conta só até ${esc(r.horCurto.fim)}. ${btn('pjp-tab','Corrigir o horário','data-v="regras"','')}</div>`:''}
         ${r.fil?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">Trabalha na Fixcol: não passa no Face ID. Cada dia da escala conta cheio; quando o gestor avisar que faltou, toque em <b>Faltou</b> no dia.</div>`:''}
         ${!ed?`<div class="pjp-av" style="background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)">O valor já foi fechado. Para corrigir alguma hora, toque em ${lnk('pjp-reab','mudar o valor',fa).replace('class="lnk"','class="lnk" style="display:inline;margin:0"')} (volta para conferir).</div>`:''}
-        <div class="pjp-dl">${lin}</div>
+        ${filtro}<div class="pjp-dl">${lin}</div>
         <p class="ps" style="margin:0;color:var(--muted);font-size:12.5px">Os horários em destaque são a primeira e a última passagem do dia no Face ID. Até ${h.tol} min do horário (${esc(h.ini)} às ${esc(h.fim)}) conta o horário certo; o intervalo de ${h.intv} min sai de cada dia.</p>`; }
     else if(tab==='desc'){ const uT=r.uni.filter(u=>u.st==='ok').reduce((a,u)=>a+u.v,0), oT=r.descs.filter(z=>z.k!=='u').reduce((a,z)=>a+z.v,0);
       const uL=r.uni.map(u=>{ const xa=`data-x="${esc(u.x._id)}" data-q="${esc(u.Q)}" ${fa}`, I=u.I;
@@ -880,6 +901,21 @@
   .pjp-d .pg-hh .pg-fds{display:block;font-size:11px;font-weight:500;color:var(--warn-ink,#7A5310)}
   .pjp-av.pjp-hc{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pjp-av.pjp-hc .btn{height:32px;font-size:13px}
   .pjp-d .pg-tag.pg-sp2{white-space:normal;line-height:1.35}
+  .pjp-dfil{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pjp-dq{flex:1 1 240px;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line,#E1E7EB);border-radius:10px;background:var(--surface);color:var(--muted)}
+  .pjp-dq:focus-within{outline:3px solid #9FBFCF;outline-offset:1px}.pjp-dq input{border:0;outline:0;background:none;flex:1;min-width:0;font:inherit;font-size:14px;color:var(--ink,inherit)}
+  .pjp-dks{display:flex;gap:6px;flex-wrap:wrap}.pjp-dk{display:inline-flex;gap:6px;align-items:center;height:32px;padding:0 11px;border-radius:999px;border:1px solid var(--line,#E1E7EB);background:var(--surface);color:inherit;font:inherit;font-size:13px;cursor:pointer}
+  .pjp-dk b{font-size:11.5px;font-weight:600;background:var(--ground);border-radius:999px;padding:0 7px}.pjp-dk[aria-pressed=true]{background:var(--teal-strong,#143F54);border-color:var(--teal-strong,#143F54);color:#fff}.pjp-dk[aria-pressed=true] b{background:rgba(255,255,255,.18);color:#fff}
+  .pjp-dv{margin:0;padding:14px;border:1px dashed var(--line,#E1E7EB);border-radius:12px;color:var(--muted);text-align:center}
+  .pjp-d .pg-es{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+  .pjp-d .pg-e1{font-size:16px;font-weight:600}.pjp-d .pg-e1 small{font-size:11px;font-weight:500;color:var(--muted);margin-right:4px;text-transform:uppercase;letter-spacing:.04em}
+  .pjp-d .pg-ar{color:var(--muted)}.pjp-d .pg-np{font-size:12px;color:var(--muted)}
+  .pjp-d .pg-bar{position:relative;height:8px;border-radius:99px;background:var(--ground);margin:7px 0 4px;max-width:420px;overflow:hidden}
+  .pjp-d .pg-bar i{position:absolute;top:0;bottom:0;border-radius:99px}.pjp-d .pg-bar i.hz{background:var(--line,#DCE3E8)}.pjp-d .pg-bar i.in{background:var(--teal,#2C6E8A)}
+  .pjp-d .pg-bar i.al{background:repeating-linear-gradient(45deg,#fff 0 3px,var(--line,#C9D3DA) 3px 6px)}.pjp-d .pg-bar i.sx{background:var(--warn,#C28A1E)}.pjp-d .pg-bar i.sd{background:var(--crit,#B5473F)}.pjp-d .pg-bar i.so{background:#9FBFCF}
+  .pjp-d details.pg-ps summary{cursor:pointer;font-size:12.5px;color:var(--teal);list-style:none;display:inline-block}.pjp-d details.pg-ps summary::-webkit-details-marker{display:none}.pjp-d details.pg-ps summary::before{content:'▸ '}.pjp-d details.pg-ps[open] summary::before{content:'▾ '}
+  .pjp-d details.pg-ps .pjp-chips{margin-top:6px}.pjp-d .pg-c2{margin-top:4px}
+  .pjp-d .pg-tag.pg-sp2{display:block;width:fit-content;max-width:100%}
   .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
   .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
   .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}
@@ -1110,6 +1146,11 @@
         await grava(C,J.per,f._id,{aj}); P.render(); return; }
       if(t.dataset.pjpC){ const f=fDe(t.dataset.f); if(pesDe(J.per,f._id).st) return; const k=t.dataset.pjpC; await grava(C,J.per,f._id,{[k]:k==='desc'?num(t.value):String(t.value||'').slice(0,120)}); P.render(); return; }
     }catch(e){ P.erro(e); } });
+  function dFiltra(){ const q=norm(J.dq||''), k=J.dk||'*', ws=q?q.split(' '):[]; let n=0;
+    document.querySelectorAll('.pjp-dl [data-pjpd]').forEach(el=>{ const b=(el.dataset.b||'').split(' '), ks=(el.dataset.k||'').split(' ');
+      const ok=(k==='*'||ks.includes(k))&&ws.every(w=>b.some(x=>x===w||(w.length>1&&x.startsWith(w))||(w.includes('/')&&x.startsWith(w)))); el.hidden=!ok; if(ok) n++; });
+    const v=document.getElementById('pjp-dv'); if(v) v.hidden=!!n; }
+  document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='pjp-dq'){ J.dq=t.value; dFiltra(); return; } });
   document.addEventListener('input',ev=>{ const t=ev.target; if(!C||!t||t.id!=='pjp-q') return; J.q=t.value; clearTimeout(J._qt); J._qt=setTimeout(()=>{ C.P.render(); setTimeout(()=>{ const i=document.getElementById('pjp-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },0); },350); });
   /* "Abrir o cadastro" da gaveta: quem abre o cadastro é o RH (rh-ed); aqui só fecha a gaveta para não voltar aberta */
   document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('.pjp-gcad'); if(b){ J.ab=''; J.edDia=null; } },true);
@@ -1121,7 +1162,7 @@
     ev.preventDefault();
     try{
       if(a==='pjp-per'){ const v=+b.dataset.v; J.per=v===0?perAtual(c):perMove(J.per,v); J.ab=''; P.render(); return; }
-      if(a==='pjp-ab'){ J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
+      if(a==='pjp-ab'){ if(J.ab!==b.dataset.f){ J.dq=''; J.dk='*'; } J.ab=b.dataset.f; J.tab=b.dataset.tab||'horas'; J.edDia=null; P.render(); return; }
       if(a==='pjp-et'){ const v=b.dataset.v; J.sit=J.sit===v?'*':v; P.render(); return; }
       if(a==='pjp-fidir'){ P.go('rhalmoco'); return; }
       if(a==='pjp-fin'){ finAbrir(c,b.dataset.f?[b.dataset.f]:null); P.render(); return; }
@@ -1152,6 +1193,7 @@
       if(a==='pjp-col'){ const v=+b.dataset.v; J.col=(v<0||J.col===v)?-1:v; if(J.col>=0) J.aba='lista'; P.render(); return; }
       if(a==='pjp-gx'){ J.ab=''; J.edDia=null; P.render(); return; }
       if(a==='pjp-tab'){ J.tab=b.dataset.v; J.edDia=null; P.render(); return; }
+      if(a==='pjp-dk'){ J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
       if(a==='pjp-confx'){ J.conf=!J.conf; P.render(); return; }
       if(a==='pjp-flimpa'){ J.emp=''; J.set=''; J.sit='*'; J.col=-1; J.conf=false; J.q=''; P.render(); return; }
       if(a==='pjp-dcor'){ J.edDia=b.dataset.d; P.render(); setTimeout(()=>{ const i=document.getElementById(document.getElementById('pjp-ce')&&!document.getElementById('pjp-ce').value?'pjp-ce':'pjp-cs'); if(i) i.focus(); },30); return; }

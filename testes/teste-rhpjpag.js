@@ -31,7 +31,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Lista só os PJ, com as horas do Face ID e o valor (salário ÷ 220 = R$ 22,73/h)', /Joao Pereira Teste/.test(s)&&/Maria Oliveira Teste/.test(s)&&!/Carlos Clt/i.test(s)&&/88h00/.test(s)&&/R\$\s?2\.000,00/.test(s)&&/96h48/.test(s)&&/R\$\s?2\.750,09/.test(s), s.replace(/\n/g,' | ').slice(0,900));
   ok('Avisa o dia com só uma passagem', /1 dia para conferir/.test(s));
   await p.click('[data-act="pjp-ab"][data-f="f1"]'); await H.dorme(700);
-  const gv=await p.evaluate(()=>{ const g=document.querySelector('.pjp-g'); return g?g.innerText:''; });
+  const gv=await p.evaluate(()=>{ const g=document.querySelector('.pjp-g'); if(g) g.querySelectorAll('details').forEach(x=>x.open=true); return g?g.innerText:''; });
   ok('Tocar no nome abre a gaveta da pessoa com os dias, a passagem do Face ID e o dia para corrigir', /Joao Pereira Teste/.test(gv)&&/Horas/.test(gv)&&/Regras desta pessoa/.test(gv)&&/07:28[\s\S]*12:01[\s\S]*17:20/.test(gv)&&/Só uma passagem/.test(gv)&&/Corrigir/.test(gv), gv.replace(/\n/g,' | ').slice(0,500));
   await p.click('[data-act="pjp-dcor"][data-d="2026-10-21"]'); await H.dorme(500);
   await p.fill('#pjp-cs','17:18'); await p.fill('#pjp-cm','Esqueceu de passar no Face ID'); await p.click('[data-act="pjp-dsalva"]'); await H.dorme(900);
