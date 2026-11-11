@@ -9,7 +9,7 @@
      ações, telas, ordens/ranchos/fichas/itens (busca do topo, tpBusca), chamados abertos e pessoas do RH (window.RHBusca). */
 "use strict";
 const ADMG=[{id:'inicio'},{g:'Produção',ms:['producao','analise','relatorios','tabprod']},{g:'Almoxarifado',ms:['premix','almox','monitor']},{g:'Silos',ms:['silos','silosver','silocel']},
-  {id:'manut'},{id:'rh'},{id:'gestor'},{id:'telas'},{g:'Sistema',ic:'ajuste',ms:['meumenu','backup']}];
+  {id:'manut'},{id:'rh'},{id:'frota'},{id:'gestor'},{id:'telas'},{g:'Sistema',ic:'ajuste',ms:['meumenu','backup']}];
 /* menu do RH reorganizado (30/10, escolha da usuária): cada item abre direto a tela; Uniformes em Pessoas */
 if(typeof P==='object'&&!P.dinheiro) P.dinheiro='<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>';
 const RHG=[{v:'rhinicio'},
