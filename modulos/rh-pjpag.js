@@ -699,7 +699,7 @@
   function antDe(c,f,pA,DA,dadosA){ const xa=DA&&DA.pes&&DA.pes[f._id]; let v=null, de='';
     if(xa&&xa.fech&&xa.st){ v=+xa.fech.valor||0; de='fechado'; } else if(dadosA||ptoMes(pA.mes)){ try{ v=calcPessoa(c,f,pA,xa||{}).valor; de='conta'; }catch(e){} }
     if(v==null||!(v>0)) return null; return {v,de,txt:pA.txt}; }
-  const difAnt=r=>{ if(!r.ant||!(r.valor>0)) return null; const dv=Math.round((r.valor-r.ant.v)*100)/100, pc=dv/r.ant.v; return {dv,pc,muda:Math.abs(pc)>=0.2&&Math.abs(dv)>=100}; };
+  const difAnt=r=>{ if(!r.ant||!(r.valor>0)) return null; if(r.fd&&hojeS()<r.fd) return null; const dv=Math.round((r.valor-r.ant.v)*100)/100, pc=dv/r.ant.v; return {dv,pc,muda:Math.abs(pc)>=0.2&&Math.abs(dv)>=100}; };
   const antTxt=r=>{ const z=difAnt(r); if(!z) return ''; return `<small class="pjp-ant ${z.muda?(z.dv>0?'up':'dn'):''}" title="Quinzena passada (${r.ant.txt}): ${R$(r.ant.v)}${r.ant.de==='conta'?' · ainda não fechada, pela conta do Face ID':''}">${Math.abs(z.dv)<0.01?'igual à passada':(z.dv>0?'+ ':'− ')+R$(Math.abs(z.dv))+' vs passada'+(z.muda?' ('+(z.dv>0?'+':'−')+Math.round(Math.abs(z.pc)*100)+'%)':'')}</small>`; };
   function render(c){ C=c; const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
     const D=docP(pid), xs=pjs(c,p);
@@ -740,7 +740,23 @@
       else if(st==='pedido'&&x.ped&&diasDesde(x.ped.em)>=(+cfg(c).avisaNota||3)){ t='Pedimos a nota há '+diasDesde(x.ped.em)+' dias e ainda não chegou'; tom='warn'; }
       else if(st==='fechado'&&prontos.length){ t='Valor fechado · falta pedir a nota'; tom='info'; }
       if(t) pv.push({o,t,tom}); });
-    const pvH=pv.length?pv.map(({o,t,tom})=>`<div class="pjp-pvi"><span>${ini(o)}</span><div class="pjp-pvt"><button class="pjp-nm" data-act="pjp-ab" ${fa(o)}>${esc(nm(o))}</button><small class="pjp-pvm ${tom}">${esc(t)}</small></div><div class="pjp-qa">${acoes(c,pid,o.f,o.x,o.r)}</div></div>`).join('')
+    /* painel (11/11, "acho que aqui pode ser um dashboard"): números, horas por dia, por empresa e etapas */
+    const hj=hojeS(), dUt=diasDe(p).filter(d=>{ const w=new Date(d+'T12:00:00').getDay(); return w>0&&w<6&&!ferP(d); }), dPas=dUt.filter(d=>d<hj);
+    const prev=cedo&&dPas.length&&dPas.length<dUt.length?totV*dUt.length/dPas.length:null;
+    const nDiasConf=rsF.reduce((t,o)=>t+(!o.x.st?o.r.alerta||0:0),0);
+    const hDia=diasDe(p).map(d=>({d,w:new Date(d+'T12:00:00').getDay(),m:rsF.reduce((t,o)=>{ const z=(o.r.dias||[]).find(y=>y.d===d); return t+(z?z.m:0); },0),fut:d>=hj}));
+    const hMax=Math.max(1,...hDia.map(x=>x.m));
+    const DS=['dom','seg','ter','qua','qui','sex','sáb'];
+    const gHoras=`<div class="pjp-hb" role="img" aria-label="Horas trabalhadas por dia, todos os PJ">${hDia.map((x,k)=>`<div class="pjp-hbc ${x.w===0||x.w===6?'fds':''} ${x.fut?'fut':''}" title="${DS[x.w]} ${brc(x.d)}: ${x.fut&&!x.m?'ainda não chegou':hTxt(x.m)}">
+        <span class="pjp-hbv">${x.m&&k===hDia.findIndex(y=>y.m===hMax)?esc(hTxt(x.m)):''}</span><i style="height:${x.m?Math.max(3,Math.round(x.m/hMax*100)):0}%"></i><small>${+x.d.slice(8,10)}</small></div>`).join('')}</div>
+      <table class="pjp-sr"><caption>Horas por dia</caption><tr><th>Dia</th><th>Horas</th></tr>${hDia.map(x=>`<tr><td>${brc(x.d)}</td><td>${hTxt(x.m)}</td></tr>`).join('')}</table>`;
+    const porEmp=[...new Set(rsF.map(o=>String(o.f.empresa||'').toUpperCase()))].map(e=>{ const ys=rsF.filter(o=>String(o.f.empresa||'').toUpperCase()===e); return {e,n:ys.length,v:soma(ys),m:ys.reduce((t,o)=>t+o.r.min,0)}; }).sort((a,b)=>b.v-a.v);
+    const eMax=Math.max(1,...porEmp.map(x=>x.v));
+    const gEmp=porEmp.length?porEmp.map(x=>`<div class="pjp-eb"><div class="pjp-ebt"><b>${esc(x.e||'Sem empresa')}</b><span class="n">${R$(x.v)}</span></div><div class="pjp-ebb"><i style="width:${Math.max(2,Math.round(x.v/eMax*100))}%"></i></div><small>${x.n} PJ · ${hTxt(x.m)}</small></div>`).join(''):'<div class="pjp-kvz">Nenhum PJ</div>';
+    const etN=COLS.map((cl,i)=>({i,t:cl.t,n:rsF.filter(o=>cl.st.includes(o.x.st||'')).length}));
+    const gEt=rsF.length?`<div class="pjp-etb" role="img" aria-label="${esc(etN.map(x=>x.t+': '+x.n).join(', '))}">${etN.filter(x=>x.n).map(x=>`<i class="k${x.i}" style="flex:${x.n}" title="${esc(x.t)}: ${x.n}"></i>`).join('')}</div>
+      <div class="pjp-etl">${etN.map(x=>`<button type="button" class="pjp-etx" data-act="pjp-col" data-v="${x.i}"><i class="k${x.i}"></i><span>${esc(x.t)}</span><b>${x.n}</b></button>`).join('')}</div>`:'<div class="pjp-kvz">Nenhum PJ</div>';
+    const pvH=pv.length?pv.map(({o,t,tom})=>`<div class="pjp-pvi"><span>${ini(o)}</span><div class="pjp-pvt"><button class="pjp-nm" data-act="pjp-ab" ${fa(o)}>${esc(nm(o))}</button><small class="pjp-pvm ${tom}">${esc(t)}</small></div><div class="pjp-qa">${cedo&&!(o.x.st)?btn('pjp-ab','Ver os dias',fa(o)):acoes(c,pid,o.f,o.x,o.r)}</div></div>`).join('')
       :`<div class="pjp-pvok">${U?U.ic('ok',18):''} Nada esperando por você agora.</div>`;
     const dadosOk=!!(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes]);
     const dias=dadosOk?Object.keys(window.RHAlmoco._A.dados[p.mes].dias||{}).filter(d=>d>=p.de&&d<=p.ate).sort():[];
@@ -778,12 +794,19 @@
       <div class="pjp-abas" role="tablist" aria-label="Partes da tela">${[['pv','Precisa de você',pv.length,'alerta'],['kb','Onde cada PJ está',null,'grid'],['lista','Todos os PJ',rsF.length,'lista']].map(([k,t,n,ic])=>`<button type="button" role="tab" class="pjp-aba" data-act="pjp-aba" data-v="${k}" aria-selected="${aba===k}">${icn(ic,18)}<span>${t}</span>${n!=null?`<b class="${k==='pv'&&n?'al':''}">${n}</b>`:''}</button>`).join('')}</div>
       ${aba==='pv'?`<section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
 
-      <div class="pjp-g2"><section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>
-        <section class="pjp-cx"><div class="pjp-ch"><h3>Resumo da quinzena</h3></div><div class="pjp-rs">
-          <div class="pjp-tl pri"><span>${icn('grafico',16)}Total a pagar</span><b class="n">${R$(totV)}</b></div><div class="pjp-tl ok"><span>${icn('check',16)}Já pago</span><b class="n">${R$(pagoV)}</b></div>
-          <div class="pjp-tl warn"><span>${icn('relogio',16)}Falta pagar</span><b class="n">${R$(totV-pagoV)}</b></div><div class="pjp-tl"><span>${icn('equipe',16)}PJ · horas</span><b class="n">${rsF.length} · ${hTxt(totM)}</b></div></div>
-          </section>
-      </div>`:''}${aba==='kb'?`
+      <div class="pjp-kpi">
+        <div class="pjp-tl pri"><span>${icn('grafico',16)}Total da quinzena${cedo?' até agora':''}</span><b class="n">${R$(totV)}</b>${prev?`<small>se continuar assim, ${R$(prev)} até ${brc(p.ate)}</small>`:`<small>${rsF.length} PJ</small>`}</div>
+        <div class="pjp-tl ok"><span>${icn('check',16)}Já pago</span><b class="n">${R$(pagoV)}</b><small>${rsF.filter(o=>o.x.st==='pago').length} PJ</small></div>
+        <div class="pjp-tl warn"><span>${icn('relogio',16)}Falta pagar</span><b class="n">${R$(totV-pagoV)}</b><small>${rsF.filter(o=>o.x.st!=='pago').length} PJ</small></div>
+        <div class="pjp-tl"><span>${icn('equipe',16)}Horas trabalhadas</span><b class="n">${hTxt(totM)}</b><small>${cedo?dPas.length+' de '+dUt.length+' dias úteis':dUt.length+' dias úteis'}</small></div>
+        <div class="pjp-tl ${nDiasConf?'warn':''}"><span>${icn('lista',16)}Dias para conferir</span><b class="n">${nDiasConf}</b><small>${nConf} PJ</small></div>
+      </div>
+      <div class="pjp-dash">
+        <section class="pjp-cx pjp-dw"><div class="pjp-ch"><h3>Horas por dia</h3><small>todos os PJ juntos</small></div><div class="pjp-db">${gHoras}</div></section>
+        <section class="pjp-cx"><div class="pjp-ch"><h3>Por empresa</h3></div><div class="pjp-db">${gEmp}</div></section>
+        <section class="pjp-cx"><div class="pjp-ch"><h3>Em que etapa</h3></div><div class="pjp-db">${gEt}</div></section>
+      </div>
+      <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>`:''}${aba==='kb'?`
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver a lista dela; toque na pessoa para ver os dias</small></div>${quadros}</section>`:''}${aba==='lista'?`
       <section class="pjp-lc">
         <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span>${btn('pjp-fin','E-mail ao financeiro')}</div>
@@ -863,6 +886,23 @@
   .pjp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   .pjp-lc .pc-vazio{margin:8px 18px 22px}
   /* cara de app (10/11): barra com a quinzena e o Face ID, cores por etapa, quadros de número */
+  .pjp-kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.pjp-kpi .pjp-tl{background:var(--surface,#fff);border:1px solid var(--line,#E1E7EB);padding:12px 14px}
+  .pjp-kpi .pjp-tl b{font-size:20px}.pjp-kpi .pjp-tl small{color:var(--muted);font-size:12px}
+  .pjp-dash{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:12px 0}.pjp-db{padding:12px 16px 14px}.pjp-ch small{color:var(--muted);font-size:12px;margin-left:6px}
+  .pjp-hb{display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:16px}.pjp-hbc{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+  .pjp-hbc i{display:block;width:100%;max-width:26px;background:var(--teal,#1F6F78);border-radius:4px 4px 0 0}.pjp-hbc.fds i{opacity:.55}.pjp-hbc:hover i{filter:brightness(1.15)}
+  .pjp-hbc small{font-size:10.5px;color:var(--muted);margin-top:4px}.pjp-hbc.fds small{opacity:.6}.pjp-hbc.fut small{opacity:.45}
+  .pjp-hbc.fut::after{content:'';position:absolute;bottom:18px;left:15%;right:15%;border-bottom:2px dashed var(--line,#D5DCE1)}
+  .pjp-hbv{position:absolute;top:-2px;font-size:11px;font-weight:600;white-space:nowrap}
+  .pjp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .pjp-eb{margin-bottom:12px}.pjp-ebt{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}.pjp-ebb{height:8px;background:var(--surface-2,#EEF2F5);border-radius:4px;margin:5px 0 3px;overflow:hidden}
+  .pjp-ebb i{display:block;height:100%;background:var(--teal,#1F6F78);border-radius:4px}.pjp-eb small{color:var(--muted);font-size:12px}
+  .pjp-etb{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden;margin-bottom:12px}.pjp-etb i{display:block;height:100%}
+  .pjp-etb .k0,.pjp-etx .k0{background:var(--k0)}.pjp-etb .k1,.pjp-etx .k1{background:var(--k1)}.pjp-etb .k2,.pjp-etx .k2{background:var(--k2)}.pjp-etb .k3,.pjp-etx .k3{background:var(--k3)}
+  .pjp-etl{display:flex;flex-direction:column;gap:2px}.pjp-etx{display:flex;align-items:center;gap:8px;border:0;background:none;padding:5px 4px;border-radius:8px;font:inherit;font-size:13.5px;color:inherit;cursor:pointer;text-align:left}
+  .pjp-etx:hover{background:var(--surface-2,#F2F5F7)}.pjp-etx i{width:10px;height:10px;border-radius:3px;flex:none}.pjp-etx span{flex:1}
+  @media(max-width:1100px){.pjp-kpi{grid-template-columns:repeat(3,minmax(0,1fr))}.pjp-dash{grid-template-columns:1fr 1fr}.pjp-dw{grid-column:1/-1}}
+  @media(max-width:700px){.pjp-kpi{grid-template-columns:1fr 1fr}.pjp-dash{grid-template-columns:1fr}.pjp-hb{height:120px}.pjp-hbv{display:none}}
   .pjp{--k0:#B7791F;--k0t:#FBF1DC;--k1:#2B6CB0;--k1t:#E3EDF8;--k2:#0F766E;--k2t:#DDF1EE;--k3:#2F7A4E;--k3t:#E3F0E8}
   :root[data-theme="dark"] .pjp{--k0:#E3B66A;--k0t:#3A2E17;--k1:#7FB0E6;--k1t:#1B2C40;--k2:#5CC4B6;--k2t:#15312E;--k3:#7FC79E;--k3t:#18332A}
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pjp{--k0:#E3B66A;--k0t:#3A2E17;--k1:#7FB0E6;--k1t:#1B2C40;--k2:#5CC4B6;--k2t:#15312E;--k3:#7FC79E;--k3t:#18332A}}
