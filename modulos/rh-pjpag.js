@@ -456,7 +456,9 @@
           <div class="pjp-calg">${['seg','ter','qua','qui','sex','sáb','dom'].map(x=>`<span class="pjp-cwd">${x}</span>`).join('')}${'<span></span>'.repeat(vaz)}${r.dias.map(cel).join('')}</div>
           <div class="pjp-call"><span><i class="ok"></i>trabalhou</span><span><i class="cf"></i>conferir</span><span><i class="sm"></i>sem passagem</span><span><i class="au"></i>atestado/férias</span><span><i class="fd"></i>fim de semana</span></div></div>`:'';
       const prox=`<button type="button" class="pjp-dk pjp-prox" data-act="pjp-prox" data-f="${esc(f._id)}" title="Pula para o próximo dia para conferir; quando acabar, vai para o próximo PJ">Próximo para conferir →</button>`;
-      const diaBt=J.dsel?`<span class="pjp-dk pjp-dia on"><button type="button" data-act="pjp-calab">${CALSVG} ${DNL[new Date(J.dsel+'T12:00:00').getDay()]} ${brc(J.dsel)}</button><button type="button" class="pjp-diax" data-act="pjp-dcal" data-v="" aria-label="Ver todos os dias">✕</button></span>`
+      const ix=J.dsel?r.dias.findIndex(d=>d.d===J.dsel):-1, dAnt=ix>0?r.dias[ix-1].d:'', dPro=ix>=0&&ix<r.dias.length-1?r.dias[ix+1].d:'';
+      /* 11/11 ("estou tendo que apertar o x para selecionar outro"): com um dia escolhido, ‹ › passam para o dia de antes/depois e tocar na data abre o calendário para trocar */
+      const diaBt=J.dsel?`<span class="pjp-dk pjp-dia on"><button type="button" class="pjp-dnv" data-act="pjp-dcal" data-v="${dAnt}" ${dAnt?'':'disabled'} aria-label="Dia anterior" title="Dia anterior">‹</button><button type="button" data-act="pjp-calab" title="Trocar o dia">${CALSVG} ${DNL[new Date(J.dsel+'T12:00:00').getDay()]} ${brc(J.dsel)} <span class="pjp-car" aria-hidden="true">▾</span></button><button type="button" class="pjp-dnv" data-act="pjp-dcal" data-v="${dPro}" ${dPro?'':'disabled'} aria-label="Próximo dia" title="Próximo dia">›</button><button type="button" class="pjp-diax" data-act="pjp-dcal" data-v="" aria-label="Ver todos os dias">✕</button></span>`
         :`<button type="button" class="pjp-dk pjp-dia" data-act="pjp-calab" aria-expanded="${!!J.calAb}">${CALSVG} Escolher o dia</button>`;
       const filtro=`<div class="pjp-dfil"><div class="pjp-dks">${prox}${diaBt}${[['*','Todos',r.dias.length],['conf','Para conferir',nK('conf')],['sai','Saiu no meio',nK('sai')],['cor','Corrigidos',nK('cor')],['sem','Sem passagem',nK('sem')],['aus','Atestado e férias',nK('aus')]].filter(([k,,n])=>k==='*'||n).map(([k,t,n])=>`<button type="button" class="pjp-dk" data-act="pjp-dk" data-v="${k}" aria-pressed="${!J.dsel&&(J.dk||'*')===k}">${t}<b>${n}</b></button>`).join('')}</div>${pop}</div>
         <p class="pjp-dv" id="pjp-dv" hidden>Nenhum dia com esse filtro.</p>`;
@@ -940,6 +942,7 @@
   .pjp-calx{margin-left:auto;width:28px;height:28px;border:0;border-radius:8px;background:var(--ground);color:inherit;cursor:pointer}
   .pjp-dia{gap:6px}.pjp-dia svg{flex:none}.pjp-dia.on{padding:0;background:var(--teal-strong,#143F54);border-color:var(--teal-strong,#143F54);color:#fff;overflow:hidden}
   .pjp-dia.on button{border:0;background:none;color:inherit;font:inherit;font-size:13px;height:100%;padding:0 6px 0 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.pjp-dia.on .pjp-diax{padding:0 10px 0 6px;opacity:.85}
+  .pjp-dia.on .pjp-dnv{padding:0 9px;font-size:17px;line-height:1}.pjp-dia.on .pjp-dnv:disabled{opacity:.35;cursor:default}.pjp-dia.on button:hover:not(:disabled){background:rgba(255,255,255,.14)}.pjp-car{font-size:10px;opacity:.8}
   .pjp-calh{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}.pjp-calh b{font-size:14px}.pjp-calh span{font-size:12.5px;color:var(--muted)}
   .pjp-calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
   .pjp-cwd{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:2px}
@@ -1256,7 +1259,7 @@
         if(!o2){ J.dsel=''; P.toast('Pronto: nada mais para conferir nesta quinzena.'); P.render(); return; }
         J.ab=o2.f._id; J.tab='horas'; J.dk='*'; J.dq=''; J.calAb=false; J.dsel=pend(o2)[0]; J.edDia=null; P.toast('Agora: '+c.titulo(o2.f.nome)); P.render(); return; }
       if(a==='pjp-calab'){ J.calAb=!J.calAb; P.render(); return; }
-      if(a==='pjp-dcal'){ const v=b.dataset.v||''; J.dsel=v; J.calAb=false; if(v) J.dk='*'; P.render(); setTimeout(()=>{ const el=v&&document.querySelector('.pjp-dl [data-pjpd="'+v+'"]'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); },60); return; }
+      if(a==='pjp-dcal'){ if(b.disabled) return; const v=b.dataset.v||''; J.dsel=v; J.calAb=false; if(v) J.dk='*'; P.render(); setTimeout(()=>{ const el=v&&document.querySelector('.pjp-dl [data-pjpd="'+v+'"]'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); },60); return; }
       if(a==='pjp-dk'){ if(J.dsel||J.calAb){ J.dsel=''; J.calAb=false; J.dk=b.dataset.v; P.render(); return; } J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
       if(a==='pjp-confx'){ J.conf=!J.conf; P.render(); return; }
       if(a==='pjp-flimpa'){ J.emp=''; J.set=''; J.sit='*'; J.col=-1; J.conf=false; J.q=''; P.render(); return; }

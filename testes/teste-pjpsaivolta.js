@@ -36,6 +36,10 @@ const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHO
   let vs=await p.evaluate(()=>[...document.querySelectorAll('.pjp-dl [data-pjpd]')].filter(e=>!e.hidden).map(e=>e.dataset.pjpd));
   const pil=await p.evaluate(()=>(document.querySelector('.pjp-dia')||{}).innerText||'');
   ok('Escolher o dia 23: o calendário fecha, a pílula vira "Sex 23/10" e a lista mostra só esse dia', vs.join()==='2026-10-23'&&/Sex 23\/10/.test(pil)&&await p.evaluate(()=>!document.querySelector('.pjp-calpop')), vs.join()+' | '+pil);
+  await p.click('.pjp-dia.on [aria-label="Próximo dia"]'); await H.dorme(400); let dsl=await p.evaluate(()=>window.RHPJPag._J.dsel);
+  ok('Com um dia escolhido, › vai para o dia seguinte sem precisar do ✕', dsl==='2026-10-24', dsl);
+  await p.click('.pjp-dia.on [data-act=pjp-calab]'); await H.dorme(400); await p.click('.pjp-calpop [data-v="2026-10-20"]'); await H.dorme(400); dsl=await p.evaluate(()=>window.RHPJPag._J.dsel);
+  ok('Tocar na data abre o calendário e troca direto para outro dia', dsl==='2026-10-20', dsl);
   await p.click('.pjp-dia .pjp-diax'); await H.dorme(400); vs=await p.evaluate(()=>[...document.querySelectorAll('.pjp-dl [data-pjpd]')].filter(e=>!e.hidden).length);
   ok('O ✕ da pílula volta todos os dias', vs===16, vs);
   await p.click('[data-act=pjp-dk][data-v=sai]'); await H.dorme(300); vs=await p.evaluate(()=>[...document.querySelectorAll('.pjp-dl [data-pjpd]')].filter(e=>!e.hidden).map(e=>e.dataset.pjpd));
