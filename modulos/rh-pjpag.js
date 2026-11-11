@@ -364,10 +364,10 @@
     if(st===''&&r.horCurto) s=selo('Horário até '+r.horCurto.fim+'? Sai às '+r.horCurto.sai,'warn'); else if(st===''){ s=!r.fixo&&!r.vh?selo('Falta o valor da hora','crit'):!r.fixo&&!r.min?selo('Sem horas no período','crit'):(r.alerta?selo(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir','warn'):'')+(r.uPend?selo('Uniforme para confirmar','warn'):'');
       if(!s) s=selo('Pronto para fechar','info'); }
     else if(st==='fechado') s=selo('Valor fechado','info');
-    else if(st==='pedido') s=selo((pedCw(x)?'Pedido no Conectwork':'Esperando a nota')+(x.ped&&x.ped.em?' desde '+brc(String(x.ped.em).slice(0,10)):''),'info');
+    else if(st==='pedido') s=selo((pedCw(x)?'Pedido no Conectwork · esperando a nota da '+c.titulo((x.ped&&x.ped.emp)||'empresa'):'Esperando a nota')+(x.ped&&x.ped.em?' desde '+brc(String(x.ped.em).slice(0,10)):''),'info');
     else if(st==='chegou') s=x.nota&&x.nota.conf==='ok'?selo('Nota chegou · bate','ok'):x.nota&&x.nota.conf==='dif'?selo('Nota chegou · com diferença','crit'):selo('Nota chegou · conferir','warn');
-    else if(st==='conferida') s=selo('Nota conferida · pagar','ok');
-    else if(st==='pago') s=selo('Pago','ok');
+    else if(st==='conferida') s=selo(x.conf&&x.conf.via==='conectwork-empresa'?'Nota da empresa conferida · pagar a empresa':'Nota conferida · pagar','ok');
+    else if(st==='pago') s=selo(x.pago&&x.pago.via==='empresa'?'Pago à '+c.titulo((x.ped&&x.ped.emp)||'empresa')+' · MEI no Conectwork':'Pago','ok');
     const n=st==='pago'?6:i;
     return sDs+s+`<span class="pjp-pg" title="Etapa ${i+1} de 6 · ${c.esc(ETAPAS[i][1])}">${ETAPAS.map((e,k)=>`<i class="${k<n?'f':k===n?'a':''}"></i>`).join('')}</span>`; }
   function acoes(c,pid,f,x,r){ const fa=`data-f="${c.esc(f._id)}"`, st=x.st||'';
@@ -623,7 +623,7 @@
     for(const o of I0.abertos) await fechar(c,o.f);
     const I=cwPedInfo(c,k); if(!I.M.itens.length) throw Object.assign(new Error('Nenhum valor para mandar de '+c.titulo(k)+'.'),{aviso:true});
     const url=cwLink(c,I.M.payload); window.__pjpUltimoCw=url; window.open(url,'_blank','noopener');
-    const p=perDe(J.per), D=docP(J.per), reg={em:agora(),por:c.eu(),total:I.M.payload.total,n:I.M.itens.length}; D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
+    const p=perDe(J.per), D=docP(J.per), reg=Object.assign({},(D.cw||{})[k]||{},{em:agora(),por:c.eu(),total:I.M.payload.total,n:I.M.itens.length}); D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
     await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:reg}},{merge:true});
     for(const o of I.com.filter(o=>o.x.st==='fechado'||!o.x.st)){ const x=pesDe(J.per,o.f._id); if(x.st!=='fechado') continue;
       await grava(c,J.per,o.f._id,{st:'pedido',ped:{via:'conectwork',em:agora(),por:c.eu(),valor:x.fech?x.fech.valor:o.valor,mes:p.mes,emp:k}},'Nota pedida pelo Conectwork ('+R$(x.fech?x.fech.valor:o.valor)+')'); }
@@ -635,7 +635,19 @@
       ${ks.map(k=>{ const M=cwMedicao(c,pid,k), ja=(D.cw||{})[k], conf=J.cwConf===k;
         return `<div class="pjp-cwe"><span><b>${esc(c.titulo(k))}</b> · ${M.itens.length} PJ · ${R$(M.payload.total/100)}${ja?`<small>Enviado em ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''}${ja.total!==M.payload.total?' · o valor mudou depois':''}</small>`:''}
           ${M.abertos&&!conf?`<small style="color:var(--crit-ink)">${M.abertos} ${M.abertos===1?'PJ ainda sem':'PJ ainda sem'} o valor fechado</small>`:''}${conf?`<small style="color:var(--crit-ink)">Toque de novo: o painel fecha os ${M.abertos} valores que faltam e manda</small>`:''}</span>
-          ${M.itens.length?btn('pjp-cw',(ja?'Enviar de novo':'Enviar ao Conectwork'),'data-e="'+esc(k)+'"',conf||!ja?'':'sec'):'<small>Nenhum valor para enviar</small>'}</div>`; }).join('')}</div>`; }
+          ${M.itens.length?btn('pjp-cw',(ja?'Enviar de novo':'Enviar ao Conectwork'),'data-e="'+esc(k)+'"',conf||!ja?'':'sec'):'<small>Nenhum valor para enviar</small>'}</div>${ja?cwEtapas(c,k,ja):''}`; }).join('')}</div>`; }
+  /* 11/11 ("o valor total gera a nota da Nexus para a Colafix e o valor do PJ gera a demanda no Conectwork dele para a Nexus"):
+     a Colafix paga só a empresa. Por empresa: 1 medição enviada · 2 nota da empresa para a Colafix conferida · 3 Colafix pagou a empresa.
+     A nota de cada MEI para a empresa e o pagamento do MEI são da empresa, no Conectwork (aqui só aparece como acompanhamento). */
+  function cwEtapas(c,k,ja){ const esc=c.esc, n=ja.nota, pg=ja.pago, nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"';
+    const pas=(ok,t,s,acao)=>`<li class="${ok?'ok':''}"><i>${ok?'✓':''}</i><div><b>${t}</b>${s?`<small>${s}</small>`:''}</div>${acao||''}</li>`;
+    return `<ol class="pjp-cwp">${pas(true,'Medição enviada ao Conectwork',esc(quando(ja.em))+(ja.por?' · '+esc(ja.por):''))}
+      ${pas(!!n,'Nota da '+nm+' para a Colafix',n?'conferida no Conectwork · '+esc(quando(n.em))+(n.por?' · '+esc(n.por):''):'a '+nm+' emite uma nota só, do valor total ('+R$(ja.total/100)+')',n?lnk('pjp-cwnotax','desfazer',e):btn('pjp-cwnota','Nota conferida',e,'sec'))}
+      ${pas(!!pg,'Colafix pagou a '+nm,pg?esc(quando(pg.em))+(pg.por?' · '+esc(pg.por):''):'depois do pagamento, a '+nm+' paga cada MEI pelo Conectwork',pg?lnk('pjp-cwpagox','desfazer',e):n?btn('pjp-cwpago','Marcar pago',e,''):'')}
+      ${pas(false,'Notas dos MEIs para a '+nm,'cada MEI recebe a demanda no Conectwork dele; a '+nm+' confere e paga lá','')}</ol>`; }
+  async function cwEmpMarca(c,k,campo,val,st,hist){ const p=perDe(J.per), D=docP(J.per), reg=Object.assign({},(D.cw||{})[k]||{},{[campo]:val}); D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
+    await c.P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:{[campo]:val}}},{merge:true});
+    for(const f of pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k)){ const x=pesDe(J.per,f._id); if(!x.fech) continue; const up=st(x); if(up) await grava(c,J.per,f._id,up,hist); } }
 
   /* etapas (10/11, "organizar a aba e deixar funcional"): cada PJ está numa etapa; os cartões das etapas também filtram a lista */
   const ETAPAS=[['','Conferir as horas','e fechar o valor'],['fechado','Pedir a nota','valor fechado'],['pedido','Esperando a nota','o PJ manda pelo link'],['chegou','Conferir a nota','chegou pelo link'],['conferida','Para pagar','nota conferida'],['pago','Pago','']];
@@ -914,6 +926,9 @@
   .pjp-lc .pc-vazio{margin:8px 18px 22px}
   /* cara de app (10/11): barra com a quinzena e o Face ID, cores por etapa, quadros de número */
   .pjp-ppl{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.pjp-ppl small{color:var(--muted);font-size:12.5px}
+  .pjp-cwp{list-style:none;margin:6px 0 12px;padding:0 0 0 4px;display:flex;flex-direction:column;gap:2px}.pjp-cwp li{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13.5px}
+  .pjp-cwp li>i{width:22px;height:22px;border-radius:50%;border:2px solid var(--line,#D5DCE1);display:grid;place-items:center;font-style:normal;font-size:12px;flex:none}
+  .pjp-cwp li.ok>i{background:var(--k3);border-color:var(--k3);color:#fff}.pjp-cwp li>div{flex:1;min-width:0}.pjp-cwp li small{display:block;color:var(--muted);font-size:12px}
   .pjp-dash.pjp-dash2{grid-template-columns:1fr 1fr;margin-top:0;align-items:start}
   .pjp-qb2{display:flex;align-items:flex-end;gap:10px;height:130px;padding-top:18px}.pjp-qc{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
   .pjp-qst{width:100%;max-width:46px;display:flex;flex-direction:column-reverse;gap:2px;border-radius:4px 4px 0 0;overflow:hidden}.pjp-qst i{display:block;width:100%;min-height:2px}
@@ -1437,6 +1452,10 @@
       if(a==='pjp-cwped'){ const k=b.dataset.e; b.disabled=true; const I=await cwPedir(c,k); P.toast('Pedido de nota de '+c.titulo(k)+' aberto no Conectwork ('+I.M.itens.length+' PJ). Confira lá e envie para a prestadora.');
         J.mod.emps=J.mod.emps.filter(x=>x!==k); if(!J.mod.emps.length&&!(J.mod.outros||[]).length) J.mod=null; P.render(); return; }
       if(a==='pjp-cwab'){ const u=String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes'; window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
+      if(a==='pjp-cwnota'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',{em:agora(),por:c.eu()},x=>['pedido','chegou'].includes(x.st)?{st:'conferida',conf:{em:agora(),por:c.eu(),via:'conectwork-empresa'}}:null,'Nota da '+c.titulo(k)+' para a Colafix conferida'); P.render(); return; }
+      if(a==='pjp-cwnotax'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',null,x=>x.st==='conferida'&&x.conf&&x.conf.via==='conectwork-empresa'?{st:'pedido',conf:null}:null,'Nota da '+c.titulo(k)+' desfeita'); P.render(); return; }
+      if(a==='pjp-cwpago'){ const k=b.dataset.e; await cwEmpMarca(c,k,'pago',{em:agora(),por:c.eu(),data:P.hojeStr()},x=>x.st&&x.st!=='pago'?{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr(),de:x.st,via:'empresa'}}:null,'Colafix pagou a '+c.titulo(k)); P.render(); return; }
+      if(a==='pjp-cwpagox'){ const k=b.dataset.e; await cwEmpMarca(c,k,'pago',null,x=>x.st==='pago'&&x.pago&&x.pago.via==='empresa'?{st:x.pago.de||'conferida',pago:null}:null,'Pagamento da '+c.titulo(k)+' desfeito'); P.render(); return; }
       if(a==='pjp-cwok'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'conferida',conf:{em:agora(),por:c.eu(),via:'conectwork'}},'Nota conferida no Conectwork'); P.render(); return; }
       if(a==='pjp-ped'||a==='pjp-env'){ const f=fDe(b.dataset.f); let ped;
         if(a==='pjp-env'){ const x=pesDe(J.per,f._id); const g=await P.db().doc(PED+'/'+x.ped.t).get(); ped=g.exists?Object.assign({t:x.ped.t},g.data()):null; if(!ped) throw new Error('Não achei o pedido. Cancele e peça de novo.'); }

@@ -41,6 +41,14 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Na lista: "Pedido no Conectwork", "Abrir o Conectwork" e "nota conferida no Conectwork"', /Pedido no Conectwork/.test(await linha('f1'))&&/Abrir o Conectwork/.test(await linha('f1'))&&/nota conferida no Conectwork/.test(await linha('f1')), await linha('f1'));
   await p.click('.pjp-lc [data-act="pjp-cwok"][data-f="f1"]'); await H.dorme(900); S=await srv();
   ok('"nota conferida no Conectwork" passa para "Marcar pago"', S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='conferida'&&/Marcar pago/.test(await linha('f1')));
+  { const cwt=await p.evaluate(()=>(document.querySelector('.pjp-cw')||{}).innerText||''); ok('Por empresa: medição enviada, nota da Zenith para a Colafix, Colafix pagou e as notas dos MEIs no Conectwork', /Medição enviada ao Conectwork/.test(cwt)&&/Nota da Zenith para a Colafix/.test(cwt)&&/Colafix pagou a Zenith/.test(cwt)&&/Notas dos MEIs para a Zenith/.test(cwt), cwt.slice(0,500)); }
+  if(process.env.SHOT2){ await p.evaluate(()=>document.querySelector('.pjp-cw').scrollIntoView()); await H.dorme(300); const bx=await p.evaluate(()=>{ const r=document.querySelector('.pjp-cw').getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; }); await p.screenshot({path:process.env.SHOT2,clip:bx}); }
+  await p.click('[data-act="pjp-cwnota"][data-e="ZENITH"]'); await H.dorme(1200); S=await srv();
+  ok('"Nota conferida" da Zenith: os PJ da Zenith ficam com a nota conferida', S['rh/dados/pjpag/2026-10-2'].cw.ZENITH.nota&&S['rh/dados/pjpag/2026-10-2'].pes.f4.st==='conferida'&&S['rh/dados/pjpag/2026-10-2'].pes.f4.conf.via==='conectwork-empresa'&&/Nota da empresa conferida/.test(await linha('f4')), await linha('f4'));
+  await p.click('[data-act="pjp-cwpago"][data-e="ZENITH"]'); await H.dorme(1200); S=await srv();
+  ok('"Colafix pagou a Zenith": todos os PJ da Zenith ficam Pago à Zenith', S['rh/dados/pjpag/2026-10-2'].cw.ZENITH.pago&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pago'&&S['rh/dados/pjpag/2026-10-2'].pes.f4.pago.via==='empresa'&&/Pago à Zenith/.test(await linha('f4')), await linha('f4'));
+  await p.click('[data-act="pjp-cwpagox"][data-e="ZENITH"]'); await H.dorme(1200); S=await srv();
+  ok('Desfazer o pagamento da Zenith volta cada PJ para a etapa de antes', !S['rh/dados/pjpag/2026-10-2'].cw.ZENITH.pago&&S['rh/dados/pjpag/2026-10-2'].pes.f4.st==='conferida'&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='conferida');
   await p.click('[data-act="pjp-fech"][data-f="f2"]'); await H.dorme(900);
   await p.evaluate(()=>{ window.RHPJPag._J.aba='pv'; window.Painel.render(); }); await H.dorme(500);
   const pp=await p.evaluate(()=>{ const e=document.querySelector('.pjp-ppl'); return e?e.innerText+' '+e.title:''; });
