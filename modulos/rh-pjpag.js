@@ -71,7 +71,8 @@
   function contaDia(e,s,h){ const ini=min(h.ini), fim=min(h.fim), tol=+h.tol||0, iv=+h.intv||0; let E=min(e), S=min(s);
     if(E==null||S==null||S<=E) return {E,S,m:0};
     if(ini!=null&&Math.abs(E-ini)<=tol) E=ini; if(fim!=null&&Math.abs(S-fim)<=tol) S=fim;
-    if(h.dentro){ if(ini!=null&&E<ini) E=ini; if(fim!=null&&S>fim) S=fim; }
+    /* antes/depois (11/11): contar ou não o Face ID antes da entrada e depois da saída do horário (cada um separado) */
+    if(!cAntes(h)&&ini!=null&&E<ini) E=ini; if(!cDepois(h)&&fim!=null&&S>fim) S=fim;
     return {E,S,m:Math.max(0,S-E-iv)}; }
   /* ---------- leitores do Face ID (05/11, "diferenciar a coluna Área e o dispositivo: Face ID produção × refeitório") ----------
      cada passagem guarda o dispositivo (no texto de `t`) e a área do Control iD (`ar`, quando o CSV tem a coluna Área).
@@ -100,8 +101,11 @@
   const pjs=(c,p)=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.nome&&pjEmps(c).includes(String(f.empresa||'').toUpperCase())&&(f.status!=='Desligado'||(f.desligamento&&f.desligamento>=p.de))&&(!f.admissao||f.admissao<=p.ate))
     .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
   /* regras da pessoa: as do Pagamento dos PJ (funcionarios.pjPag) valem antes; senão o "Horário diferente" do cadastro (horEsp); senão o padrão */
+  /* antes/depois: true = conta; o "dentro" antigo (não conta nenhum dos dois) continua valendo onde não foi escolhido */
+  const cAntes=h=>typeof h.antes==='boolean'?h.antes:!h.dentro, cDepois=h=>typeof h.depois==='boolean'?h.depois:!h.dentro;
+  const gAD=(g,k)=>typeof g[k]==='boolean'?g[k]:!g.dentro;
   const horDe=(c,f)=>{ const g=cfg(c), x=f.pjPag||{}, he=f.horEsp||{}, tem=v=>v!=null&&v!=='';
-    return {ini:x.ini||he.ini||g.ini,fim:x.fim||he.fim||g.fim,intv:tem(x.intv)?+x.intv:+g.intv,tol:tem(x.tol)?+x.tol:+g.tol,dentro:typeof x.dentro==='boolean'?x.dentro:!!g.dentro,
+    return {ini:x.ini||he.ini||g.ini,fim:x.fim||he.fim||g.fim,intv:tem(x.intv)?+x.intv:+g.intv,tol:tem(x.tol)?+x.tol:+g.tol,dentro:typeof x.dentro==='boolean'?x.dentro:!!g.dentro,antes:typeof x.antes==='boolean'?x.antes:typeof x.dentro==='boolean'?!x.dentro:gAD(g,'antes'),depois:typeof x.depois==='boolean'?x.depois:typeof x.dentro==='boolean'?!x.dentro:gAD(g,'depois'),
       dias:Array.isArray(x.dias)&&x.dias.length?x.dias:Array.isArray(he.dias)&&he.dias.length?he.dias:[1,2,3,4,5],de:{ini:x.ini?'pj':he.ini?'cad':'pad',fim:x.fim?'pj':he.fim?'cad':'pad'}}; };
   const vhDe=(c,f)=>{ const x=f.pjPag||{}; if(+x.vh>0) return +x.vh; const s=num(f.salario); return s>0?s/(+cfg(c).horasMes||220):0; }; /* como a planilha: valor da hora com todas as casas (5000/220 = 22,7272…); só o total vira centavos */
   const empDe=(c,f)=>{ const k=String(f.empresa||'').toUpperCase(); return (c.EMP_DOC||{})[k]||{nome:f.empresa||'',cnpj:''}; };
@@ -175,7 +179,7 @@
       if(fer&&fer.pago) m=Math.max(m,escM);
       const dFil=fil&&!cor&&!fer&&h.dias.includes(dw); if(dFil){ m=escM; info='Fixcol · sem Face ID · dia cheio da escala'; }
       const fF=fdsF(c); let mR=null; if((dw===0||dw===6)&&m>0&&fF!==1&&!dFil){ mR=m; m=Math.round(m*fF); }
-      let ehF=false; if(!fil&&d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro}}; }
+      let ehF=false; if(!fil&&d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro,antes:cAntes(h),depois:cDepois(h)}}; }
       if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
       else if(!cor&&!dFil&&!fil){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
       out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil,mR,fF:mR!=null?fF:null}); tot+=m; });
@@ -443,7 +447,9 @@
           <label>Tolerância (min)<input id="pjp-rtol" inputmode="numeric" value="${tem(pj.tol)?esc(pj.tol):''}" placeholder="${esc(g.tol)}">${pad(g.tol,tem(pj.tol)?'pj':'pad')}</label></div>
           <div class="pjp-rl" style="margin-top:12px">Dias que trabalha<small>dia fora da escala com passagem aparece marcado; dia da escala sem passagem também</small></div>
           <div class="pjp-dw" style="margin-top:6px">${[1,2,3,4,5,6,0].map(i=>`<label><input type="checkbox" data-pjp-dw="${i}" ${h.dias.includes(i)?'checked':''}><span>${DNL[i]}</span></label>`).join('')}</div>
-          <label class="pjp-ck" style="margin-top:12px"><input type="checkbox" id="pjp-rdentro" ${h.dentro?'checked':''}> Não contar o tempo antes da entrada nem depois da saída</label></div>
+          <div class="pjp-rl" style="margin-top:12px">Face ID fora do horário<small>desmarcado = conta a partir da entrada (${esc(h.ini)}) ou até a saída (${esc(h.fim)}) do horário, mesmo que a pessoa tenha passado antes ou depois</small></div>
+          <label class="pjp-ck" style="margin-top:6px"><input type="checkbox" id="pjp-rantes" ${cAntes(h)?'checked':''}> Considerar o Face ID <b>antes</b> do horário de entrada</label>
+          <label class="pjp-ck" style="margin-top:6px"><input type="checkbox" id="pjp-rdepois" ${cDepois(h)?'checked':''}> Considerar o Face ID <b>depois</b> do horário de saída</label></div>
         ${(()=>{ const vis=leitVistos(dadosMes(pid)), lt=leitDe(c,f), gl=Array.isArray(g.leit)?g.leit:[], nomes=l=>l.length?l.map(k=>(vis.find(v=>v.k===k)||{n:k}).n).join(', '):'todos os leitores';
           return `<div class="pjp-sec"><h4>Leitores do Face ID que contam</h4><small style="color:var(--muted);display:block;margin:-4px 0 8px">A entrada é a 1ª passagem e a saída é a última, só nos leitores que contam. Ex.: tirar o refeitório. Quando o Face ID da entrada da fábrica (importado no alto da tela) tem marcação no dia, vale ele; sem marcação, vale este.</small>
           <label class="pjp-ck"><input type="radio" name="pjp-rlm" value="pad" ${lt.de==='pad'?'checked':''}> Usar o padrão (${esc(nomes(gl))})</label>
@@ -481,7 +487,8 @@
         <div class="pjp-box"><h4>Horas</h4>
           <div class="pjp-g3"><div><label for="pjp-cini">Horário padrão: entra</label><input type="time" id="pjp-cini" value="${esc(g.ini)}"></div><div><label for="pjp-cfim">Sai</label><input type="time" id="pjp-cfim" value="${esc(g.fim)}"></div><div><label for="pjp-cintv">Intervalo (min)</label><input id="pjp-cintv" inputmode="numeric" value="${esc(g.intv)}"></div></div>
           <div class="pjp-g3"><div><label for="pjp-ctol">Tolerância (min)</label><input id="pjp-ctol" inputmode="numeric" value="${esc(g.tol)}"><small>até esses minutos vira o horário certo</small></div><div><label for="pjp-chm">Horas por mês</label><input id="pjp-chm" inputmode="numeric" value="${esc(g.horasMes)}"><small>valor da hora = salário ÷ horas</small></div><div><label for="pjp-cfds">Sábado e domingo valem</label><input id="pjp-cfds" inputmode="decimal" value="${esc(String(fdsF(c)).replace('.',','))}"><small>vezes a hora (1,5 = 50% a mais; 1 = normal)</small></div></div>
-          <label class="pjp-ck" style="margin-top:10px"><input type="checkbox" id="pjp-cdentro" ${g.dentro?'checked':''}> Não contar o tempo antes do início nem depois do fim do horário</label>
+          <label class="pjp-ck" style="margin-top:10px"><input type="checkbox" id="pjp-cantes" ${gAD(g,'antes')?'checked':''}> Considerar o Face ID <b>antes</b> do horário de entrada</label>
+          <label class="pjp-ck" style="margin-top:6px"><input type="checkbox" id="pjp-cdepois" ${gAD(g,'depois')?'checked':''}> Considerar o Face ID <b>depois</b> do horário de saída</label>
           <label style="margin-top:12px">Leitores do Face ID que contam para a entrada e a saída <small style="font-weight:400;color:var(--muted)">(nenhum marcado = todos; ex.: deixe o refeitório de fora)</small></label>${leitCaixas(esc,leitVistos(dadosMes(J.per)),Array.isArray(g.leit)?g.leit:[],'pjp-clt')}</div>
         <div class="pjp-box"><h4>Nota fiscal</h4>
           <div class="pjp-g3"><div><label for="pjp-cdias">Link da nota vale (dias)</label><input id="pjp-cdias" inputmode="numeric" value="${esc(g.dias)}"></div><div><label for="pjp-caviso">Avisar se a nota não chegar em (dias)</label><input id="pjp-caviso" inputmode="numeric" value="${esc(g.avisaNota)}"></div><div></div></div>
@@ -1012,7 +1019,7 @@
       let r=1;
       os.forEach(o=>{ const h=o.r.h, ini=min(h.ini), fim=min(h.fim), tol=+h.tol||0, iv=+h.intv||0;
         const t=W.getRow(r); t.getCell(1).value=c.titulo(o.f.nome).toUpperCase(); t.getCell(2).value=String(o.f.setor||'').toUpperCase(); W.mergeCells(`C${r}:H${r}`);
-        t.getCell(3).value='Horário: '+h.ini+'hr às '+h.fim+'hr / Intervalo de '+hhmm(iv)+(h.dentro?' · não conta fora do horário':'')+(o.r.fixo?' · VALOR FIXO':'');
+        t.getCell(3).value='Horário: '+h.ini+'hr às '+h.fim+'hr / Intervalo de '+hhmm(iv)+(!cAntes(h)&&!cDepois(h)?' · não conta fora do horário':!cAntes(h)?' · não conta antes da entrada':!cDepois(h)?' · não conta depois da saída':'')+(o.r.fixo?' · VALOR FIXO':'');
         t.eachCell({includeEmpty:true},cl=>{ cl.font={bold:true}; cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:CZ}}; cl.border=bd; }); r++;
         const hd=W.getRow(r); hd.values=['Dia','Entrada','Saída','Entrada Tolerância Ajustada','Saída Tolerância Ajustada','Total de Horas (desconta '+hhmm(iv)+' intervalo)','Conversão Decimal','Observação'];
         hd.eachCell(cl=>{ cl.font={bold:true,size:10}; cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:CI}}; cl.alignment={wrapText:true,vertical:'middle'}; cl.border=bd; }); hd.height=30; r++;
@@ -1022,7 +1029,7 @@
           row.getCell(2).value=d.zero?0:tFr(d.e); row.getCell(3).value=d.zero?0:tFr(d.e&&d.s?d.s:'');
           const lim=(v,b)=>`AND(${v}>=${tF(b-tol)},${v}<=${tF(b+tol)})`;
           let fD=`IF(B${r}=0,0,IF(${lim('B'+r,ini)},${tF(ini)},B${r}))`, fE=`IF(C${r}=0,0,IF(${lim('C'+r,fim)},${tF(fim)},C${r}))`;
-          if(h.dentro){ fD=`IF(B${r}=0,0,MAX(${tF(ini)},${fD}))`; fE=`IF(C${r}=0,0,MIN(${tF(fim)},${fE}))`; }
+          if(!cAntes(h)) fD=`IF(B${r}=0,0,MAX(${tF(ini)},${fD}))`; if(!cDepois(h)) fE=`IF(C${r}=0,0,MIN(${tF(fim)},${fE}))`;
           row.getCell(4).value={formula:fD,result:d.E!=null&&d.m?d.E/1440:(d.e&&!d.zero?tFr(d.e):0)};
           row.getCell(5).value={formula:fE,result:d.S!=null&&d.m?d.S/1440:0};
           row.getCell(6).value=d.fech||d.fil||(d.fer&&d.fer.pago)?d.m/1440:{formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`+(d.mR!=null?'*'+d.fF:''),result:d.m/1440};   /* dia do fechamento e feriado pago: o dia cheio, não a conta das passagens */
@@ -1140,13 +1147,13 @@
       if(a==='pjp-cfgok'){ const g=id=>document.getElementById(id), o={modo:g('pjp-cmodo').value,ini:g('pjp-cini').value||PAD.ini,fim:g('pjp-cfim').value||PAD.fim,intv:Math.max(0,parseInt(g('pjp-cintv').value,10)||0),tol:Math.max(0,parseInt(g('pjp-ctol').value,10)||0),
           horasMes:Math.max(1,parseInt(g('pjp-chm').value,10)||220),dias:Math.max(2,Math.min(90,parseInt(g('pjp-cdias').value,10)||30)),
           corte:Math.max(10,Math.min(20,parseInt(g('pjp-ccorte').value,10)||15)),fds:(v=>v>=1&&v<=3?v:1.5)(num(g('pjp-cfds').value)),pagDias:Math.max(0,Math.min(60,parseInt(g('pjp-cpag').value,10)||0)),avisaNota:Math.max(1,Math.min(30,parseInt(g('pjp-caviso').value,10)||3)),
-          emps:(e=>e.length?e:['ZENITH','NEXUS'])([...document.querySelectorAll('[data-pjp-cemp]')].filter(i=>i.checked).map(i=>i.dataset.pjpCemp)),dentro:g('pjp-cdentro').checked,leit:[...document.querySelectorAll('[data-pjp-clt]')].filter(i=>i.checked).map(i=>i.dataset.pjpClt),msg:String(g('pjp-cmsg').value||'').slice(0,800)||PAD.msg};
+          emps:(e=>e.length?e:['ZENITH','NEXUS'])([...document.querySelectorAll('[data-pjp-cemp]')].filter(i=>i.checked).map(i=>i.dataset.pjpCemp)),antes:g('pjp-cantes').checked,depois:g('pjp-cdepois').checked,dentro:!g('pjp-cantes').checked&&!g('pjp-cdepois').checked,leit:[...document.querySelectorAll('[data-pjp-clt]')].filter(i=>i.checked).map(i=>i.dataset.pjpClt),msg:String(g('pjp-cmsg').value||'').slice(0,800)||PAD.msg};
         const ant=cfg(c).modo, antK=corteQ(); o.finEmail=cfg(c).finEmail||null; if(!o.finEmail) delete o.finEmail; c.R.cfg.pjPag=Object.assign({},(c.R.cfg||{}).pjPag||{},o); await P.db().doc('rh/config').set({pjPag:o},{merge:true}); if(ant!==o.modo||antK!==o.corte) J.per=perAtual(c); J.mod=null; P.toast('Parâmetros do pagamento salvos.'); P.render(); return; }
       if(a==='pjp-psalva'){ const f=fDe(b.dataset.f), g=id=>(document.getElementById(id)||{}).value||'', n0=v=>v===''?null:Math.max(0,parseInt(v,10)||0);
         const dias=[...document.querySelectorAll('[data-pjp-dw]')].filter(i=>i.checked).map(i=>+i.dataset.pjpDw).sort();
         if(!dias.length) return P.toast('Marque pelo menos um dia de trabalho.');
-        const fixoOn=(document.querySelector('input[name="pjp-rv"]:checked')||{}).value==='f', gp=cfg(c), dentro=document.getElementById('pjp-rdentro').checked;
-        const o={ini:g('pjp-ri'),fim:g('pjp-rf'),intv:n0(g('pjp-rint')),tol:n0(g('pjp-rtol')),dias:dias.join(',')==='1,2,3,4,5'&&!(f.horEsp&&f.horEsp.dias)?[]:dias,dentro:dentro===!!gp.dentro?null:dentro,
+        const fixoOn=(document.querySelector('input[name="pjp-rv"]:checked')||{}).value==='f', gp=cfg(c), antes=document.getElementById('pjp-rantes').checked, depois=document.getElementById('pjp-rdepois').checked;
+        const o={ini:g('pjp-ri'),fim:g('pjp-rf'),intv:n0(g('pjp-rint')),tol:n0(g('pjp-rtol')),dias:dias.join(',')==='1,2,3,4,5'&&!(f.horEsp&&f.horEsp.dias)?[]:dias,dentro:null,antes:antes===gAD(gp,'antes')?null:antes,depois:depois===gAD(gp,'depois')?null:depois,
           vh:fixoOn?0:num(g('pjp-rvh'))||0,fixo:fixoOn?num(g('pjp-rfx'))||0:0,obs:String(g('pjp-rob')).trim().slice(0,200),em:agora(),por:c.eu()};
         { const lm=(document.querySelector('input[name="pjp-rlm"]:checked')||{}).value, ls=[...document.querySelectorAll('[data-pjp-rlt]')].filter(i=>i.checked).map(i=>i.dataset.pjpRlt);
           if(lm==='sel'&&!ls.length) return P.toast('Marque pelo menos um leitor, ou escolha "Usar o padrão".'); o.leit=lm==='sel'?ls:null; }

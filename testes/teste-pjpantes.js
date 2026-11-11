@@ -1,0 +1,28 @@
+/* Pagamento dos PJ (11/11): nas Regras, "Considerar o Face ID antes do horário de entrada" e "depois do horário de saída", separados. Dados inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed');
+const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Expedição'],pjPag:{ini:'08:00',fim:'18:00',intv:72,tol:5,fds:1}};
+  D['rh/dados/funcionarios/f1']={nome:'CARLOS PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',setor:'Expedição',funcao:'Ajudante',status:'Ativo',admissao:'2025-01-10',pjPag:{vh:20}};
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias:{'2026-10-20':{'11122233344':{p:1,t:['07:21:00 ESTACIONAMENTO ENT','07:30:00 SAIDA ESTACIONAMENTO','07:50:00 ESTACIONAMENTO ENT','18:40:00 SAIDA ESTACIONAMENTO']}}},pessoas:{'11122233344':{n:'CARLOS PEREIRA TESTE',e:'ZENITH'}},imp:[]};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.per='2026-10-2'; J.aba='lista'; J.ab='f1'; J.tab='horas'; __T.go('rhpjpag'); window.Painel.render(); }); await H.dorme(2500);
+  const dia=()=>p.evaluate(()=>{ const t=(document.querySelector('.pjp-g')||{}).innerText||''; return (t.match(/Ter 20\/10[\s\S]{0,260}/)||[''])[0].replace(/\n/g,' | '); });
+  let x=await dia(); ok('Padrão (conta antes e depois): 07:21 às 18:40 − 1h12 = 10h07', /conta 07:21–18:40/.test(x)&&/10h07/.test(x), x);
+  await p.evaluate(()=>{ window.RHPJPag._J.tab='regras'; window.Painel.render(); }); await H.dorme(600);
+  ok('Nas Regras: as duas caixinhas, marcadas', await p.evaluate(()=>document.getElementById('pjp-rantes').checked&&document.getElementById('pjp-rdepois').checked&&/antes\s+do horário de entrada/i.test(document.querySelector('.pjp-g').innerText)));
+  await p.uncheck('#pjp-rantes'); await p.click('[data-act=pjp-psalva]'); await H.dorme(1200);
+  const S=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs, pj=(S['rh/dados/funcionarios/f1']||{}).pjPag||{};
+  ok('Grava só o "antes" desta pessoa (o depois fica no padrão)', pj.antes===false&&(pj.depois==null), JSON.stringify(pj));
+  await p.evaluate(()=>{ window.RHPJPag._J.tab='horas'; window.Painel.render(); }); await H.dorme(800);
+  x=await dia(); ok('Sem o antes: conta de 08:00 às 18:40 = 9h28', /conta 08:00–18:40/.test(x)&&/9h28/.test(x), x);
+  await p.evaluate(()=>{ window.RHPJPag._J.tab='regras'; window.Painel.render(); }); await H.dorme(600);
+  await p.uncheck('#pjp-rdepois'); await p.click('[data-act=pjp-psalva]'); await H.dorme(1200);
+  await p.evaluate(()=>{ window.RHPJPag._J.tab='horas'; window.Painel.render(); }); await H.dorme(800);
+  x=await dia(); ok('Sem o antes e sem o depois: 08:00 às 18:00 = 8h48', /conta 08:00–18:00/.test(x)&&/8h48/.test(x), x);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab=''; J.mod={k:'cfg'}; window.Painel.render(); }); await H.dorme(600);
+  ok('Nos Parâmetros também tem as duas caixinhas (padrão de todos)', await p.evaluate(()=>!!document.getElementById('pjp-cantes')&&!!document.getElementById('pjp-cdepois')));
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
