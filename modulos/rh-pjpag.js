@@ -16,7 +16,7 @@
    Usado pelo rh.js: window.RHPJPag.render(ctx) · .avisos(ctx). Prefixo `pjp`. */
 (function(){
   const PTO='rh/dados/ponto', COL='rh/dados/pjpag', PED='rh/dados/pjnotaped', ENV='rh/dados/pjnotaenv';
-  const PAD={modo:'quinzena',tol:5,dentro:false,ini:'07:30',fim:'17:18',intv:60,horasMes:220,dias:30,
+  const PAD={modo:'quinzena',corte:15,pagDias:5,avisaNota:3,tol:5,dentro:false,ini:'07:30',fim:'17:18',intv:60,horasMes:220,dias:30,
     msg:'Olá, {NOME}! Fechamos {PERIODO}: {HORAS} trabalhadas, total de {VALOR}.\nPor favor, emita a nota fiscal de serviço para {EMPRESA} (CNPJ {CNPJ}) e mande por este link:\n{LINK}'};
   const ST={'':['Conferir as horas','warn'],fechado:['Valor fechado','teal'],pedido:['Nota pedida','teal'],chegou:['Nota chegou · conferir','warn'],conferida:['Nota conferida','ok'],pago:['Pago','ok']};
   const J={per:'',docs:{},sub:{},envSub:false,env:{},ab:'',q:'',emp:'',cfgAb:false,mod:null,proc:{},fid:{},carr:{},pto:{},ptoSub:{}};
@@ -48,15 +48,19 @@
   const cfg=c=>Object.assign({},PAD,((c||C).R.cfg||{}).pjPag||{});
   /* ---------- período ---------- */
   const fimMes=(y,m)=>new Date(y,m,0).getDate();
-  function perDe(pid){ const m=String(pid||'').match(/^(\d{4})-(\d{2})(?:-([12]))?$/); if(!m) return null; const y=+m[1], mo=+m[2], q=m[3], f=fimMes(y,mo), b=m[1]+'-'+m[2]+'-';
-    const de=q==='2'?b+'16':b+'01', ate=q==='1'?b+'15':b+pad2(f);
-    return {pid,de,ate,mes:m[1]+'-'+m[2],txt:(q?(q==='1'?'1 a 15':'16 a '+f)+'/'+m[2]+'/'+m[1]:'mês '+m[2]+'/'+m[1])+'',curto:(q?brc(de)+' a '+brc(ate):m[2]+'/'+m[1])}; }
+  /* dia que divide a quinzena (Parâmetros, 11/11): 1ª = 1 até o corte, 2ª = corte+1 até o fim do mês; padrão 15 */
+  const corteQ=()=>{ const v=+((((C&&C.R&&C.R.cfg)||{}).pjPag)||{}).corte; return v>=10&&v<=20?v:15; };
+  function perDe(pid){ const m=String(pid||'').match(/^(\d{4})-(\d{2})(?:-([12]))?$/); if(!m) return null; const y=+m[1], mo=+m[2], q=m[3], f=fimMes(y,mo), b=m[1]+'-'+m[2]+'-', k=corteQ();
+    const de=q==='2'?b+pad2(k+1):b+'01', ate=q==='1'?b+pad2(k):b+pad2(f);
+    return {pid,de,ate,mes:m[1]+'-'+m[2],txt:(q?(q==='1'?'1 a '+k:(k+1)+' a '+f)+'/'+m[2]+'/'+m[1]:'mês '+m[2]+'/'+m[1])+'',curto:(q?brc(de)+' a '+brc(ate):m[2]+'/'+m[1])}; }
+  /* dia do pagamento sugerido = fim do período + N dias (Parâmetros), nunca antes de hoje */
+  function pagSug(c,p){ const n=Math.max(0,parseInt(cfg(c).pagDias,10)||0), d=new Date(p.ate+'T12:00:00'); d.setDate(d.getDate()+n); const k=isoD(d), h=hojeS(); return k<h?h:k; }
   function perAtual(c){ const h=new Date(), y=h.getFullYear(), mo=h.getMonth()+1, d=h.getDate(), modo=cfg(c).modo;
     if(modo==='mes'){ const dd=new Date(y,mo-1-(d<=7?1:0),1); return dd.getFullYear()+'-'+pad2(dd.getMonth()+1); }
     /* nos primeiros 7 dias de uma quinzena, mostra a que acabou de fechar */
     if(d<=7){ const dd=new Date(y,mo-2,1); return dd.getFullYear()+'-'+pad2(dd.getMonth()+1)+'-2'; }
-    if(d>=16&&d<=22) return y+'-'+pad2(mo)+'-1';
-    return y+'-'+pad2(mo)+'-'+(d<=15?1:2); }
+    const k=corteQ(); if(d>=k+1&&d<=k+7) return y+'-'+pad2(mo)+'-1';
+    return y+'-'+pad2(mo)+'-'+(d<=k?1:2); }
   function perMove(pid,k){ const m=pid.match(/^(\d{4})-(\d{2})(?:-([12]))?$/); let y=+m[1], mo=+m[2];
     if(!m[3]){ const d=new Date(y,mo-1+k,1); return d.getFullYear()+'-'+pad2(d.getMonth()+1); }
     let q=+m[3]+k; while(q>2){ q-=2; mo++; } while(q<1){ q+=2; mo--; } const d=new Date(y,mo-1,1); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+q; }
@@ -451,14 +455,23 @@
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b></div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
   function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); if(M.k==='cwped') return cwPedModal(c);
-    if(M.k==='cfg'){ const g=cfg(c);
-      return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Configurar o pagamento dos PJ"><h3>Como o painel faz a conta</h3><p class="sub">Vale para todos os PJ; o horário e o valor da hora de cada pessoa ficam no detalhe dela.</p>
-        <div class="pjp-box"><label>Período de pagamento</label><select id="pjp-cmodo"><option value="quinzena" ${g.modo==='quinzena'?'selected':''}>Quinzena (1 a 15 e 16 ao fim do mês)</option><option value="mes" ${g.modo==='mes'?'selected':''}>Mês inteiro</option></select>
-          <div class="pjp-g3"><div><label>Horário padrão: entra</label><input type="time" id="pjp-cini" value="${esc(g.ini)}"></div><div><label>Sai</label><input type="time" id="pjp-cfim" value="${esc(g.fim)}"></div><div><label>Intervalo (min)</label><input id="pjp-cintv" inputmode="numeric" value="${esc(g.intv)}"></div></div>
-          <div class="pjp-g3"><div><label>Tolerância (min)</label><input id="pjp-ctol" inputmode="numeric" value="${esc(g.tol)}"></div><div><label>Horas por mês (salário ÷)</label><input id="pjp-chm" inputmode="numeric" value="${esc(g.horasMes)}"></div><div><label>Link vale (dias)</label><input id="pjp-cdias" inputmode="numeric" value="${esc(g.dias)}"></div></div>
-          <label style="display:flex;gap:8px;align-items:center;color:inherit;font-size:14px;margin-top:12px"><input type="checkbox" id="pjp-cdentro" style="width:20px;height:20px" ${g.dentro?'checked':''}> Não contar o tempo antes do início nem depois do fim do horário</label>
-          <label style="margin-top:12px">Leitores do Face ID que contam para a entrada e a saída <small style="font-weight:400;color:var(--muted)">(nenhum marcado = todos; ex.: deixe o refeitório de fora)</small></label>${leitCaixas(esc,leitVistos(dadosMes(J.per)),Array.isArray(g.leit)?g.leit:[],'pjp-clt')}
-          <label>Mensagem do pedido de nota ({NOME}, {PERIODO}, {HORAS}, {VALOR}, {EMPRESA}, {CNPJ}, {LINK})</label><textarea id="pjp-cmsg" rows="5">${esc(g.msg)}</textarea></div>
+    if(M.k==='cfg'){ const g=cfg(c), k=corteQ(), emV=pjEmps(c), emT=[...new Set(['ZENITH','NEXUS','COLAFIX'].concat((c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.empresa).map(f=>String(f.empresa).toUpperCase())))];
+      const nEmp=e=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.status!=='Desligado'&&String(f.empresa||'').toUpperCase()===e).length;
+      return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-par" role="dialog" aria-label="Parâmetros do pagamento dos PJ"><h3>Parâmetros do pagamento</h3><p class="sub">Valem para todos os PJ. O horário e o valor da hora de cada pessoa ficam no detalhe dela (toque no nome › Regras).</p>
+        <div class="pjp-box"><h4>Período do pagamento</h4>
+          <div class="pjp-g3"><div><label for="pjp-cmodo">Pagar por</label><select id="pjp-cmodo"><option value="quinzena" ${g.modo!=='mes'?'selected':''}>Quinzena</option><option value="mes" ${g.modo==='mes'?'selected':''}>Mês inteiro</option></select></div>
+            <div><label for="pjp-ccorte">1ª quinzena vai até o dia</label><input id="pjp-ccorte" inputmode="numeric" value="${k}" ${g.modo==='mes'?'disabled':''}><small>1 a ${k} e ${k+1} ao fim do mês (entre 10 e 20)</small></div>
+            <div><label for="pjp-cpag">Pagamento sai</label><input id="pjp-cpag" inputmode="numeric" value="${esc(g.pagDias)}"><small>dias depois do fim do período (vai como data no e-mail ao financeiro)</small></div></div>
+          <p class="sub" style="margin:8px 0 0">Mudar o período muda as datas de todas as quinzenas, inclusive as já fechadas: o valor fechado continua guardado, mas confira antes de mudar no meio do mês.</p></div>
+        <div class="pjp-box"><h4>Quem entra no pagamento</h4><div class="pjp-emps">${emT.map(e=>`<label class="pjp-ck"><input type="checkbox" data-pjp-cemp="${esc(e)}" ${emV.includes(e)?'checked':''}> ${esc(e==='COLAFIX'?'Colafix (paga direto)':e.charAt(0)+e.slice(1).toLowerCase())} <small>${nEmp(e)} PJ</small></label>`).join('')}</div><small>Só aparecem na tela, nos números e nos relatórios os PJ das empresas marcadas.</small></div>
+        <div class="pjp-box"><h4>Horas</h4>
+          <div class="pjp-g3"><div><label for="pjp-cini">Horário padrão: entra</label><input type="time" id="pjp-cini" value="${esc(g.ini)}"></div><div><label for="pjp-cfim">Sai</label><input type="time" id="pjp-cfim" value="${esc(g.fim)}"></div><div><label for="pjp-cintv">Intervalo (min)</label><input id="pjp-cintv" inputmode="numeric" value="${esc(g.intv)}"></div></div>
+          <div class="pjp-g3"><div><label for="pjp-ctol">Tolerância (min)</label><input id="pjp-ctol" inputmode="numeric" value="${esc(g.tol)}"><small>até esses minutos vira o horário certo</small></div><div><label for="pjp-chm">Horas por mês</label><input id="pjp-chm" inputmode="numeric" value="${esc(g.horasMes)}"><small>valor da hora = salário ÷ horas</small></div><div></div></div>
+          <label class="pjp-ck" style="margin-top:10px"><input type="checkbox" id="pjp-cdentro" ${g.dentro?'checked':''}> Não contar o tempo antes do início nem depois do fim do horário</label>
+          <label style="margin-top:12px">Leitores do Face ID que contam para a entrada e a saída <small style="font-weight:400;color:var(--muted)">(nenhum marcado = todos; ex.: deixe o refeitório de fora)</small></label>${leitCaixas(esc,leitVistos(dadosMes(J.per)),Array.isArray(g.leit)?g.leit:[],'pjp-clt')}</div>
+        <div class="pjp-box"><h4>Nota fiscal</h4>
+          <div class="pjp-g3"><div><label for="pjp-cdias">Link da nota vale (dias)</label><input id="pjp-cdias" inputmode="numeric" value="${esc(g.dias)}"></div><div><label for="pjp-caviso">Avisar se a nota não chegar em (dias)</label><input id="pjp-caviso" inputmode="numeric" value="${esc(g.avisaNota)}"></div><div></div></div>
+          <label for="pjp-cmsg">Mensagem do pedido de nota ({NOME}, {PERIODO}, {HORAS}, {VALOR}, {EMPRESA}, {CNPJ}, {LINK})</label><textarea id="pjp-cmsg" rows="5">${esc(g.msg)}</textarea></div>
         <div class="pjp-ac">${btn('pjp-modx','Cancelar')}${btn('pjp-cfgok','Salvar','','')}</div></div></div>`; }
     if(M.k==='ped'){ const lk=linkDe(M.ped.t), tel=dig(M.tel), wa=(tel?'https://wa.me/'+(tel.length<=11?'55':'')+tel:'https://wa.me/')+'?text='+encodeURIComponent(M.msg);
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Pedido de nota"><h3>Pedido de nota · ${esc(M.ped.nome)}</h3><p class="sub">${esc(M.ped.perTxt)} · ${R$(M.ped.valor)}. O link vale ${cfg(c).dias} dias.</p>
@@ -619,7 +632,7 @@
         else { const a=[]; if(r.alerta) a.push(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir (só uma passagem)'); if(r.uPend) a.push('desconto do uniforme para confirmar'); if(a.length){ t=a.join(' · '); tom='warn'; } } }
       else if(st==='chegou'){ t=x.nota&&x.nota.conf==='dif'?'Nota chegou com diferença':'Nota chegou · conferir'; tom=x.nota&&x.nota.conf==='dif'?'crit':'warn'; }
       else if(st==='conferida'){ t='Nota conferida · falta marcar pago'; tom='info'; }
-      else if(st==='pedido'&&x.ped&&diasDesde(x.ped.em)>=3){ t='Pedimos a nota há '+diasDesde(x.ped.em)+' dias e ainda não chegou'; tom='warn'; }
+      else if(st==='pedido'&&x.ped&&diasDesde(x.ped.em)>=(+cfg(c).avisaNota||3)){ t='Pedimos a nota há '+diasDesde(x.ped.em)+' dias e ainda não chegou'; tom='warn'; }
       else if(st==='fechado'&&prontos.length){ t='Valor fechado · falta pedir a nota'; tom='info'; }
       if(t) pv.push({o,t,tom}); });
     const pvH=pv.length?pv.map(({o,t,tom})=>`<div class="pjp-pvi"><span>${ini(o)}</span><div class="pjp-pvt"><button class="pjp-nm" data-act="pjp-ab" ${fa(o)}>${esc(nm(o))}</button><small class="pjp-pvm ${tom}">${esc(t)}</small></div><div class="pjp-qa">${acoes(c,pid,o.f,o.x,o.r)}</div></div>`).join('')
@@ -645,14 +658,17 @@
     const fidT=FI?[FI.sub,FI.ultTxt+(FI.imp&&FI.robo?' · último CSV '+hm(FI.imp.em):'')].join(' · '):'';
     const MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
     const pD=+p.de.slice(8,10), pA=+p.ate.slice(8,10), pM=MES[+p.mes.slice(5,7)-1], pY=p.mes.slice(0,4), ehMes=cfg(c).modo==='mes', q2=/-2$/.test(pid);
+    const perOps=(()=>{ let k=perAtual(c); for(let n=0;n<2;n++) k=perMove(k,1); const out=[]; for(let n=0;n<26;n++){ out.push(k); k=perMove(k,-1); } if(!out.includes(pid)) out.push(pid); return out; })();
+    const perNome=k=>{ const q=perDe(k), mm=MES[+q.mes.slice(5,7)-1], dd=+q.de.slice(8,10), aa=+q.ate.slice(8,10); return ehMes?mm+' de '+q.mes.slice(0,4):dd+' a '+aa+' de '+mm+' de '+q.mes.slice(0,4); };
     const quin=`<div class="pjp-q" aria-label="Período ${esc(p.txt)}"><button class="pjp-qb" data-act="pjp-per" data-v="-1" aria-label="${ehMes?'Mês':'Quinzena'} anterior">‹</button>
-          <div class="pjp-qm"><span class="pjp-qi" aria-hidden="true">${U?U.ic('calendario',16):''}</span><div><small>${ehMes?'Mês':(q2?'2ª quinzena':'1ª quinzena')}${ehAt?' · atual':''}</small><b>${ehMes?esc(pM)+' de '+pY:pD+' a '+pA+' de '+esc(pM)}</b>${ehAt?'':`<button class="pjp-qv" data-act="pjp-per" data-v="0" type="button">voltar para a atual</button>`}</div></div>
+          <div class="pjp-qm"><select class="pjp-qsel" data-pjp-qsel aria-label="Escolher o período">${perOps.map(k=>`<option value="${k}" ${k===pid?'selected':''}>${esc(perNome(k))}${k===perAtual(c)?' · atual':''}</option>`).join('')}</select><span class="pjp-qi" aria-hidden="true">${U?U.ic('calendario',16):''}</span><div><small>${ehMes?'Mês':(q2?'2ª quinzena':'1ª quinzena')}${ehAt?' · atual':''}</small><b>${ehMes?esc(pM)+' de '+pY:pD+' a '+pA+' de '+esc(pM)}</b>${ehAt?'':`<button class="pjp-qv" data-act="pjp-per" data-v="0" type="button">voltar para a atual</button>`}</div></div>
           <button class="pjp-qb" data-act="pjp-per" data-v="1" aria-label="${ehMes?'Próximo mês':'Próxima quinzena'}">›</button></div>`;
     const barra=`<div class="pjp-bar">
         ${FI?`<div class="pjp-fid ${FI.tom}" role="status" title="${esc(fidT)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(FI.tit)}</b>${FI.curto?`<small>${esc(FI.curto)}</small>`:''}<button class="lnk" data-act="pjp-fidir" type="button">ver</button></div>`:''}
         ${ptoPil(c,p)}
-        <span class="pjp-sp"></span><div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','PDF')}${btn('pjp-cfg','Como é feita a conta')}</div>${quin}</div>`;
-    return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
+        </div>`;
+    const topoAc=`<div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','PDF')}<button class="btn sec" data-act="pjp-cfg" type="button">${U?U.ic('ajuste',15):''} Parâmetros</button></div>${quin}`;
+    return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.',topoAc,'RH · PAGAMENTO DOS PJ')+
       `<div class="pjp">${barra}${avFid}
       <div class="pjp-abas" role="tablist" aria-label="Partes da tela">${[['pv','Precisa de você',pv.length,'alerta'],['kb','Onde cada PJ está',null,'grid'],['lista','Todos os PJ',rsF.length,'lista']].map(([k,t,n,ic])=>`<button type="button" role="tab" class="pjp-aba" data-act="pjp-aba" data-v="${k}" aria-selected="${aba===k}">${icn(ic,18)}<span>${t}</span>${n!=null?`<b class="${k==='pv'&&n?'al':''}">${n}</b>`:''}</button>`).join('')}</div>
       ${aba==='pv'?`<section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
@@ -811,7 +827,19 @@
   .pjp-pp{padding:16px 20px;border-radius:16px;gap:16px}.pjp-pp h3{font-size:18px}.pjp-pp p{font-size:13.5px}.pjp-ppi{width:38px;height:38px;border-radius:11px}
   .pjp-pp .btn{height:40px!important;font-size:14px!important;padding:0 18px!important}
   .pjp-q{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:4px;box-shadow:0 1px 2px rgba(20,40,60,.06)}
-  .pjp-qm{display:flex;align-items:center;gap:10px;padding:2px 10px 2px 6px}
+  .pjp-qm{position:relative;display:flex;align-items:center;gap:10px;padding:2px 10px 2px 6px;border-radius:10px;cursor:pointer}.pjp-qm:hover{background:var(--ground)}
+  .pjp-par{max-width:760px}.pjp-par .pjp-box{margin-top:12px}.pjp-par h4{margin:0 0 10px;font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--teal-strong)}
+  .pjp-par small{display:block;font-size:11.5px;color:var(--muted);font-weight:400;margin-top:3px}.pjp-par input:disabled{opacity:.5}
+  .pjp-emps{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}.pjp-ck{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;color:inherit!important;font-size:14px!important;font-weight:500!important}
+  .pjp-emps .pjp-ck{border:1px solid var(--line,#E1E7EB);border-radius:10px;padding:7px 12px}.pjp-emps .pjp-ck small{display:inline;margin:0}.pjp-ck input{width:18px;height:18px}
+  .pjp-mod .pjp-box input[type=checkbox]{width:18px;height:18px;padding:0;margin:0;flex:none;accent-color:var(--teal-strong)}
+  .pjp-mod .pjp-box .pjp-lt label{display:flex;margin-top:0;color:inherit}.pjp-mod .pjp-box .pjp-lt label small{display:block}
+  .pjp-par .pjp-emps .pjp-ck small{white-space:nowrap;color:var(--muted)}.pjp-mod .pjp-box label.pjp-ck{margin-top:10px}
+  .pjp-par .pjp-lt{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:6px}.pjp-mod.pjp-par .pjp-box .pjp-lt label{border:1px solid var(--line,#E1E7EB);border-radius:10px;padding:9px 12px;gap:10px;align-items:flex-start;font-size:14px}.pjp-par .pjp-lt label span{display:flex;flex-direction:column}.pjp-par .pjp-lt input{margin-top:2px!important}
+  .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
+  .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
+  .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}
+  .pjp-tbt .btn svg{vertical-align:-2px;margin-right:2px}
   .pjp-qi{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--teal-tint,#E2ECF1);color:var(--teal-strong,#143F54);flex:none}
   .pjp-qm>div{display:flex;flex-direction:column;line-height:1.15}
   .pjp-qm small{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -859,7 +887,7 @@
   function finAbrir(c,fids){ const pid=J.per, p=perDe(pid), os=finPessoas(c,pid), g=cfg(c).finEmail||{};
     const sel={}; (fids&&fids.length?fids:os.filter(o=>o.r.valor>0&&o.x.st!=='pago').map(o=>o.f._id)).forEach(id=>sel[id]=true);
     const desl=os.some(o=>sel[o.f._id]&&desligadoNo(o.f,p));
-    J.mod={k:'fin',sel,mot:desl?'desl':'quinzena',data:hojeS(),para:g.para||'',cc:g.cc||''}; }
+    J.mod={k:'fin',sel,mot:desl?'desl':'quinzena',data:pagSug(c,perDe(J.per)),para:g.para||'',cc:g.cc||''}; }
   function finGrupos(c,M){ const os=finPessoas(c,J.per).filter(o=>M.sel[o.f._id]); const G={}; os.forEach(o=>(G[o.emp]=G[o.emp]||[]).push(o)); return G; }
   const TD='border:1px solid #BFC9D1;padding:2px 6px;font-family:Calibri,Arial,sans-serif;font-size:11px;';
   function finTabela(c,o,p){ const {f,r}=o, h=r.h, esc=c.esc, nm=String(f.nome||'').toUpperCase();
@@ -1009,7 +1037,7 @@
   /* ---------- avisos (Meu dia e Início do RH) ---------- */
   function avisos(c){ C=C||c; try{ const pid=J.per||perAtual(c); assina(c,pid); const D=docP(pid), p=perDe(pid), xs=Object.entries(D.pes||{}); const out=[];
       const ch=xs.filter(([,x])=>x.st==='chegou').length; if(ch) out.push({nivel:'warn',rotulo:'PJ',titulo:ch+(ch>1?' notas de PJ chegaram':' nota de PJ chegou')+' para conferir',texto:p.txt,go:'rhpjpag'});
-      const at=xs.filter(([,x])=>x.st==='pedido'&&x.ped&&Date.now()-new Date(x.ped.em)>3*864e5).length; if(at) out.push({nivel:'warn',rotulo:'PJ',titulo:at+' PJ ainda não mandaram a nota',texto:'Pedida há mais de 3 dias · '+p.txt,go:'rhpjpag'});
+      const at=xs.filter(([,x])=>x.st==='pedido'&&x.ped&&Date.now()-new Date(x.ped.em)>(+cfg(c).avisaNota||3)*864e5).length; if(at) out.push({nivel:'warn',rotulo:'PJ',titulo:at+' PJ ainda não mandaram a nota',texto:'Pedida há mais de '+(+cfg(c).avisaNota||3)+' dias · '+p.txt,go:'rhpjpag'});
       if(c.P.hojeStr()>p.ate){ const fz=pjs(c,p).filter(f=>!((D.pes||{})[f._id]||{}).st).length; if(fz) out.push({nivel:'warn',rotulo:'PJ',titulo:'Fechar o pagamento dos PJ de '+p.curto,texto:fz+' PJ com o valor ainda não fechado',go:'rhpjpag'}); }
       return out; }catch(e){ return []; } }
   /* ---------- ações ---------- */
@@ -1021,6 +1049,8 @@
     const fech={cheio:r.cheio||null,min:r.min,vh:r.vh,fixo:r.fixo,bruto:r.bruto,desc:r.desc,descMot:r.descMot,descs:r.descs.map(z=>({t:z.t,v:z.v})),valor:r.valor,dias:r.dias.map(d=>({d:d.d,e:d.E!=null?hhmm(d.E):'',s:d.S!=null?hhmm(d.S):'',m:d.m})),h:r.h,em:agora(),por:c.eu()};
     await grava(c,pid,f._id,{st:'fechado',fech},'Valor fechado: '+(r.fixo?'fixo ':hTxt(r.min)+' × '+R$(r.vh)+' ')+(r.desc?'− '+R$(r.desc)+' ':'')+'= '+R$(r.valor)); }
   document.addEventListener('change',async ev=>{ const t=ev.target; if(!C||!t||!t.closest) return; const P=C.P;
+    if(t.id==='pjp-cmodo'){ const k=document.getElementById('pjp-ccorte'); if(k) k.disabled=t.value==='mes'; return; }
+    if(t.matches&&t.matches('[data-pjp-qsel]')){ if(t.value&&perDe(t.value)){ J.per=t.value; J.ab=''; C.P.render(); } return; }
     if(t.matches&&t.matches('[data-pjp-pto]')){ const fl=t.files&&t.files[0]; t.value=''; if(fl) await ptoImporta(C,fl); return; }
     try{
       if(t.id==='pjp-emp'){ J.emp=t.value; P.render(); return; }
@@ -1090,8 +1120,10 @@
       if(a==='pjp-modx'){ J.mod=null; P.render(); return; }
       if(a==='pjp-cfg'){ J.mod={k:'cfg'}; P.render(); return; }
       if(a==='pjp-cfgok'){ const g=id=>document.getElementById(id), o={modo:g('pjp-cmodo').value,ini:g('pjp-cini').value||PAD.ini,fim:g('pjp-cfim').value||PAD.fim,intv:Math.max(0,parseInt(g('pjp-cintv').value,10)||0),tol:Math.max(0,parseInt(g('pjp-ctol').value,10)||0),
-          horasMes:Math.max(1,parseInt(g('pjp-chm').value,10)||220),dias:Math.max(2,Math.min(90,parseInt(g('pjp-cdias').value,10)||30)),dentro:g('pjp-cdentro').checked,leit:[...document.querySelectorAll('[data-pjp-clt]')].filter(i=>i.checked).map(i=>i.dataset.pjpClt),msg:String(g('pjp-cmsg').value||'').slice(0,800)||PAD.msg};
-        const ant=cfg(c).modo; c.R.cfg.pjPag=o; await P.db().doc('rh/config').set({pjPag:o},{merge:true}); if(ant!==o.modo) J.per=perAtual(c); J.mod=null; P.toast('Configuração do pagamento dos PJ salva.'); P.render(); return; }
+          horasMes:Math.max(1,parseInt(g('pjp-chm').value,10)||220),dias:Math.max(2,Math.min(90,parseInt(g('pjp-cdias').value,10)||30)),
+          corte:Math.max(10,Math.min(20,parseInt(g('pjp-ccorte').value,10)||15)),pagDias:Math.max(0,Math.min(60,parseInt(g('pjp-cpag').value,10)||0)),avisaNota:Math.max(1,Math.min(30,parseInt(g('pjp-caviso').value,10)||3)),
+          emps:(e=>e.length?e:['ZENITH','NEXUS'])([...document.querySelectorAll('[data-pjp-cemp]')].filter(i=>i.checked).map(i=>i.dataset.pjpCemp)),dentro:g('pjp-cdentro').checked,leit:[...document.querySelectorAll('[data-pjp-clt]')].filter(i=>i.checked).map(i=>i.dataset.pjpClt),msg:String(g('pjp-cmsg').value||'').slice(0,800)||PAD.msg};
+        const ant=cfg(c).modo, antK=corteQ(); o.finEmail=cfg(c).finEmail||null; if(!o.finEmail) delete o.finEmail; c.R.cfg.pjPag=Object.assign({},(c.R.cfg||{}).pjPag||{},o); await P.db().doc('rh/config').set({pjPag:o},{merge:true}); if(ant!==o.modo||antK!==o.corte) J.per=perAtual(c); J.mod=null; P.toast('Parâmetros do pagamento salvos.'); P.render(); return; }
       if(a==='pjp-psalva'){ const f=fDe(b.dataset.f), g=id=>(document.getElementById(id)||{}).value||'', n0=v=>v===''?null:Math.max(0,parseInt(v,10)||0);
         const dias=[...document.querySelectorAll('[data-pjp-dw]')].filter(i=>i.checked).map(i=>+i.dataset.pjpDw).sort();
         if(!dias.length) return P.toast('Marque pelo menos um dia de trabalho.');
