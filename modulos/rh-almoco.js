@@ -891,7 +891,7 @@
   /* ---------- presença para a Visão do gestor (22/10): resumo SEM CPF em presenca/{dia} ----------
      Quem tem o RH (ou a administradora) publica sozinho, só quando muda. O gestor lê presenca/ (regra própria). */
   const PR={map:{},sub:false,ult:0,ocupado:false};
-  const ehSaida=s=>/SAIDA/.test(nrm(s)); const ehEst=s=>/ESTACIONAMENTO/.test(nrm(s));
+  const ehSaida=s=>/SAIDA/.test(nrm(s)); const ehEnt=s=>/\bENT(RADA)?\b/.test(nrm(s)); const ehEst=s=>/ESTACIONAMENTO/.test(nrm(s))&&!ehEnt(s);   /* "Estacionamento Ent" é entrada; só o estacionamento sem sentido vale para os dois */
   function prEmp(f,x){ const e=nrm((f&&f.empresa)||(x&&x.e)||''); if(/ZENITH/.test(e)) return 'Zenith'; if(/NEXUS/.test(e)) return 'Nexus'; if(/COLAFIX|FIXCOL/.test(e)) return 'Colafix'; return e?'Terceiros':'Colafix'; }
   function prHash(o){ const s=JSON.stringify(o); let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36)+'.'+s.length; }
   const prMenos=(d,n)=>{ const x=new Date(d+'T12:00'); x.setDate(x.getDate()-n); return x.toISOString().slice(0,10); };

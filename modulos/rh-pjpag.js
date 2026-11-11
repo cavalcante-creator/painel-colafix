@@ -164,6 +164,24 @@
      Cada dia da escala conta cheio; o RH marca "Faltou" no dia quando o gestor avisar (aj[dia].zero). */
   const ehFil=(c,f)=>{ const sF=(((c.R.cfg)||{}).setoresFilial||[]).map(norm); return f.filial==='FIXCOL'||!!(f.setor&&sF.includes(norm(f.setor))); };
   const SRC_T={pto:'Entrada da fábrica',mix:'Entrada da fábrica + Face ID',fid:'Face ID (sem marcação na entrada)'};
+  /* entradas e saídas no meio do dia (11/11, "desconfie de entradas e saídas e entradas"): o dia conta da 1ª à última passagem;
+     se no meio a pessoa passou num leitor de SAÍDA e depois num de ENTRADA, o tempo fora entra na conta. Fora do almoço
+     (uma saída entre 11:00 e 14:30 de até intervalo + 30 min), cada saída de 5 min ou mais vira "para conferir", com
+     "Descontar N min" (aj[dia].descF) ou "Está certo" (aj[dia].okFora). Também desconfia de dia que começa numa saída ou termina numa entrada. */
+  const dirP=q=>{ const t=norm((q.disp||'')+' '+(q.area||'')); if(/SAIDA/.test(t)) return 's'; if(/\bENT(RADA)?\b/.test(t)) return 'e'; return ''; };
+  function suspDia(ps,h,E,S){ const xs=(ps||[]).filter(q=>q.ok!==false).map(q=>({h:q.h,m:min(q.h),d:dirP(q)})).filter(q=>q.m!=null&&q.d); if(xs.length<2) return null;
+    const out=[], iv=+h.intv||0; let alm=false;
+    for(let i=0;i<xs.length;i++){ if(xs[i].d!=='s') continue; const j=xs.findIndex((q,k)=>k>i&&q.d==='e'); if(j<0) continue;
+      const a=Math.max(xs[i].m,E!=null?E:-1), b=Math.min(xs[j].m,S!=null?S:1e9), g=b-a; if(g<5) continue;
+      if(!alm&&a<14*60+30&&b>11*60&&g<=iv+30){ alm=true; continue; }
+      out.push({a:xs[i].h,b:xs[j].h,m:g}); i=j-1; }
+    const ini=xs[0].d==='s', fim=xs[xs.length-1].d==='e';
+    return out.length||ini||fim?{sai:out,min:out.reduce((t,z)=>t+z.m,0),ini,fim}:null; }
+  function spHtml(d,ed,fa,esc){ const z=d.sp, t=[]; if(z.sai.length) t.push('Saiu e voltou '+(z.sai.length>1?z.sai.length+'×':'')+' · '+hTxt(z.min)+' fora ('+z.sai.map(q=>q.a+'–'+q.b).join(', ')+')'); if(z.ini) t.push('o dia começa numa saída: falta a entrada?'); if(z.fim) t.push('o dia termina numa entrada: falta a saída?');
+    const cls=d.descF?'pg-t':d.okFora?'pg-m':'pg-w', st=d.descF?' · descontado '+hTxt(d.descF):d.okFora?' · conferido: está certo':'';
+    const bt=!ed?'':d.descF||d.okFora?` <button class="lnk" data-act="pjp-spx" data-d="${d.d}" ${fa} style="display:inline;margin:0">desfazer</button>`
+      :`${z.min?` <button class="lnk" data-act="pjp-spd" data-v="${z.min}" data-d="${d.d}" ${fa} style="display:inline;margin:0"><b>Descontar ${hTxt(z.min)}</b></button>`:''} <button class="lnk" data-act="pjp-spok" data-d="${d.d}" ${fa} style="display:inline;margin:0">Está certo</button>`;
+    return `<span class="pg-tag ${cls} pg-sp2">⚠ ${esc(t.join(' · '))}${st}</span>${bt}`; }
   /* sábado e domingo trabalhados valem N vezes (Parâmetros, padrão 1,5; 1 = hora normal) */
   const fdsF=c=>{ const v=+cfg(c).fds; return v>=1&&v<=3?v:1.5; };
   const ACX=['Vale-transporte','Ajuda de custo','Diferença da quinzena passada','Outro'];
@@ -176,13 +194,15 @@
       let e=hs[0]||'', s=hs.length>1?hs[hs.length-1]:''; const a=aj[d], cor=!!(a&&(a.e||a.s||a.zero)); if(cor){ e=a.zero?'':(a.e||e); s=a.zero?'':(a.s||s); }
       const fp=ferP(d), fer=a&&a.fer?{nome:a.ferNome||(fp&&fp.nome)||'Feriado',pago:!!a.pago,rh:true}:fp?{nome:fp.nome||'Feriado',pago:!!(a&&a.pago),rh:false}:null;
       const r=contaDia(e,s,h), dw=new Date(d+'T12:00:00').getDay(); let fl='', info='', m=r.m;
+      const sp=!cor&&!fil&&hs.length>=2?suspDia(ps,h,r.E,r.S):null, descF=a&&+a.descF>0?+a.descF:0, okFora=!!(a&&a.okFora);
+      if(descF&&!cor) m=Math.max(0,m-descF);
       if(fer&&fer.pago) m=Math.max(m,escM);
       const dFil=fil&&!cor&&!fer&&h.dias.includes(dw); if(dFil){ m=escM; info='Fixcol · sem Face ID · dia cheio da escala'; }
       const fF=fdsF(c); let mR=null; if((dw===0||dw===6)&&m>0&&fF!==1&&!dFil){ mR=m; m=Math.round(m*fF); }
       let ehF=false; if(!fil&&d===fd&&!cor&&!fer&&h.dias.includes(new Date(d+'T12:00:00').getDay())&&(hs.length||d>=hojeS())){ ehF=true; m=Math.max(m,escM); cheio={d,m:escM,h:{ini:h.ini,fim:h.fim,intv:h.intv,tol:h.tol,dentro:h.dentro,antes:cAntes(h),depois:cDepois(h)}}; }
       if(ehF) info='Dia do fechamento · pago o dia cheio ('+hTxt(escM)+'); se sair mais cedo, desconta na próxima quinzena';
-      else if(!cor&&!dFil&&!fil){ if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
-      out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil,mR,fF:mR!=null?fF:null}); tot+=m; });
+      else if(!cor&&!dFil&&!fil){ if(sp&&!descF&&!okFora) alerta++; if(hs.length===1){ fl='Só uma passagem'; alerta++; } else if(fer) info='Feriado · '+fer.nome+(hs.length?' · trabalhou':''); else if(hs.length&&!h.dias.includes(dw)) info='Fora da escala'; else if(!hs.length&&nFora&&h.dias.includes(dw)) info='Só passou em leitor que não conta'; else if(!hs.length&&h.dias.includes(dw)&&d<=hojeS()) info='Sem passagem'; }
+      out.push({d,dw,hs,ps,nFora,src:DP.src,e,s,E:r.E,S:r.S,m,aj:cor,zero:!!(a&&a.zero),mot:a&&a.mot||'',fl,info,esc:h.dias.includes(dw),fer,fech:ehF,fil:dFil,mR,fF:mR!=null?fF:null,sp,descF,okFora}); tot+=m; });
     /* horário que não bate (11/11, foto: horário 08:00 às 12:00 e a pessoa sai às 18h → o dia cheio do fechamento dava 2h48):
        saída mais comum nos dias de semana com entrada e saída; se passa 2 h do fim do horário, avisa */
     const sais=out.filter(d=>!d.aj&&!d.fil&&d.esc&&d.dw>0&&d.dw<6&&d.hs.length>=2).map(d=>min(d.hs[d.hs.length-1])).filter(v=>v!=null).sort((a,b)=>a-b);
@@ -401,7 +421,7 @@
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds">${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
         const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">${d.src==='pto'||d.src==='mix'?'Entrada da fábrica':'Face ID'}: ${esc(d.hs.join(' · '))}</small>`:''}`
-          :d.ps&&d.ps.length?`<div class="pjp-chips">${chipsP(d.ps,esc)}</div>${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${d.src==='fid'?'Sem marcação no Face ID da entrada da fábrica neste dia: vale o Face ID de sempre':d.src==='mix'?'Só uma marcação na entrada da fábrica: juntou com o Face ID de sempre':'Vale o Face ID da entrada da fábrica'}">${SRC_T[d.src]}</span>`:''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
+          :d.ps&&d.ps.length?`<div class="pjp-chips">${chipsP(d.ps,esc)}</div>${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${d.src==='fid'?'Sem marcação no Face ID da entrada da fábrica neste dia: vale o Face ID de sempre':d.src==='mix'?'Só uma marcação na entrada da fábrica: juntou com o Face ID de sempre':'Vale o Face ID da entrada da fábrica'}">${SRC_T[d.src]}</span>`:''}${d.sp?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
           :d.fil?`<div class="pjp-chips"><span>dia cheio</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fech?`<div class="pjp-chips"><span>dia do fechamento</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fer?`<div class="pjp-chips"><span>não trabalhou</span></div><span class="pg-tag pg-f">Feriado · ${esc(d.fer.nome)}</span>`
@@ -650,7 +670,7 @@
     const pv=[];
     rsF.forEach(o=>{ const {x,r}=o, st=x.st||''; let t='', tom='';
       if(st===''){ if(!r.fixo&&!r.vh){ t='Sem valor da hora'+(r.semFid?' e sem passagem no Face ID':''); tom='crit'; } else if(!r.fixo&&!r.min){ t='Sem horas no período'+(r.semFid?' (não passou no Face ID)':''); tom='crit'; }
-        else { const a=[]; if(r.alerta) a.push(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir (só uma passagem)'); if(r.uPend) a.push('desconto do uniforme para confirmar'); if(r.horCurto) a.push('horário até '+r.horCurto.fim+', mas sai por volta das '+r.horCurto.sai+' · confira as Regras'); if(a.length){ t=a.join(' · '); tom='warn'; } } }
+        else { const a=[]; if(r.alerta) a.push(r.alerta+' dia'+(r.alerta>1?'s':'')+' para conferir (só uma passagem ou saiu e voltou)'); if(r.uPend) a.push('desconto do uniforme para confirmar'); if(r.horCurto) a.push('horário até '+r.horCurto.fim+', mas sai por volta das '+r.horCurto.sai+' · confira as Regras'); if(a.length){ t=a.join(' · '); tom='warn'; } } }
       else if(st==='chegou'){ t=x.nota&&x.nota.conf==='dif'?'Nota chegou com diferença':'Nota chegou · conferir'; tom=x.nota&&x.nota.conf==='dif'?'crit':'warn'; }
       else if(st==='conferida'){ t='Nota conferida · falta marcar pago'; tom='info'; }
       else if(st==='pedido'&&x.ped&&diasDesde(x.ped.em)>=(+cfg(c).avisaNota||3)){ t='Pedimos a nota há '+diasDesde(x.ped.em)+' dias e ainda não chegou'; tom='warn'; }
@@ -859,6 +879,7 @@
   .pjp-par .pjp-lt{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:6px}.pjp-mod.pjp-par .pjp-box .pjp-lt label{border:1px solid var(--line,#E1E7EB);border-radius:10px;padding:9px 12px;gap:10px;align-items:flex-start;font-size:14px}.pjp-par .pjp-lt label span{display:flex;flex-direction:column}.pjp-par .pjp-lt input{margin-top:2px!important}
   .pjp-d .pg-hh .pg-fds{display:block;font-size:11px;font-weight:500;color:var(--warn-ink,#7A5310)}
   .pjp-av.pjp-hc{background:var(--warn-tint,#FBF1DC);color:var(--warn-ink,#7A5310);display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pjp-av.pjp-hc .btn{height:32px;font-size:13px}
+  .pjp-d .pg-tag.pg-sp2{white-space:normal;line-height:1.35}
   .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
   .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
   .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}
@@ -1032,9 +1053,9 @@
           if(!cAntes(h)) fD=`IF(B${r}=0,0,MAX(${tF(ini)},${fD}))`; if(!cDepois(h)) fE=`IF(C${r}=0,0,MIN(${tF(fim)},${fE}))`;
           row.getCell(4).value={formula:fD,result:d.E!=null&&d.m?d.E/1440:(d.e&&!d.zero?tFr(d.e):0)};
           row.getCell(5).value={formula:fE,result:d.S!=null&&d.m?d.S/1440:0};
-          row.getCell(6).value=d.fech||d.fil||(d.fer&&d.fer.pago)?d.m/1440:{formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`+(d.mR!=null?'*'+d.fF:''),result:d.m/1440};   /* dia do fechamento e feriado pago: o dia cheio, não a conta das passagens */
+          row.getCell(6).value=d.fech||d.fil||d.descF||(d.fer&&d.fer.pago)?d.m/1440:{formula:`IF(E${r}-D${r}<=0,0,MAX(0,E${r}-D${r}-${tF(iv)}))`+(d.mR!=null?'*'+d.fF:''),result:d.m/1440};   /* dia do fechamento e feriado pago: o dia cheio, não a conta das passagens */
           row.getCell(7).value={formula:`F${r}*24`,result:+(d.m/60).toFixed(4)};
-          row.getCell(8).value=d.aj?(d.zero?'Não trabalhou':'Corrigido à mão')+(d.mot?': '+d.mot:'')+(d.hs.length?' · Face ID: '+d.hs.join(' '):''):d.fil?'Fixcol · dia cheio (sem Face ID)':d.mR!=null?'Fim de semana × '+String(d.fF).replace('.',','):d.fl?d.fl+' · Face ID: '+d.hs.join(' '):d.hs.length>2?'Face ID: '+d.hs.join(' '):d.info||'';
+          row.getCell(8).value=d.aj?(d.zero?'Não trabalhou':'Corrigido à mão')+(d.mot?': '+d.mot:'')+(d.hs.length?' · Face ID: '+d.hs.join(' '):''):d.fil?'Fixcol · dia cheio (sem Face ID)':d.descF?'Saiu e voltou: descontado '+hTxt(d.descF):d.mR!=null?'Fim de semana × '+String(d.fF).replace('.',','):d.fl?d.fl+' · Face ID: '+d.hs.join(' '):d.hs.length>2?'Face ID: '+d.hs.join(' '):d.info||'';
           [2,3,4,5].forEach(k=>row.getCell(k).numFmt='hh:mm'); row.getCell(6).numFmt='[h]:mm'; row.getCell(7).numFmt='0.00';
           row.eachCell({includeEmpty:true},cl=>{ cl.border=bd; if(d.dw===0||d.dw===6) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF7F7F7'}}; if(d.fl&&!d.aj) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFBF1DC'}}; if(d.aj) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEAF2F6'}}; }); r++; });
         const d1=r-1, cf=(lab,k,v,fmt,bold)=>{ const row=W.getRow(r); row.getCell(5).value=lab; row.getCell(k).value=v; if(fmt) row.getCell(k).numFmt=fmt; [5,6,7].forEach(j=>{ row.getCell(j).border=bd; if(bold){ row.getCell(j).font={bold:true}; row.getCell(j).fill={type:'pattern',pattern:'solid',fgColor:{argb:CZ}}; } }); return r++; };
@@ -1179,6 +1200,10 @@
         const as=((x.dsc&&x.dsc.a)||[]).concat([{id:'a'+Date.now().toString(36),t,v,em:agora(),por:c.eu()}]); await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{a:as})},'Acréscimo: '+t+' '+R$(v)); P.render(); return; }
       if(a==='pjp-axx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const id=b.dataset.id, z=((x.dsc&&x.dsc.a)||[]).find(y=>y.id===id), as=((x.dsc&&x.dsc.a)||[]).filter(y=>y.id!==id);
         await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{a:as})},'Acréscimo tirado: '+(z?z.t+' '+R$(z.v):'')); P.render(); return; }
+      if(a==='pjp-spd'||a==='pjp-spok'||a==='pjp-spx'){ const f=fDe(b.dataset.f), d=b.dataset.d, x=pesDe(J.per,f._id); if(x.st) return; const aj=Object.assign({},x.aj||{}), cur=Object.assign({},aj[d]||{});
+        delete cur.descF; delete cur.okFora; if(a==='pjp-spd'){ cur.descF=+b.dataset.v; cur.por=c.eu(); cur.em=agora(); } if(a==='pjp-spok'){ cur.okFora=true; cur.por=c.eu(); cur.em=agora(); }
+        aj[d]=Object.keys(cur).filter(k=>!['por','em'].includes(k)).length?cur:null;
+        await grava(c,J.per,f._id,{aj},a==='pjp-spd'?'Descontou '+hTxt(+b.dataset.v)+' de saída no meio do dia '+brc(d):a==='pjp-spok'?'Conferiu a saída no meio do dia '+brc(d)+': está certo':'Desfez a conferência da saída de '+brc(d)); P.render(); return; }
       if(a==='pjp-dxx'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id); if(x.st) return; const id=b.dataset.id;
         if(id==='fch'){ await grava(c,J.per,f._id,{fchX:{em:agora(),por:c.eu()}},'Desconto do dia do fechamento tirado'); P.render(); return; }
         if(id==='leg'){ await grava(c,J.per,f._id,{desc:0,descMot:''},'Desconto tirado: '+(x.descMot||'desconto lançado')+' '+R$(x.desc)); P.render(); return; }
