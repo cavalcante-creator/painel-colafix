@@ -643,12 +643,15 @@
     const vazio=!xs.length?['Nenhum PJ ativo','Cadastre em Funcionários as pessoas com vínculo PJ.']:col>=0&&rsF.length?['Ninguém nesta etapa','Toque em "ver todos" para a lista inteira.']:['Nenhum PJ com esse filtro','Mude a busca ou toque em "Limpar filtros".'];
     const FI=fidInfo(c,p), icn=(n,t)=>U?U.ic(n,t||18):'', aba=J.aba||'pv';
     const fidT=FI?[FI.sub,FI.ultTxt+(FI.imp&&FI.robo?' · último CSV '+hm(FI.imp.em):'')].join(' · '):'';
-    const barra=`<div class="pjp-bar"><div class="pjp-nav"><button class="pjp-nb" data-act="pjp-per" data-v="-1" aria-label="Quinzena anterior">‹</button>
-          <div><b>${cfg(c).modo==='mes'?'Mês ':''}${esc(p.txt)}</b>${ehAt?'':lnk('pjp-per','voltar para a atual','data-v="0"')}</div>
-          <button class="pjp-nb" data-act="pjp-per" data-v="1" aria-label="Próxima quinzena">›</button></div>
+    const MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    const pD=+p.de.slice(8,10), pA=+p.ate.slice(8,10), pM=MES[+p.mes.slice(5,7)-1], pY=p.mes.slice(0,4), ehMes=cfg(c).modo==='mes', q2=/-2$/.test(pid);
+    const quin=`<div class="pjp-q" aria-label="Período ${esc(p.txt)}"><button class="pjp-qb" data-act="pjp-per" data-v="-1" aria-label="${ehMes?'Mês':'Quinzena'} anterior">‹</button>
+          <div class="pjp-qm"><span class="pjp-qi" aria-hidden="true">${U?U.ic('calendario',16):''}</span><div><small>${ehMes?'Mês':(q2?'2ª quinzena':'1ª quinzena')}${ehAt?' · atual':''}</small><b>${ehMes?esc(pM)+' de '+pY:pD+' a '+pA+' de '+esc(pM)}</b>${ehAt?'':`<button class="pjp-qv" data-act="pjp-per" data-v="0" type="button">voltar para a atual</button>`}</div></div>
+          <button class="pjp-qb" data-act="pjp-per" data-v="1" aria-label="${ehMes?'Próximo mês':'Próxima quinzena'}">›</button></div>`;
+    const barra=`<div class="pjp-bar">
         ${FI?`<div class="pjp-fid ${FI.tom}" role="status" title="${esc(fidT)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(FI.tit)}</b>${FI.curto?`<small>${esc(FI.curto)}</small>`:''}<button class="lnk" data-act="pjp-fidir" type="button">ver</button></div>`:''}
         ${ptoPil(c,p)}
-        <span class="pjp-sp"></span><div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','PDF')}${btn('pjp-cfg','Como é feita a conta')}</div></div>`;
+        <span class="pjp-sp"></span><div class="pjp-tbt">${btn('pjp-xls','Excel')}${btn('pjp-pdf','PDF')}${btn('pjp-cfg','Como é feita a conta')}</div>${quin}</div>`;
     return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.','','RH · PAGAMENTO DOS PJ')+
       `<div class="pjp">${barra}${avFid}
       <div class="pjp-abas" role="tablist" aria-label="Partes da tela">${[['pv','Precisa de você',pv.length,'alerta'],['kb','Onde cada PJ está',null,'grid'],['lista','Todos os PJ',rsF.length,'lista']].map(([k,t,n,ic])=>`<button type="button" role="tab" class="pjp-aba" data-act="pjp-aba" data-v="${k}" aria-selected="${aba===k}">${icn(ic,18)}<span>${t}</span>${n!=null?`<b class="${k==='pv'&&n?'al':''}">${n}</b>`:''}</button>`).join('')}</div>
@@ -807,6 +810,16 @@
   .pjp-abas{padding:4px;border-radius:13px;box-shadow:none}.pjp-aba{padding:8px 14px;font-size:14px;border-radius:10px;gap:8px}.pjp-aba svg{width:16px;height:16px}
   .pjp-pp{padding:16px 20px;border-radius:16px;gap:16px}.pjp-pp h3{font-size:18px}.pjp-pp p{font-size:13.5px}.pjp-ppi{width:38px;height:38px;border-radius:11px}
   .pjp-pp .btn{height:40px!important;font-size:14px!important;padding:0 18px!important}
+  .pjp-q{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line,#E1E7EB);border-radius:14px;padding:4px;box-shadow:0 1px 2px rgba(20,40,60,.06)}
+  .pjp-qm{display:flex;align-items:center;gap:10px;padding:2px 10px 2px 6px}
+  .pjp-qi{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--teal-tint,#E2ECF1);color:var(--teal-strong,#143F54);flex:none}
+  .pjp-qm>div{display:flex;flex-direction:column;line-height:1.15}
+  .pjp-qm small{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .pjp-qm b{font-size:15px;font-weight:600;white-space:nowrap;color:var(--ink,inherit)}
+  .pjp-qv{background:none;border:0;padding:0;margin-top:1px;font:inherit;font-size:11.5px;color:var(--teal);cursor:pointer;text-align:left;text-decoration:underline}
+  .pjp-qb{width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center}
+  .pjp-qb:hover{background:var(--ground);color:var(--teal-strong)}
+  @media(max-width:760px){.pjp-q{width:100%;justify-content:space-between;order:-1}}
   @media(max-width:1100px){.pjp-bar .pjp-fid .pjp-fu{display:none}}
   .pjp-bar .pjp-fid{padding:5px 11px;gap:7px}.pjp-bar .pjp-fid b{font-size:12.5px}.pjp-bar .pjp-fid small{font-size:12px}.pjp-bar .pjp-fid.crit{background:var(--crit-tint,#F6E3E1)}.pjp-bar .pjp-fid.warn{background:var(--warn-tint,#FBF1DC);border-color:transparent}
   .pjp-bar .pjp-fid.pto .pjp-imp{font-size:12px;margin-left:2px}
