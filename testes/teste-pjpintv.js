@@ -1,0 +1,24 @@
+/* Pagamento dos PJ (11/11): intervalo padrão 72 min, definido nos Parâmetros; link nas Regras da pessoa; aplicar a quem tem intervalo próprio. Dados inventados. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed');
+const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Expedição']};
+  D['rh/dados/funcionarios/f1']={nome:'CARLOS PEREIRA TESTE',tipo:'PJ',empresa:'ZENITH',cpf:'11122233344',cnpj:'12345678000190',salario:4400,setor:'Expedição',funcao:'Ajudante',status:'Ativo',admissao:'2025-01-10'};
+  D['rh/dados/funcionarios/f2']={nome:'BEATRIZ LIMA TESTE',tipo:'PJ',empresa:'NEXUS',cpf:'22233344455',cnpj:'98765432000110',salario:4400,setor:'Expedição',funcao:'Ajudante',status:'Ativo',admissao:'2025-01-10',pjPag:{intv:75}};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.per='2026-10-2'; J.aba='lista'; J.ab='f1'; J.tab='regras'; __T.go('rhpjpag'); window.Painel.render(); }); await H.dorme(2000);
+  let t=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
+  ok('Sem nada configurado, o intervalo padrão é 72 min', /padrão: 72/.test(t), (t.match(/Intervalo[\s\S]{0,80}/)||[''])[0]);
+  ok('As Regras da pessoa têm o link "mudar o padrão nos Parâmetros"', /mudar o padrão nos Parâmetros/.test(t));
+  await p.click('.pjp-g [data-act=pjp-cfg]'); await H.dorme(800);
+  const m=await p.evaluate(()=>({v:(document.getElementById('pjp-cintv')||{}).value,ab:window.RHPJPag._J.ab,t:document.body.innerText}));
+  ok('O link abre os Parâmetros com o intervalo padrão 72 (e fecha a folha da pessoa)', m.v==='72'&&!m.ab, JSON.stringify({v:m.v,ab:m.ab}));
+  ok('Os Parâmetros mostram quem tem intervalo próprio', /Beatriz Lima Teste 75 min/i.test(m.t));
+  await p.fill('#pjp-cintv','70'); await p.check('#pjp-cintvt'); await p.click('[data-act=pjp-cfgok]'); await H.dorme(1500);
+  const S=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs;
+  ok('Salvar grava o intervalo padrão', ((S['rh/config']||{}).pjPag||{}).intv===70, JSON.stringify((S['rh/config']||{}).pjPag));
+  ok('"Usar também para quem tem um próprio" tira o intervalo próprio', (S['rh/dados/funcionarios/f2'].pjPag||{}).intv==null, JSON.stringify(S['rh/dados/funcionarios/f2'].pjPag));
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
