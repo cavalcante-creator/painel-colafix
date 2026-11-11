@@ -23,7 +23,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await aba('kb');
   const kb=await p.evaluate(()=>[...document.querySelectorAll('.pjp-kh')].map(h=>h.querySelector('b').textContent+'='+h.querySelector('span').textContent));
   ok('Quadros por etapa com quantos PJ em cada um', kb.join('|')==='Conferir e fechar=4|Nota=2|Para pagar=0|Pago=1', kb.join('|'));
-  await aba('pv'); let pp=await txt('.pjp-pp'); ok('Próximo passo: os 2 prontos para fechar, com o botão que fecha os dois', /2 PJ prontos para fechar o valor/.test(pp)&&/Fechar o valor dos 2/.test(pp)&&/Joao, Maria/.test(pp), pp.replace(/\n/g,' | '));
+  await aba('pv'); let pp=await p.evaluate(()=>{ const e=document.querySelector('.pjp-ppl'); return e?e.innerText+' '+e.title:''; }); ok('Próximo passo: os 2 prontos para fechar, com o botão que fecha os dois', /2 PJ prontos para fechar o valor/.test(pp)&&/Fechar o valor dos 2/.test(pp)&&/Joao, Maria/.test(pp), pp.replace(/\n/g,' | '));
   const pv=await txt('.pjp-dash + .pjp-cx'); ok('Precisa de você: sem valor da hora, sem horas e o valor fechado que falta pedir a nota', /Diego Rocha Teste[\s\S]*Sem valor da hora/.test(pv)&&/Eva Moura Teste[\s\S]*Sem horas no período/.test(pv)&&/Carla Dias Teste[\s\S]*falta pedir a nota/.test(pv)&&!/Maria Oliveira/.test(pv), pv.replace(/\n/g,' | '));
   const rsm=await txt('.pjp-kpi'); ok('Painel com o já pago e quantos PJ', /Já pago\s*R\$\s?2\.363,40/.test(rsm)&&/7 PJ/.test(rsm), rsm.replace(/\n/g,' | '));
   const dsh=await txt('.pjp-dash'); ok('Painel com horas por dia, por empresa e etapas', /Horas por dia/.test(dsh)&&/Por empresa/.test(dsh)&&/ZENITH/.test(dsh)&&/Conferir e fechar/.test(dsh), dsh.replace(/\n/g,' | ').slice(0,300));
@@ -43,12 +43,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Sem horas no período: avisa e não oferece fechar', /Sem horas no período/.test(ev)&&!/Fechar valor/.test(ev), ev);
   await aba('kb'); await p.click('.pjp-kcard[data-f="f5"]'); await H.dorme(600); const gk=await p.evaluate(()=>!!document.querySelector('.pjp-g')&&/Bruno Lima/.test(document.querySelector('.pjp-g').innerText));
   ok('Tocar no cartão do quadro abre a pessoa', gk); await p.click('[data-act="pjp-gx"]').catch(()=>{}); await H.dorme(400);
-  await aba('lista'); await p.selectOption('#pjp-emp','NEXUS'); await H.dorme(600); await aba('pv'); pp=await txt('.pjp-pp');
+  await aba('lista'); await p.selectOption('#pjp-emp','NEXUS'); await H.dorme(600); await aba('pv'); pp=await p.evaluate(()=>{ const e=document.querySelector('.pjp-ppl'); return e?e.innerText+' '+e.title:''; });
   ok('Com filtro de empresa, o próximo passo só conta quem está no filtro', /1 PJ pronto para fechar o valor/.test(pp)&&/Maria/.test(pp)&&!/Joao/.test(pp), pp.replace(/\n/g,' | '));
   await aba('lista'); await p.selectOption('#pjp-emp',''); await H.dorme(600); await aba('pv');
-  await p.click('.pjp-pp [data-act="pjp-fechtodos"]'); await H.dorme(1500); const S=await srv(), pes=S['rh/dados/pjpag/2026-10-2'].pes;
+  await p.click('.pjp-ppl [data-act="pjp-fechtodos"]'); await H.dorme(1500); const S=await srv(), pes=S['rh/dados/pjpag/2026-10-2'].pes;
   ok('Fechar pelo próximo passo fecha os dois prontos e não fecha quem está sem valor/sem horas', pes.f1&&pes.f1.st==='fechado'&&pes.f2&&pes.f2.st==='fechado'&&!(pes.f7&&pes.f7.st)&&!(pes.f8&&pes.f8.st), JSON.stringify(Object.fromEntries(Object.entries(pes).map(([k,v])=>[k,v.st]))));
-  pp=await txt('.pjp-pp'); ok('Depois de fechar, o próximo passo vira "pedir a nota"', /3 valores fechados: falta pedir a nota/.test(pp)&&/Pedir nota aos 3/.test(pp), pp.replace(/\n/g,' | '));
+  pp=await p.evaluate(()=>{ const e=document.querySelector('.pjp-ppl'); return e?e.innerText+' '+e.title:''; }); ok('Depois de fechar, o próximo passo vira "pedir a nota"', /3 valores fechados: falta pedir a nota/.test(pp)&&/Pedir nota aos 3/.test(pp), pp.replace(/\n/g,' | '));
   /* Face ID: última verificação */
   let fd=await txt('.pjp-fid'); ok('Face ID sem robô nem CSV, mas com passagens: avisa que não sabe quando foi lido e mostra a última passagem', /sem data de atualização/.test(fd)&&/Última passagem registrada: 30\/10 às 17:2/.test(fd), fd.replace(/\n/g,' | '));
   await p.evaluate(()=>{ window.RHAlmoco._A.robo={ultima:new Date(Date.now()-12*60000).toISOString(),ok:true}; window.Painel.render(); }); await H.dorme(400);

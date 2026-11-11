@@ -43,9 +43,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('"nota conferida no Conectwork" passa para "Marcar pago"', S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='conferida'&&/Marcar pago/.test(await linha('f1')));
   await p.click('[data-act="pjp-fech"][data-f="f2"]'); await H.dorme(900);
   await p.evaluate(()=>{ window.RHPJPag._J.aba='pv'; window.Painel.render(); }); await H.dorme(500);
-  const pp=await p.evaluate(()=>(document.querySelector('.pjp-pp')||{}).innerText||'');
+  const pp=await p.evaluate(()=>{ const e=document.querySelector('.pjp-ppl'); return e?e.innerText+' '+e.title:''; });
   ok('Próximo passo com Nexus e outra empresa: diz que Zenith e Nexus vão pelo Conectwork', /Zenith e Nexus pelo Conectwork/.test(pp)&&/Pedir nota aos 3/.test(pp), pp.replace(/\n/g,' | '));
-  await p.click('.pjp-pp [data-act="pjp-pedtodos"]'); await H.dorme(700);
+  await p.click('.pjp-ppl [data-act="pjp-pedtodos"]'); await H.dorme(700);
   m=await p.evaluate(()=>{ const x=document.querySelector('[aria-label="Pedir nota pelo Conectwork"]'); return x?x.innerText:''; });
   ok('"Pedir nota aos 2": a Nexus vai pelo Conectwork e o da outra empresa pelo link', /Nexus/.test(m)&&/Maria Oliveira Teste/.test(m)&&/2 PJ de outras empresas continuam pelo link/.test(m), m.slice(0,300));
   await p.click('[data-act="pjp-pedlink"]'); await H.dorme(1200); S=await srv();

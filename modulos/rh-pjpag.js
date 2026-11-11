@@ -792,7 +792,7 @@
     return css+css3+c.topo('Pagamento dos PJ','Horas de cada PJ pelo Face ID, o valor a pagar e a nota fiscal.',topoAc,'RH · PAGAMENTO DOS PJ')+
       `<div class="pjp">${barra}${avFid}
       <div class="pjp-abas" role="tablist" aria-label="Partes da tela">${[['pv','Precisa de você',pv.length,'alerta'],['kb','Onde cada PJ está',null,'grid'],['lista','Todos os PJ',rsF.length,'lista']].map(([k,t,n,ic])=>`<button type="button" role="tab" class="pjp-aba" data-act="pjp-aba" data-v="${k}" aria-selected="${aba===k}">${icn(ic,18)}<span>${t}</span>${n!=null?`<b class="${k==='pv'&&n?'al':''}">${n}</b>`:''}</button>`).join('')}</div>
-      ${aba==='pv'?`<section class="pjp-pp ${pp.ok?'ok':''}"><span class="pjp-ppi" aria-hidden="true">${icn(pp.ok?'check':'seta',24)}</span><div><span>Próximo passo</span><h3>${esc(pp.t)}</h3><p>${esc(pp.s)}</p></div>${pp.b}</section>
+      ${aba==='pv'?`
 
       <div class="pjp-kpi">
         <div class="pjp-tl pri"><span>${icn('grafico',16)}Total da quinzena${cedo?' até agora':''}</span><b class="n">${R$(totV)}</b>${prev?`<small>se continuar assim, ${R$(prev)} até ${brc(p.ate)}</small>`:`<small>${rsF.length} PJ</small>`}</div>
@@ -806,7 +806,7 @@
         <section class="pjp-cx"><div class="pjp-ch"><h3>Por empresa</h3></div><div class="pjp-db">${gEmp}</div></section>
         <section class="pjp-cx"><div class="pjp-ch"><h3>Em que etapa</h3></div><div class="pjp-db">${gEt}</div></section>
       </div>
-      <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}</div>${pvH}</section>`:''}${aba==='kb'?`
+      <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}${pp.ok?'':`<div class="pjp-ppl" title="${esc(pp.s)}"><small>${esc(pp.t)}</small>${pp.b}</div>`}</div>${pvH}</section>`:''}${aba==='kb'?`
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver a lista dela; toque na pessoa para ver os dias</small></div>${quadros}</section>`:''}${aba==='lista'?`
       <section class="pjp-lc">
         <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span>${btn('pjp-fin','E-mail ao financeiro')}</div>
@@ -886,6 +886,7 @@
   .pjp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   .pjp-lc .pc-vazio{margin:8px 18px 22px}
   /* cara de app (10/11): barra com a quinzena e o Face ID, cores por etapa, quadros de número */
+  .pjp-ppl{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.pjp-ppl small{color:var(--muted);font-size:12.5px}
   .pjp-kpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.pjp-kpi .pjp-tl{background:var(--surface,#fff);border:1px solid var(--line,#E1E7EB);padding:12px 14px}
   .pjp-kpi .pjp-tl b{font-size:20px}.pjp-kpi .pjp-tl small{color:var(--muted);font-size:12px}
   .pjp-dash{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:12px 0}.pjp-db{padding:12px 16px 14px}.pjp-ch small{color:var(--muted);font-size:12px;margin-left:6px}
