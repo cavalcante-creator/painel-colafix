@@ -24,7 +24,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   g=await gav('f1','2026-11-1','desc');
   ok('Na quinzena seguinte, desconto automático de quem saiu mais cedo no dia do fechamento (3h × R$ 20 = R$ 60)', /Saiu mais cedo no dia do fechamento \(30\/10\): 3h00/.test(g)&&/R\$\s?60,00/.test(g)&&/automático/.test(g), g.slice(0,600));
   await p.evaluate(()=>{ window.RHPJPag._J.ab=''; window.Painel.render(); }); await H.dorme(500);
-  await p.click('.pjp-lc [data-act="pjp-fech"][data-f="f1"]'); await H.dorme(1000);
+  p.once("dialog",dg=>dg.accept()); await p.click('.pjp-lc [data-act="pjp-fech"][data-f="f1"]'); await H.dorme(1000);
   const tr=()=>p.evaluate(()=>{ const b=document.querySelector('.pjp-lc [data-f="f1"]'); return b?b.closest('tr').innerText:''; });
   ok('Com o valor fechado, o RH já pode "marcar pago" (sem esperar a nota)', /marcar pago/.test(await tr()), await tr());
   let S=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs;

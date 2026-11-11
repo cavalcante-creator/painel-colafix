@@ -720,8 +720,9 @@
     const nomes=a=>a.slice(0,3).map(o=>nm(o).split(' ')[0]).join(', ')+(a.length>3?' e mais '+(a.length-3):'');
     /* 1) próximo passo */
     const chegou=rsF.filter(o=>o.x.st==='chegou'), conf=rsF.filter(o=>o.x.st==='conferida'), ped=rsF.filter(o=>o.x.st==='pedido');
-    let pp;
-    if(prontos.length) pp={t:prontos.length===1?'1 PJ pronto para fechar o valor':prontos.length+' PJ prontos para fechar o valor',s:nomes(prontos)+' · '+R$(soma(prontos))+'. Depois de fechar, já dá para pedir a nota.',b:prontos.length===1?btn('pjp-fech','Fechar o valor',fa(prontos[0]),''):btn('pjp-fechtodos','Fechar o valor dos '+prontos.length,'','')};
+    let pp; const cedo=hojeS()<fechDia(p);
+    if(prontos.length&&cedo) pp={t:'Quinzena em andamento: o valor fecha em '+brc(fechDia(p)),s:'Até o último dia útil ('+brc(fechDia(p))+') as horas ainda mudam. Para fechar a quinzena que já acabou, vá para a quinzena passada.',b:btn('pjp-per','Ir para a quinzena passada','data-v="-1"','')};
+    else if(prontos.length) pp={t:prontos.length===1?'1 PJ pronto para fechar o valor':prontos.length+' PJ prontos para fechar o valor',s:nomes(prontos)+' · '+R$(soma(prontos))+'. Depois de fechar, já dá para pedir a nota.',b:prontos.length===1?btn('pjp-fech','Fechar o valor',fa(prontos[0]),''):btn('pjp-fechtodos','Fechar o valor dos '+prontos.length,'','')};
     else if(fechados.length) pp={t:fechados.length===1?'1 valor fechado: falta pedir a nota':fechados.length+' valores fechados: falta pedir a nota',s:nomes(fechados)+' · '+R$(soma(fechados))+(fechados.every(o=>viaCw(c,o.f))?'. O pedido vai pelo Conectwork.':fechados.some(o=>viaCw(c,o.f))?'. Zenith e Nexus pelo Conectwork; os outros recebem o link pelo WhatsApp.':'. O PJ recebe o link pelo WhatsApp.'),b:fechados.length===1?btn('pjp-ped','Pedir a nota',fa(fechados[0]),''):btn('pjp-pedtodos','Pedir nota aos '+fechados.length,'','')};
     else if(chegou.length) pp={t:chegou.length===1?'1 nota chegou para conferir':chegou.length+' notas chegaram para conferir',s:nomes(chegou)+'. Confira o valor e o CNPJ antes de pagar.',b:btn('pjp-nver','Ver a nota de '+nm(chegou[0]).split(' ')[0],fa(chegou[0]),'')};
     else if(conf.length) pp={t:conf.length===1?'1 nota conferida: falta marcar pago':conf.length+' notas conferidas: falta marcar pago',s:nomes(conf)+' · '+R$(soma(conf))+'.',b:btn('pjp-pago','Marcar pago',fa(conf[0]),'')};
@@ -1192,6 +1193,9 @@
       return out; }catch(e){ return []; } }
   /* ---------- ações ---------- */
   const fDe=id=>(C.R.func||[]).find(f=>f._id===id);
+  /* 11/11 ("marquei fechar valor na quinzena passada, por que aparece aqui?"): a tela abre na quinzena ATUAL; fechar antes do último dia útil pergunta antes */
+  function fechaCedo(c,n){ const p=perDe(J.per), fd=fechDia(p); if(hojeS()>=fd) return true;
+    return confirm('Atenção: esta é a quinzena de '+p.curto+', que ainda não terminou (o valor fecha em '+brc(fd)+').\n\nSe você queria fechar a quinzena passada, cancele e use a seta ‹ ao lado da quinzena.\n\nFechar '+(n>1?'o valor dos '+n+' PJ':'este valor')+' agora mesmo assim?'); }
   async function fechar(c,f){ const pid=J.per, p=perDe(pid), x=pesDe(pid,f._id), r=calcPessoa(c,f,p,x);
     if(!r.fixo&&!r.vh) throw Object.assign(new Error(c.titulo(f.nome)+': falta o valor da hora (abra a pessoa e preencha).'),{aviso:true});
     if(!r.fixo&&!r.min) throw Object.assign(new Error(c.titulo(f.nome)+': não tem horas neste período (confira os dias no Face ID ou corrija à mão).'),{aviso:true});
@@ -1331,8 +1335,8 @@
         if(id==='leg'){ await grava(c,J.per,f._id,{desc:0,descMot:''},'Desconto tirado: '+(x.descMot||'desconto lançado')+' '+R$(x.desc)); P.render(); return; }
         const z=((x.dsc&&x.dsc.x)||[]).find(y=>y.id===id), xs=((x.dsc&&x.dsc.x)||[]).filter(y=>y.id!==id); await grava(c,J.per,f._id,{dsc:Object.assign({},x.dsc||{},{x:xs})},'Desconto tirado: '+(z?z.t+' '+R$(z.v):'')); P.render(); return; }
       if(a==='pjp-diax'){ const f=fDe(b.dataset.f), x=pesDe(J.per,f._id), aj=Object.assign({},x.aj||{}), o=aj[b.dataset.d]; aj[b.dataset.d]=o&&o.fer?{fer:true,ferNome:o.ferNome,pago:!!o.pago}:null; await grava(c,J.per,f._id,{aj}); P.render(); return; }
-      if(a==='pjp-fech'){ await fechar(c,fDe(b.dataset.f)); P.render(); return; }
-      if(a==='pjp-fechtodos'){ const p=perDe(J.per), vis=J._vis||[], xs=pjs(c,p).filter(f=>!pesDe(J.per,f._id).st&&vis.includes(f._id)); const er=[]; b.disabled=true;
+      if(a==='pjp-fech'){ if(!fechaCedo(c,1)) return; await fechar(c,fDe(b.dataset.f)); P.render(); return; }
+      if(a==='pjp-fechtodos'){ const p=perDe(J.per), vis=J._vis||[], xs=pjs(c,p).filter(f=>!pesDe(J.per,f._id).st&&vis.includes(f._id)); if(!fechaCedo(c,xs.length)) return; const er=[]; b.disabled=true;
         for(const f of xs){ try{ await fechar(c,f); }catch(e){ er.push(e.message); } } P.toast(er.length?(xs.length-er.length)+' fechados. '+er.join(' '):xs.length+' valores fechados.'); P.render(); return; }
       if(a==='pjp-reab'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'',fech:null},'Reaberto para conferir'); P.render(); return; }
       if(a==='pjp-ped'&&viaCw(c,fDe(b.dataset.f))){ J.mod={k:'cwped',emps:[String(fDe(b.dataset.f).empresa||'').toUpperCase()]}; P.render(); return; }
