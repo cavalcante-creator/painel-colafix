@@ -68,6 +68,15 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await p.click('[data-pjp-cwl="ZENITH"] [data-act="pjp-cwvolta"][data-f="f7"]'); await H.dorme(1200);
   X=await pes(); ok('"Pôr de volta" tira a marca', X.f7.cwFora===false);
   ok('O passo 1 diz "Falta enviar no Conectwork" e que é preciso tocar em Enviar lá', /Falta enviar no Conectwork/.test(await card())&&/Enviar/.test(await card()));
+  // 5) convidar os PJ (12/11): o link abre o "Sou MEI" com o CNPJ; grava quando foi convidado
+  await p.keyboard.press('Escape'); await H.dorme(300); await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
+  await p.click('[data-act="pjp-cwconv"]'); await H.dorme(600);
+  const cv=await p.evaluate(()=>(document.querySelector('.pjp-cwm')||{}).innerText||'');
+  ok('"Convidar os PJ" lista os PJ da Zenith com WhatsApp e "ainda não convidado"', /Convidar os PJ/.test(cv)&&/Joao/i.test(cv)&&/ainda não convidado/.test(cv), cv.slice(0,500));
+  await p.click('[data-act="pjp-cwconvw"][data-f="f1"]'); await H.dorme(1000);
+  const u=await p.evaluate(()=>window.__pjpUltimoConv||''), fd=(await srv())['rh/dados/funcionarios/f1'];
+  ok('WhatsApp vai para o telefone do PJ com o link ?mei=<CNPJ>&nome= e grava cwConv', /^https:\/\/wa\.me\/5551999990000\?text=/.test(u)&&/conectwork\.com\.br%2F%3Fmei%3D12345678000190%26nome%3DJoao/.test(u)&&!!(fd.cwConv&&fd.cwConv.em), u.slice(0,300));
+  ok('A linha passa a dizer "convidado"', /convidado \d{2}\/\d{2}/.test(await p.evaluate(()=>document.querySelector('.pjp-cwm').innerText)));
   if(process.env.SHOT){ await p.evaluate(()=>document.getElementById('pjp-cw-ZENITH').scrollIntoView()); await H.dorme(300); await p.screenshot({path:process.env.SHOT}); }
   ok('Sem erros na página', !er.length, er.join(' | '));
   await B.browser.close(); console.log(res.filter(Boolean).length+' de '+res.length+' testes de pjpcwsep passaram.'); process.exit(res.every(Boolean)?0:1); })().catch(e=>{ console.error('ERRO NO TESTE',e); process.exit(1); });

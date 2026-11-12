@@ -322,7 +322,7 @@
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .pjp-cwq{margin-top:8px}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
+  .pjp-cwq{margin-top:8px}.pjp-cwhb{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pjp-cwq li>span:first-child small{display:block;color:var(--muted);font-size:12px}.pjp-cwq li>small.ok{color:var(--ok,#1f7a4a)}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
   .pjp-cwbus{display:flex;align-items:center;gap:6px;border:1px solid var(--line,#dde3ea);border-radius:10px;padding:0 10px;background:var(--surface,#fff);min-width:min(260px,100%)}
   .pjp-cwbus input{border:0;outline:0;background:transparent;font:inherit;font-size:14px;padding:8px 0;flex:1;min-width:0;color:inherit}.pjp-cwbus:focus-within{border-color:var(--teal,#1a6b80)}
   .pjp-cwq ul{max-height:280px;overflow:auto}.pjp-cwq li.ret>span:first-child,.pjp-cwq li.ret>b{color:var(--muted);text-decoration:line-through}.pjp-cwqa{display:flex;gap:6px;align-items:center;margin-left:auto}
@@ -425,7 +425,7 @@
   .pjp-gh{display:flex;gap:14px;align-items:center;padding:18px 22px 12px;position:sticky;top:0;background:var(--surface);z-index:2}
   .pjp-av2{width:46px;height:46px;border-radius:50%;background:var(--teal-tint,#E2ECF1);color:var(--teal-strong);display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
   .pjp-gh h2{margin:0;font-size:20px}.pjp-gh small{display:block;color:var(--muted);font-size:13px}
-  .pjp-gcad{margin-left:auto;flex:none;white-space:nowrap}.pjp-gcad+.pjp-gx{margin-left:8px}
+  .pjp-gh .pjp-gcad{margin-left:auto;flex:none;white-space:nowrap}.pjp-gcad+.pjp-gx{margin-left:8px}
   .pjp-gx{margin-left:auto;border:0;background:var(--ground);width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;color:inherit;flex:none}
   .pjp-gs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 22px 10px}.pjp-gs .lnk{display:inline;margin:0}
   .pjp-tabs{display:flex;gap:4px;padding:0 22px;border-bottom:1px solid var(--line,#E1E7EB);position:sticky;top:76px;background:var(--surface);z-index:2}
@@ -581,7 +581,7 @@
         <div>${r.uPend?`<span class="pjp-pill warn">${r.uPend} de uniforme para confirmar</span>`:''}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b>${antTxt(r)}</div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
-  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); if(M.k==='cw') return cwModal(c); 
+  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); if(M.k==='cw') return cwModal(c); if(M.k==='cwconv') return cwConvModal(c); 
     if(M.k==='cfg'){ const g=cfg(c), k=corteQ(), emV=pjEmps(c), emT=[...new Set(['ZENITH','NEXUS','COLAFIX'].concat((c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.empresa).map(f=>String(f.empresa).toUpperCase())))];
       const nEmp=e=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.status!=='Desligado'&&String(f.empresa||'').toUpperCase()===e).length;
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-par" role="dialog" aria-label="Parâmetros do pagamento dos PJ"><h3>Parâmetros do pagamento</h3><p class="sub">Valem para todos os PJ. O horário e o valor da hora de cada pessoa ficam no detalhe dela (toque no nome › Regras).</p>
@@ -693,11 +693,30 @@
   /* símbolo do Conectwork (o mesmo do app: faixa azul em losango arredondado com a folha verde-água) */
   const CW_SIMB=`<svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="pjpcwA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1F63FF"/><stop offset="1" stop-color="#0733C4"/></linearGradient><linearGradient id="pjpcwB" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0A4C8A"/><stop offset=".5" stop-color="#0FA394"/><stop offset="1" stop-color="#24DFB3"/></linearGradient></defs><path d="M70.5 40.1 61.3 30.9Q50 19.6 38.7 30.9L30.9 38.7Q19.6 50 30.9 61.3L38.7 69.1Q50 80.4 61.3 69.1L63.5 66.9" fill="none" stroke="url(#pjpcwA)" stroke-width="21"/><path d="M49.6 66 71 44.6Q74 41.6 78.5 41.2L85.5 40.7Q88.6 40.5 88.4 43.6L87.9 50.6Q87.6 54.8 84.8 57.6L64.4 80.8Z" fill="url(#pjpcwB)" fill-opacity=".94"/></svg>`;
   function cwModal(c){ const pid=J.per, p=perDe(pid), emps=[...new Set(pjs(c,p).map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
-    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Notas das prestadoras</h3></div><button type="button" class="pjp-cwir" data-act="pjp-cwab" title="Abre o Conectwork já na empresa Colafix">Abrir o Conectwork da Colafix ↗</button></div>
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Notas das prestadoras</h3></div><span class="pjp-cwhb"><button type="button" class="pjp-cwir" data-act="pjp-cwconv" title="Mandar aos PJ o link para cadastrar o MEI no Conectwork">Convidar os PJ</button><button type="button" class="pjp-cwir" data-act="pjp-cwab" title="Abre o Conectwork já na empresa Colafix">Abrir o Conectwork da Colafix ↗</button></span></div>
       <p class="sub">A Colafix paga a empresa. Cada PJ vai <b>junto</b> na nota da empresa (padrão) ou numa <b>nota separada</b>. Só nome, horas, valor e CNPJ (nunca CPF); no Conectwork você confere e envia.</p>
       ${J.cwLinkBloq?`<div class="pjp-cwbloq" role="alert"><b>O navegador não abriu o Conectwork.</b> Toque aqui para abrir: <a href="${c.esc(J.cwLinkBloq)}" target="_blank" rel="noopener" data-pjp-cwlk>Abrir a medição no Conectwork ↗</a></div>`:''}
       ${cwBloco(c,pid,emps)||'<p>Nenhuma prestadora pelo Conectwork nesta quinzena.</p>'}
       <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${btn('pjp-modx','Fechar')}</div></div></div>`; }
+  /* convite dos PJ (12/11, "eles precisam se conectar: nenhum dos PJ do painel está cadastrado"): cada PJ das prestadoras do
+     Conectwork recebe pelo WhatsApp o link ?mei=<CNPJ>&nome=<nome>, que abre o "Sou MEI" já preenchido. O painel não lê o
+     Conectwork: guarda só quando foi convidado (funcionarios.cwConv {em,por}). PJ sem CNPJ no cadastro não pode ser convidado. */
+  const cwConvLink=(c,f)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'').replace(/\?.*$/,'')+'?mei='+dig(f.cnpj)+'&nome='+encodeURIComponent(c.titulo(f.nome).split(' ')[0]);
+  const cwConvMsg=(c,f)=>{ const k=String(f.empresa||'').toUpperCase(), nm=c.titulo(f.nome).split(' ')[0];
+    return 'Olá, '+nm+'! A partir de agora a '+c.titulo(k)+' vai pedir e receber as suas notas fiscais pelo Conectwork. Faça o cadastro do seu MEI (leva uns 2 minutos, o CNPJ já vai preenchido): '+cwConvLink(c,f)+'\n\nDepois do cadastro, o valor de cada quinzena aparece lá, pronto para você emitir a nota.'; };
+  function cwConvModal(c){ const esc=c.esc, p=perDe(J.per), ks=cwEmps(c), q=semAc(J.cwConvQ||'');
+    const xs=pjs(c,p).filter(f=>ks.includes(String(f.empresa||'').toUpperCase())).sort((a,b)=>String(a.empresa).localeCompare(String(b.empresa))||String(a.nome).localeCompare(String(b.nome)));
+    const nConv=xs.filter(f=>f.cwConv).length, sem=xs.filter(f=>dig(f.cnpj).length!==14).length;
+    const linha=f=>{ const ok=dig(f.cnpj).length===14, tel=dig(f.telefone||f.celular||''), cv=f.cwConv, d='data-f="'+esc(f._id)+'"';
+      return `<li data-b="${esc(semAc(c.titulo(f.nome)+' '+(f.empresa||'')+' '+(f.setor||'')))}"><span><b>${esc(c.titulo(f.nome))}</b><small>${esc(c.titulo(f.empresa||''))}${ok?' · CNPJ '+esc(String(f.cnpj)):''}</small></span>
+        <small class="${cv?'ok':''}">${!ok?'<span class="pjp-cwab">sem CNPJ no cadastro</span>':cv?'convidado '+esc(quando(cv.em)):'ainda não convidado'}</small>
+        <span class="pjp-cwqa">${ok?btn('pjp-cwconvw',tel.length>=10?'WhatsApp':'WhatsApp (escolher contato)',d,cv?'sec':'')+lnk('pjp-cwconvc','copiar',d):`<button class="lnk pjp-gcad" data-act="rh-ed" data-id="${esc(f._id)}" data-go-func="1">pôr o CNPJ no cadastro</button>`}</span></li>`; };
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Convidar os PJ para o Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Convidar os PJ</h3></div></div>
+      <p class="sub">Cada PJ recebe um link que abre o cadastro do MEI no Conectwork <b>já com o CNPJ dele</b>. Depois de cadastrado, a ${esc(ks.map(k=>c.titulo(k)).join(' e a '))} pede e recebe a nota dele por lá. ${nConv} de ${xs.length} já convidados${sem?` · <b>${sem} sem CNPJ no cadastro</b>`:''}.</p>
+      <div class="pjp-cwq"><div class="pjp-cwqh"><b>PJ (${xs.length})</b><label class="pjp-cwbus"><span aria-hidden="true">⌕</span><input type="search" data-pjp-cwbus="conv" placeholder="Procurar PJ pelo nome" value="${esc(J.cwConvQ||'')}"></label></div>
+        <ul>${xs.map(linha).join('')}</ul><small class="pjp-cwq0" hidden>Nenhum PJ com esse nome.</small></div>
+      <p class="sub" style="margin-top:10px">Lembrete: a ${esc(ks.map(k=>c.titulo(k)).join(' e a '))} também precisa estar cadastrada no Conectwork (pré-cadastro pela equipe Conectwork).</p>
+      <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${lnk('pjp-cwabre','voltar para as notas')}${btn('pjp-modx','Fechar')}</div></div></div>`; }
   function cwBloco(c,pid,emps){ const esc=c.esc, D=docP(pid), p=perDe(pid), ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
     return `<div class="pjp-cw" id="pjp-cw">
       ${ks.map(k=>{ const nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"', ja=(D.cw||{})[k], conf=J.cwConf===k;
@@ -1430,7 +1449,7 @@
   document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='pjp-dq'){ J.dq=t.value; dFiltra(); return; } });
   document.addEventListener('input',ev=>{ const t=ev.target; if(!C||!t||t.id!=='pjp-q') return; J.q=t.value; clearTimeout(J._qt); J._qt=setTimeout(()=>{ C.P.render(); setTimeout(()=>{ const i=document.getElementById('pjp-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },0); },350); });
   /* "Abrir o cadastro" da gaveta: quem abre o cadastro é o RH (rh-ed); aqui só fecha a gaveta para não voltar aberta */
-  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('.pjp-gcad'); if(b){ J.ab=''; J.edDia=null; } },true);
+  document.addEventListener('click',ev=>{ const b=ev.target.closest&&ev.target.closest('.pjp-gcad'); if(b){ J.ab=''; J.edDia=null; J.mod=null; } },true);
   document.addEventListener('click',async ev=>{ const fu=ev.target.closest&&ev.target.closest('[data-pjp-fundo]'); if(fu&&ev.target===fu){ J.mod=null; C&&C.P.render(); return; }
     const gf=ev.target.closest&&ev.target.closest('[data-pjp-gf]'); if(gf&&ev.target===gf){ J.ab=''; J.edDia=null; C&&C.P.render(); return; }
     const b=ev.target.closest&&ev.target.closest('[data-act^="pjp-"]'); if(!b||!C) return; const a=b.dataset.act, P=C.P, c=C;
@@ -1562,6 +1581,11 @@
       if(a==='pjp-cwsepm'){ const k=b.dataset.e, f=fDe(b.dataset.f); b.disabled=true; const win=cwJanela(); await cwPedir(c,k,{so:f._id,win});
         P.toast('Nota separada de '+c.titulo(f.nome).split(' ')[0]+' aberta no Conectwork. Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
       if(a==='pjp-cwab'){ const u=cwBase(c,'medicoes'); window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
+      if(a==='pjp-cwconv'){ J.mod={k:'cwconv'}; P.render(); return; }
+      if(a==='pjp-cwconvw'||a==='pjp-cwconvc'){ const f=fDe(b.dataset.f), msg=cwConvMsg(c,f);
+        if(a==='pjp-cwconvw'){ const tel=dig(f.telefone||f.celular||''), u='https://wa.me/'+(tel.length>=10?(tel.length<=11?'55':'')+tel:'')+'?text='+encodeURIComponent(msg); window.__pjpUltimoConv=u; window.open(u,'_blank','noopener'); }
+        else { try{ await navigator.clipboard.writeText(msg); P.toast('Convite copiado. Cole no WhatsApp ou no e-mail de '+c.titulo(f.nome).split(' ')[0]+'.'); }catch(e){ window.prompt('Copie o convite:',msg); } }
+        const v={em:agora(),por:c.eu()}; f.cwConv=v; await P.db().doc('rh/dados/funcionarios/'+f._id).set({cwConv:v},{merge:true}); P.render(); return; }
       if(a==='pjp-cwconf'||a==='pjp-cwconfx'){ const k=b.dataset.e, p=perDe(J.per), D=docP(J.per), v=a==='pjp-cwconf'?{em:agora(),por:c.eu()}:null;
         D.cw=Object.assign({},D.cw,{[k]:Object.assign({},(D.cw||{})[k]||{},{conf:v})}); J.docs[J.per]=D;
         await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:{conf:v}}},{merge:true});
