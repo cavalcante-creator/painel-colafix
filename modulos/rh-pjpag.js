@@ -322,7 +322,9 @@
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .pjp-cwq{margin-top:8px}.pjp-cwlote{margin-top:12px;padding:12px;border:1px dashed var(--line,#dde3ea);border-radius:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.pjp-cwlote small{color:var(--muted)}.pjp-cwhb{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pjp-cwq li>span:first-child small{display:block;color:var(--muted);font-size:12px}.pjp-cwq li>small.ok{color:var(--ok,#1f7a4a)}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
+  .pjp-cwq{margin-top:8px}.pjp-cwpt{margin:10px 0;padding:12px;border:1px solid var(--line,#dde3ea);border-radius:12px;display:flex;flex-direction:column;gap:6px}.pjp-cwpt.on{border-color:var(--ok,#1f7a4a)}.pjp-cwpt small{color:var(--muted)}.pjp-cwpt.on b{color:var(--ok,#1f7a4a)}
+  .pjp-cwptf{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.pjp-cwptf input{flex:1 1 180px;min-width:0;padding:8px 10px;border:1px solid var(--line,#dde3ea);border-radius:8px;font:inherit;font-size:16px;background:var(--surface,#fff);color:inherit}
+  .pjp-cwq li>small.warn{color:var(--warn-strong,#8a5a00)}.pjp-cwq li>small.crit{color:var(--crit,#b42318)}.pjp-cwlote{margin-top:12px;padding:12px;border:1px dashed var(--line,#dde3ea);border-radius:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.pjp-cwlote small{color:var(--muted)}.pjp-cwhb{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pjp-cwq li>span:first-child small{display:block;color:var(--muted);font-size:12px}.pjp-cwq li>small.ok{color:var(--ok,#1f7a4a)}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
   .pjp-cwbus{display:flex;align-items:center;gap:6px;border:1px solid var(--line,#dde3ea);border-radius:10px;padding:0 10px;background:var(--surface,#fff);min-width:min(260px,100%)}
   .pjp-cwbus input{border:0;outline:0;background:transparent;font:inherit;font-size:14px;padding:8px 0;flex:1;min-width:0;color:inherit}.pjp-cwbus:focus-within{border-color:var(--teal,#1a6b80)}
   .pjp-cwq ul{max-height:280px;overflow:auto}.pjp-cwq li.ret>span:first-child,.pjp-cwq li.ret>b{color:var(--muted);text-decoration:line-through}.pjp-cwqa{display:flex;gap:6px;align-items:center;margin-left:auto}
@@ -704,15 +706,40 @@
   const cwConvLink=(c,f)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'').replace(/\?.*$/,'')+'?mei='+dig(f.cnpj)+'&nome='+encodeURIComponent(c.titulo(f.nome).split(' ')[0]);
   const cwConvMsg=(c,f)=>{ const k=String(f.empresa||'').toUpperCase(), nm=c.titulo(f.nome).split(' ')[0];
     return 'Olá, '+nm+'! A partir de agora a '+c.titulo(k)+' vai pedir e receber as suas notas fiscais pelo Conectwork. Faça o cadastro do seu MEI (leva uns 2 minutos, o CNPJ já vai preenchido): '+cwConvLink(c,f)+'\n\nDepois do cadastro, o valor de cada quinzena aparece lá, pronto para você emitir a nota.'; };
+  /* fila automática (12/11, escolha da usuária): com a ponte ligada (modulos/cw-ponte.js), os PJ das prestadoras do Conectwork vão
+     sozinhos para a fila do Conectwork sempre que o RH abre o painel ou muda um cadastro (só o que é novo ou mudou); a equipe Conectwork
+     pré-cadastra e o convite volta para cá (resultado em CwPonte.resultados()). */
+  const PT=()=>window.CwPonte||null;
+  const pjsAtivosCw=c=>{ const ks=cwEmps(c); return (c.R.func||[]).filter(f=>f&&!f.removido&&String(f.tipo||'').toUpperCase()==='PJ'&&ks.includes(String(f.empresa||'').toUpperCase())&&!/deslig|inativ|encerr|demit/i.test(String(f.status||''))); };
+  const cwItens=c=>pjsAtivosCw(c).filter(f=>dig(f.cnpj).length===14).map(f=>{ const k=String(f.empresa||'').toUpperCase(), e=(c.EMP_DOC||{})[k]||{};
+    return {cnpjNum:dig(f.cnpj),cnpj:fCNPJ(f.cnpj),nome:c.titulo(f.nome).slice(0,120),email:String(f.email||'').trim().toLowerCase().slice(0,120),tel:dig(f.telefone||f.celular||'').slice(0,13),prestadora:c.titulo(k).slice(0,120),prestCnpj:dig(e.cnpj)}; });
+  function cwAuto(c){ const T=PT(); if(!T) return; if(!J.ptLig){ J.ptLig=true; try{ T.ligar(dig(((c.EMP_DOC||{}).COLAFIX||{}).cnpj)); T.ouvir(()=>{ if(J.mod&&J.mod.k==='cwconv'&&C) C.P.rerender(); if(C) cwAuto(C); }); }catch(e){} }
+    const E=T.estado(); if(!E.on||!E.resOk||J.ptSinc) return; const its=cwItens(c), h=JSON.stringify(its); if(h===J.ptHash) return;
+    J.ptSinc=true; T.sincronizar(its,c.eu()).then(r=>{ J.ptHash=h; if(r.novos||r.mudados) c.P.toast((r.novos?r.novos+' PJ foram':'')+(r.novos&&r.mudados?' e ':'')+(r.mudados?r.mudados+' atualizados':'')+' para a fila do Conectwork.'); }).catch(e=>{ J.ptErro=e.message||String(e); }).finally(()=>{ J.ptSinc=false; }); }
+  const cwSit=(c,f)=>{ const T=PT(), E=T&&T.estado(); if(!E||!E.on) return null; const r=(E.res||{})[dig(f.cnpj)]; if(!r) return {t:'vai para a fila do Conectwork',k:''};
+    if(r.st==='pendente') return {t:'na fila: o Conectwork pré-cadastra quando a equipe abrir o app',k:''};
+    if(r.st==='ja') return {t:'já tinha cadastro no Conectwork: ele entra com o login dele',k:'ok'};
+    if(r.st==='erro') return {t:'não deu para pré-cadastrar: '+((r.res||{}).msg||''),k:'crit'};
+    const cv=(r.res||{}).convite; return cv?{t:'pronto no Conectwork · mande o convite',k:'ok',conv:cv,email:(r.res||{}).conviteEmail||r.email}:{t:'pronto no Conectwork · sem e-mail: ponha o e-mail no cadastro para ele entrar',k:'warn'}; };
+  const cwConvLinkTok=(c,t)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'').replace(/\?.*$/,'').replace(/\/?$/,'/')+'convite/?c='+t;
+  function cwPonteCard(c){ const T=PT(); if(!T) return ''; const E=T.estado(), esc=c.esc;
+    if(E.on) return `<div class="pjp-cwpt on"><b>✓ Painel ligado ao Conectwork</b><small>Como ${esc(E.email)} · ${esc(E.empresaNome)}. Os PJ vão sozinhos para o Conectwork quando o cadastro muda; a equipe Conectwork deixa cada um pronto e o convite aparece aqui.${J.ptErro?' <b class="pjp-cwab">'+esc(J.ptErro)+'</b>':''}</small>${lnk('pjp-ptsair','desligar')}</div>`;
+    return `<div class="pjp-cwpt"><b>Ligar o painel ao Conectwork (uma vez só)</b><small>Entre com o seu login do Conectwork (administrador ou RH da Colafix lá). Depois disso, todo PJ cadastrado aqui vai sozinho para o Conectwork.</small>
+      ${E.carregando?'<small>Conectando…</small>':''}${E.erro?`<small class="pjp-cwab">${esc(E.erro)}</small>`:''}
+      <div class="pjp-cwptf"><input type="email" id="pjp-pte" placeholder="E-mail do Conectwork" autocomplete="username" value="${esc(E.email||'')}"><input type="password" id="pjp-pts" placeholder="Senha" autocomplete="current-password">${btn('pjp-ptok','Conectar','','')}${btn('pjp-ptg','Entrar com Google','','sec')}</div></div>`; }
+  const cwConvMsgTok=(c,f,t,email)=>{ const k=String(f.empresa||'').toUpperCase(), nm=c.titulo(f.nome).split(' ')[0];
+    return 'Olá, '+nm+'! O seu MEI já está cadastrado no Conectwork, onde a '+c.titulo(k)+' vai pedir e receber as suas notas fiscais.\n\nPara entrar, abra o link e crie a sua senha com o e-mail '+email+':\n'+cwConvLinkTok(c,t)+'\n\nO convite vale só para esse e-mail.'; };
   function cwConvModal(c){ const esc=c.esc, p=perDe(J.per), ks=cwEmps(c), q=semAc(J.cwConvQ||'');
     const xs=pjs(c,p).filter(f=>ks.includes(String(f.empresa||'').toUpperCase())).sort((a,b)=>String(a.empresa).localeCompare(String(b.empresa))||String(a.nome).localeCompare(String(b.nome)));
     const nConv=xs.filter(f=>f.cwConv).length, sem=xs.filter(f=>dig(f.cnpj).length!==14).length;
     const linha=f=>{ const ok=dig(f.cnpj).length===14, tel=dig(f.telefone||f.celular||''), cv=f.cwConv, d='data-f="'+esc(f._id)+'"';
       return `<li data-b="${esc(semAc(c.titulo(f.nome)+' '+(f.empresa||'')+' '+(f.setor||'')))}"><span><b>${esc(c.titulo(f.nome))}</b><small>${esc(c.titulo(f.empresa||''))}${ok?' · CNPJ '+esc(String(f.cnpj)):''}</small></span>
-        <small class="${cv?'ok':''}">${!ok?'<span class="pjp-cwab">sem CNPJ no cadastro</span>':cv?'convidado '+esc(quando(cv.em)):'ainda não convidado'}</small>
+        ${(()=>{ const z=ok&&cwSit(c,f); return z?`<small class="${z.k}">${esc(z.t)}${cv?' · convidado '+esc(quando(cv.em)):''}</small>`:''; })()}
+        <small class="${cv?'ok':''}"${ok&&cwSit(c,f)?' hidden':''}>${!ok?'<span class="pjp-cwab">sem CNPJ no cadastro</span>':cv?'convidado '+esc(quando(cv.em)):'ainda não convidado'}</small>
         <span class="pjp-cwqa">${ok?btn('pjp-cwconvw',tel.length>=10?'WhatsApp':'WhatsApp (escolher contato)',d,cv?'sec':'')+lnk('pjp-cwconvc','copiar',d):`<button class="lnk pjp-gcad" data-act="rh-ed" data-id="${esc(f._id)}" data-go-func="1">pôr o CNPJ no cadastro</button>`}</span></li>`; };
     return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Convidar os PJ para o Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Convidar os PJ</h3></div></div>
       <p class="sub">Cada PJ recebe um link que abre o cadastro do MEI no Conectwork <b>já com o CNPJ dele</b>. Depois de cadastrado, a ${esc(ks.map(k=>c.titulo(k)).join(' e a '))} pede e recebe a nota dele por lá. ${nConv} de ${xs.length} já convidados${sem?` · <b>${sem} sem CNPJ no cadastro</b>`:''}.</p>
+      ${cwPonteCard(c)}
       <div class="pjp-cwq"><div class="pjp-cwqh"><b>PJ (${xs.length})</b><label class="pjp-cwbus"><span aria-hidden="true">⌕</span><input type="search" data-pjp-cwbus="conv" placeholder="Procurar PJ pelo nome" value="${esc(J.cwConvQ||'')}"></label></div>
         <ul>${xs.map(linha).join('')}</ul><small class="pjp-cwq0" hidden>Nenhum PJ com esse nome.</small></div>
       <p class="sub" style="margin-top:10px">Lembrete: a ${esc(ks.map(k=>c.titulo(k)).join(' e a '))} também precisa estar cadastrada no Conectwork (pré-cadastro pela equipe Conectwork).</p>
@@ -830,7 +857,7 @@
     if(v==null||!(v>0)) return null; return {v,de,txt:pA.txt}; }
   const difAnt=r=>{ if(!r.ant||!(r.valor>0)) return null; if(r.fd&&hojeS()<r.fd) return null; const dv=Math.round((r.valor-r.ant.v)*100)/100, pc=dv/r.ant.v; return {dv,pc,muda:Math.abs(pc)>=0.2&&Math.abs(dv)>=100}; };
   const antTxt=r=>{ const z=difAnt(r); if(!z) return ''; return `<small class="pjp-ant ${z.muda?(z.dv>0?'up':'dn'):''}" title="Quinzena passada (${r.ant.txt}): ${R$(r.ant.v)}${r.ant.de==='conta'?' · ainda não fechada, pela conta do Face ID':''}">${Math.abs(z.dv)<0.01?'igual à passada':(z.dv>0?'+ ':'− ')+R$(Math.abs(z.dv))+' vs passada'+(z.muda?' ('+(z.dv>0?'+':'−')+Math.round(Math.abs(z.pc)*100)+'%)':'')}</small>`; };
-  function render(c){ C=c; const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
+  function render(c){ C=c; try{ cwAuto(c); }catch(e){} const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
     const D=docP(pid), xs=pjs(c,p);
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
     const q=norm(J.q), ehAt=pid===perAtual(c), col=J.col==null?-1:J.col;
@@ -1407,7 +1434,7 @@
       partes:[{secao:'Por pessoa',cols:[{t:'PJ',w:46},{t:'Empresa',w:18},{t:'Horas',w:14,al:'r'},{t:'R$/hora',w:16,al:'r'},{t:'Desconto',w:16,al:'r'},{t:'Total',w:20,al:'r'},{t:'Situação',w:26}],
         rows:L.map(o=>[c.titulo(o.f.nome),String(o.f.empresa||'').toUpperCase(),o.r.fixo?'fixo':hTxt(o.min),o.r.fixo?'—':n2(o.vh),o.desc?n2(o.desc):'—',n2(o.valor),(ST[o.x.st||'']||ST[''])[0]]).concat([Object.assign(['Total','',hTxt(tm),'','',n2(tot),''],{_tot:true})])}],arq:'Pagamento-PJ-'+J.per}); }
   /* ---------- avisos (Meu dia e Início do RH) ---------- */
-  function avisos(c){ C=C||c; try{ const pid=J.per||perAtual(c); assina(c,pid); const D=docP(pid), p=perDe(pid), xs=Object.entries(D.pes||{}); const out=[];
+  function avisos(c){ C=C||c; try{ cwAuto(c); }catch(e){} try{ const pid=J.per||perAtual(c); assina(c,pid); const D=docP(pid), p=perDe(pid), xs=Object.entries(D.pes||{}); const out=[];
       const ch=xs.filter(([,x])=>x.st==='chegou').length; if(ch) out.push({nivel:'warn',rotulo:'PJ',titulo:ch+(ch>1?' notas de PJ chegaram':' nota de PJ chegou')+' para conferir',texto:p.txt,go:'rhpjpag'});
       const at=xs.filter(([,x])=>x.st==='pedido'&&x.ped&&Date.now()-new Date(x.ped.em)>(+cfg(c).avisaNota||3)*864e5).length; if(at) out.push({nivel:'warn',rotulo:'PJ',titulo:at+' PJ ainda não mandaram a nota',texto:'Pedida há mais de '+(+cfg(c).avisaNota||3)+' dias · '+p.txt,go:'rhpjpag'});
       { const pa=perDe(perAtual(c)), fd=fechDia(pa); if(c.P.hojeStr()===fd){ assina(c,pa.pid); const fz=pjs(c,pa).filter(f=>!((docP(pa.pid).pes||{})[f._id]||{}).st).length; if(fz) out.push({nivel:'warn',rotulo:'PJ',titulo:'Hoje é o dia de fechar a quinzena dos PJ',texto:pa.curto+' · '+fz+' PJ com o valor ainda não fechado',go:'rhpjpag'}); } }
@@ -1587,7 +1614,10 @@
       if(a==='pjp-cwconv'){ J.mod={k:'cwconv'}; P.render(); return; }
       if(a==='pjp-cwlista'){ const p=perDe(J.per), ks=cwEmps(c), xs=pjs(c,p).filter(f=>ks.includes(String(f.empresa||'').toUpperCase())), t=cwListaTxt(c,xs), n=t.split('\n').length-1, se=xs.filter(f=>dig(f.cnpj).length===14&&!String(f.email||'').includes('@')).length;
         window.__pjpCwLista=t; try{ await navigator.clipboard.writeText(t); P.toast(n+' PJ copiados. No Conectwork: Cadastros › "Pré-cadastrar vários MEIs" › colar.'+(se?' '+se+' sem e-mail no cadastro: eles ficam cadastrados, mas o convite sai depois.':'')); }catch(e){ window.prompt('Copie a lista:',t); } return; }
-      if(a==='pjp-cwconvw'||a==='pjp-cwconvc'){ const f=fDe(b.dataset.f), msg=cwConvMsg(c,f);
+      if(a==='pjp-ptok'||a==='pjp-ptg'){ const T=PT(); if(!T) return; const cn=dig(((c.EMP_DOC||{}).COLAFIX||{}).cnpj); b.disabled=true;
+        try{ if(a==='pjp-ptg') await T.google(cn); else { const em=(document.getElementById('pjp-pte')||{}).value||'', se=(document.getElementById('pjp-pts')||{}).value||''; if(!em||!se) throw new Error('Escreva o e-mail e a senha do Conectwork.'); await T.conectar(em,se,cn); } J.ptLig=false; cwAuto(c); }catch(e){ P.toast(e.message||String(e)); } P.render(); return; }
+      if(a==='pjp-ptsair'){ const T=PT(); if(T&&confirm('Desligar o painel do Conectwork neste aparelho? Os PJ param de ir sozinhos para o Conectwork.')) await T.sair(); J.ptHash=''; P.render(); return; }
+      if(a==='pjp-cwconvw'||a==='pjp-cwconvc'){ const f=fDe(b.dataset.f), z=cwSit(c,f), msg=z&&z.conv?cwConvMsgTok(c,f,z.conv,z.email):cwConvMsg(c,f);
         if(a==='pjp-cwconvw'){ const tel=dig(f.telefone||f.celular||''), u='https://wa.me/'+(tel.length>=10?(tel.length<=11?'55':'')+tel:'')+'?text='+encodeURIComponent(msg); window.__pjpUltimoConv=u; window.open(u,'_blank','noopener'); }
         else { try{ await navigator.clipboard.writeText(msg); P.toast('Convite copiado. Cole no WhatsApp ou no e-mail de '+c.titulo(f.nome).split(' ')[0]+'.'); }catch(e){ window.prompt('Copie o convite:',msg); } }
         const v={em:agora(),por:c.eu()}; f.cwConv=v; await P.db().doc('rh/dados/funcionarios/'+f._id).set({cwConv:v},{merge:true}); P.render(); return; }
