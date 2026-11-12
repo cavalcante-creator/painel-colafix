@@ -70,6 +70,6 @@ const res=[]; const ok=(n,c,d)=>{ res.push({n,ok:!!c}); console.log((c?'PASSOU '
  ds=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs); ok('Apagar (dois toques) marca o abastecimento como removido', ds['frota/dados/abastecimentos/i43'].removido===true);
  console.log('erros:',B.erros.filter(x=>!/404/.test(x))); await B.browser.close();
  const rg=fs.readFileSync(path.join(__dirname,'..','firestore.rules'),'utf8');
- ok('Regras: frota fora da regra geral e com frotaOk()', /'horaextra', 'frota'\]/.test(rg)&&/match \/frota\/\{resto=\*\*\}/.test(rg)&&/function frotaOk/.test(rg));
+ ok('Regras: frota fora da regra geral e com frotaOk()', /'horaextra', 'frota'[,\]]/.test(rg)&&/match \/frota\/\{resto=\*\*\}/.test(rg)&&/function frotaOk/.test(rg));
  const bkp=fs.readFileSync(path.join(__dirname,'..','modulos','backup.js'),'utf8'); ok('Cópia de segurança inclui frota/dados', /'frota\/dados':\['caminhoes'/.test(bkp));
  console.log(res.every(r=>r.ok)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(r=>!r.ok).length+')'); process.exit(0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });
