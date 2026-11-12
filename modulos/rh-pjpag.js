@@ -322,7 +322,11 @@
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .pjp-cwq summary{cursor:pointer;font-size:13px;color:var(--teal-strong,#0e4c5f)}.pjp-cwq ul,.pjp-cwsec ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+  .pjp-cwq{margin-top:8px}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
+  .pjp-cwbus{display:flex;align-items:center;gap:6px;border:1px solid var(--line,#dde3ea);border-radius:10px;padding:0 10px;background:var(--surface,#fff);min-width:min(260px,100%)}
+  .pjp-cwbus input{border:0;outline:0;background:transparent;font:inherit;font-size:14px;padding:8px 0;flex:1;min-width:0;color:inherit}.pjp-cwbus:focus-within{border-color:var(--teal,#1a6b80)}
+  .pjp-cwq ul{max-height:280px;overflow:auto}.pjp-cwq li.ret>span:first-child,.pjp-cwq li.ret>b{color:var(--muted);text-decoration:line-through}.pjp-cwqa{display:flex;gap:6px;align-items:center;margin-left:auto}
+  .pjp-cwq0{color:var(--muted);font-size:12px}.pjp-cwbloq{margin:10px 0;padding:10px 12px;border-radius:10px;border:1px solid var(--warn,#c98a00);font-size:14px}.pjp-cwbloq a{font-weight:600}.pjp-cwq ul,.pjp-cwsec ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
   .pjp-cwq li,.pjp-cwsec li{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line,#dde3ea)}.pjp-cwq li>span,.pjp-cwsec li>span{flex:1 1 180px;min-width:0}
   .pjp-cwq li small,.pjp-cwsec li small{color:var(--muted);font-size:12px}.pjp-cwsec{font-size:13px}.pjp-cwsec>small{color:var(--muted)}.pjp-cwfo{color:var(--muted);font-size:12px}
   .pjp-cwj{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2,#f4f6f8);font-size:13px}.pjp-cwj small{display:block;margin-top:4px;color:var(--muted)}
@@ -630,7 +634,8 @@
   const sepDe=(fid,x)=>!!((x&&x.ped&&x.ped.via==='conectwork'&&x.ped.sep)||(J.cwSep||{})[fid]);
   /* quem entra na nota da empresa (junto): sem valor fechado, valor fechado ou já pedido pelo Conectwork junto.
      Fica fora quem foi em nota separada, quem pediu a nota pelo link (nota própria) e quem já foi pago por fora. */
-  const cwJunto=x=>!x.st||x.st==='fechado'||(pedCw(x)&&!x.ped.sep);
+  const semAc=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const cwJunto=x=>!x.cwFora&&(!x.st||x.st==='fechado'||(pedCw(x)&&!x.ped.sep));
   function cwMedicao(c,pid,empK,opt){ opt=opt||{}; const p=perDe(pid), D=docP(pid), emp=(c.EMP_DOC||{})[empK]||null;
     const rs=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===empK).filter(f=>{ const x=(D.pes||{})[f._id]||{};
       return opt.so?f._id===opt.so:!sepDe(f._id,x)&&cwJunto(x)&&(!opt.soFechados||!!x.st); }).map(f=>{ const x=(D.pes||{})[f._id]||{}, r=calcPessoa(c,f,p,x), fe=x.st&&x.fech;
@@ -649,7 +654,13 @@
   async function cwPedir(c,k,opt){ opt=opt||{}; const P=c.P, I0=cwPedInfo(c,k,opt);
     if(!opt.soFechados) for(const o of I0.abertos) await fechar(c,o.f);
     const I=cwPedInfo(c,k,opt); if(!I.M.itens.length) throw Object.assign(new Error('Nenhum valor para mandar de '+c.titulo(k)+'.'),{aviso:true});
-    const url=cwLink(c,I.M.payload); window.__pjpUltimoCw=url; window.open(url,'_blank','noopener');
+    const url=cwLink(c,I.M.payload); window.__pjpUltimoCw=url; (window.__pjpCwHist=window.__pjpCwHist||[]).push(url);
+    /* 12/11 ("diz que foi e não apareceu no Conectwork"): a janela é aberta no próprio toque (opt.win), antes de gravar; aberta depois
+       de esperar o banco, o navegador bloqueava. Se ainda assim bloquear, a janela do painel mostra o link para tocar. */
+    let w=opt.win&&!opt.win.closed?opt.win:null;
+    if(w){ try{ w.location.href=url; }catch(e){ w=null; } }
+    if(!w){ try{ w=window.open(url,'_blank'); }catch(e){ w=null; } }
+    J.cwLinkBloq=w?'':url; if(w) try{ w.opener=null; }catch(e){}
     const p=perDe(J.per), D=docP(J.per);
     if(!opt.so){ const reg=Object.assign({},(D.cw||{})[k]||{},{em:agora(),por:c.eu(),total:I.M.payload.total,n:I.M.itens.length}); D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
       await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:reg}},{merge:true}); }
@@ -658,6 +669,8 @@
         (opt.so?'Nota separada pedida pelo Conectwork (':'Nota pedida pelo Conectwork (')+R$(x.fech?x.fech.valor:o.valor)+')'); }
     if(opt.so&&J.cwSep) delete J.cwSep[opt.so];
     return I; }
+  /* janela aberta no toque (o navegador só deixa abrir sem esperar nada); o endereço entra depois, em cwPedir */
+  const cwJanela=()=>{ try{ const w=window.open('about:blank','_blank'); if(w&&w.document&&w.document.body) w.document.body.innerHTML='<p style="font:16px system-ui;padding:24px">Abrindo o Conectwork…</p>'; return w||null; }catch(e){ return null; } };
   const quando=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
   function cwVai(c,k){ J.mod={k:'cw'}; J.cwFoco=k||''; J.ab=''; c.P.render(); setTimeout(()=>{ const el=k&&document.getElementById('pjp-cw-'+k); if(el) el.scrollIntoView({block:'nearest'}); },60); }
   /* 12/11 ("direcionar para o login da Colafix no Conectwork"): o link leva ?empresa=<CNPJ da Colafix>; no Conectwork, depois
@@ -673,7 +686,7 @@
      "Conectwork" ao lado do "E-mail ao financeiro"; o botão mostra quantos estão prontos e ainda não foram. */
   function cwBotao(c,pid,emps){ const ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
     const p=perDe(pid), D=docP(pid); let n=0;
-    ks.forEach(k=>pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k).forEach(f=>{ const x=pesDe(pid,f._id); if(x.st==='fechado') n++; }));
+    ks.forEach(k=>pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k).forEach(f=>{ const x=pesDe(pid,f._id); if(x.st==='fechado'&&!x.cwFora) n++; }));
     return `<button type="button" class="pjp-cwbt" data-act="pjp-cwabre" title="Notas das prestadoras pelo Conectwork: junto na nota da empresa ou nota separada" aria-label="Conectwork${n?' · '+n+' para mandar':''}">
       <span class="pjp-cwlg">${CW_SIMB}</span><span class="pjp-cwwm">Conect<b>work</b></span>${n?`<span class="pjp-cwbd">${n} para mandar</span>`:''}</button>`;
   }
@@ -682,6 +695,7 @@
   function cwModal(c){ const pid=J.per, p=perDe(pid), emps=[...new Set(pjs(c,p).map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
     return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Notas das prestadoras</h3></div><button type="button" class="pjp-cwir" data-act="pjp-cwab" title="Abre o Conectwork já na empresa Colafix">Abrir o Conectwork da Colafix ↗</button></div>
       <p class="sub">A Colafix paga a empresa. Cada PJ vai <b>junto</b> na nota da empresa (padrão) ou numa <b>nota separada</b>. Só nome, horas, valor e CNPJ (nunca CPF); no Conectwork você confere e envia.</p>
+      ${J.cwLinkBloq?`<div class="pjp-cwbloq" role="alert"><b>O navegador não abriu o Conectwork.</b> Toque aqui para abrir: <a href="${c.esc(J.cwLinkBloq)}" target="_blank" rel="noopener" data-pjp-cwlk>Abrir a medição no Conectwork ↗</a></div>`:''}
       ${cwBloco(c,pid,emps)||'<p>Nenhuma prestadora pelo Conectwork nesta quinzena.</p>'}
       <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${btn('pjp-modx','Fechar')}</div></div></div>`; }
   function cwBloco(c,pid,emps){ const esc=c.esc, D=docP(pid), p=perDe(pid), ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
@@ -689,18 +703,25 @@
       ${ks.map(k=>{ const nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"', ja=(D.cw||{})[k], conf=J.cwConf===k;
         const todos=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k).map(f=>{ const x=pesDe(pid,f._id), r=calcPessoa(c,f,p,x); return {f,x,valor:x.st&&x.fech?x.fech.valor:r.valor}; }).filter(o=>o.valor>0);
         const jt=todos.filter(o=>!sepDe(o.f._id,o.x)&&cwJunto(o.x)), pr=jt.filter(o=>o.x.st), ab=jt.filter(o=>!o.x.st);
-        const sep=todos.filter(o=>sepDe(o.f._id,o.x)), fora=todos.filter(o=>!sepDe(o.f._id,o.x)&&!cwJunto(o.x));
+        const sep=todos.filter(o=>!o.x.cwFora&&sepDe(o.f._id,o.x)), ret=todos.filter(o=>o.x.cwFora), fora=todos.filter(o=>!o.x.cwFora&&!sepDe(o.f._id,o.x)&&!cwJunto(o.x));
         const tot=xs=>R$(xs.reduce((a,o)=>a+o.valor,0)), nome=o=>esc(c.titulo(o.f.nome)), pnome=o=>esc(c.titulo(o.f.nome).split(' ')[0]);
         const mudou=ja&&ja.total!==Math.round(pr.reduce((a,o)=>a+o.valor,0)*100);
         const novos=ja?pr.filter(o=>o.x.st==='fechado').length:0;
         const bts=!jt.length?'':!ja?(pr.length?btn('pjp-cwped',ab.length?(pr.length===1?'Mandar o pronto agora':'Mandar os '+pr.length+' prontos agora'):'Mandar a nota da '+nm,e+(ab.length?' data-so="f"':''),''):'')
             +(ab.length?(conf?btn('pjp-cwped','Confirmar: fechar os '+ab.length+' e mandar todos',e,'crit'):lnk('pjp-cwtodos',ab.length===1?'fechar o que falta e mandar todos':'fechar os '+ab.length+' que faltam e mandar todos',e)):'')
           :(novos||mudou?btn('pjp-cwped','Mandar de novo (atualiza a medição)',e+(ab.length?' data-so="f"':''),''):'')+(ab.length?(conf?btn('pjp-cwped','Confirmar: fechar os '+ab.length+' e mandar todos',e,'crit'):lnk('pjp-cwtodos','fechar os '+ab.length+' que faltam e mandar todos',e)):'');
-        const quem=jt.length?`<details class="pjp-cwq"><summary>Quem está na nota da ${nm} (${jt.length})</summary><ul>${jt.map(o=>`<li><span>${nome(o)}</span><b>${R$(o.valor)}</b><small>${!o.x.st?'falta fechar o valor':o.x.st==='fechado'?(ja?'pronto · ainda não foi':'pronto'):'já foi'}</small>${!pedCw(o.x)?lnk('pjp-cwsepr','nota separada','data-f="'+esc(o.f._id)+'"'):''}</li>`).join('')}</ul></details>`:'';
+        /* 12/11 ("coloque a opção de pesquisar e escolher o PJ e um botão de retirar"): a lista fica aberta, com busca (filtra sem
+           redesenhar) e, em cada PJ, Retirar (sai desta nota; fica em "Retirados" com "Pôr de volta") e nota separada. */
+        const fb=o=>'data-b="'+esc(semAc(c.titulo(o.f.nome)+' '+(o.f.setor||'')+' '+(o.f.funcao||'')))+'"', df=o=>'data-f="'+esc(o.f._id)+'"';
+        const quem=(jt.length||ret.length)?`<div class="pjp-cwq"><div class="pjp-cwqh"><b>Quem está na nota da ${nm} (${jt.length})</b><label class="pjp-cwbus"><span aria-hidden="true">⌕</span><input type="search" data-pjp-cwbus="${esc(k)}" placeholder="Procurar PJ pelo nome" aria-label="Procurar PJ na nota da ${nm}"></label></div>
+          <ul data-pjp-cwl="${esc(k)}">${jt.map(o=>`<li ${fb(o)}><span>${nome(o)}</span><b>${R$(o.valor)}</b><small>${!o.x.st?'falta fechar o valor':o.x.st==='fechado'?(ja?'pronto · ainda não foi':'pronto'):'já foi na nota'}</small>
+            <span class="pjp-cwqa">${!o.x.st?btn('pjp-fech','Fechar o valor',df(o),'sec'):''}${!pedCw(o.x)?lnk('pjp-cwsepr','nota separada',df(o)):''}${btn('pjp-cwret','Retirar',df(o)+' title="Tirar da nota da '+nm+' desta quinzena"','sec')}</span></li>`).join('')}
+          ${ret.map(o=>`<li class="ret" ${fb(o)}><span>${nome(o)}</span><b>${R$(o.valor)}</b><small>retirado da nota</small><span class="pjp-cwqa">${btn('pjp-cwvolta','Pôr de volta',df(o),'sec')}</span></li>`).join('')}</ul>
+          <small class="pjp-cwq0" hidden>Nenhum PJ com esse nome nesta nota.</small></div>`:'';
         const sepH=sep.length?`<div class="pjp-cwsec"><b>Notas separadas</b> <small>(a ${nm} faz uma nota só com o valor de cada um)</small><ul>${sep.map(o=>{ const env=pedCw(o.x)&&o.x.ped.sep;
             return `<li><span>${nome(o)}</span><b>${R$(o.valor)}</b>${env?`<small>enviada ${esc(quando(o.x.ped.em))}</small>`:btn('pjp-cwsepm',o.x.st?'Mandar só '+pnome(o):'Fechar e mandar só '+pnome(o),e+' data-f="'+esc(o.f._id)+'"','')+lnk('pjp-cwsepx','voltar para a nota da '+nm,'data-f="'+esc(o.f._id)+'"')}</li>`; }).join('')}</ul></div>`:'';
         return `<div class="pjp-cwe pjp-cwk${J.cwFoco===k?' foco':''}" id="pjp-cw-${esc(k)}"><div class="pjp-cwh"><b>${nm}</b>
-            <span class="pjp-cwn">${jt.length?`Nota da ${nm}: <b>${pr.length} pronto${pr.length===1?'':'s'}</b> · ${tot(pr)}${ab.length?` · <span class="pjp-cwab">${ab.length} sem valor fechado</span>`:''}`:'Nenhum PJ na nota da '+nm}${ja?`<small>Enviada ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''} · ${R$(ja.total/100)} (${ja.n} PJ)${novos||mudou?' · <b class="pjp-cwab">tem valor novo: mande de novo</b>':''}</small>`:''}</span>
+            <span class="pjp-cwn">${jt.length?`Nota da ${nm}: <b>${pr.length} pronto${pr.length===1?'':'s'}</b> · ${tot(pr)}${ab.length?` · <span class="pjp-cwab">${ab.length} sem valor fechado</span>`:''}`:'Nenhum PJ na nota da '+nm}${ja?`<small>Aberta no Conectwork ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''} · ${R$(ja.total/100)} (${ja.n} PJ)${novos||mudou?' · <b class="pjp-cwab">tem valor novo: mande de novo</b>':''}</small>`:''}</span>
             <span class="pjp-ac">${bts}</span></div>
           ${quem}${sepH}${fora.length?`<small class="pjp-cwfo">Fora da nota da ${nm}: ${fora.map(nome).join(', ')} (já pagos por fora ou com nota pelo link)</small>`:''}
           ${ja?cwEtapas(c,k,ja):''}</div>`; }).join('')}</div>`; }
@@ -709,7 +730,7 @@
      A nota de cada MEI para a empresa e o pagamento do MEI são da empresa, no Conectwork (aqui só aparece como acompanhamento). */
   function cwEtapas(c,k,ja){ const esc=c.esc, n=ja.nota, pg=ja.pago, nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"';
     const pas=(ok,t,s,acao)=>`<li class="${ok?'ok':''}"><i>${ok?'✓':''}</i><div><b>${t}</b>${s?`<small>${s}</small>`:''}</div>${acao||''}</li>`;
-    return `<ol class="pjp-cwp">${pas(true,'Medição enviada ao Conectwork',esc(quando(ja.em))+(ja.por?' · '+esc(ja.por):''))}
+    return `<ol class="pjp-cwp">${pas(true,'Medição aberta no Conectwork',esc(quando(ja.em))+(ja.por?' · '+esc(ja.por):'')+' · só vale depois de tocar em <b>Enviar</b> lá. Não apareceu? Veja em Medições ou mande de novo.',lnk('pjp-cwab','ver as medições no Conectwork',''))}
       ${pas(!!n,'Nota da '+nm+' para a Colafix',n?'conferida no Conectwork · '+esc(quando(n.em))+(n.por?' · '+esc(n.por):''):'a '+nm+' emite uma nota só, do valor total ('+R$(ja.total/100)+')',n?lnk('pjp-cwnotax','desfazer',e):btn('pjp-cwnota','Nota conferida',e,'sec'))}
       ${pas(!!pg,'Colafix pagou a '+nm,pg?esc(quando(pg.em))+(pg.por?' · '+esc(pg.por):''):'depois do pagamento, a '+nm+' paga cada MEI pelo Conectwork',pg?lnk('pjp-cwpagox','desfazer',e):n?btn('pjp-cwpago','Marcar pago',e,''):'')}
       ${pas(false,'Notas dos MEIs para a '+nm,'cada MEI recebe a demanda no Conectwork dele; a '+nm+' confere e paga lá','')}</ol>`; }
@@ -1397,6 +1418,9 @@
     document.querySelectorAll('.pjp-dl [data-pjpd]').forEach(el=>{ const b=(el.dataset.b||'').split(' '), ks=(el.dataset.k||'').split(' ');
       const ok=(!J.dsel||el.dataset.pjpd===J.dsel)&&(k==='*'||ks.includes(k))&&ws.every(w=>b.some(x=>x===w||(w.length>1&&x.startsWith(w))||(w.includes('/')&&x.startsWith(w)))); el.hidden=!ok; if(ok) n++; });
     const v=document.getElementById('pjp-dv'); if(v) v.hidden=!!n; }
+  document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!t.dataset||t.dataset.pjpCwbus==null) return; const q=semAc(t.value).trim().split(/\s+/).filter(Boolean), box=t.closest('.pjp-cwq'); if(!box) return; let n=0;
+    box.querySelectorAll('li[data-b]').forEach(li=>{ const ok=q.every(w=>li.dataset.b.includes(w)); li.hidden=!ok; if(ok) n++; }); const z=box.querySelector('.pjp-cwq0'); if(z) z.hidden=!!n; });
+  document.addEventListener('click',ev=>{ if(ev.target.closest&&ev.target.closest('[data-pjp-cwlk]')){ J.cwLinkBloq=''; } },true);
   document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='pjp-dq'){ J.dq=t.value; dFiltra(); return; } });
   document.addEventListener('input',ev=>{ const t=ev.target; if(!C||!t||t.id!=='pjp-q') return; J.q=t.value; clearTimeout(J._qt); J._qt=setTimeout(()=>{ C.P.render(); setTimeout(()=>{ const i=document.getElementById('pjp-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },0); },350); });
   /* "Abrir o cadastro" da gaveta: quem abre o cadastro é o RH (rh-ed); aqui só fecha a gaveta para não voltar aberta */
@@ -1524,9 +1548,12 @@
           cwVai(c,String(cw[0].empresa||'').toUpperCase()); return; } }
       if(a==='pjp-pedlink'){ const ids=(J.mod&&J.mod.outros)||[]; const out=[]; for(const id of ids){ const f=fDe(id); try{ const ped=await pedir(c,J.per,f); out.push({fid:f._id,nome:ped.nome,valor:ped.valor,tel:f.telefone||'',msg:msgDe(c,f,ped)}); }catch(e){ P.erro(e); } }
         J.mod={k:'lote',xs:out}; P.render(); return; }
-      if(a==='pjp-cwped'){ const k=b.dataset.e, soF=b.dataset.so==='f'; b.disabled=true; J.cwConf=''; const I=await cwPedir(c,k,soF?{soFechados:true}:{}); J.cwFoco=k;
+      if(a==='pjp-cwret'||a==='pjp-cwvolta'){ const f=fDe(b.dataset.f), k=String(f.empresa||'').toUpperCase(), ret=a==='pjp-cwret';
+        await grava(c,J.per,f._id,{cwFora:ret},(ret?'Retirado da nota da ':'Posto de volta na nota da ')+c.titulo(k)+' (Conectwork)'); J.cwFoco=k;
+        P.toast(c.titulo(f.nome).split(' ')[0]+(ret?' saiu da nota da '+c.titulo(k)+'. Se a nota já foi aberta no Conectwork, mande de novo para atualizar.':' voltou para a nota da '+c.titulo(k)+'.')); P.render(); return; }
+      if(a==='pjp-cwped'){ const k=b.dataset.e, soF=b.dataset.so==='f'; b.disabled=true; J.cwConf=''; const win=cwJanela(); const I=await cwPedir(c,k,Object.assign(soF?{soFechados:true}:{},{win})); J.cwFoco=k;
         P.toast('Nota da '+c.titulo(k)+' aberta no Conectwork ('+I.M.itens.length+' PJ). Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
-      if(a==='pjp-cwsepm'){ const k=b.dataset.e, f=fDe(b.dataset.f); b.disabled=true; await cwPedir(c,k,{so:f._id});
+      if(a==='pjp-cwsepm'){ const k=b.dataset.e, f=fDe(b.dataset.f); b.disabled=true; const win=cwJanela(); await cwPedir(c,k,{so:f._id,win});
         P.toast('Nota separada de '+c.titulo(f.nome).split(' ')[0]+' aberta no Conectwork. Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
       if(a==='pjp-cwab'){ const u=cwBase(c,'medicoes'); window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
       if(a==='pjp-cwnota'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',{em:agora(),por:c.eu()},x=>['pedido','chegou'].includes(x.st)?{st:'conferida',conf:{em:agora(),por:c.eu(),via:'conectwork-empresa'}}:null,'Nota da '+c.titulo(k)+' para a Colafix conferida'); P.render(); return; }

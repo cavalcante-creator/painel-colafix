@@ -54,6 +54,20 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
     R&&R.itens.length===2&&R.ref==='painel-rh:2026-10-2:ZENITH'&&!R.itens.some(i=>/^(Ana|Lia)/.test(i.n))&&X.f7.st==='pedido'&&(await srv())['rh/dados/pjpag/2026-10-2'].cw.ZENITH.n===2, JSON.stringify(R));
   const l4=await linhaF('f4'), l7=await linhaF('f7');
   ok('Na lista: a Ana "Nota separada no Conectwork" com "Nota separada conferida"; o Rui só com o link para a nota da Zenith', /Nota separada no Conectwork/.test(l4)&&/Nota separada conferida/.test(l4)&&/ver na nota da Zenith/.test(l7)&&!/Abrir o Conectwork/.test(l7), JSON.stringify({l4,l7}));
+  // 4) procurar o PJ e retirar da nota (12/11): sai da nota da Zenith, aparece riscado com "Pôr de volta"; o próximo envio vai sem ele
+  await p.keyboard.press('Escape'); await H.dorme(300); await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
+  await p.fill('[data-pjp-cwbus="ZENITH"]','rui'); await H.dorme(300);
+  const vis=await p.evaluate(()=>[...document.querySelectorAll('[data-pjp-cwl="ZENITH"] li')].filter(li=>!li.hidden).map(li=>li.innerText.split('\n')[0]));
+  ok('Procurar "rui" mostra só o Rui na lista da nota da Zenith', vis.length===1&&/Rui/i.test(vis[0]), JSON.stringify(vis));
+  await p.click('[data-pjp-cwl="ZENITH"] [data-act="pjp-cwret"][data-f="f7"]'); await H.dorme(1200);
+  X=await pes(); m=await card();
+  ok('"Retirar" grava cwFora e o Rui aparece como retirado com "Pôr de volta"', X.f7.cwFora===true&&/retirado da nota/.test(m)&&/Pôr de volta/.test(m), m.slice(0,800));
+  await p.click('#pjp-cw-ZENITH [data-act="pjp-cwped"]'); await H.dorme(2000);
+  R=await ultimo();
+  ok('Mandar de novo vai sem o Rui (só o Joao)', R&&R.itens.length===1&&/^Jo/.test(R.itens[0].n), JSON.stringify(R));
+  await p.click('[data-pjp-cwl="ZENITH"] [data-act="pjp-cwvolta"][data-f="f7"]'); await H.dorme(1200);
+  X=await pes(); ok('"Pôr de volta" tira a marca', X.f7.cwFora===false);
+  ok('O passo 1 diz "aberta no Conectwork" e que só vale depois de Enviar lá', /Medição aberta no Conectwork/.test(await card())&&/Enviar/.test(await card()));
   if(process.env.SHOT){ await p.evaluate(()=>document.getElementById('pjp-cw-ZENITH').scrollIntoView()); await H.dorme(300); await p.screenshot({path:process.env.SHOT}); }
   ok('Sem erros na página', !er.length, er.join(' | '));
   await B.browser.close(); console.log(res.filter(Boolean).length+' de '+res.length+' testes de pjpcwsep passaram.'); process.exit(res.every(Boolean)?0:1); })().catch(e=>{ console.error('ERRO NO TESTE',e); process.exit(1); });
