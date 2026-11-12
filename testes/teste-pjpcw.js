@@ -31,9 +31,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await p.keyboard.press('Escape'); await H.dorme(300);
   await p.click('.pjp-lc [data-act="pjp-ped"][data-f="f1"]'); await H.dorme(700);
   let m=await p.evaluate(()=>{ const x=document.querySelector('[aria-label="Pedir nota pelo Conectwork"]'); return x?x.innerText:''; });
-  ok('Abre "Pedir nota pelo Conectwork" com todos os PJ da Zenith e avisa quem ainda não tem o valor fechado', /Joao Pereira Teste/.test(m)&&/Ana Souza Teste · .*valor ainda não fechado/.test(m)&&!/Maria/.test(m)&&/Fechar o que falta e mandar ao Conectwork/.test(m), m.slice(0,400));
+  ok('Abre "Pedir nota pelo Conectwork" com todos os PJ da Zenith e avisa quem ainda não tem o valor fechado', /Joao Pereira Teste/.test(m)&&/Ana Souza Teste · .*valor ainda não fechado/.test(m)&&!/Maria/.test(m)&&/Fechar o que falta e mandar todos/.test(m), m.slice(0,400));
   if(process.env.SHOT) await p.screenshot({path:process.env.SHOT});
-  await p.click('[data-act="pjp-cwped"][data-e="ZENITH"]'); await H.dorme(1800);
+  await p.click('[data-act="pjp-cwped"][data-e="ZENITH"]:not([data-so])'); await H.dorme(1800);
   const ab=await p.evaluate(()=>window.__abriu||[]), u=ab.filter(x=>/importar/.test(x)).pop()||''; let R=null; try{ R=ler(u); }catch(e){}
   ok('Manda ao Conectwork a medição da Zenith com os 2 PJ, horas, valor e o CNPJ de cada um (sem CPF)', R&&R.cnpj==='62944495000164'&&R.itens.length===2&&R.itens.every(i=>/^\d{14}$/.test(i.c)&&i.v>0)&&!/11122233344|22233344455/.test(JSON.stringify(R)), JSON.stringify(R));
   let S=await srv(), pes=S['rh/dados/pjpag/2026-10-2'].pes;
