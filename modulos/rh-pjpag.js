@@ -316,7 +316,9 @@
   .pjp-cwwm{font-weight:700;font-size:14.5px;letter-spacing:-.01em;color:#fff}.pjp-cwwm b{color:#4D8DFF;font-weight:700}
   .pjp-cwmh{display:flex;align-items:center;gap:12px;margin:-20px -22px 14px;padding:16px 22px;border-radius:18px 18px 0 0;background:linear-gradient(135deg,#0B1A45 0%,#12366D 70%,#1A5CF0 140%)}
   .pjp-cwmh .pjp-cwlg{width:40px;height:40px;border-radius:12px}.pjp-cwmh .pjp-cwlg svg{width:30px;height:30px}
-  .pjp-cwmh .pjp-cwwm{font-size:13px;opacity:.95}.pjp-cwmh h3{margin:0;color:#fff;font-size:18px}
+  .pjp-cwmh .pjp-cwwm{font-size:13px;opacity:.95}.pjp-cwmh h3{margin:0;color:#fff;font-size:18px}.pjp-cwmh>div{flex:1;min-width:0}
+  .pjp-cwir{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:7px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  @media (hover:hover) and (pointer:fine){.pjp-cwir:hover{background:rgba(255,255,255,.18)}}
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -658,7 +660,11 @@
     return I; }
   const quando=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
   function cwVai(c,k){ J.mod={k:'cw'}; J.cwFoco=k||''; J.ab=''; c.P.render(); setTimeout(()=>{ const el=k&&document.getElementById('pjp-cw-'+k); if(el) el.scrollIntoView({block:'nearest'}); },60); }
-  const cwLink=(c,payload)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes/importar/'+b64u(JSON.stringify(payload));
+  /* 12/11 ("direcionar para o login da Colafix no Conectwork"): o link leva ?empresa=<CNPJ da Colafix>; no Conectwork, depois
+     do login (ou direto, se já entrou naquele navegador), abre na empresa Colafix sem perguntar. A senha nunca vai no link. */
+  const cwBase=(c,rota)=>{ const u=String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'').replace(/\?.*$/,''), cn=dig(((c.EMP_DOC||{}).COLAFIX||{}).cnpj);
+    return u+(cn.length===14?'?empresa='+cn:'')+'#'+rota; };
+  const cwLink=(c,payload)=>cwBase(c,'medicoes/importar/'+b64u(JSON.stringify(payload)));
   /* Conectwork num lugar só (12/11, "tem vários botões da Conectwork e confunde; melhorar a lógica"): um quadro por empresa com
      1) a nota da empresa (junto): quem já está pronto, quem falta fechar, mandar / mandar de novo (atualiza a medição);
      2) as notas separadas (cada PJ que a empresa fatura à parte); 3) as etapas da nota e do pagamento à empresa.
@@ -674,7 +680,7 @@
   /* símbolo do Conectwork (o mesmo do app: faixa azul em losango arredondado com a folha verde-água) */
   const CW_SIMB=`<svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="pjpcwA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1F63FF"/><stop offset="1" stop-color="#0733C4"/></linearGradient><linearGradient id="pjpcwB" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0A4C8A"/><stop offset=".5" stop-color="#0FA394"/><stop offset="1" stop-color="#24DFB3"/></linearGradient></defs><path d="M70.5 40.1 61.3 30.9Q50 19.6 38.7 30.9L30.9 38.7Q19.6 50 30.9 61.3L38.7 69.1Q50 80.4 61.3 69.1L63.5 66.9" fill="none" stroke="url(#pjpcwA)" stroke-width="21"/><path d="M49.6 66 71 44.6Q74 41.6 78.5 41.2L85.5 40.7Q88.6 40.5 88.4 43.6L87.9 50.6Q87.6 54.8 84.8 57.6L64.4 80.8Z" fill="url(#pjpcwB)" fill-opacity=".94"/></svg>`;
   function cwModal(c){ const pid=J.per, p=perDe(pid), emps=[...new Set(pjs(c,p).map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
-    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Notas das prestadoras</h3></div></div>
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Notas das prestadoras</h3></div><button type="button" class="pjp-cwir" data-act="pjp-cwab" title="Abre o Conectwork já na empresa Colafix">Abrir o Conectwork da Colafix ↗</button></div>
       <p class="sub">A Colafix paga a empresa. Cada PJ vai <b>junto</b> na nota da empresa (padrão) ou numa <b>nota separada</b>. Só nome, horas, valor e CNPJ (nunca CPF); no Conectwork você confere e envia.</p>
       ${cwBloco(c,pid,emps)||'<p>Nenhuma prestadora pelo Conectwork nesta quinzena.</p>'}
       <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${btn('pjp-modx','Fechar')}</div></div></div>`; }
@@ -1522,7 +1528,7 @@
         P.toast('Nota da '+c.titulo(k)+' aberta no Conectwork ('+I.M.itens.length+' PJ). Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
       if(a==='pjp-cwsepm'){ const k=b.dataset.e, f=fDe(b.dataset.f); b.disabled=true; await cwPedir(c,k,{so:f._id});
         P.toast('Nota separada de '+c.titulo(f.nome).split(' ')[0]+' aberta no Conectwork. Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
-      if(a==='pjp-cwab'){ const u=String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes'; window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
+      if(a==='pjp-cwab'){ const u=cwBase(c,'medicoes'); window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
       if(a==='pjp-cwnota'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',{em:agora(),por:c.eu()},x=>['pedido','chegou'].includes(x.st)?{st:'conferida',conf:{em:agora(),por:c.eu(),via:'conectwork-empresa'}}:null,'Nota da '+c.titulo(k)+' para a Colafix conferida'); P.render(); return; }
       if(a==='pjp-cwnotax'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',null,x=>x.st==='conferida'&&x.conf&&x.conf.via==='conectwork-empresa'?{st:'pedido',conf:null}:null,'Nota da '+c.titulo(k)+' desfeita'); P.render(); return; }
       if(a==='pjp-cwpago'){ const k=b.dataset.e; await cwEmpMarca(c,k,'pago',{em:agora(),por:c.eu(),data:P.hojeStr()},x=>x.st&&x.st!=='pago'?{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr(),de:x.st,via:'empresa'}}:null,'Colafix pagou a '+c.titulo(k)); P.render(); return; }

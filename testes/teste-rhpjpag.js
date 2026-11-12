@@ -151,7 +151,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
     return JSON.parse(decodeURIComponent(Array.from(atob(pad)).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }catch(e){ return null; } },cwU);
   const cwS=(await srv())['rh/dados/pjpag/2026-10-2'];
   ok('Conectwork: só a Nexus (que está na lista) tem o quadro; o link leva período, CNPJ, nome, horas, valor e o CNPJ do MEI (sem CPF) e fica registrado',
-    /Nexus/.test(cwB)&&!(await p.$('#pjp-cw-ZENITH'))&&/^https:\/\/conectwork\.com\.br\/#medicoes\/importar\//.test(cwU)&&!/55566677788/.test(cwU)
+    /Nexus/.test(cwB)&&!(await p.$('#pjp-cw-ZENITH'))&&/^https:\/\/conectwork\.com\.br\/\?empresa=08813381000130#medicoes\/importar\//.test(cwU)&&!/55566677788/.test(cwU)
     &&cwN&&cwN.v===1&&cwN.periodo==='2026-10-2'&&cwN.itens.length===1&&cwN.itens[0].c==='11222333000181'&&Number.isInteger(cwN.itens[0].v)&&cwN.total===cwN.itens[0].v
     &&cwS&&cwS.cw&&cwS.cw.NEXUS&&cwS.cw.NEXUS.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwN,cw:cwS&&cwS.cw}));
   const cwB2=await p.evaluate(()=>{ const x=document.getElementById('pjp-cw-NEXUS'); return x?x.innerText:''; });
