@@ -322,7 +322,7 @@
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .pjp-cwq{margin-top:8px}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
+  .pjp-cwq{margin-top:8px}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
   .pjp-cwbus{display:flex;align-items:center;gap:6px;border:1px solid var(--line,#dde3ea);border-radius:10px;padding:0 10px;background:var(--surface,#fff);min-width:min(260px,100%)}
   .pjp-cwbus input{border:0;outline:0;background:transparent;font:inherit;font-size:14px;padding:8px 0;flex:1;min-width:0;color:inherit}.pjp-cwbus:focus-within{border-color:var(--teal,#1a6b80)}
   .pjp-cwq ul{max-height:280px;overflow:auto}.pjp-cwq li.ret>span:first-child,.pjp-cwq li.ret>b{color:var(--muted);text-decoration:line-through}.pjp-cwqa{display:flex;gap:6px;align-items:center;margin-left:auto}
@@ -662,7 +662,7 @@
     if(!w){ try{ w=window.open(url,'_blank'); }catch(e){ w=null; } }
     J.cwLinkBloq=w?'':url; if(w) try{ w.opener=null; }catch(e){}
     const p=perDe(J.per), D=docP(J.per);
-    if(!opt.so){ const reg=Object.assign({},(D.cw||{})[k]||{},{em:agora(),por:c.eu(),total:I.M.payload.total,n:I.M.itens.length}); D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
+    if(!opt.so){ const reg=Object.assign({},(D.cw||{})[k]||{},{em:agora(),por:c.eu(),total:I.M.payload.total,n:I.M.itens.length,conf:null}); D.cw=Object.assign({},D.cw,{[k]:reg}); J.docs[J.per]=D;
       await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:reg}},{merge:true}); }
     for(const o of I.com){ const x=pesDe(J.per,o.f._id); if(x.st!=='fechado') continue;
       await grava(c,J.per,o.f._id,{st:'pedido',ped:Object.assign({via:'conectwork',em:agora(),por:c.eu(),valor:x.fech?x.fech.valor:o.valor,mes:p.mes,emp:k},opt.so?{sep:true,parte:parteDe(o.f._id)}:{})},
@@ -721,7 +721,7 @@
         const sepH=sep.length?`<div class="pjp-cwsec"><b>Notas separadas</b> <small>(a ${nm} faz uma nota só com o valor de cada um)</small><ul>${sep.map(o=>{ const env=pedCw(o.x)&&o.x.ped.sep;
             return `<li><span>${nome(o)}</span><b>${R$(o.valor)}</b>${env?`<small>enviada ${esc(quando(o.x.ped.em))}</small>`:btn('pjp-cwsepm',o.x.st?'Mandar só '+pnome(o):'Fechar e mandar só '+pnome(o),e+' data-f="'+esc(o.f._id)+'"','')+lnk('pjp-cwsepx','voltar para a nota da '+nm,'data-f="'+esc(o.f._id)+'"')}</li>`; }).join('')}</ul></div>`:'';
         return `<div class="pjp-cwe pjp-cwk${J.cwFoco===k?' foco':''}" id="pjp-cw-${esc(k)}"><div class="pjp-cwh"><b>${nm}</b>
-            <span class="pjp-cwn">${jt.length?`Nota da ${nm}: <b>${pr.length} pronto${pr.length===1?'':'s'}</b> · ${tot(pr)}${ab.length?` · <span class="pjp-cwab">${ab.length} sem valor fechado</span>`:''}`:'Nenhum PJ na nota da '+nm}${ja?`<small>Aberta no Conectwork ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''} · ${R$(ja.total/100)} (${ja.n} PJ)${novos||mudou?' · <b class="pjp-cwab">tem valor novo: mande de novo</b>':''}</small>`:''}</span>
+            <span class="pjp-cwn">${jt.length?`Nota da ${nm}: <b>${pr.length} pronto${pr.length===1?'':'s'}</b> · ${tot(pr)}${ab.length?` · <span class="pjp-cwab">${ab.length} sem valor fechado</span>`:''}`:'Nenhum PJ na nota da '+nm}${ja?`<small>${ja.conf?'Enviada no Conectwork':'Aberta (falta enviar lá)'} ${esc(quando(ja.em))}${ja.por?' por '+esc(ja.por):''} · ${R$(ja.total/100)} (${ja.n} PJ)${novos||mudou?' · <b class="pjp-cwab">tem valor novo: mande de novo</b>':''}</small>`:''}</span>
             <span class="pjp-ac">${bts}</span></div>
           ${quem}${sepH}${fora.length?`<small class="pjp-cwfo">Fora da nota da ${nm}: ${fora.map(nome).join(', ')} (já pagos por fora ou com nota pelo link)</small>`:''}
           ${ja?cwEtapas(c,k,ja):''}</div>`; }).join('')}</div>`; }
@@ -730,7 +730,13 @@
      A nota de cada MEI para a empresa e o pagamento do MEI são da empresa, no Conectwork (aqui só aparece como acompanhamento). */
   function cwEtapas(c,k,ja){ const esc=c.esc, n=ja.nota, pg=ja.pago, nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"';
     const pas=(ok,t,s,acao)=>`<li class="${ok?'ok':''}"><i>${ok?'✓':''}</i><div><b>${t}</b>${s?`<small>${s}</small>`:''}</div>${acao||''}</li>`;
-    return `<ol class="pjp-cwp">${pas(true,'Medição aberta no Conectwork',esc(quando(ja.em))+(ja.por?' · '+esc(ja.por):'')+' · só vale depois de tocar em <b>Enviar</b> lá. Não apareceu? Veja em Medições ou mande de novo.',lnk('pjp-cwab','ver as medições no Conectwork',''))}
+    /* 12/11 ("aparece medição enviada mas não funcionou"): o painel não lê o Conectwork; abrir o link não é enviar. O passo 1 só fica
+       feito quando a pessoa confirma "Enviei no Conectwork" (cw.<EMP>.conf); até lá, explica o que fazer e deixa abrir de novo. */
+    const cf=ja.conf;
+    if(!cf) return `<ol class="pjp-cwp"><li class="pend"><i></i><div><b>Falta enviar no Conectwork</b><small>Aberta ${esc(quando(ja.em))}${ja.por?' · '+esc(ja.por):''}, mas ainda não confirmada. No Conectwork, confira e toque em <b>Enviar</b>. Se lá aparecer "Falta registrar o contrato", toque em <b>Registrar o contrato que já existe</b> (só uma vez por empresa).</small></div>
+        <span class="pjp-ac">${btn('pjp-cwped','Abrir de novo no Conectwork',e+' data-so="f"','sec')}${btn('pjp-cwconf','Enviei no Conectwork',e,'')}</span></li>
+      ${pas(false,'Nota da '+nm+' para a Colafix','depois de enviar a medição','')}${pas(false,'Colafix pagou a '+nm,'','')}</ol>`;
+    return `<ol class="pjp-cwp">${pas(true,'Medição enviada no Conectwork','confirmada '+esc(quando(cf.em))+(cf.por?' · '+esc(cf.por):''),lnk('pjp-cwconfx','não chegou? desfazer',e)+' '+lnk('pjp-cwab','ver no Conectwork',''))}
       ${pas(!!n,'Nota da '+nm+' para a Colafix',n?'conferida no Conectwork · '+esc(quando(n.em))+(n.por?' · '+esc(n.por):''):'a '+nm+' emite uma nota só, do valor total ('+R$(ja.total/100)+')',n?lnk('pjp-cwnotax','desfazer',e):btn('pjp-cwnota','Nota conferida',e,'sec'))}
       ${pas(!!pg,'Colafix pagou a '+nm,pg?esc(quando(pg.em))+(pg.por?' · '+esc(pg.por):''):'depois do pagamento, a '+nm+' paga cada MEI pelo Conectwork',pg?lnk('pjp-cwpagox','desfazer',e):n?btn('pjp-cwpago','Marcar pago',e,''):'')}
       ${pas(false,'Notas dos MEIs para a '+nm,'cada MEI recebe a demanda no Conectwork dele; a '+nm+' confere e paga lá','')}</ol>`; }
@@ -1556,6 +1562,10 @@
       if(a==='pjp-cwsepm'){ const k=b.dataset.e, f=fDe(b.dataset.f); b.disabled=true; const win=cwJanela(); await cwPedir(c,k,{so:f._id,win});
         P.toast('Nota separada de '+c.titulo(f.nome).split(' ')[0]+' aberta no Conectwork. Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
       if(a==='pjp-cwab'){ const u=cwBase(c,'medicoes'); window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
+      if(a==='pjp-cwconf'||a==='pjp-cwconfx'){ const k=b.dataset.e, p=perDe(J.per), D=docP(J.per), v=a==='pjp-cwconf'?{em:agora(),por:c.eu()}:null;
+        D.cw=Object.assign({},D.cw,{[k]:Object.assign({},(D.cw||{})[k]||{},{conf:v})}); J.docs[J.per]=D;
+        await P.db().doc(COL+'/'+J.per).set({pid:J.per,de:p.de,ate:p.ate,em:agora(),cw:{[k]:{conf:v}}},{merge:true});
+        P.toast(v?'Medição da '+c.titulo(k)+' marcada como enviada no Conectwork.':'Voltou para "falta enviar".'); P.render(); return; }
       if(a==='pjp-cwnota'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',{em:agora(),por:c.eu()},x=>['pedido','chegou'].includes(x.st)?{st:'conferida',conf:{em:agora(),por:c.eu(),via:'conectwork-empresa'}}:null,'Nota da '+c.titulo(k)+' para a Colafix conferida'); P.render(); return; }
       if(a==='pjp-cwnotax'){ const k=b.dataset.e; await cwEmpMarca(c,k,'nota',null,x=>x.st==='conferida'&&x.conf&&x.conf.via==='conectwork-empresa'?{st:'pedido',conf:null}:null,'Nota da '+c.titulo(k)+' desfeita'); P.render(); return; }
       if(a==='pjp-cwpago'){ const k=b.dataset.e; await cwEmpMarca(c,k,'pago',{em:agora(),por:c.eu(),data:P.hojeStr()},x=>x.st&&x.st!=='pago'?{st:'pago',pago:{em:agora(),por:c.eu(),data:P.hojeStr(),de:x.st,via:'empresa'}}:null,'Colafix pagou a '+c.titulo(k)); P.render(); return; }

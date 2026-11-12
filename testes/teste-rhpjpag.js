@@ -155,7 +155,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
     &&cwN&&cwN.v===1&&cwN.periodo==='2026-10-2'&&cwN.itens.length===1&&cwN.itens[0].c==='11222333000181'&&Number.isInteger(cwN.itens[0].v)&&cwN.total===cwN.itens[0].v
     &&cwS&&cwS.cw&&cwS.cw.NEXUS&&cwS.cw.NEXUS.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwN,cw:cwS&&cwS.cw}));
   const cwB2=await p.evaluate(()=>{ const x=document.getElementById('pjp-cw-NEXUS'); return x?x.innerText:''; });
-  ok('Depois de enviar, o quadro mostra quando e por quem', /Aberta no Conectwork \d{2}\/\d{2} às \d{2}:\d{2} por Stefani RH/.test(cwB2), cwB2.slice(0,300));
+  ok('Depois de enviar, o quadro mostra quando e por quem', /Aberta \(falta enviar lá\) \d{2}\/\d{2} às \d{2}:\d{2} por Stefani RH/.test(cwB2), cwB2.slice(0,300));
   const e=erros.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });

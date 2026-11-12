@@ -67,7 +67,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Mandar de novo vai sem o Rui (só o Joao)', R&&R.itens.length===1&&/^Jo/.test(R.itens[0].n), JSON.stringify(R));
   await p.click('[data-pjp-cwl="ZENITH"] [data-act="pjp-cwvolta"][data-f="f7"]'); await H.dorme(1200);
   X=await pes(); ok('"Pôr de volta" tira a marca', X.f7.cwFora===false);
-  ok('O passo 1 diz "aberta no Conectwork" e que só vale depois de Enviar lá', /Medição aberta no Conectwork/.test(await card())&&/Enviar/.test(await card()));
+  ok('O passo 1 diz "Falta enviar no Conectwork" e que é preciso tocar em Enviar lá', /Falta enviar no Conectwork/.test(await card())&&/Enviar/.test(await card()));
   if(process.env.SHOT){ await p.evaluate(()=>document.getElementById('pjp-cw-ZENITH').scrollIntoView()); await H.dorme(300); await p.screenshot({path:process.env.SHOT}); }
   ok('Sem erros na página', !er.length, er.join(' | '));
   await B.browser.close(); console.log(res.filter(Boolean).length+' de '+res.length+' testes de pjpcwsep passaram.'); process.exit(res.every(Boolean)?0:1); })().catch(e=>{ console.error('ERRO NO TESTE',e); process.exit(1); });
