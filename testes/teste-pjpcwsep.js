@@ -42,10 +42,12 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('A nota separada vai só com a Ana, com a "parte" própria (outra medição no Conectwork), e fica marcada separada',
     R&&R.itens.length===1&&/^Ana/.test(R.itens[0].n)&&/^[a-z0-9]{3,30}$/.test(R.parte)&&R.ref==='painel-rh:2026-10-2:ZENITH:'+R.parte&&X.f4.st==='pedido'&&X.f4.ped.sep===true, JSON.stringify({R,f4:X.f4}));
 
-  // 3) depois o Rui fecha: o quadro avisa "valor novo" e mandar de novo vai com Joao + Rui (sem a Ana)
+  // 3) depois o Rui fecha (fecha a janela, fecha o valor e abre de novo pelo botão): mandar de novo vai com Joao + Rui
+  await p.keyboard.press('Escape'); await H.dorme(300);
   await p.click('[data-act="pjp-fech"][data-f="f7"]'); await H.dorme(1000);
+  const bt3=await p.evaluate(()=>{ const b=document.querySelector('[data-act="pjp-cwabre"]'); return b?b.innerText:''; }); await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
   m=await card();
-  ok('Com o Rui fechado, o quadro avisa "tem valor novo" e mostra a Ana como nota separada enviada', /tem valor novo/.test(m)&&/Mandar de novo \(atualiza a medição\)/.test(m)&&/enviada/.test(m), m.slice(0,600));
+  ok('Botão "Conectwork · 1 para mandar" e, na janela, com o Rui fechado, o quadro avisa "tem valor novo" e mostra a Ana como nota separada enviada', /1 para mandar/.test(bt3)&&/tem valor novo/.test(m)&&/Mandar de novo \(atualiza a medição\)/.test(m)&&/enviada/.test(m), m.slice(0,600));
   await p.click('#pjp-cw-ZENITH [data-act="pjp-cwped"]'); await H.dorme(2200);
   R=await ultimo(); X=await pes();
   ok('"Mandar de novo": a nota da Zenith vai com Joao + Rui (atualiza a de antes), sem a Ana e sem a Lia',

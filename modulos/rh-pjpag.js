@@ -306,6 +306,7 @@
   .pjp-cwl{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border:1px solid var(--line,#dde3ea);border-radius:10px}
   .pjp-cwl>div{flex:1 1 220px;min-width:0}.pjp-cwl small{flex-basis:100%;color:var(--muted)}
   .pjp-cws select{height:34px;border:1px solid var(--line,#dde3ea);border-radius:8px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:13px;padding:0 8px;max-width:100%}
+  .pjp-mod.pjp-cwm{max-width:900px}.pjp-cwm .pjp-cw{margin-top:8px;border:0;padding:0;background:none}.pjp-cwbd{display:inline-block;margin-left:6px;background:var(--crit,#c0392b);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;font-weight:600}
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -564,7 +565,7 @@
         <div>${r.uPend?`<span class="pjp-pill warn">${r.uPend} de uniforme para confirmar</span>`:''}</div>
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b>${antTxt(r)}</div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
-  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); 
+  function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); if(M.k==='cw') return cwModal(c); 
     if(M.k==='cfg'){ const g=cfg(c), k=corteQ(), emV=pjEmps(c), emT=[...new Set(['ZENITH','NEXUS','COLAFIX'].concat((c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.empresa).map(f=>String(f.empresa).toUpperCase())))];
       const nEmp=e=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.status!=='Desligado'&&String(f.empresa||'').toUpperCase()===e).length;
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-par" role="dialog" aria-label="Parâmetros do pagamento dos PJ"><h3>Parâmetros do pagamento</h3><p class="sub">Valem para todos os PJ. O horário e o valor da hora de cada pessoa ficam no detalhe dela (toque no nome › Regras).</p>
@@ -646,14 +647,26 @@
     if(opt.so&&J.cwSep) delete J.cwSep[opt.so];
     return I; }
   const quando=iso=>{ const d=new Date(iso); return isNaN(d)?'':pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+' às '+pad2(d.getHours())+':'+pad2(d.getMinutes()); };
-  function cwVai(c,k){ J.aba='lista'; J.cwFoco=k; J.ab=''; c.P.render(); setTimeout(()=>{ const el=document.getElementById('pjp-cw-'+k); if(el) el.scrollIntoView({block:'start',behavior:'smooth'}); },60); }
+  function cwVai(c,k){ J.mod={k:'cw'}; J.cwFoco=k||''; J.ab=''; c.P.render(); setTimeout(()=>{ const el=k&&document.getElementById('pjp-cw-'+k); if(el) el.scrollIntoView({block:'nearest'}); },60); }
   const cwLink=(c,payload)=>String(((c.R.cfg||{}).conectworkUrl)||CW_URL).replace(/#.*$/,'')+'#medicoes/importar/'+b64u(JSON.stringify(payload));
   /* Conectwork num lugar só (12/11, "tem vários botões da Conectwork e confunde; melhorar a lógica"): um quadro por empresa com
      1) a nota da empresa (junto): quem já está pronto, quem falta fechar, mandar / mandar de novo (atualiza a medição);
      2) as notas separadas (cada PJ que a empresa fatura à parte); 3) as etapas da nota e do pagamento à empresa.
      Nas linhas da lista fica só "Ver na nota da Zenith" e o link "nota separada". */
+  /* 12/11 ("pode ser um botão que nem o e-mail do financeiro, lá em cima"): o quadro do Conectwork abre numa janela pelo botão
+     "Conectwork" ao lado do "E-mail ao financeiro"; o botão mostra quantos estão prontos e ainda não foram. */
+  function cwBotao(c,pid,emps){ const ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
+    const p=perDe(pid), D=docP(pid); let n=0;
+    ks.forEach(k=>pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k).forEach(f=>{ const x=pesDe(pid,f._id); if(x.st==='fechado') n++; }));
+    return btn('pjp-cwabre','Conectwork'+(n?` <span class="pjp-cwbd">${n} para mandar</span>`:''),'title="Notas das prestadoras pelo Conectwork: junto na nota da empresa ou nota separada"','');
+  }
+  function cwModal(c){ const pid=J.per, p=perDe(pid), emps=[...new Set(pjs(c,p).map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><h3>Conectwork · notas das prestadoras</h3>
+      <p class="sub">A Colafix paga a empresa. Cada PJ vai <b>junto</b> na nota da empresa (padrão) ou numa <b>nota separada</b>. Só nome, horas, valor e CNPJ (nunca CPF); no Conectwork você confere e envia.</p>
+      ${cwBloco(c,pid,emps)||'<p>Nenhuma prestadora pelo Conectwork nesta quinzena.</p>'}
+      <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${btn('pjp-modx','Fechar')}</div></div></div>`; }
   function cwBloco(c,pid,emps){ const esc=c.esc, D=docP(pid), p=perDe(pid), ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
-    return `<div class="pjp-cw" id="pjp-cw"><div><b>Conectwork · notas das prestadoras</b><small>A Colafix paga a empresa. Cada PJ vai <b>junto</b> na nota da empresa (padrão) ou numa <b>nota separada</b>. Só nome, horas, valor e CNPJ (nunca CPF); no Conectwork você confere e envia.</small></div>
+    return `<div class="pjp-cw" id="pjp-cw">
       ${ks.map(k=>{ const nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"', ja=(D.cw||{})[k], conf=J.cwConf===k;
         const todos=pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k).map(f=>{ const x=pesDe(pid,f._id), r=calcPessoa(c,f,p,x); return {f,x,valor:x.st&&x.fech?x.fech.valor:r.valor}; }).filter(o=>o.valor>0);
         const jt=todos.filter(o=>!sepDe(o.f._id,o.x)&&cwJunto(o.x)), pr=jt.filter(o=>o.x.st), ab=jt.filter(o=>!o.x.st);
@@ -884,7 +897,7 @@
       <section class="pjp-cx"><div class="pjp-ch"><h3>Precisa de você</h3>${pv.length?`<span class="pjp-ct">${pv.length}</span>`:''}${pp.ok?'':`<div class="pjp-ppl" title="${esc(pp.s)}"><small>${esc(pp.t)}</small>${pp.b}</div>`}</div>${pvH}</section>`:''}${aba==='kb'?`
       <section><div class="pjp-sh"><h3>Onde cada PJ está</h3><small>toque no título de uma etapa para ver a lista dela; toque na pessoa para ver os dias</small></div>${quadros}</section>`:''}${aba==='lista'?`
       <section class="pjp-lc">
-        <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span>${btn('pjp-fin','E-mail ao financeiro')}</div>
+        <div class="pjp-lt1"><h3>${col<0?'Todos os PJ':esc(COLS[col].t)}</h3><small>${rs.length} PJ · ${R$(soma(rs))}</small>${col>=0?lnk('pjp-col','ver todos','data-v="-1"'):''}<span class="pjp-sp"></span>${cwBotao(c,pid,emps)}${btn('pjp-fin','E-mail ao financeiro')}</div>
         <div class="pjp-lt2"><label class="pjp-busca"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pjp-q" type="search" placeholder="Buscar PJ, setor ou empresa" aria-label="Buscar PJ" value="${esc(J.q)}"></label>
           <select id="pjp-emp" aria-label="Empresa"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e)}" ${J.emp===e?'selected':''}>${esc(e)}</option>`).join('')}</select>
           ${sets.length?`<select id="pjp-set" aria-label="Setor"><option value="">Todos os setores</option>${sets.map(e=>`<option ${J.set===e?'selected':''}>${esc(e)}</option>`).join('')}</select>`:''}
@@ -893,7 +906,7 @@
         ${rs.length?`<div class="pjp-tw"><table class="pjp-t"><thead><tr><th>PJ <small>· toque no nome para ver os dias</small></th><th>Situação</th><th class="n">Total a pagar</th><th class="pjp-qa"><span class="pjp-sr">Ações</span></th></tr></thead><tbody>${linhas}</tbody>
           <tfoot><tr><td>Total · ${rs.length} PJ</td><td></td><td class="n pjp-tt" data-r="Total a pagar">${R$(soma(rs))}</td><td></td></tr></tfoot></table></div>`
           :(U?U.vazio({tit:vazio[0],txt:vazio[1]}):`<div class="empty">${esc(vazio[0])}</div>`)}
-      </section>${cwBloco(c,pid,emps)}`:''}
+      </section>`:''}
 
       </div>`+(J._rsT=rsF,'')+gaveta(c,pid,rsT)+modal(c); }
   const css3=`<style id="pjp-css3">
@@ -1481,14 +1494,15 @@
         for(const f of xs){ try{ await fechar(c,f); }catch(e){ er.push(e.message); } } P.toast(er.length?(xs.length-er.length)+' fechados. '+er.join(' '):xs.length+' valores fechados.'); P.render(); return; }
       if(a==='pjp-reab'){ const f=fDe(b.dataset.f); await grava(c,J.per,f._id,{st:'',fech:null},'Reaberto para conferir'); P.render(); return; }
       if((a==='pjp-ped'||a==='pjp-cwvai')&&b.dataset.f&&viaCw(c,fDe(b.dataset.f))){ cwVai(c,String(fDe(b.dataset.f).empresa||'').toUpperCase()); return; }
+      if(a==='pjp-cwabre'){ cwVai(c,''); return; }
       if(a==='pjp-cwtodos'){ J.cwConf=b.dataset.e; P.render(); return; }
       if(a==='pjp-cwsepr'){ const f=fDe(b.dataset.f); J.cwSep=Object.assign({},J.cwSep,{[f._id]:1}); cwVai(c,String(f.empresa||'').toUpperCase()); P.toast(c.titulo(f.nome).split(' ')[0]+' foi para "Notas separadas". Toque em "Mandar só '+c.titulo(f.nome).split(' ')[0]+'" quando quiser.'); return; }
       if(a==='pjp-cwsepx'){ const f=fDe(b.dataset.f); J.cwSep=Object.assign({},J.cwSep); delete J.cwSep[f._id]; P.render(); return; }
       if(a==='pjp-pedtodos'){ const p=perDe(J.per), xs=pjs(c,p).filter(f=>pesDe(J.per,f._id).st==='fechado'&&(J._vis||[]).includes(f._id)), cw=xs.filter(f=>viaCw(c,f));
         if(cw.length&&!b.dataset.link){ const outros=xs.filter(f=>!viaCw(c,f)), out=[];
           for(const f of outros){ try{ const ped=await pedir(c,J.per,f); out.push({fid:f._id,nome:ped.nome,valor:ped.valor,tel:f.telefone||'',msg:msgDe(c,f,ped)}); }catch(e){ P.erro(e); } }
-          if(out.length) J.mod={k:'lote',xs:out};
-          cwVai(c,String(cw[0].empresa||'').toUpperCase()); P.toast('Zenith e Nexus: mande pelo quadro "Conectwork" da lista.'+(out.length?' Os outros recebem o link.':'')); return; } }
+          if(out.length){ J.mod={k:'lote',xs:out}; P.render(); P.toast('Os das outras empresas recebem o link. Zenith e Nexus: toque em "Conectwork", ao lado do E-mail ao financeiro.'); return; }
+          cwVai(c,String(cw[0].empresa||'').toUpperCase()); return; } }
       if(a==='pjp-pedlink'){ const ids=(J.mod&&J.mod.outros)||[]; const out=[]; for(const id of ids){ const f=fDe(id); try{ const ped=await pedir(c,J.per,f); out.push({fid:f._id,nome:ped.nome,valor:ped.valor,tel:f.telefone||'',msg:msgDe(c,f,ped)}); }catch(e){ P.erro(e); } }
         J.mod={k:'lote',xs:out}; P.render(); return; }
       if(a==='pjp-cwped'){ const k=b.dataset.e, soF=b.dataset.so==='f'; b.disabled=true; J.cwConf=''; const I=await cwPedir(c,k,soF?{soFechados:true}:{}); J.cwFoco=k;

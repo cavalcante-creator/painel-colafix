@@ -142,6 +142,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.keyboard.press('Escape'); await H.dorme(300);
   await p.evaluate(()=>window.Painel.db().doc('rh/config').set({conectworkMei:['NEXUS']},{merge:true})); await H.dorme(800);
   await p.evaluate(()=>{ window.open=()=>null; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.ab=''; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(1500);
+  await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
   const cwB=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
   const temN=await p.$('#pjp-cw-NEXUS [data-act="pjp-cwtodos"]'); if(temN){ await p.click('#pjp-cw-NEXUS [data-act="pjp-cwtodos"]'); await H.dorme(500); }
   await p.click('#pjp-cw-NEXUS [data-act="pjp-cwped"]'); await H.dorme(1500);

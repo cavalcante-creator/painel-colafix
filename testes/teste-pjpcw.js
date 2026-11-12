@@ -24,7 +24,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('PJ de outra empresa continua com "Pedir nota" (link)', /Pedir nota/.test(await linha('f5'))&&!/Conectwork/.test(await linha('f5')));
   await p.click('[data-act="pjp-fech"][data-f="f6"]'); await H.dorme(900);
   ok('PJ que a Colafix paga direto: "Pedir nota" pelo link (não vai ao Conectwork)', /Pedir nota/.test(await linha('f6'))&&!/Conectwork/.test(await linha('f6')));
-  const cwB=await p.evaluate(()=>(document.querySelector('.pjp-cw')||{}).innerText||''); ok('A Colafix não aparece no quadro do Conectwork', !(await p.$('#pjp-cw-COLAFIX'))&&!!(await p.$('#pjp-cw-ZENITH'))&&!/Colafix \(paga/.test(cwB), cwB.slice(0,200));
+  const btnCw=await p.evaluate(()=>{ const b=document.querySelector('[data-act="pjp-cwabre"]'); return b?b.innerText:''; }); await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
+  const cwB=await p.evaluate(()=>(document.querySelector('.pjp-cw')||{}).innerText||''); ok('Botão "Conectwork" ao lado do E-mail ao financeiro, com quantos estão para mandar; abre a janela', /Conectwork/.test(btnCw)&&/1 para mandar/.test(btnCw)&&!!(await p.$('[aria-label="Conectwork"]')), btnCw); ok('A Colafix não aparece no quadro do Conectwork', !(await p.$('#pjp-cw-COLAFIX'))&&!!(await p.$('#pjp-cw-ZENITH'))&&!/Colafix \(paga/.test(cwB), cwB.slice(0,200));
+  await p.keyboard.press('Escape'); await H.dorme(300);
   await p.click('.pjp-lc [data-act="pjp-fin"][data-f="f6"]'); await H.dorme(700);
   const pv=await p.evaluate(()=>(document.getElementById('pjp-finpv')||{}).innerText||'');
   ok('E-mail ao financeiro da PJ paga direto: nota do próprio prestador para a Colafix e depósito na conta do prestador', /emitida para a COLAFIX/.test(pv)&&/Depositar na conta de cada prestador/.test(pv)&&!/Depositar em conta COLAFIX/.test(pv), pv.slice(0,300));
@@ -48,12 +50,15 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('"Colafix pagou a Zenith": todos os PJ da Zenith ficam Pago à Zenith', S['rh/dados/pjpag/2026-10-2'].cw.ZENITH.pago&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='pago'&&S['rh/dados/pjpag/2026-10-2'].pes.f4.pago.via==='empresa'&&/Pago à Zenith/.test(await linha('f4')), await linha('f4'));
   await p.click('[data-act="pjp-cwpagox"][data-e="ZENITH"]'); await H.dorme(1200); S=await srv();
   ok('Desfazer o pagamento da Zenith volta cada PJ para a etapa de antes', !S['rh/dados/pjpag/2026-10-2'].cw.ZENITH.pago&&S['rh/dados/pjpag/2026-10-2'].pes.f4.st==='conferida'&&S['rh/dados/pjpag/2026-10-2'].pes.f1.st==='conferida');
+  await p.keyboard.press('Escape'); await H.dorme(300);
   await p.click('[data-act="pjp-fech"][data-f="f2"]'); await H.dorme(900);
   await p.evaluate(()=>{ window.RHPJPag._J.aba='pv'; window.Painel.render(); }); await H.dorme(500);
   const pp=await p.evaluate(()=>{ const e=document.querySelector('.pjp-ppl'); return e?e.innerText+' '+e.title:''; });
   ok('Próximo passo com Nexus e outra empresa: diz que Zenith e Nexus vão pelo Conectwork', /Zenith e Nexus pelo Conectwork/.test(pp)&&/Pedir nota aos 3/.test(pp), pp.replace(/\n/g,' | '));
   await p.click('.pjp-ppl [data-act="pjp-pedtodos"]'); await H.dorme(700);
+  const loteTxt=await p.evaluate(()=>document.body.innerText);
+  await p.keyboard.press('Escape'); await H.dorme(300); await p.evaluate(()=>{ window.RHPJPag._J.aba='lista'; window.Painel.render(); }); await H.dorme(400); await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
   S=await srv(); m=await p.evaluate(()=>(document.getElementById('pjp-cw-NEXUS')||{}).innerText||'');
-  ok('"Pedir nota aos 3": o da outra empresa recebe o link e a Nexus fica no quadro do Conectwork (1 pronto)', S['rh/dados/pjpag/2026-10-2'].pes.f5.st==='pedido'&&!S['rh/dados/pjpag/2026-10-2'].pes.f5.ped.via&&/pedidos de nota criados/.test(await p.evaluate(()=>document.body.innerText))&&/1 pronto/.test(m)&&/Maria|Mandar a nota da Nexus|Mandar o pronto/.test(m), m.slice(0,300));
+  ok('"Pedir nota aos 3": o da outra empresa recebe o link e a Nexus fica no quadro do Conectwork (1 pronto)', S['rh/dados/pjpag/2026-10-2'].pes.f5.st==='pedido'&&!S['rh/dados/pjpag/2026-10-2'].pes.f5.ped.via&&/pedidos de nota criados/.test(loteTxt)&&/1 pronto/.test(m)&&/Maria|Mandar a nota da Nexus|Mandar o pronto/.test(m), m.slice(0,300));
   const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
   console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
