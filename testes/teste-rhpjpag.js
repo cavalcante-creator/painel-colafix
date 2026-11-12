@@ -64,7 +64,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Regras desta pessoa ficam no cadastro (tolerância, dias de trabalho, observação)', rg.tol===10&&JSON.stringify(rg.dias)==='[1,2,3,4,5,6]'&&rg.obs==='Trabalha sábado de manhã', JSON.stringify(rg));
   await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag-gaveta.png'});
   await p.click('[data-act="pjp-gx"]',{timeout:4000}); await H.dorme(500);
-  s=await view(); ok('Lista com o valor novo', /96h48[\s\S]*R\$\s?2\.150,00/.test(s), s.replace(/\n/g,' | ').slice(0,300));
+  s=await p.evaluate(()=>{ const b=document.querySelector('.pjp-lc [data-f="f1"]'); const tr=b&&b.closest('tr'); return tr?tr.innerText:''; }); ok('Lista com o valor novo', /R\$\s?2\.150,00[\s\S]*96h48/.test(s), s.replace(/\n/g,' | ').slice(0,300));
   /* filtros */
   await p.selectOption('#pjp-emp','NEXUS'); await H.dorme(500); s=await view();
   ok('Filtro por empresa', /Maria Oliveira/.test(s)&&!/Joao Pereira/.test(s));
@@ -137,30 +137,24 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.click('[data-act="pjp-psalva"]'); await H.dorme(800);
   const F2=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['rh/dados/funcionarios/f2'].pjPag.leit);
   ok('Regra só desta pessoa: guarda os leitores dela no cadastro', JSON.stringify(F2)==='["REFEITORIO"]', JSON.stringify(F2));
-  /* Enviar ao Conectwork (07/11): a medição da quinzena por prestadora, no link, sem CPF */
+  /* Conectwork (07/11, quadro único desde 12/11): só as prestadoras em conectworkMei aparecem; o link leva período, CNPJ, nome,
+     horas, valor e o CNPJ do MEI de cada PJ (nunca CPF). Os fluxos junto/separada estão em teste-pjpcw.js e teste-pjpcwsep.js. */
   await p.keyboard.press('Escape'); await H.dorme(300);
   await p.evaluate(()=>window.Painel.db().doc('rh/config').set({conectworkMei:['NEXUS']},{merge:true})); await H.dorme(800);
   await p.evaluate(()=>{ window.open=()=>null; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.ab=''; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(1500);
   const cwB=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
-  for(let i=0;i<2&&!(await p.evaluate(()=>window.__pjpUltimoCw));i++){ await p.click('[data-act="pjp-cw"][data-e="ZENITH"]'); await H.dorme(700); }
+  const temN=await p.$('#pjp-cw-NEXUS [data-act="pjp-cwtodos"]'); if(temN){ await p.click('#pjp-cw-NEXUS [data-act="pjp-cwtodos"]'); await H.dorme(500); }
+  await p.click('#pjp-cw-NEXUS [data-act="pjp-cwped"]'); await H.dorme(1500);
   const cwU=await p.evaluate(()=>window.__pjpUltimoCw||'');
-  /* lê o link do mesmo jeito que o Conectwork (modulos/medicoes.js, lerResumo) */
-  const cwR=await p.evaluate(u=>{ try{ const t=u.split('#medicoes/importar/')[1], b64=t.replace(/-/g,'+').replace(/_/g,'/'), pad=b64+'==='.slice((b64.length+3)%4);
+  const cwN=await p.evaluate(u=>{ try{ const t=u.split('#medicoes/importar/')[1], b64=t.replace(/-/g,'+').replace(/_/g,'/'), pad=b64+'==='.slice((b64.length+3)%4);
     return JSON.parse(decodeURIComponent(Array.from(atob(pad)).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }catch(e){ return null; } },cwU);
   const cwS=(await srv())['rh/dados/pjpag/2026-10-2'];
-  ok('Enviar ao Conectwork: um botão por prestadora; o link leva período, CNPJ da prestadora, nome, horas e valor de cada PJ (sem CPF) e fica registrado',
-    /Zenith/.test(cwB)&&/Nexus/.test(cwB)&&!/Colafix/i.test(cwB)&&/^https:\/\/conectwork\.com\.br\/#medicoes\/importar\//.test(cwU)&&!/11122233344|55566677788/.test(cwU)&&!/11122233344/.test(JSON.stringify(cwR))
-    &&cwR&&cwR.v===1&&cwR.periodo==='2026-10-2'&&cwR.cnpj==='62944495000164'&&cwR.itens.length===1&&cwR.itens[0].n==='Joao Pereira Teste'&&Number.isInteger(cwR.itens[0].v)&&cwR.itens[0].v>0&&cwR.total===cwR.itens[0].v&&typeof cwR.itens[0].h==='number'
-    &&cwS&&cwS.cw&&cwS.cw.ZENITH&&cwS.cw.ZENITH.total===cwR.total&&cwS.cw.ZENITH.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwR,cw:cwS&&cwS.cw}));
-  /* 10/11/2026: só a NEXUS manda o CNPJ do MEI de cada PJ (o Conectwork prepara a nota do PJ para a prestadora); a Zenith não */
-  await p.evaluate(()=>{ window.__pjpUltimoCw=''; });
-  for(let i=0;i<2&&!(await p.evaluate(()=>window.__pjpUltimoCw));i++){ await p.click('[data-act="pjp-cw"][data-e="NEXUS"]'); await H.dorme(700); }
-  const cwN=await p.evaluate(u=>{ try{ const t=u.split('#medicoes/importar/')[1], b64=t.replace(/-/g,'+').replace(/_/g,'/'), pad=b64+'==='.slice((b64.length+3)%4);
-    return JSON.parse(decodeURIComponent(Array.from(atob(pad)).map(ch=>'%'+ch.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }catch(e){ return null; } },await p.evaluate(()=>window.__pjpUltimoCw||''));
-  ok('Enviar ao Conectwork: a NEXUS leva o CNPJ do MEI de cada PJ (nunca CPF); a Zenith não leva',
-    cwN&&cwN.itens.length===1&&cwN.itens[0].c==='11222333000181'&&!/55566677788/.test(JSON.stringify(cwN))&&cwR&&!('c' in cwR.itens[0]), JSON.stringify({cwN,z:cwR&&cwR.itens}));
-  const cwB2=await p.evaluate(()=>{ const x=document.querySelector('.pjp-cw'); return x?x.innerText:''; });
-  ok('Depois de enviar, mostra quando e por quem e o botão vira "Enviar de novo"', /Enviado em \d{2}\/\d{2} às \d{2}:\d{2} por Stefani RH/.test(cwB2)&&/Enviar de novo/.test(cwB2), cwB2.slice(0,300));
+  ok('Conectwork: só a Nexus (que está na lista) tem o quadro; o link leva período, CNPJ, nome, horas, valor e o CNPJ do MEI (sem CPF) e fica registrado',
+    /Nexus/.test(cwB)&&!(await p.$('#pjp-cw-ZENITH'))&&/^https:\/\/conectwork\.com\.br\/#medicoes\/importar\//.test(cwU)&&!/55566677788/.test(cwU)
+    &&cwN&&cwN.v===1&&cwN.periodo==='2026-10-2'&&cwN.itens.length===1&&cwN.itens[0].c==='11222333000181'&&Number.isInteger(cwN.itens[0].v)&&cwN.total===cwN.itens[0].v
+    &&cwS&&cwS.cw&&cwS.cw.NEXUS&&cwS.cw.NEXUS.n===1, JSON.stringify({cwB:cwB.slice(0,200),cwN,cw:cwS&&cwS.cw}));
+  const cwB2=await p.evaluate(()=>{ const x=document.getElementById('pjp-cw-NEXUS'); return x?x.innerText:''; });
+  ok('Depois de enviar, o quadro mostra quando e por quem', /Enviada \d{2}\/\d{2} às \d{2}:\d{2} por Stefani RH/.test(cwB2), cwB2.slice(0,300));
   const e=erros.concat(B.erros||[]).filter(x=>!/404|cdnjs/.test(x)); ok('Nenhum erro de JavaScript', !e.length, e.join(' | ')); await B.browser.close();
   const f=res.filter(x=>!x.ok).length; console.log(f?'FALHOU ('+f+')':'PASSOU — '+res.length+' verificações'); process.exit(f?1:0);
 })().catch(e=>{ console.error(e); console.log('FALHOU'); process.exit(1); });
