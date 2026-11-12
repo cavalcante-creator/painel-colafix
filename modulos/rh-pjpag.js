@@ -322,7 +322,7 @@
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .pjp-cwq{margin-top:8px}.pjp-cwhb{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pjp-cwq li>span:first-child small{display:block;color:var(--muted);font-size:12px}.pjp-cwq li>small.ok{color:var(--ok,#1f7a4a)}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
+  .pjp-cwq{margin-top:8px}.pjp-cwlote{margin-top:12px;padding:12px;border:1px dashed var(--line,#dde3ea);border-radius:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.pjp-cwlote small{color:var(--muted)}.pjp-cwhb{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pjp-cwq li>span:first-child small{display:block;color:var(--muted);font-size:12px}.pjp-cwq li>small.ok{color:var(--ok,#1f7a4a)}.pjp-cwp li.pend{flex-wrap:wrap}.pjp-cwp li.pend>i{border-color:var(--warn,#c98a00)!important}.pjp-cwp li.pend b{color:var(--warn-strong,#8a5a00)}.pjp-cwqh{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px}.pjp-cwqh>b{flex:1 1 auto}
   .pjp-cwbus{display:flex;align-items:center;gap:6px;border:1px solid var(--line,#dde3ea);border-radius:10px;padding:0 10px;background:var(--surface,#fff);min-width:min(260px,100%)}
   .pjp-cwbus input{border:0;outline:0;background:transparent;font:inherit;font-size:14px;padding:8px 0;flex:1;min-width:0;color:inherit}.pjp-cwbus:focus-within{border-color:var(--teal,#1a6b80)}
   .pjp-cwq ul{max-height:280px;overflow:auto}.pjp-cwq li.ret>span:first-child,.pjp-cwq li.ret>b{color:var(--muted);text-decoration:line-through}.pjp-cwqa{display:flex;gap:6px;align-items:center;margin-left:auto}
@@ -716,7 +716,10 @@
       <div class="pjp-cwq"><div class="pjp-cwqh"><b>PJ (${xs.length})</b><label class="pjp-cwbus"><span aria-hidden="true">⌕</span><input type="search" data-pjp-cwbus="conv" placeholder="Procurar PJ pelo nome" value="${esc(J.cwConvQ||'')}"></label></div>
         <ul>${xs.map(linha).join('')}</ul><small class="pjp-cwq0" hidden>Nenhum PJ com esse nome.</small></div>
       <p class="sub" style="margin-top:10px">Lembrete: a ${esc(ks.map(k=>c.titulo(k)).join(' e a '))} também precisa estar cadastrada no Conectwork (pré-cadastro pela equipe Conectwork).</p>
+      <div class="pjp-cwlote"><b>Deixar todos prontos de uma vez</b><small>Copia a lista (nome, CNPJ, prestadora, celular e e-mail; nunca CPF) para a equipe Conectwork colar em Cadastros › "Pré-cadastrar vários MEIs". Cada MEI já nasce cadastrado e quem tem e-mail recebe o convite para entrar.</small>${btn('pjp-cwlista','Copiar a lista para o Conectwork ('+xs.filter(f=>dig(f.cnpj).length===14).length+')','','')}</div>
       <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${lnk('pjp-cwabre','voltar para as notas')}${btn('pjp-modx','Fechar')}</div></div></div>`; }
+  /* lista para o "Pré-cadastrar vários MEIs" do Conectwork: Nome;CNPJ;Prestadora;Celular;E-mail (nunca CPF) */
+  const cwListaTxt=(c,xs)=>['Nome;CNPJ;Prestadora;Celular;E-mail'].concat(xs.filter(f=>dig(f.cnpj).length===14).map(f=>[c.titulo(f.nome),fCNPJ(f.cnpj),c.titulo(String(f.empresa||'')),dig(f.telefone||f.celular||''),String(f.email||'').trim().toLowerCase()].map(x=>String(x).replace(/[;\n\r\t]/g,' ')).join(';'))).join('\n');
   function cwBloco(c,pid,emps){ const esc=c.esc, D=docP(pid), p=perDe(pid), ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
     return `<div class="pjp-cw" id="pjp-cw">
       ${ks.map(k=>{ const nm=esc(c.titulo(k)), e='data-e="'+esc(k)+'"', ja=(D.cw||{})[k], conf=J.cwConf===k;
@@ -1582,6 +1585,8 @@
         P.toast('Nota separada de '+c.titulo(f.nome).split(' ')[0]+' aberta no Conectwork. Confira lá e envie para a '+c.titulo(k)+'.'); P.render(); return; }
       if(a==='pjp-cwab'){ const u=cwBase(c,'medicoes'); window.__pjpUltimoCw=u; window.open(u,'_blank','noopener'); return; }
       if(a==='pjp-cwconv'){ J.mod={k:'cwconv'}; P.render(); return; }
+      if(a==='pjp-cwlista'){ const p=perDe(J.per), ks=cwEmps(c), xs=pjs(c,p).filter(f=>ks.includes(String(f.empresa||'').toUpperCase())), t=cwListaTxt(c,xs), n=t.split('\n').length-1, se=xs.filter(f=>dig(f.cnpj).length===14&&!String(f.email||'').includes('@')).length;
+        window.__pjpCwLista=t; try{ await navigator.clipboard.writeText(t); P.toast(n+' PJ copiados. No Conectwork: Cadastros › "Pré-cadastrar vários MEIs" › colar.'+(se?' '+se+' sem e-mail no cadastro: eles ficam cadastrados, mas o convite sai depois.':'')); }catch(e){ window.prompt('Copie a lista:',t); } return; }
       if(a==='pjp-cwconvw'||a==='pjp-cwconvc'){ const f=fDe(b.dataset.f), msg=cwConvMsg(c,f);
         if(a==='pjp-cwconvw'){ const tel=dig(f.telefone||f.celular||''), u='https://wa.me/'+(tel.length>=10?(tel.length<=11?'55':'')+tel:'')+'?text='+encodeURIComponent(msg); window.__pjpUltimoConv=u; window.open(u,'_blank','noopener'); }
         else { try{ await navigator.clipboard.writeText(msg); P.toast('Convite copiado. Cole no WhatsApp ou no e-mail de '+c.titulo(f.nome).split(' ')[0]+'.'); }catch(e){ window.prompt('Copie o convite:',msg); } }

@@ -77,6 +77,9 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   const u=await p.evaluate(()=>window.__pjpUltimoConv||''), fd=(await srv())['rh/dados/funcionarios/f1'];
   ok('WhatsApp vai para o telefone do PJ com o link ?mei=<CNPJ>&nome= e grava cwConv', /^https:\/\/wa\.me\/5551999990000\?text=/.test(u)&&/conectwork\.com\.br%2F%3Fmei%3D12345678000190%26nome%3DJoao/.test(u)&&!!(fd.cwConv&&fd.cwConv.em), u.slice(0,300));
   ok('A linha passa a dizer "convidado"', /convidado \d{2}\/\d{2}/.test(await p.evaluate(()=>document.querySelector('.pjp-cwm').innerText)));
+  await p.evaluate(()=>{ try{ navigator.clipboard.writeText=async()=>{}; }catch(e){} }); await p.click('[data-act="pjp-cwlista"]'); await H.dorme(500);
+  const li=await p.evaluate(()=>window.__pjpCwLista||'');
+  ok('"Copiar a lista para o Conectwork": Nome;CNPJ;Prestadora;Celular;E-mail de cada PJ, sem CPF', /^Nome;CNPJ;Prestadora;Celular;E-mail/.test(li)&&/Joao Pereira Teste;12\.345\.678\/0001-90;Zenith;51999990000;/.test(li)&&!/11122233344/.test(li), li.slice(0,300));
   if(process.env.SHOT){ await p.evaluate(()=>document.getElementById('pjp-cw-ZENITH').scrollIntoView()); await H.dorme(300); await p.screenshot({path:process.env.SHOT}); }
   ok('Sem erros na página', !er.length, er.join(' | '));
   await B.browser.close(); console.log(res.filter(Boolean).length+' de '+res.length+' testes de pjpcwsep passaram.'); process.exit(res.every(Boolean)?0:1); })().catch(e=>{ console.error('ERRO NO TESTE',e); process.exit(1); });
