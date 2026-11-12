@@ -31,12 +31,12 @@ service cloud.firestore {
 
     // Tudo o que é operacional (ordens, entregas, paradas, ranchos, almox, premix, chamados, config...)
     match /{col}/{id} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota', 'api', 'apibots']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota', 'api', 'apibots']);
     }
     match /{col}/{id}/{resto=**} {
-      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota']);
-      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota']);
+      allow read: if le() && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota', 'api', 'apibots']);
+      allow write: if grava() && !bloq(col) && !(col in ['acessos', 'pedidos', 'perfis', 'silomov', 'crachas', 'rh', 'presenca', 'gxquadro', 'melhorias', 'horaextra', 'frota', 'api', 'apibots']);
     }
 
     // Silos: histórico do saldo (consumo, estorno, medição). Só inclusão: ninguém altera nem apaga uma movimentação.
@@ -179,6 +179,18 @@ service cloud.firestore {
     match /frota/{resto=**} {
       allow read: if frotaOk();
       allow write: if frotaOk() && (dono() || !soVer());
+    }
+    // Resumo para o chatbot do gestor (12/11/2026): cada painel aberto grava os números que já carregou (sem dados pessoais);
+    // o login do chatbot (cadastrado em apibots/{uid} pela dona, no console) só lê este documento e nada mais do banco.
+    function apiBot() { return logado() && exists(/databases/$(database)/documents/apibots/$(request.auth.uid)); }
+    match /api/resumo {
+      allow read: if dono() || liberado() || apiBot();
+      allow write: if (dono() || liberado()) && !apiBot()
+        && request.resource.data.keys().hasOnly(['versao','producao','manutencao','silos','estoque','pessoas','em_producao','em_manutencao','em_silos','em_estoque','em_pessoas']);
+    }
+    match /apibots/{uid} {
+      allow read: if dono() || (logado() && request.auth.uid == uid);
+      allow write: if dono();
     }
     match /presenca/{dia} {
       allow read: if rhOk() || (liberado() && (acs().get('mods', []).hasAny(['gestor']) || acs().get('extras', []).hasAny(['gestor'])));
