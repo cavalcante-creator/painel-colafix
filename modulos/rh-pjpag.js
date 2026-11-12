@@ -306,7 +306,17 @@
   .pjp-cwl{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:13px;padding:8px 10px;border:1px solid var(--line,#dde3ea);border-radius:10px}
   .pjp-cwl>div{flex:1 1 220px;min-width:0}.pjp-cwl small{flex-basis:100%;color:var(--muted)}
   .pjp-cws select{height:34px;border:1px solid var(--line,#dde3ea);border-radius:8px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:13px;padding:0 8px;max-width:100%}
-  .pjp-mod.pjp-cwm{max-width:900px}.pjp-cwm .pjp-cw{margin-top:8px;border:0;padding:0;background:none}.pjp-cwbd{display:inline-block;margin-left:6px;background:var(--crit,#c0392b);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;font-weight:600}
+  .pjp-mod.pjp-cwm{max-width:900px}.pjp-cwm .pjp-cw{margin-top:8px;border:0;padding:0;background:none}.pjp-cwbd{display:inline-block;background:#22D3A6;color:#081638;border-radius:999px;font-size:11.5px;padding:2px 8px;font-weight:700;line-height:1.4}
+  .pjp-cwbt{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px 0 6px;border:0;border-radius:12px;cursor:pointer;font:inherit;color:#fff;
+    background:linear-gradient(135deg,#0B1A45 0%,#12366D 60%,#1A5CF0 130%);box-shadow:0 2px 6px rgba(11,26,69,.25),inset 0 0 0 1px rgba(255,255,255,.08);transition:transform .12s ease-out,box-shadow .15s}
+  .pjp-cwbt:active{transform:scale(.97)}
+  @media (hover:hover) and (pointer:fine){.pjp-cwbt:hover{box-shadow:0 4px 14px rgba(26,92,240,.35),inset 0 0 0 1px rgba(255,255,255,.14)}}
+  .pjp-cwbt:focus-visible{outline:2px solid #22D3A6;outline-offset:2px}
+  .pjp-cwlg{width:28px;height:28px;border-radius:9px;background:#fff;display:grid;place-items:center;flex:none}.pjp-cwlg svg{width:22px;height:22px}
+  .pjp-cwwm{font-weight:700;font-size:14.5px;letter-spacing:-.01em;color:#fff}.pjp-cwwm b{color:#4D8DFF;font-weight:700}
+  .pjp-cwmh{display:flex;align-items:center;gap:12px;margin:-20px -22px 14px;padding:16px 22px;border-radius:18px 18px 0 0;background:linear-gradient(135deg,#0B1A45 0%,#12366D 70%,#1A5CF0 140%)}
+  .pjp-cwmh .pjp-cwlg{width:40px;height:40px;border-radius:12px}.pjp-cwmh .pjp-cwlg svg{width:30px;height:30px}
+  .pjp-cwmh .pjp-cwwm{font-size:13px;opacity:.95}.pjp-cwmh h3{margin:0;color:#fff;font-size:18px}
   .pjp-cwk{flex-direction:column;align-items:stretch;gap:8px}.pjp-cwk.foco{border-top-color:var(--teal,#14627a);box-shadow:inset 3px 0 0 var(--teal,#14627a);padding-left:12px}
   .pjp-cwh{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}.pjp-cwh>b{font-size:15px}.pjp-cwn{flex:1 1 260px;min-width:0;font-size:13.5px}.pjp-cwn small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .pjp-cwab{color:var(--warn-ink,#9a5b00)}.pjp-cwh .pjp-ac{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -658,10 +668,13 @@
   function cwBotao(c,pid,emps){ const ks=emps.filter(k=>cwEmps(c).includes(k)); if(!ks.length) return '';
     const p=perDe(pid), D=docP(pid); let n=0;
     ks.forEach(k=>pjs(c,p).filter(f=>String(f.empresa||'').toUpperCase()===k).forEach(f=>{ const x=pesDe(pid,f._id); if(x.st==='fechado') n++; }));
-    return btn('pjp-cwabre','Conectwork'+(n?` <span class="pjp-cwbd">${n} para mandar</span>`:''),'title="Notas das prestadoras pelo Conectwork: junto na nota da empresa ou nota separada"','');
+    return `<button type="button" class="pjp-cwbt" data-act="pjp-cwabre" title="Notas das prestadoras pelo Conectwork: junto na nota da empresa ou nota separada" aria-label="Conectwork${n?' · '+n+' para mandar':''}">
+      <span class="pjp-cwlg">${CW_SIMB}</span><span class="pjp-cwwm">Conect<b>work</b></span>${n?`<span class="pjp-cwbd">${n} para mandar</span>`:''}</button>`;
   }
+  /* símbolo do Conectwork (o mesmo do app: faixa azul em losango arredondado com a folha verde-água) */
+  const CW_SIMB=`<svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="pjpcwA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1F63FF"/><stop offset="1" stop-color="#0733C4"/></linearGradient><linearGradient id="pjpcwB" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0A4C8A"/><stop offset=".5" stop-color="#0FA394"/><stop offset="1" stop-color="#24DFB3"/></linearGradient></defs><path d="M70.5 40.1 61.3 30.9Q50 19.6 38.7 30.9L30.9 38.7Q19.6 50 30.9 61.3L38.7 69.1Q50 80.4 61.3 69.1L63.5 66.9" fill="none" stroke="url(#pjpcwA)" stroke-width="21"/><path d="M49.6 66 71 44.6Q74 41.6 78.5 41.2L85.5 40.7Q88.6 40.5 88.4 43.6L87.9 50.6Q87.6 54.8 84.8 57.6L64.4 80.8Z" fill="url(#pjpcwB)" fill-opacity=".94"/></svg>`;
   function cwModal(c){ const pid=J.per, p=perDe(pid), emps=[...new Set(pjs(c,p).map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
-    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><h3>Conectwork · notas das prestadoras</h3>
+    return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-cwm" role="dialog" aria-label="Conectwork"><div class="pjp-cwmh"><span class="pjp-cwlg">${CW_SIMB}</span><div><span class="pjp-cwwm">Conect<b>work</b></span><h3>Notas das prestadoras</h3></div></div>
       <p class="sub">A Colafix paga a empresa. Cada PJ vai <b>junto</b> na nota da empresa (padrão) ou numa <b>nota separada</b>. Só nome, horas, valor e CNPJ (nunca CPF); no Conectwork você confere e envia.</p>
       ${cwBloco(c,pid,emps)||'<p>Nenhuma prestadora pelo Conectwork nesta quinzena.</p>'}
       <div class="pjp-ac" style="margin-top:14px;justify-content:flex-end">${btn('pjp-modx','Fechar')}</div></div></div>`; }
