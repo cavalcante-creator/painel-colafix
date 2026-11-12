@@ -1,0 +1,60 @@
+/* Correções de toque e de celular (12/11/2026, revisão da Programação, vale para o painel inteiro).
+   Carregado por último no index.html. Só corrige: não muda cores nem o desenho das telas. */
+
+/* 1. Sem a piscada cinza ao tocar e sem a espera de ~0,3 s do toque duplo */
+html{-webkit-tap-highlight-color:transparent}
+button,a,select,label,summary,[role="button"],[data-act]{touch-action:manipulation}
+
+/* 2. iPhone dá zoom e não volta quando o campo tem letra menor que 16 px */
+@media (pointer:coarse){
+  html body input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+  html body select,html body textarea{font-size:16px!important}
+}
+
+/* 3. Botões que só apareciam com o mouse por cima: no toque ficam sempre visíveis */
+@media (hover:none),(pointer:coarse){
+  .oseq button{opacity:1}
+  .pf-l .pf-add{display:inline-flex}
+}
+
+/* ---------- Programação ---------- */
+/* setas e número da fila com tamanho de dedo no toque */
+@media (pointer:coarse){
+  .oseq button{width:30px;height:24px;font-size:10px}
+  html body .oseqn{width:34px!important;height:30px}
+  .pf-l > button{height:40px}
+  .fpbtn{min-height:38px}
+}
+
+/* filtros: nada cortado dentro do quadro no celular */
+@media (max-width:860px){
+  .pfil{min-width:0}
+  .pf-r1,.pf-r3{min-width:0}
+  .pf-r1 > *,.pf-r3 > *{max-width:100%;min-width:0}
+  .pf-r1 .seg,.pf-r3 .seg{max-width:100%;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}
+  .pf-r1 .seg::-webkit-scrollbar,.pf-r3 .seg::-webkit-scrollbar{display:none}
+  .pf-r1 .srch{flex:1 1 100%}
+  .pf-r3 > span{flex-wrap:wrap;margin-left:0!important}
+  .p29-f{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+  .p29-fam{flex:1 1 200px;min-width:0}
+  .p29-fam select{max-width:none!important;width:100%;min-width:0}
+  .drng{flex-wrap:wrap;max-width:100%}
+}
+
+/* lista no celular: cada parte da ordem no seu lugar (antes o número ficava por cima do selo
+   quando a data e a previsão eram compridas, e o nome do produto passava por cima da linha de baixo).
+   O cartão do celular vem do js/12-organizacao.js; aqui só a posição de cada parte. */
+@media (max-width:640px){
+  html body:not(.tv) .orow:not(.ohead){grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"on os" "od od" "op op" "en pe" "fp fp"}
+  html body:not(.tv) .orow .on{grid-area:on;align-self:center}
+  html body:not(.tv) .orow .os{grid-area:os}
+  html body:not(.tv) .orow .od{grid-area:od;align-self:start}
+  html body:not(.tv) .orow .op{grid-area:op;min-width:0}
+  html body:not(.tv) .orow .op > b{display:block!important;-webkit-line-clamp:unset;overflow-wrap:anywhere}
+  html body:not(.tv) .orow .nr[data-l="Entregue"]{grid-area:en}
+  html body:not(.tv) .orow .nr[data-l="Pendente"]{grid-area:pe}
+  html body:not(.tv) .orow > .ofp{grid-area:fp}
+  /* filtros de baixo: quebram em linhas em vez de ficarem escondidos à direita */
+  html .ofil .pf-r3{flex-wrap:wrap;overflow:visible}
+}

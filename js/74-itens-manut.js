@@ -17,7 +17,7 @@
    confirmação ("Não está na lista") antes de mandar. Dados: config/manitens {itens:[{id,c,d,u,st,de,para,mot,obs,em,por,porNome,cadEm,cadPor}],imp}
    st: ok (no sistema) · cad (para cadastrar) · inc (incorreto) · rep (repetido) · sub (substituído). Regras: config/* (grava()). Prefixo `mi`. */
 "use strict";
-S.mi={d:null,sub:false,tab:'todos',at:'todos',q:'',lim:150,fm:null,inc:null,imp:null,cod:{},sel:null};
+S.mi={cp:(S.mi&&S.mi.cp)||hojeStr().slice(0,7),d:null,sub:false,tab:'todos',at:'todos',q:'',lim:150,fm:null,inc:null,imp:null,cod:{},sel:null};
 const MI_ST={ok:['No sistema','ok'],cad:['Para cadastrar','warn'],inc:['Incorreto','crit'],rep:['Repetido','crit'],sub:['Substituído','neu']};
 const MI_UN=['UN','PC','PAR','JG','KIT','M','CM','KG','G','L','ML','CX','RL','GL','BD','FD','PCT','CJ'];
 const miN=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
