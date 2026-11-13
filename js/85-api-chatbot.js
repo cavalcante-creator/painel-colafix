@@ -7,8 +7,8 @@
    está atualizado), no máximo a cada 5 min por assunto.
    O chatbot entra com um login próprio (Firebase Auth, e-mail e senha) cadastrado em apibots/{uid}: as regras deixam
    esse login ler SÓ api/resumo — ele não enxerga mais nada do banco. Guia para o programador: docs/API-CHATBOT.md.
-   LGPD: pessoas só em números (sem nome, CPF ou horário de ninguém). */
-const API_MIN = 5 * 60e3, API_VIVO = 15 * 60e3, API_VERSAO = 1;
+   LGPD: pessoas em números + os nomes de quem não veio (13/11, pedido da administradora); nunca CPF nem horário. */
+const API_MIN = 5 * 60e3, API_VIVO = 15 * 60e3, API_VERSAO = 2;
 const _api = { ult: {}, em: {}, ocupado: false };
 
 function apiR(n, c) { const k = Math.pow(10, c == null ? 1 : c); return Math.round((+n || 0) * k) / k; }
@@ -69,8 +69,13 @@ function apiPessoas() {
   if (typeof gxpDoc !== 'function' || typeof gxpResumo !== 'function') return null;
   const D = gxpDoc(hojeStr()); if (!D) return null;
   const R = gxpResumo(D); if (!R) return null;
+  /* 13/11/2026, pedido da administradora: os nomes de quem não veio (só nome, setor, empresa e o motivo que o painel
+     já mostra: Sem registro ou Férias). Nunca CPF nem horário. Afastado/folga e "fora do Face ID" ficam de fora. */
+  const faltaram = (D.f || []).filter(x => x && x.m !== 'Sumiu' && x.m !== 'Afastado' && x.m !== 'Folga')
+    .map(x => ({ nome: x.n || '', setor: x.s || '', empresa: x.e || '', motivo: x.m === 'Férias' ? 'Férias' : 'Sem registro no Face ID' }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
   return { dia: D.dia, vieram: R.vieram, naEmpresaAgora: R.na, almocaram: R.alm, chegaramDepoisDoHorario: R.atr, naoVieram: R.nao, semRegistro: R.semReg, ferias: R.fer, afastadosOuFolga: R.jus, esperados: R.esper,
-    atualizadoEm: (D.fonte && D.fonte.em) || '', observacao: 'Só números, sem nomes (LGPD).' };
+    faltaram, atualizadoEm: (D.fonte && D.fonte.em) || '', observacao: 'Nomes só de quem não veio (nome, setor, empresa e motivo). Sem CPF.' };
 }
 
 const API_SEC = { producao: apiProducao, manutencao: apiManutencao, silos: apiSilos, estoque: apiEstoque, pessoas: apiPessoas };

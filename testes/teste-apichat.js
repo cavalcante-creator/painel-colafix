@@ -27,12 +27,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const SI=(R.silos||{}).silos||[], ES=R.estoque||{}, PE=R.pessoas||{};
  ok('Silos: toneladas, capacidade e ocupação de cada silo', SI.length===2&&SI[0].silo==='Silo 1'&&SI[0].toneladas===30&&SI[0].ocupacao===50&&SI[1].material==='Areia', JSON.stringify(SI));
  ok('Estoque: item zerado com venda aparece em "agir hoje"', (ES.agirHoje||[]).some(x=>x.codigo==='AC0002'), JSON.stringify(ES).slice(0,300));
- ok('Pessoas: só números (vieram 2, chegou depois 1, não vieram, férias)', PE.vieram===2&&PE.chegaramDepoisDoHorario===1&&PE.ferias===1&&!/Pessoa/.test(JSON.stringify(PE)), JSON.stringify(PE));
+ ok('Pessoas: números (vieram 2, chegou depois 1, férias 1)', PE.vieram===2&&PE.chegaramDepoisDoHorario===1&&PE.ferias===1, JSON.stringify(PE));
+ ok('Pessoas: nomes só de quem faltou (C sem registro, D férias), sem quem veio', JSON.stringify((PE.faltaram||[]).map(x=>x.nome+':'+x.motivo))==='["Pessoa C:Sem registro no Face ID","Pessoa D:Férias"]'&&!/Pessoa A|Pessoa B/.test(JSON.stringify(PE)), JSON.stringify(PE.faltaram));
  const txt=JSON.stringify(R); console.log('outros:', JSON.stringify({s:R.silos,e:R.estoque,pe:R.pessoas}).slice(0,600));
- ok('Nada de CPF nem dado pessoal do RH no resumo', !/cpf|\d{3}\.\d{3}\.\d{3}-\d{2}/i.test(txt));
+ ok('Nada de CPF nem dado pessoal do RH no resumo', !/"cpf"|\d{3}\.\d{3}\.\d{3}-\d{2}/i.test(txt));
  await p.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(1200);
  const doc=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['api/resumo']);
- ok('Publica em api/resumo: um campo JSON por assunto, com a hora', doc&&typeof doc.producao==='string'&&JSON.parse(doc.producao).totalHoje.sacos===900&&/^\d{4}-\d{2}-\d{2}T/.test(doc.em_producao||'')&&doc.versao===1&&typeof doc.manutencao==='string', JSON.stringify(doc||{}).slice(0,200));
+ ok('Publica em api/resumo: um campo JSON por assunto, com a hora', doc&&typeof doc.producao==='string'&&JSON.parse(doc.producao).totalHoje.sacos===900&&/^\d{4}-\d{2}-\d{2}T/.test(doc.em_producao||'')&&doc.versao===2&&typeof doc.manutencao==='string', JSON.stringify(doc||{}).slice(0,200));
  ok('Só grava campos permitidos pelas regras', doc&&Object.keys(doc).every(k=>/^(versao|producao|manutencao|silos|estoque|pessoas|em_(producao|manutencao|silos|estoque|pessoas))$/.test(k)), Object.keys(doc||{}).join(','));
  const em1=doc.em_producao; await p.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(600); await p.evaluate(()=>window.__api_pub=1);
  await B.browser.close();

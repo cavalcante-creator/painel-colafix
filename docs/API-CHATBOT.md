@@ -1,7 +1,7 @@
 # Resumo do painel para o chatbot
 
 O painel publica um **resumo** com os números da fábrica num único documento do banco: `api/resumo`, no projeto Firebase `painel-colafix-2`.
-O chatbot entra com um **login próprio, só de leitura**, e lê esse documento. Esse login não consegue ver mais nada do banco: nem ordens, nem o RH, nem pessoas.
+O chatbot entra com um **login próprio, só de leitura**, e lê esse documento. Esse login não consegue ver mais nada do banco: nem ordens, nem o RH.
 
 ## O que tem no resumo
 
@@ -13,7 +13,7 @@ O documento tem um campo por assunto. Cada campo é um **texto JSON**: é só da
 | `manutencao` | chamados abertos, quantos estão sem técnico, máquinas paradas, a lista dos 40 mais recentes (OS, tipo, linha, equipamento, problema, situação, técnico, quando abriu, urgência e prazo), preventivas atrasadas e pedidos de peça em aberto | `em_manutencao` |
 | `silos` | cada silo: material, toneladas, capacidade, % de ocupação e quando foi atualizado | `em_silos` |
 | `estoque` | itens para **agir hoje** (zerados com venda ou que acabam em até 1 dia) e para **esta semana** (acabam em até 7 dias), com código, produto, estoque, dias até acabar (`ruptura`), pedidos em carteira e linha | `em_estoque` |
-| `pessoas` | **só números** do dia: vieram, estão na empresa agora, almoçaram, chegaram depois do horário, não vieram, sem registro, férias, afastados ou de folga, esperados. Sem nomes e sem CPF (LGPD). | `em_pessoas` |
+| `pessoas` | números do dia: vieram, estão na empresa agora, almoçaram, chegaram depois do horário, não vieram, sem registro, férias, afastados ou de folga, esperados; e `faltaram` = a lista de quem não veio (`nome`, `setor`, `empresa`, `motivo`: "Sem registro no Face ID" ou "Férias"). Afastados, de folga e quem está fora do Face ID há mais de 14 dias não entram na lista. Nunca CPF nem horários. | `em_pessoas` |
 
 ### Quando o resumo é atualizado
 
