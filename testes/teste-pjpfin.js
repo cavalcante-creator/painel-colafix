@@ -18,6 +18,17 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   ok('Abre a janela com os 3 PJ marcados e, como tem um desligado, o motivo "desligado antes da data habitual"', m&&m.sel==='f1,f2,f3'&&m.mot==='desl', JSON.stringify(m&&{mot:m.mot,sel:m.sel}));
   ok('Prévia como o e-mail do RH: valor, ENVIAR TOTAL, nota fiscal e depósito por empresa, desligamento, folha e assinatura',
     /devido ser desligado antes da data de pagamento habitual/.test(m.pv)&&/ENVIAR TOTAL DE R\$/.test(m.pv)&&/a nota fiscal será ZENITH/.test(m.pv)&&/a nota fiscal será NEXUS/.test(m.pv)&&/Depositar em conta ZENITH/.test(m.pv)&&/Depositar em conta NEXUS/.test(m.pv)&&/Total a Pagar/.test(m.pv)&&/Conversão Decimal/.test(m.pv)&&/Gestão de Pessoas/.test(m.pv)&&/Stefani RH/.test(m.pv), m.pv.slice(0,300));
+  { const vis=()=>p.evaluate(()=>[...document.querySelectorAll('.pjp-finl .pjp-ck')].filter(l=>!l.hidden&&l.offsetParent).map(l=>l.querySelector('input').dataset.pjpFsel).join(','));
+    await p.fill('#pjp-fq','maria'); await H.dorme(300); const v1=await vis();
+    ok('Procurar pessoa na lista do e-mail: "maria" mostra só a Maria', v1==='f2', v1);
+    await p.fill('#pjp-fq',''); await p.selectOption('#pjp-femp','ZENITH'); await H.dorme(600); const v2=await vis();
+    ok('Filtro por empresa: Zenith mostra só os da Zenith', v2==='f1,f3', v2);
+    await p.click('[data-act="pjp-fmar"][data-v="0"]'); await H.dorme(600);
+    const sel=await p.evaluate(()=>[...document.querySelectorAll('[data-pjp-fsel]')].filter(c=>c.checked).map(c=>c.dataset.pjpFsel).join(','));
+    ok('"Desmarcar os mostrados" tira só os da Zenith; esconder não tira ninguém', sel==='f2', sel);
+    await p.click('[data-act="pjp-fmar"][data-v="1"]'); await p.selectOption('#pjp-femp',''); await H.dorme(600);
+    const s2=await p.evaluate(()=>[...document.querySelectorAll('[data-pjp-fsel]')].filter(c=>c.checked).length+'/'+document.querySelectorAll('.pjp-finl .pjp-ck:not([hidden])').length);
+    ok('"Marcar os mostrados" volta a marcar e "Todas as empresas" mostra todos', s2==='3/3', s2); }
   await p.uncheck('[data-pjp-fsel="f2"]'); await H.dorme(500);
   m=await p.evaluate(()=>document.getElementById('pjp-finpv').innerText);
   ok('Desmarcar tira a pessoa e a empresa do e-mail', !/NEXUS/.test(m)&&!/Maria/.test(m)&&/Pedro/.test(m), m.slice(0,200));

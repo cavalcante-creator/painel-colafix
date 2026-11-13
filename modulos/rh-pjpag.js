@@ -1295,6 +1295,8 @@
   @media(max-width:760px){.pjp-bar .pjp-fid{border-radius:12px;flex-wrap:wrap;white-space:normal}.pjp-bar .pjp-fid small{white-space:normal}.pjp-tbt{width:100%}}
   .pjp-mod.pjp-fin{max-width:1100px}
   .pjp-fing{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}@media(max-width:860px){.pjp-fing{grid-template-columns:1fr}}
+  .pjp-finf{display:flex;gap:8px;margin:4px 0 2px}.pjp-finf input{flex:1;min-width:0}.pjp-finf select{width:auto;max-width:48%}
+  .pjp-finfa{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}.pjp-finfa .lnk{margin:0;font-size:12.5px}.pjp-finl .pjp-ck[hidden]{display:none!important}
   .pjp-finl{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;margin-top:4px}
   .pjp-finl .pjp-ck{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}.pjp-finl .pjp-ck input{width:16px;height:16px;margin:2px 0 0;flex:none}.pjp-finl .pjp-ck small{display:block}.pjp-finl small{color:var(--muted);font-size:12px}
   .pjp-finp{min-width:0}.pjp-finpv{border:1px solid var(--line,#E1E7EB);border-radius:12px;background:#fff;color:#1F2A33;padding:16px;max-height:62vh;overflow:auto}
@@ -1361,6 +1363,13 @@
         ...os.flatMap(o=>[c.titulo(o.f.nome)+': '+hMin(o.r.min)+' ('+n2(hDec(o.r.min))+' h) × '+R$(o.r.fixo||o.r.vh)+(o.r.acr?' + '+(o.r.acrMot||'acréscimo '+R$(o.r.acr)):'')+(o.r.desc?' − desconto '+R$(o.r.desc):'')+' = '+R$(o.r.valor)].concat(dias?finDias(o):[])),'',emp==='COLAFIX'?'Depositar na conta de cada prestador (dados bancários no cadastro).':'Depositar em conta '+emp+'.',''); });
     L.push('Att.,','--',c.eu(),'Gestão de Pessoas'); return L.join('\n').replace(/ /g,' '); }
   const finAssunto=(c,M)=>{ const G=finGrupos(c,M); return 'Pagamento PJ · '+Object.keys(G).sort().join(' e ')+' · '+perDe(J.per).txt+(M.mot==='desl'?' · desligamento':''); };
+  /* 13/11/2026 ("pesquisa por pessoa e filtro por empresas"): a lista "Quem entra no e-mail" filtra sem redesenhar (M.fq, M.femp);
+     "marcar/desmarcar os mostrados" vale só para quem está à vista. Esconder não tira do e-mail: só a caixinha decide. */
+  const finVe=(M,o)=>{ const q=norm(M.fq||'').split(' ').filter(Boolean), b=norm(o.f.nome); return (!M.femp||o.emp===M.femp)&&q.every(w=>b.includes(w)); };
+  function finFiltro(c,M,os){ const esc=c.esc, emps=[...new Set(os.map(o=>o.emp))].filter(Boolean).sort(), vis=os.filter(o=>finVe(M,o)), nv=vis.filter(o=>M.sel[o.f._id]).length;
+    return `<div class="pjp-finf"><input id="pjp-fq" type="search" placeholder="Procurar pessoa" value="${esc(M.fq||'')}" autocomplete="off">
+      <select id="pjp-femp" aria-label="Empresa"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e)}" ${M.femp===e?'selected':''}>${esc(e)} (${os.filter(o=>o.emp===e).length})</option>`).join('')}</select></div>
+      <div class="pjp-finfa"><small id="pjp-fvis">${vis.length===os.length?os.length+' PJ':vis.length+' de '+os.length+' PJ mostrados'}</small><button type="button" class="lnk" data-act="pjp-fmar" data-v="1">marcar os mostrados</button><button type="button" class="lnk" data-act="pjp-fmar" data-v="0">desmarcar os mostrados</button></div>`; }
   function finModal(c){ const M=J.mod, esc=c.esc, os=finPessoas(c,J.per), n=os.filter(o=>M.sel[o.f._id]).length, tot=os.filter(o=>M.sel[o.f._id]).reduce((a,o)=>a+o.r.valor,0);
     return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-fin" role="dialog" aria-label="E-mail ao financeiro"><h3>E-mail ao financeiro</h3><p class="sub">O mesmo e-mail de sempre, montado pelo painel: valor de cada PJ, total por empresa e a folha de cada um. O Outlook abre com o e-mail já escrito. As tabelas formatadas ficam copiadas: se quiser, clique no corpo do e-mail, Ctrl+A e Ctrl+V.</p>
       <div class="pjp-fing"><div class="pjp-box">
@@ -1368,7 +1377,7 @@
         <label for="pjp-fcc">Cópia</label><input id="pjp-fcc" value="${esc(M.cc)}" placeholder="opcional">
         <label for="pjp-fdata">Pagamento no dia</label><input id="pjp-fdata" type="date" value="${esc(M.data)}">
         <label for="pjp-fmot">Motivo</label><select id="pjp-fmot"><option value="quinzena" ${M.mot==='quinzena'?'selected':''}>Pagamento da quinzena</option><option value="desl" ${M.mot==='desl'?'selected':''}>Desligado antes da data de pagamento habitual</option></select>
-        <label>Quem entra no e-mail · ${n} PJ · ${R$(tot)}</label><div class="pjp-finl">${os.map(o=>`<label class="pjp-ck"><input type="checkbox" data-pjp-fsel="${esc(o.f._id)}" ${M.sel[o.f._id]?'checked':''}><span>${esc(c.titulo(o.f.nome))} <small>${esc(o.emp)} · ${R$(o.r.valor)}${o.x.st==='pago'?' · pago':''}${desligadoNo(o.f,perDe(J.per))?' · desligado':''}</small></span></label>`).join('')}</div>
+        <label>Quem entra no e-mail · ${n} PJ · ${R$(tot)}</label>${finFiltro(c,M,os)}<div class="pjp-finl">${os.map(o=>`<label class="pjp-ck" data-b="${esc(norm(o.f.nome))}" data-e="${esc(o.emp)}" ${finVe(M,o)?'':'hidden'}><input type="checkbox" data-pjp-fsel="${esc(o.f._id)}" ${M.sel[o.f._id]?'checked':''}><span>${esc(c.titulo(o.f.nome))} <small>${esc(o.emp)} · ${R$(o.r.valor)}${o.x.st==='pago'?' · pago':''}${desligadoNo(o.f,perDe(J.per))?' · desligado':''}</small></span></label>`).join('')}</div>
       </div><div class="pjp-finp"><div class="pjp-lbl">Como vai sair · ${esc(finAssunto(c,M))}</div><div class="pjp-finpv" id="pjp-finpv">${n?finHtml(c,M):'<p class="sub">Marque pelo menos um PJ.</p>'}</div></div></div>
       <div class="pjp-ac" style="margin-top:14px">${finOlBts(c,n)}</div>${M.semJan?`<p class="sub" style="margin-top:10px">O e-mail já foi copiado. <a href="${esc(M.semJan)}" target="_blank" rel="noopener">Abrir o Outlook</a> e colar (Ctrl+V).</p>`:''}</div></div>`; }
   /* Criar no Outlook pelo login da Microsoft (Graph): o rascunho já sai com as tabelas, sem colar nada */
@@ -1507,6 +1516,7 @@
       if(J.mod&&J.mod.k==='fin'&&(t.dataset.pjpFsel||['pjp-fmot','pjp-fdata','pjp-fpara','pjp-fcc'].includes(t.id))){ const M=J.mod;
         if(t.dataset.pjpFsel) M.sel[t.dataset.pjpFsel]=t.checked; else if(t.id==='pjp-fmot') M.mot=t.value; else if(t.id==='pjp-fdata') M.data=t.value||M.data; else if(t.id==='pjp-fpara'){ M.para=t.value; return; } else { M.cc=t.value; return; }
         P.render(); return; }
+      if(t.id==='pjp-femp'&&J.mod&&J.mod.k==='fin'){ J.mod.femp=t.value; P.render(); return; }
       if(t.id==='pjp-set'){ J.set=t.value; P.render(); return; }
       if(t.id==='pjp-fe'){ J.fe=t.value; P.render(); return; }
       if(t.id==='pjp-sit'){ J.sit=t.value; P.render(); return; }
@@ -1524,6 +1534,9 @@
   document.addEventListener('input',ev=>{ const t=ev.target; if(!t||!t.dataset||t.dataset.pjpCwbus==null) return; const q=semAc(t.value).trim().split(/\s+/).filter(Boolean), box=t.closest('.pjp-cwq'); if(!box) return; let n=0;
     box.querySelectorAll('li[data-b]').forEach(li=>{ const ok=q.every(w=>li.dataset.b.includes(w)); li.hidden=!ok; if(ok) n++; }); const z=box.querySelector('.pjp-cwq0'); if(z) z.hidden=!!n; });
   document.addEventListener('click',ev=>{ if(ev.target.closest&&ev.target.closest('[data-pjp-cwlk]')){ J.cwLinkBloq=''; } },true);
+  document.addEventListener('input',ev=>{ const t=ev.target; if(!t||t.id!=='pjp-fq'||!J.mod||J.mod.k!=='fin') return; const M=J.mod; M.fq=t.value;
+    const q=norm(M.fq).split(' ').filter(Boolean); let v=0, n=0; document.querySelectorAll('.pjp-finl .pjp-ck').forEach(l=>{ n++; const ok=(!M.femp||l.dataset.e===M.femp)&&q.every(w=>(l.dataset.b||'').includes(w)); l.hidden=!ok; if(ok) v++; });
+    const s=document.getElementById('pjp-fvis'); if(s) s.textContent=v===n?n+' PJ':v+' de '+n+' PJ mostrados'; });
   document.addEventListener('input',ev=>{ const t=ev.target; if(t&&t.id==='pjp-dq'){ J.dq=t.value; dFiltra(); return; } });
   document.addEventListener('input',ev=>{ const t=ev.target; if(!C||!t||t.id!=='pjp-q') return; J.q=t.value; clearTimeout(J._qt); J._qt=setTimeout(()=>{ C.P.render(); setTimeout(()=>{ const i=document.getElementById('pjp-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },0); },350); });
   /* "Abrir o cadastro" da gaveta: quem abre o cadastro é o RH (rh-ed); aqui só fecha a gaveta para não voltar aberta */
@@ -1555,6 +1568,7 @@
         }catch(e){ try{ w&&w.close(); }catch(_){}
           const t=String(e&&e.message||e); P.toast(/403|Access|denied|consent|Authorization/i.test(t)?'A Microsoft não deixou o painel criar e-mails nesta conta. Peça para liberar a permissão "Mail.ReadWrite" no aplicativo do painel (Microsoft Entra) ou use "Abrir o Outlook e colar".':'Não deu para criar o e-mail no Outlook: '+t); }
         return; }
+      if(a==='pjp-fmar'){ const M=J.mod; if(!M||M.k!=='fin') return; const on=b.dataset.v==='1'; finPessoas(c,J.per).filter(o=>finVe(M,o)).forEach(o=>{ M.sel[o.f._id]=on; }); P.render(); return; }
       if(a==='pjp-fincp'||a==='pjp-finok'){ const M=J.mod; if(!M||M.k!=='fin') return; const g=id=>(document.getElementById(id)||{}).value; M.para=g('pjp-fpara')||''; M.cc=g('pjp-fcc')||''; M.data=g('pjp-fdata')||M.data;
         if(a==='pjp-finok'&&!mails(M.para).length) return P.toast('Escreva o e-mail do financeiro em "Para".');
         const url=finOwa(c,M), cp=await finCopia(c,M); window.__pjpFin={html:finHtml(c,M),txt:finTexto(c,M),assunto:finAssunto(c,M),url,cp};
