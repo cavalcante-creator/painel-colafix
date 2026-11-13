@@ -85,7 +85,7 @@
   /* fichas das passagens do dia: hora + leitor; a que não conta fica riscada */
   const chipsP=(ps,esc)=>{ const ok=ps.filter(q=>q.ok), varios=new Set(ps.map(q=>norm(leitNome(q)))).size>1;
     return ps.map(q=>{ const nm=leitNome(q), ex=q===ok[0]||q===ok[ok.length-1];
-      return `<span class="${q.ok?(ex?'pe':'pm'):'fo'}" title="${q.pto?'Entrada da fábrica · ':''}${esc(nm)}${q.ok?'':q.sec?' · não conta: vale a entrada da fábrica':' · não conta para o horário'}">${esc(q.h)}${(varios||q.pto)&&nm?`<small>${q.pto?'entrada · ':''}${esc(nm.slice(0,18))}</small>`:''}</span>`; }).join(''); };
+      return `<span class="${q.ok?(ex?'pe':'pm'):'fo'}" title="${q.pto?'Face ID da produção · ':''}${esc(nm)}${q.ok?'':q.sec?' · não conta: vale o Face ID da produção ou o estacionamento/saída':' · não conta para o horário'}">${esc(q.h)}${(varios||q.pto)&&nm?`<small>${q.pto?'produção · ':''}${esc(nm.slice(0,18))}</small>`:''}</span>`; }).join(''); };
   const dadosMes=pid=>{ const p=perDe(pid); return p&&window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes]||null; };
   /* caixinhas dos leitores: os vistos no Face ID do mês + os que já estão escolhidos */
   function leitCaixas(esc,vis,sel,nome){ const ks=vis.map(v=>v.k), xs=vis.concat(sel.filter(k=>!ks.includes(k)).map(k=>({k,n:k,tipo:'?',q:0})));
@@ -159,18 +159,29 @@
      aqui como CSV "Acessos Gerais" em rh/dados/ponto/{AAAA-MM} (mesmo formato do Face ID do almoço: dias.{dia}.{cpf}={p,t,ar}).
      No dia: 2+ passagens na entrada = vale só a entrada; 1 = junta com o Face ID; nenhuma = vale o Face ID de sempre. ---------- */
   const ptoMes=m=>J.pto[m]||null;
+  /* leitores de garantia do Face ID de sempre: estacionamento e os de entrada/saída (portaria); refeitório e os de dentro não contam */
+  const gar=q=>/ESTACION|SAIDA|PORTARIA|\bENT(RADA)?\b/.test(norm((q.disp||'')+' '+(q.area||'')));
   function diaPas(c,f,d,LT,K){ const m=d.slice(0,7), dF=window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[m]||null, dP=ptoMes(m);
     K=K||{}; if(!('kf' in K)) K.kf=dF?chaveFid(c,f,dF):''; if(!('kp' in K)) K.kp=dP?chaveFid(c,f,dP):'';
     const xF=K.kf&&dF&&dF.dias&&dF.dias[d]&&dF.dias[d][K.kf]||null, xP=K.kp&&dP&&dP.dias&&dP.dias[d]&&dP.dias[d][K.kp]||null;
     const pP=pasDe(xP).map(q=>Object.assign(q,{ok:true,pto:true})), pF=pasDe(xF).map(q=>Object.assign(q,{ok:contaP(q,LT)}));
-    let ps, src; if(pP.length>=2){ src='pto'; ps=pP.concat(pF.map(q=>Object.assign(q,{ok:false,sec:true}))); } else if(pP.length===1){ src='mix'; ps=pP.concat(pF); } else { src=pF.length?'fid':''; ps=pF; }
+    /* 13/11/2026 ("o da produção é o oficial; o do estacionamento é só uma garantia; se não bateu ali, conferir nos de saída"):
+       2+ na produção = só a produção · 1 = a da produção + estacionamento/saída · nenhuma = estacionamento/saída;
+       sem nada disso, o Face ID de sempre (leitores que contam). */
+    /* a regra da garantia só vale nos meses em que o Face ID da produção já existe (antes, como sempre) e respeita os leitores escolhidos */
+    const gq=q=>!!dP&&q.ok&&gar(q), gF=pF.filter(gq); let ps, src;
+    if(pP.length>=2){ src='pto'; ps=pP.concat(pF.map(q=>Object.assign(q,{ok:false,sec:true}))); }
+    else if(pP.length===1){ src=gF.length?'mix':'pto1'; ps=pP.concat(pF.map(q=>gq(q)?q:Object.assign(q,{ok:false,sec:true}))); }
+    else if(gF.length){ src='gar'; ps=pF.map(q=>gq(q)?q:Object.assign(q,{ok:false,sec:true})); }
+    else { src=pF.length?'fid':''; ps=pF; }
     ps.sort((a,b)=>a.h.localeCompare(b.h)); const hs=ps.filter(q=>q.ok).map(q=>q.h);
     return {ps,hs,src,nFora:ps.filter(q=>!q.ok&&!q.sec).length,pP:pP.length,pF:pF.length}; }
   /* Fixcol (10/11, "os funcionários que trabalham na Fixcol não passam no Face ID; o valor deles é considerado inteiro e depende
      do gestor falar se faltou"): mesma marcação da presença (cadastro filial FIXCOL ou setor em Cadastros › Setores › "Fica na Fixcol").
      Cada dia da escala conta cheio; o RH marca "Faltou" no dia quando o gestor avisar (aj[dia].zero). */
   const ehFil=(c,f)=>{ const sF=(((c.R.cfg)||{}).setoresFilial||[]).map(norm); return f.filial==='FIXCOL'||!!(f.setor&&sF.includes(norm(f.setor))); };
-  const SRC_T={pto:'Entrada da fábrica',mix:'Entrada da fábrica + Face ID',fid:'Face ID (sem marcação na entrada)'};
+  const SRC_T={pto:'Face ID da produção',pto1:'Face ID da produção (só uma marcação)',mix:'Produção + estacionamento/saída',gar:'Estacionamento/saída (sem marcação na produção)',fid:'Face ID de sempre (sem produção nem portaria)'};
+  const SRC_D={pto:'Vale o Face ID da produção (oficial)',pto1:'Só uma marcação no Face ID da produção e nenhuma no estacionamento ou na saída: conferir',mix:'Só uma marcação na produção: completou com o estacionamento ou a saída',gar:'Sem marcação no Face ID da produção neste dia: valem o estacionamento e os leitores de saída (garantia)',fid:'Sem marcação na produção, no estacionamento nem na saída: vale o Face ID de sempre'};
   /* entradas e saídas no meio do dia (11/11, "desconfie de entradas e saídas e entradas"): o dia conta da 1ª à última passagem;
      se no meio a pessoa passou num leitor de SAÍDA e depois num de ENTRADA, o tempo fora entra na conta. Fora do almoço
      (uma saída entre 11:00 e 14:30 de até intervalo + 30 min), cada saída de 5 min ou mais vira "para conferir", com
@@ -450,7 +461,7 @@
   .pjp-d.pg-al{background:none;box-shadow:inset 3px 0 var(--warn,#C28A1E)}.pjp-d.pg-aj{box-shadow:inset 3px 0 var(--teal)}.pjp-d.pg-sp .pjp-chips span{background:none;color:var(--muted);font-weight:400;padding:0}
   .pjp-d .pg-tag{font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;display:inline-block;margin-top:3px}
   .pjp-d .pg-tag.pg-w{background:#fff;color:var(--warn-ink,#7A5310)}.pjp-d .pg-tag.pg-t{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-m{background:var(--ground);color:var(--muted)}
-  .pjp-d .pg-tag.pg-src{margin-left:4px}.pjp-d .pg-tag.pg-pto{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-mix{background:var(--ground);color:var(--teal-strong)}.pjp-d .pg-tag.pg-fid{background:var(--warn-tint,#FBF1DD);color:var(--warn-ink,#7A5310)}
+  .pjp-d .pg-tag.pg-src{margin-left:4px}.pjp-d .pg-tag.pg-pto{background:var(--teal-tint,#E2ECF1);color:var(--teal-strong)}.pjp-d .pg-tag.pg-mix{background:var(--ground);color:var(--teal-strong)}.pjp-d .pg-tag.pg-pto1,.pjp-d .pg-tag.pg-gar{background:var(--ground);color:var(--teal-strong)}.pjp-d .pg-tag.pg-pto1{background:var(--warn-tint,#FBF1DD);color:var(--warn-ink,#7A5310)}.pjp-d .pg-tag.pg-fid{background:var(--warn-tint,#FBF1DD);color:var(--warn-ink,#7A5310)}
   .pjp-fid.pto .pjp-imp{cursor:pointer;color:var(--teal-strong);font-weight:600;font-size:12.5px;text-decoration:underline}.pjp-fid.pto .pjp-imp input{display:none!important}
   .pjp-ed{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--teal);border-radius:10px;padding:10px 12px;margin-top:6px}
   .pjp-ed label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}
@@ -508,7 +519,7 @@
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds" ${at(d)}>${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
         const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">${d.src==='pto'||d.src==='mix'?'Entrada da fábrica':'Face ID'}: ${esc(d.hs.join(' · '))}</small>`:''}`
-          :d.ps&&d.ps.length?`${diaVis(d,h,esc)}${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${d.src==='fid'?'Sem marcação no Face ID da entrada da fábrica neste dia: vale o Face ID de sempre':d.src==='mix'?'Só uma marcação na entrada da fábrica: juntou com o Face ID de sempre':'Vale o Face ID da entrada da fábrica'}">${SRC_T[d.src]}</span>`:''}${d.sp&&!d.sp.soAlm?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
+          :d.ps&&d.ps.length?`${diaVis(d,h,esc)}${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${SRC_D[d.src]||''}">${SRC_T[d.src]}</span>`:''}${d.sp&&!d.sp.soAlm?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
           :d.fil?`<div class="pjp-chips"><span>dia cheio</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fech?`<div class="pjp-chips"><span>dia do fechamento</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fer?`<div class="pjp-chips"><span>não trabalhou</span></div><span class="pg-tag pg-f">Feriado · ${esc(d.fer.nome)}</span>`
