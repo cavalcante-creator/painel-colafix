@@ -123,6 +123,9 @@ function apiPessoas() {
 const API_SEC = { producao: apiProducao, manutencao: apiManutencao, silos: apiSilos, estoque: apiEstoque, pessoas: apiPessoas };
 async function apiPublicar(forca) {
   if (_api.ocupado || !apiPodeGravar()) return; _api.ocupado = true;
+  /* 13/11: a presença (Face ID) só era lida quando alguém abria Início ou Pessoas hoje do gestor; o resumo ia sem as pessoas.
+     Agora quem publica e pode ver Pessoas hoje já assina (14 documentos, uma vez). */
+  try { if (typeof gxpAssina === 'function' && viewOk('gxpres')) gxpAssina(); } catch (e) {}
   try {
     const agora = Date.now(), up = {};
     for (const k in API_SEC) {

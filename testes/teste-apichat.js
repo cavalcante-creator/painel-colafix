@@ -41,6 +41,11 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Publica em api/resumo: um campo JSON por assunto, com a hora', doc&&typeof doc.producao==='string'&&JSON.parse(doc.producao).totalHoje.sacos===900&&/^\d{4}-\d{2}-\d{2}T/.test(doc.em_producao||'')&&doc.versao===3&&typeof doc.manutencao==='string', JSON.stringify(doc||{}).slice(0,200));
  ok('Só grava campos permitidos pelas regras', doc&&Object.keys(doc).every(k=>/^(versao|producao|manutencao|silos|estoque|pessoas|em_(producao|manutencao|silos|estoque|pessoas))$/.test(k)), Object.keys(doc||{}).join(','));
  const em1=doc.em_producao; await p.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(600); await p.evaluate(()=>window.__api_pub=1);
+ const B2=await H.abrir({viewport:{width:1440,height:900}}); await B2.ctx.clock.setFixedTime(AGORA); const p2=B2.page; await H.preparar(p2,d); await p2.goto(H.BASE); await H.entrar(p2,'iasmyn','senha123'); await H.dorme(3000);
+ await p2.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(2500); await p2.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(1500);
+ const PA=await p2.evaluate(()=>{ const r=Painel.apiResumo.calcular(); return r.pessoas; });
+ ok('Painel da administradora (sem abrir telas do gestor) já traz as pessoas com os nomes', PA&&(PA.vieramLista||[]).length===2&&(PA.faltaram||[]).length===2, JSON.stringify(PA).slice(0,200));
+ await B2.browser.close();
  await B.browser.close();
  const f=res.filter(r=>!r.ok).length; console.log(`\n${res.length-f} de ${res.length} testes passaram.`); process.exit(f?1:0);
 })().catch(e=>{ console.error('ERRO NO TESTE',e); process.exit(1); });
