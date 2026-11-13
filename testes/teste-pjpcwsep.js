@@ -33,10 +33,13 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
     R&&R.itens.length===1&&R.ref==='painel-rh:2026-10-2:ZENITH'&&!R.parte&&X.f1.st==='pedido'&&!X.f1.ped.sep&&!(X.f4&&X.f4.st)&&!(X.f7&&X.f7.st), JSON.stringify({R,X}));
 
   // 2) a Ana vai em nota SEPARADA (a Zenith faz uma nota só para ela)
-  await p.evaluate(()=>{ const d=document.querySelector('#pjp-cw-ZENITH details.pjp-cwq'); if(d) d.open=true; }); await H.dorme(200);
+  // a lista da nota só mostra quem tem o valor fechado (12/11): fecha a Ana antes
+  m=await card();
+  ok('A lista da nota só mostra quem tem valor fechado e diz quantos faltam', !/Ana Souza/.test(m.split('Fora da nota')[0])&&/2 PJ ainda sem o valor fechado/.test(m), m.slice(0,500));
+  await p.keyboard.press('Escape'); await H.dorme(300); await p.click('[data-act="pjp-fech"][data-f="f4"]'); await H.dorme(1000); await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500);
   await p.click('#pjp-cw-ZENITH [data-act="pjp-cwsepr"][data-f="f4"]'); await H.dorme(700);
   m=await card();
-  ok('"nota separada" passa a Ana para "Notas separadas" com "Fechar e mandar só Ana" (e sai da nota da Zenith)', /Notas separadas/.test(m)&&/Fechar e mandar só Ana/.test(m)&&/1 sem valor fechado/.test(m), m.slice(0,600));
+  ok('"nota separada" passa a Ana para "Notas separadas" com "Mandar só Ana" (e sai da nota da Zenith)', /Notas separadas/.test(m)&&/Mandar só Ana/.test(m)&&/1 sem valor fechado/.test(m), m.slice(0,600));
   await p.click('#pjp-cw-ZENITH [data-act="pjp-cwsepm"][data-f="f4"]'); await H.dorme(1800);
   R=await ultimo(); X=await pes();
   ok('A nota separada vai só com a Ana, com a "parte" própria (outra medição no Conectwork), e fica marcada separada',
