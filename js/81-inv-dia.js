@@ -52,13 +52,17 @@ function invdConfHoje(){ const X=S.invd, h=hojeStr(); if(S.alx&&S.alx._l_confere
 function invdContHoje(){ const h=hojeStr(), s={}; invdConfHoje().forEach(cf=>{ if(!cf||cf.excluida||(cf.dia||String(cf.em||'').slice(0,10))!==h) return; for(const c in (cf.itens||{})) s[c]=cf.porNome||true; }); return s; }
 /* liberação da contagem (pedido de 04/11: "liberar para ele contar assim que eu importar o saldo; a comparação fica no meu login") */
 function invdSaldoEm(){ const I=(S.anl.base||{}).itens||{}, a=(I.atual||{}).SALDO; const d=new Date(a||I.em||0); return isNaN(d)||!(a||I.em)?null:d; }
-function invdLib(){ const h=hojeStr(), sd=invdSaldoEm(), X=S.invd, lb=X.dia&&X.dia.liberado;
-  if(sd&&hojeStr(sd)===h) return {ok:true,como:'saldo',hm:sd.toTimeString().slice(0,5)};
-  if(lb&&lb.em&&String(lb.em).slice(0,10)<=h&&(X.dia.dia||X.diaK)===h) return {ok:true,como:'manual',hm:new Date(lb.em).toTimeString().slice(0,5),por:lb.porNome||''};
-  return {ok:false,sd:sd?(hojeStr(sd)===hojeStr(new Date(Date.now()-864e5))?'ontem':dm(hojeStr(sd)))+' às '+sd.toTimeString().slice(0,5):''}; }
+/* 13/11 · CORTE DO DIA (pedido "muita divergência no estoque; depende de mim fazer o upload"): a contagem nunca espera o saldo.
+   O saldo do Focco que estiver na base é a "foto"; ao avaliar a contagem o painel desconta o que foi faturado (NFS) e produzido (EPP)
+   depois da foto (Extrato do Focco) e o que foi apontado no painel nos dias que o Extrato ainda não cobre. Só abre divergência do que
+   sobra de verdade; se o Extrato ainda não chegou até o dia da contagem, a divergência fica "Conferindo com o Focco" (st 'extrato')
+   e é avaliada sozinha quando o Extrato for importado (`invdReavalia`). */
+function invdLib(){ const h=hojeStr(), sd=invdSaldoEm();
+  const sdT=sd?(hojeStr(sd)===h?'hoje':hojeStr(sd)===hojeStr(new Date(Date.now()-864e5))?'ontem':dm(hojeStr(sd)))+' às '+sd.toTimeString().slice(0,5):'';
+  return {ok:true,como:sd&&hojeStr(sd)===h?'saldo':'corte',hm:sd?sd.toTimeString().slice(0,5):'',sd:sdT}; }
 async function invdLibera(){ const h=hojeStr(); try{ await S.db.doc('invdia/'+h).set({dia:h,liberado:{em:new Date().toISOString(),por:S.uid||null,porNome:(S.nomes&&S.nomes[S.uid])||''}},{merge:true}); toast('Contagem de hoje liberada para os conferentes.'); }catch(e){ erro(e); } }
-NAV_EXTRA.push(()=>{ try{ if(!viewOk('anlinvd')||!viewOk('anlbase')) return []; const L=invdLib(); if(L.ok) return []; const d=new Date(); if(d.getDay()===0||d.getDay()===6) return [];
-  return [{n:'',t:'Contagem do inventário esperando o saldo de hoje',s:'Importe o saldo do Focco para liberar os conferentes',acao:'anlinvd',c:'warn'}]; }catch(e){ return []; } });
+NAV_EXTRA.push(()=>{ try{ if(!viewOk('anlinvd')||!viewOk('anlbase')) return []; const n=(S.invd.ab||[]).filter(x=>x.aberta&&x.st==='extrato'&&x.esperaAte).length; if(!n) return [];
+  return [{n:'',t:n+(n===1?' contagem esperando':' contagens esperando')+' o Extrato do Focco',s:'Importe o Extrato para o painel conferir o que saiu depois da foto do saldo',acao:'anlinvd',c:'warn'}]; }catch(e){ return []; } });
 function invdHojeLista(){ const X=S.invd, C=invdCfg(), feito=invdContHoje(), L=[], vis={};
   X.ab.filter(x=>x.st==='recontar').forEach(x=>{ if(vis[x.c]) return; vis[x.c]=1; L.push({cod:x.c,m:'rec',div:x._id,b:x.b,porNome:(x.c1||{}).porNome||'',meu:invdMesma(x.c1||{},{por:S.uid,porNome:(S.nomes&&S.nomes[S.uid])||''}),feito:false}); });
   const it=(X.dia&&X.dia.itens)||{}; Object.keys(it).forEach(c=>{ if(vis[c]) return; vis[c]=1; L.push({cod:c,m:it[c].m,u:it[c].u||null,feito:!!feito[c]}); });
@@ -67,33 +71,73 @@ function invdHojeLista(){ const X=S.invd, C=invdCfg(), feito=invdContHoje(), L=[
   const LB=invdLib(); return {dia:X.diaK||hojeStr(),hora:C.hora,lib:LB,pronto:!!X._l_dia&&!!(X.dia&&X.dia.itens),itens:L,meus:Object.keys(mi).length,meusUlt:hm,meusItens:Object.keys(mi)}; }
 
 /* ---------- 2 · divergências abertas ao salvar a contagem ---------- */
+function invdTemBase(){ const B=S.anl&&S.anl.base; return !!(B&&B.vendas&&B.vendas.diario&&B.itens); }
+function invdAp(c,de,ate,depoisDe){ /* apontado no painel (entregas) do item entre dois momentos, só nos dias depois do Extrato */
+  const an=new Set((S.entregas||[]).filter(e=>e.anula).map(e=>e.anula)); let q=0;
+  (S.entregas||[]).forEach(e=>{ if(e.anula||an.has(e._id)||!e.em||e.em<=de||e.em>ate) return; if(depoisDe&&hojeStr(new Date(e.em))<=depoisDe) return;
+    const o=(typeof ordById==='function'&&e.ordem&&ordById(e.ordem))||null; const cc=o?codigoDe(o):''; if(cc===c) q+=+e.qtd||0; }); return q; }
+function invdAvalia(c,x){ /* x: {q,s,dia,em,foto,adj} → {st:'ok'|'div'|'espera', esp, lo, hi, sai, ent, ap, ate} */
+  const q=+x.q||0, s=+x.s||0, tol=invdTol(s), r={esp:s,sai:0,ent:0,ap:0,lo:q-s,hi:q-s};
+  const fim=v=>{ r.st=(r.lo<=tol&&r.hi>=-tol)?'ok':v; return r; };
+  if(!x.adj||!x.foto||!invdTemBase()) return fim(invdTemBase()||!x.foto?'div':'espera');
+  const fd=hojeStr(new Date(x.foto)), dia=x.dia||hojeStr(new Date(x.em)); if(fd>dia) return fim('div');
+  const V=S.anl.base.vendas, D=(V.diario||{})[c]||{}, vAte=V.ate||'', ontem=addDias(dia,-1), fech=new Date(x.foto).getHours()>=17;
+  const mv=d=>{ const v=D[d]; return v?{e:+v[0]||0,s:+v[1]||0}:{e:0,s:0}; };
+  let n=0, amb=0; /* n = movimento certo (dias inteiros entre a foto e a contagem); amb = dias pela metade (o da foto e o da contagem) */
+  for(let d=addDias(fd,1); d<dia; d=addDias(d,1)){ if(d>vAte) continue; const m=mv(d); r.ent+=m.e; r.sai+=m.s; n+=m.e-m.s; }
+  if(fd<dia&&!fech&&fd<=vAte){ const m=mv(fd); amb+=m.e-m.s; }
+  if(dia<=vAte){ const m=mv(dia); amb+=m.e-m.s; }
+  r.ap=invdAp(c,x.foto,x.em||new Date().toISOString(),vAte); /* produção apontada no painel que o Extrato ainda não tem */
+  r.esp=s+n+r.ap; const r0=q-r.esp; r.lo=Math.min(r0,r0-amb); r.hi=Math.max(r0,r0-amb);
+  const falta=ontem>fd&&vAte<ontem; /* faltam dias inteiros no Extrato */
+  if(falta){ r.ate=ontem; if(r.lo<=tol&&r.hi>=-tol) return fim('ok'); r.st='espera'; return r; }
+  return fim('div'); }
 async function invdConf(cf){ const X=S.invd; if(!cf||!cf.itens||!S.db) return; const em=new Date().toISOString(), dia=cf.dia||hojeStr();
   const quem={por:cf.por||null,porNome:cf.porNome||''};
   for(const c in cf.itens){ const it=cf.itens[c]||{};
     for(const b of invdBl(cf.local)){ const sk='saldoSistema'+b; if(it[sk]==null&&it['almox'+b]==null) continue;
-      const q=+it['almox'+b]||0, s=+it[sk]||0; if(!q&&!s) continue; const dif=q-s, div=Math.abs(dif)>=invdTol(s);
-      const e={q,s,dif,por:quem.por,porNome:quem.porNome,conf:cf.numero||null,em,dia,local:cf.local||''};
+      const q=+it['almox'+b]||0, s=+it[sk]||0; if(!q&&!s) continue; const dif=q-s;
+      const outro=b===3?30:3, adj=!(+it['saldoSistema'+outro]||0)&&!(+it['almox'+outro]||0); /* o Extrato não separa por almox */
+      const e={q,s,dif,por:quem.por,porNome:quem.porNome,conf:cf.numero||null,em,dia,local:cf.local||'',foto:cf.foto||null,adj};
+      const ev=invdAvalia(c,e); e.esp=Math.round(ev.esp); e.real=Math.round((ev.lo+ev.hi)/2); if(ev.sai) e.sai=ev.sai; if(ev.ent) e.ent=ev.ent; if(ev.ap) e.ap=ev.ap;
+      const div=ev.st!=='ok';
       const op=X.ab.find(x=>x.c===c&&+x.b===+b&&x.aberta);
       try{ if(!op){ if(!div) continue; const id=String(c).replace(/[\/\s]/g,'-')+'_'+b+'_'+Date.now().toString(36);
-          const d={c,d:invdDesc(c),b,local:cf.local||'',aberta:true,st:'recontar',dia,em,c1:e,cs:[e]}; X.ab.push(Object.assign({_id:id},d)); await S.db.doc('invdiv/'+id).set(d); continue; }
+          const d={c,d:invdDesc(c),b,local:cf.local||'',aberta:true,st:ev.st==='div'?'recontar':'extrato',dia,em,c1:e,cs:[e]}; if(ev.st==='espera') d.esperaAte=ev.ate||null; X.ab.push(Object.assign({_id:id},d)); await S.db.doc('invdiv/'+id).set(d); continue; }
         if((op.cs||[]).some(x=>x.conf&&x.conf===e.conf&&x.em&&String(x.em).slice(0,16)===em.slice(0,16))) continue;
         const cs=(op.cs||[]).concat([e]).slice(-12), up={cs,ult:e};
-        if(op.st==='recontar'){ const mes=invdMesma(op.c1||{},quem);
-          if(!div){ Object.assign(up,{aberta:false,st:'fechada',auto:true,causa:'Erro na contagem',foc:'nao',fechObs:mes?'Recontei e bateu com o sistema.':'A recontagem de '+(quem.porNome||'outra pessoa')+' bateu com o sistema.',fechadoEm:em,fechadoPorNome:'Automático'}); if(!mes) up.rec=e; }
+        if(op.st==='extrato'){ /* ainda conferindo com o Focco: guarda a contagem nova e avalia de novo */
+          if(!div) Object.assign(up,{aberta:false,st:'fechada',auto:true,causa:'Saldo do Focco antigo (vendeu depois da foto do saldo)',foc:'nao',fechObs:'Contou de novo e bateu com o Focco depois de descontar o movimento.',fechadoEm:em,fechadoPorNome:'Automático'});
+          else { up.c1=e; up.st=ev.st==='div'?'recontar':'extrato'; up.esperaAte=ev.st==='espera'?(ev.ate||null):null; } }
+        else if(op.st==='recontar'){ const mes=invdMesma(op.c1||{},quem);
+          if(ev.st==='espera'){ /* sem como comparar ainda: guarda e não decide */ }
+          else if(!div){ Object.assign(up,{aberta:false,st:'fechada',auto:true,causa:'Erro na contagem',foc:'nao',fechObs:mes?'Recontei e bateu com o sistema.':'A recontagem de '+(quem.porNome||'outra pessoa')+' bateu com o sistema.',fechadoEm:em,fechadoPorNome:'Automático'}); if(!mes) up.rec=e; }
           else if(!mes){ Object.assign(up,{st:'pcp',rec:e,pcpEm:em}); } }
         Object.assign(op,up); if(up.aberta===false) X.ab=X.ab.filter(x=>x!==op); await S.db.doc('invdiv/'+op._id).update(up); }
       catch(err){ console.warn('[invdiv]',err); } } } }
 const _invdGravar=invGravar;
 invGravar=async function(acao,id,d,json){ const r=await _invdGravar.apply(this,arguments);
   if(acao==='salvarConf'&&d){ try{ const k=String(d.numero||id||'').replace(/\//g,'-').slice(0,600), ant=(S.alx.conferencias||[]).find(c=>c._id===k);
-      const cf=Object.assign({},d,{por:ant?(ant.por||null):(S.uid||null),porNome:(ant&&ant.porNome)||(S.nomes&&S.nomes[S.uid])||'',dia:(ant&&ant.dia)||hojeStr()});
+      const sd=invdSaldoEm(); const cf=Object.assign({},d,{por:ant?(ant.por||null):(S.uid||null),porNome:(ant&&ant.porNome)||(S.nomes&&S.nomes[S.uid])||'',dia:(ant&&ant.dia)||hojeStr(),foto:(ant&&ant.foto)||(sd?sd.toISOString():null)});
       invdConf(cf).catch(e=>console.warn('[invdiv]',e)); }catch(e){ console.warn('[invdiv]',e); } }
   return r; };
+async function invdReavalia(){ const X=S.invd; if(!S.db||!invdTemBase()||X.reav) return; let pode=false; try{ pode=viewOk('anlinvd')||viewOk('inventario'); }catch(e){} if(!pode) return;
+  const xs=(X.ab||[]).filter(x=>x.aberta&&x.st==='extrato'&&x.c1); if(!xs.length) return; const vAte=(S.anl.base.vendas||{}).ate||'', k=vAte+'|'+xs.length+'|'+((S.entregas||[]).length);
+  if(X.reavK===k) return; X.reav=true;
+  try{ for(const x of xs){ const ev=invdAvalia(x.c,x.c1), em=new Date().toISOString(); let up=null;
+      if(ev.st==='ok') up={aberta:false,st:'fechada',auto:true,causa:'Saldo do Focco antigo (vendeu depois da foto do saldo)',foc:'nao',fechObs:'Bateu depois de descontar o que saiu e entrou depois da foto do saldo'+(ev.sai?' (saíram '+invdN(ev.sai)+')':'')+'.',fechadoEm:em,fechadoPorNome:'Automático'};
+      else if(ev.st==='div') up={st:'recontar',esperaAte:null,c1:Object.assign({},x.c1,{esp:Math.round(ev.esp),real:Math.round((ev.lo+ev.hi)/2),sai:ev.sai||0,ent:ev.ent||0,ap:ev.ap||0}),avaliadoEm:em};
+      else if((x.esperaAte||null)!==(ev.ate||null)) up={esperaAte:ev.ate||null};
+      if(!up) continue; Object.assign(x,up); if(up.aberta===false) X.ab=X.ab.filter(y=>y!==x);
+      try{ await S.db.doc('invdiv/'+x._id).update(up); }catch(e){ console.warn('[invdiv] reavaliar',e); } }
+    X.reavK=k; rerenderSeguro(); }finally{ X.reav=false; } }
+setInterval(()=>{ try{ invdReavalia(); }catch(e){ console.warn('[invd] reavaliar',e); } },20000);
+if(window.Painel&&Painel.inv){ Painel.inv.reavaliar=invdReavalia; Painel.inv.avaliarConf=invdConf; }
 if(window.Painel&&Painel.inv) Painel.inv.dia=()=>{ try{ return invdHojeLista(); }catch(e){ return {pronto:false,itens:[]}; } };
 
 /* ---------- 3 · tela do PCP ---------- */
 const invdN=v=>(+v||0).toLocaleString('pt-BR',{maximumFractionDigits:0}), invdS=v=>(v>0?'+':v<0?'−':'')+invdN(Math.abs(v));
-function invdCont(e,rot){ if(!e) return '<span class="sub" style="margin:0">—</span>'; return `<div class="ivd-c"><small>${rot}</small><b class="num">${invdN(e.q)}</b> <span class="sub" style="margin:0">sistema ${invdN(e.s)}</span> <span class="${e.dif<0?'cm-neg':'ivd-pos'}">${invdS(e.dif)}</span><i>${esc(e.porNome||'—')} · ${dm(e.dia)}${e.local?' · '+esc(e.local):''}</i></div>`; }
+function invdCont(e,rot){ if(!e) return '<span class="sub" style="margin:0">—</span>'; return `<div class="ivd-c"><small>${rot}</small><b class="num">${invdN(e.q)}</b> <span class="sub" style="margin:0">sistema ${invdN(e.s)}</span> <span class="${e.dif<0?'cm-neg':'ivd-pos'}">${invdS(e.dif)}</span>${e.esp!=null&&Math.round(e.esp)!==Math.round(e.s)?`<small class="xf-de">depois da foto do saldo: ${e.sai?'saíram '+invdN(e.sai):''}${e.sai&&(e.ent||e.ap)?', ':''}${e.ent||e.ap?'entraram '+invdN((e.ent||0)+(e.ap||0)):''} · devia ter ${invdN(e.esp)} · <b class="${e.real<0?'cm-neg':'ivd-pos'}">de verdade ${invdS(e.real)}</b></small>`:''}<i>${esc(e.porNome||'—')} · ${dm(e.dia)}${e.local?' · '+esc(e.local):''}</i></div>`; }
 function invdForm(x){ const F=S.invd.fm||{}; if(F.id!==x._id) return '';
   const so=x.st==='focco'; const foc=F.foc||'sim';
   return `<tr class="ivd-fr"><td colspan="6"><div class="ivd-f">${so?'':`<label>Causa<select id="ivd-causa" class="txt">${['<option value="">Escolha a causa…</option>'].concat(INVD_CAUSAS.map(t=>`<option ${F.causa===t?'selected':''}>${esc(t)}</option>`)).join('')}</select></label>
@@ -104,14 +148,14 @@ function invdForm(x){ const F=S.invd.fm||{}; if(F.id!==x._id) return '';
 function vInvd(){ invdAssina(); invdAssinaFe(); const X=S.invd, C=invdCfg();
   const head=`<div class="head"><div><div class="eyebrow">ANÁLISE PCP · SISTEMA</div><h1>Divergências do inventário</h1>
     <p class="sub">Cada diferença da contagem é recontada por outra pessoa e só sai daqui quando o PCP diz a causa e se corrigiu no Focco.</p></div></div>`;
-  const ab=X.ab.filter(x=>x.aberta), g={recontar:ab.filter(x=>x.st==='recontar'),pcp:ab.filter(x=>x.st==='pcp'),focco:ab.filter(x=>x.st==='focco')};
+  const ab=X.ab.filter(x=>x.aberta), g={recontar:ab.filter(x=>x.st==='recontar'),pcp:ab.filter(x=>x.st==='pcp'),focco:ab.filter(x=>x.st==='focco'),extrato:ab.filter(x=>x.st==='extrato')};
   const lim=hojeStr(new Date(Date.now()-30*864e5)), fe=X.fe.filter(x=>String(x.fechadoEm||'').slice(0,10)>=lim);
   const k=(t,v,s,c,a)=>`<button class="cm-k ${c||''} ivd-k${X.aba===a?' on':''}" data-act="ivd-aba" data-v="${a}"><span>${t}</span><b class="num">${v}</b><i>${s}</i></button>`;
   const L=invdHojeLista(), nF=L.itens.filter(i=>i.feito).length, nR=L.itens.filter(i=>i.m==='rec').length, nG=L.itens.filter(i=>i.m==='giro').length, nO=L.itens.filter(i=>i.m==='rod').length;
   const agora=new Date(), [hh,mm]=String(C.hora).split(':').map(Number), passou=agora.getHours()*60+agora.getMinutes()>(hh||0)*60+(mm||0);
   const LB=invdLib();
-  const libH=LB.ok?`<div class="ivd-lib ok"><b>Contagem liberada</b> · ${LB.como==='saldo'?'saldo do Focco de hoje às '+esc(LB.hm):'liberada às '+esc(LB.hm)+(LB.por?' por '+esc(LB.por):'')+' sem importar o saldo'}</div>`
-    :`<div class="ivd-lib"><div><b>Os conferentes estão esperando.</b> A contagem de hoje só começa depois que o saldo do Focco de hoje for importado${LB.sd?' (o último é de '+esc(LB.sd)+')':''}.</div><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" data-act="ivd-imp">Importar o saldo agora</button><button class="btn sec" data-act="ivd-lib">Liberar sem importar</button></div></div>`;
+  const vAte=((S.anl.base||{}).vendas||{}).ate||'', espX=g.extrato.filter(x=>x.esperaAte);
+  const libH=`<div class="ivd-lib ok"><div><b>Corte do dia:</b> os conferentes contam sem esperar. A foto do saldo é a última importada${LB.sd?' ('+esc(LB.sd)+')':' (nenhuma ainda)'}; o painel desconta o que saiu e entrou depois dela pelo Extrato${vAte?' (importado até '+dm(vAte)+')':''} e pelo que foi apontado no painel.${espX.length?` <b>${espX.length} ${espX.length===1?'contagem espera':'contagens esperam'} o Extrato</b> para ser conferida${espX.length===1?'':'s'}.`:''}</div>${espX.length?'<button class="btn" data-act="ivd-imp">Importar o Extrato</button>':''}</div>`;
   const lista=`<section class="card cm-s">${libH}<div class="cm-q">CONTAGEM DO DIA · ${dm(L.dia)}</div>
     <p class="cm-r">${L.pronto||nR?`${L.itens.length} ${L.itens.length===1?'item':'itens'} para contar hoje, antes da expedição (até ${esc(C.hora)}): ${nR} para recontar por outra pessoa, ${nG} de giro alto e ${nO} do rodízio. ${nF?nF+' já contados hoje.':'Nenhum contado ainda hoje.'}`:'A lista de hoje aparece quando alguém do inventário abrir o painel.'}${passou&&L.itens.length>nF+nR?' <b>A expedição já começou:</b> o que sair agora deixa a contagem diferente.':''}</p>
     <details class="ivd-dt"${X.listaAb?' open':''}><summary data-act="ivd-lista">Ver a lista e os ajustes</summary>
@@ -121,17 +165,17 @@ function vInvd(){ invdAssina(); invdAssinaFe(); const X=S.invd, C=invdCfg();
       <button class="btn sec" data-act="ivd-aj">Salvar ajustes</button></div><p class="cm-nota">Os ajustes valem a partir da lista de amanhã (a de hoje já foi feita).</p></details></section>`;
   const q=anlNorm(X.q||''); const fil=xs=>xs.filter(x=>!q||anlNorm(x.c+' '+(x.d||'')).includes(q));
   const linha=x=>{ const fe=!x.aberta; return `<tr><td class="l"><b>${esc(x.c)}</b><small class="xf-de">${esc(x.d||invdDesc(x.c))}</small><small class="xf-de">Almox ${x.b===30||x.b==='30'?'30':'3'} · aberta ${dm(x.dia)}${x.aberta?' · há '+Math.max(0,invdDias(x.dia,hojeStr()))+' dias':''}</small></td>
-     <td class="l">${invdCont(x.c1,'1ª contagem')}</td><td class="l">${x.rec?invdCont(x.rec,'Recontagem'):x.st==='recontar'?`<span class="pill warn">esperando outra pessoa</span>${(x.cs||[]).length>1?'<small class="xf-de">a mesma pessoa recontou e não bateu</small>':''}`:'—'}</td>
+     <td class="l">${invdCont(x.c1,'1ª contagem')}</td><td class="l">${x.rec?invdCont(x.rec,'Recontagem'):x.st==='extrato'?`<span class="pill">conferindo com o Focco</span><small class="xf-de">${x.esperaAte?'falta o Extrato até '+dm(x.esperaAte):'falta a base do Focco carregar'}</small>`:x.st==='recontar'?`<span class="pill warn">esperando outra pessoa</span>${(x.cs||[]).length>1?'<small class="xf-de">a mesma pessoa recontou e não bateu</small>':''}`:'—'}</td>
      <td class="l">${fe?`<b>${esc(x.causa||'—')}</b><small class="xf-de">${x.foc==='sim'?'Corrigido no Focco · '+esc(x.doc||''):x.foc==='nao'?'Não precisou corrigir':'—'}${x.fechObs?' · '+esc(x.fechObs):''}</small><small class="xf-de">${esc(x.fechadoPorNome||'')} · ${dm(String(x.fechadoEm||'').slice(0,10))}</small>`:x.st==='focco'?`<b>${esc(x.causa||'')}</b><small class="xf-de">falta corrigir no Focco${x.fechObs?' · '+esc(x.fechObs):''}</small>`:''}</td>
      <td>${fe?'':`<button class="btn ${x.st==='recontar'?'sec':''}" data-act="ivd-abre" data-v="${esc(x._id)}">${x.st==='focco'?'Corrigi no Focco':x.st==='recontar'?'Fechar sem recontar':'Fechar'}</button>`}</td>
      <td><button class="btn sec" data-act="ivd-xf" data-v="${esc(x.c)}" title="Ver as contagens no Estoque × Focco">Estoque × Focco</button></td></tr>`+(x.aberta?invdForm(x):''); };
   const xs=X.aba==='fe'?fil(fe):fil(g[X.aba]||[]); xs.sort((a,b)=>String(a.dia||'').localeCompare(String(b.dia||'')));
-  const vazio={pcp:'Nenhuma divergência para o PCP fechar.',recontar:'Nenhuma divergência esperando recontagem.',focco:'Nada falta corrigir no Focco.',fe:'Nenhuma divergência fechada nos últimos 30 dias.'}[X.aba];
+  const vazio={pcp:'Nenhuma divergência para o PCP fechar.',recontar:'Nenhuma divergência esperando recontagem.',focco:'Nada falta corrigir no Focco.',extrato:'Nenhuma contagem esperando o Extrato.',fe:'Nenhuma divergência fechada nos últimos 30 dias.'}[X.aba];
   return head+`<div class="cm">${lista}
-   <div class="cm-ks ivd-ks">${k('Para o PCP fechar',g.pcp.length,'a recontagem confirmou','c','pcp')}${k('Esperando recontagem',g.recontar.length,'por outra pessoa','w','recontar')}${k('Falta corrigir no Focco',g.focco.length,'causa já dita','o','focco')}${k('Fechadas',fe.length,'nos últimos 30 dias','','fe')}</div>
+   <div class="cm-ks ivd-ks">${k('Para o PCP fechar',g.pcp.length,'a recontagem confirmou','c','pcp')}${k('Esperando recontagem',g.recontar.length,'por outra pessoa','w','recontar')}${k('Falta corrigir no Focco',g.focco.length,'causa já dita','o','focco')}${k('Conferindo com o Focco',g.extrato.length,'falta o Extrato do dia','','extrato')}${k('Fechadas',fe.length,'nos últimos 30 dias','','fe')}</div>
    <section class="card cm-s"><div class="xf-fb"><label class="srch">${ic('lupa',16,2)}<input class="txt" id="ivd-q" value="${esc(X.q||'')}" placeholder="Buscar código ou produto (Enter)" autocomplete="off"></label><span class="sub" style="margin:0">${xs.length} ${xs.length===1?'divergência':'divergências'}</span></div>
     ${xs.length?`<div class="cm-tw"><table class="cm-t ivd-t"><thead><tr><th class="l">Item</th><th class="l">Contagem</th><th class="l">Recontagem</th><th class="l">Causa</th><th></th><th></th></tr></thead><tbody>${xs.slice(0,200).map(linha).join('')}</tbody></table></div>`:`<div class="empty">${vazio}</div>`}</section>
-   <p class="cm-nota">Abre divergência o item com diferença de 5 ou mais e de 3% ou mais do saldo do sistema na contagem. A recontagem precisa ser de outra pessoa; se ela bater com o sistema, a divergência fecha sozinha como erro na contagem. Se a mesma pessoa recontar e bater, também fecha.</p></div>`; }
+   <p class="cm-nota">Abre divergência o item que, depois de descontar o que saiu e entrou depois da foto do saldo, ainda tem diferença de 5 ou mais e de 3% ou mais. O dia da foto (se o saldo foi importado antes das 17h) e o dia da contagem podem ter movimento antes ou depois do horário: se em algum dos dois jeitos a conta bate, não abre. A recontagem precisa ser de outra pessoa; se ela bater com o sistema, a divergência fecha sozinha como erro na contagem. Se a mesma pessoa recontar e bater, também fecha.</p></div>`; }
 
 VIEWS.anlinvd={nome:'Divergências do inventário',ic:'caixa',mob:'Divergências'}; CRUMB.anlinvd='Divergências do inventário'; S.extViews=S.extViews||{}; S.extViews.anlinvd=()=>banner()+vInvd();
 function invdReg(){ const M=MODS.find(x=>x.id==='analise'); if(M&&!M.views.includes('anlinvd')) M.views.push('anlinvd');

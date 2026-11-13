@@ -22,7 +22,7 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
 
   await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500);
   let f=await frame(); await H.dorme(2500); let t=await f.evaluate(()=>(document.getElementById('invDia')||{}).innerText||'');
-  ok('Saldo do Focco de ontem: o conferente espera a liberação (sem botão de começar, sem contar o que vê)', /Esperando a liberação/.test(t)&&!/Começar a contagem/.test(t)&&!/Escolher itens na lista/.test(t), t.replace(/\n/g,' | ').slice(0,200));
+  { t=await card(f); ok('Corte do dia: com o saldo de ontem o conferente já conta (não espera a liberação), lista separada por almoxarifado', !/Esperando a liberação/.test(t)&&/Começar a contagem do dia/.test(t)&&/Almox 3/.test(t)&&/Contar estes/.test(t), t.replace(/\n/g,' | ').slice(0,240)); }
   { const b0=await srv(); b0.docs['pcpbase/itens'].atual={SALDO:new Date().toISOString()}; await H.preparar(p,b0); await p.goto(H.BASE); await H.entrar(p,'conf','conf123'); await H.dorme(2500); f=await frame(); }
   t=await card(f);
   let b=await srv(); const dia=b.docs['invdia/'+hoje];
@@ -76,10 +76,27 @@ const diaMenos=n=>{ const d=new Date(Date.now()-n*864e5), p=k=>String(k).padStar
   ok('"Corrigi no Focco" com o nº do documento fecha a divergência', x.aberta===false&&x.st==='fechada'&&x.foc==='sim'&&x.doc==='AJ 7788'&&x.fechadoPorNome, JSON.stringify(x).slice(0,220));
   await p.click('[data-act="ivd-aba"][data-v="fe"]'); await H.dorme(800); t=await H.txt(p,'#view')||'';
   ok('Aba Fechadas mostra a causa e o documento', /AJ 7788/.test(t)&&/Faturado/.test(t), t.replace(/\n/g,' | ').slice(-300));
-  await p.evaluate(()=>{ const S=__T.S(); S.anl.base.itens=Object.assign({},S.anl.base.itens,{atual:{SALDO:'2000-01-02T08:00:00'},em:'2000-01-02T08:00:00.000Z'}); __T.go('anlinvd'); }); await H.dorme(1200);
   t=await H.txt(p,'#view')||'';
-  ok('Sem o saldo de hoje, o PCP vê "Os conferentes estão esperando" com Importar e Liberar sem importar', /conferentes estão esperando/.test(t)&&/Importar o saldo agora/.test(t)&&/Liberar sem importar/.test(t), t.slice(0,200));
-  await p.click('[data-act="ivd-lib"]'); await H.dorme(1500); b=await srv();
-  ok('"Liberar sem importar" grava a liberação do dia e a tela mostra "Contagem liberada"', b.docs['invdia/'+hoje]&&b.docs['invdia/'+hoje].liberado&&b.docs['invdia/'+hoje].itens&&/Contagem liberada/.test(await H.txt(p,'#view')||''), JSON.stringify(b.docs['invdia/'+hoje]&&b.docs['invdia/'+hoje].liberado));
+  ok('PCP vê "Corte do dia" (sem "conferentes estão esperando")', /Corte do dia/.test(t)&&!/conferentes estão esperando/.test(t), t.slice(0,240));
+  /* corte do dia: foto do saldo de 3 dias atrás (18h), contagem hoje */
+  const foto=new Date(diaMenos(3)+'T18:00:00').toISOString();
+  const conta=async(c,q,vAte,sai)=>p.evaluate(async([c,q,vAte,sai,foto,hoje,d1,d2])=>{ const S=__T.S(); const V=S.anl.base.vendas; V.ate=vAte; V.diario[c]={}; if(sai){ V.diario[c][d2]=[0,sai[0]]; V.diario[c][d1]=[0,sai[1]]; }
+      await Painel.inv.avaliarConf({numero:'T-'+c,local:'Almox 3',dia:hoje,por:'uX',porNome:'Teste',foto,itens:{[c]:{almox3:q,saldoSistema3:100,almox30:0}}}); },[c,q,vAte,sai,foto,hoje,diaMenos(1),diaMenos(2)]);
+  const div=async c=>{ const b=await srv(); return Object.values(b.docs).find(y=>y&&y.c===c&&y.b!=null); };
+  await conta('AC0020',50,diaMenos(1),[30,20]); await H.dorme(600);
+  ok('Contou 50, Focco 100, mas saíram 50 depois da foto (Extrato): não abre divergência', !(await div('AC0020')));
+  await conta('AC0022',50,diaMenos(1),null); await H.dorme(600); x=await div('AC0022');
+  ok('Nada saiu depois da foto e contou 50 de 100: abre para recontar, com "devia ter 100"', x&&x.st==='recontar'&&x.c1.esp===100&&x.c1.real===-50, JSON.stringify(x).slice(0,240));
+  await conta('AC0021',50,diaMenos(3),null); await H.dorme(600); x=await div('AC0021');
+  ok('Extrato só até o dia da foto: fica "Conferindo com o Focco" esperando o Extrato (não pede recontagem)', x&&x.st==='extrato'&&x.esperaAte===diaMenos(1), JSON.stringify(x).slice(0,240));
+  await p.evaluate(()=>__T.go('anlinvd')); await H.dorme(800); t=await H.txt(p,'#view')||'';
+  ok('PCP vê "1 contagem espera o Extrato" e o quadro Conferindo com o Focco', /contagem espera o Extrato/.test(t)&&/Conferindo com o Focco\s*1/.test(t), t.slice(0,300));
+  await p.evaluate(async([d1,d2])=>{ const S=__T.S(); const V=S.anl.base.vendas; V.ate=d1; V.diario.AC0021={[d2]:[0,25],[d1]:[0,25]}; await Painel.inv.reavaliar(); },[diaMenos(1),diaMenos(2)]); await H.dorme(800);
+  x=await div('AC0021');
+  ok('Chegou o Extrato com as 50 que saíram: fecha sozinha ("Saldo do Focco antigo")', x&&x.aberta===false&&x.auto&&/Saldo do Focco antigo/.test(x.causa), JSON.stringify(x).slice(0,240));
+  await conta('AC0023',50,diaMenos(3),null); await H.dorme(600);
+  await p.evaluate(async d1=>{ const S=__T.S(); const V=S.anl.base.vendas; V.ate=d1; V.diario.AC0023={}; S.invd.reavK=''; await Painel.inv.reavaliar(); },diaMenos(1)); await H.dorme(800);
+  x=await div('AC0023');
+  ok('Chegou o Extrato e nada saiu: a divergência vai para recontar', x&&x.aberta===true&&x.st==='recontar'&&x.c1.esp===100, JSON.stringify(x).slice(0,240));
   if(process.env.SHOT) await p.screenshot({path:'/tmp/invd.png',fullPage:true});
   const fal=res.filter(r=>!r.ok).length; console.log(fal?`FALHOU ${fal} de ${res.length}`:`PASSOU ${res.length}`); await B.browser.close(); process.exit(fal?1:0); })().catch(e=>{ console.error('ERRO',e); process.exit(1); });

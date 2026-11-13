@@ -34,6 +34,9 @@
     const u=xs.map(r=>String(r.dataHora||'').slice(11,16)).filter(Boolean).sort().pop(); return {n:xs.length,u}; }catch(e){ return {n:0}; } }
   const hist=()=>{ try{ return sessionStorage.getItem('ivh.hist')==='1'; }catch(e){ return false; } };
   const podeAud=()=>{ const b=$('btnModoAuditoria'); return !!(b&&b.style.display!=='none'); };
+  /* lista do dia separada por almoxarifado (13/11, "não sabe o que contar / difícil achar"): uma área de cada vez */
+  function grupos(ord){ const m=new Map(); ord.forEach(i=>{ const l=ondeK(i.it)[0], n=i.meu?'Para outra pessoa recontar':(l?l[1]:'Outros'); if(!m.has(n)) m.set(n,{n,xs:[],f:[],ok:0,o:i.meu?99:(l?LORD.indexOf(l):9)}); const g=m.get(n); g.xs.push(i); if(!i.meu){ if(i.feito) g.ok++; else g.f.push(String(i.cod)); } });
+    return [...m.values()].sort((a,b)=>(!b.f.length-!a.f.length)||a.o-b.o); }
   let sig='';
   function desenha(){ const sc=$('confSelCard'), wrap=$('confModoContagemWrap'); if(!sc||typeof CONF_MODO==='undefined') return; let el=$('invDia');
     let pf={}; try{ pf=perfil(); }catch(e){} const conta=!!(pf.podeConferir||pf.podeAdmin);
@@ -60,7 +63,8 @@
       :`<div class="ivh-k">Contagem do dia</div><h2>${meusN} ${meusN===1?'item':'itens'} para contar hoje</h2>
         <div class="ivh-h ${passou?'pas':'ok'}">${ICO.relogio}<span>${passou?'<b>A expedição já começou</b> ('+esc(D.hora)+') · conte primeiro o que não está saindo agora':'<b>Dá tempo:</b> conte antes da expedição começar, até '+esc(D.hora)}</span></div>
         <div class="ivh-pg"><div class="ivh-anel" style="--p:${pct}"><i>${feitos}/${meusN}</i></div><div class="ivh-ns"><div><b>${falta.length}</b> para contar</div><div><b>${feitos}</b> já contados hoje</div>${rec.length?`<div class="r"><b>${rec.length}</b> ${rec.length===1?'recontagem pedida':'recontagens pedidas'} para você</div>`:''}${outros.length?`<div><b>${outros.length}</b> para outra pessoa recontar</div>`:''}</div></div>
-        <div class="ivh-l">${ord.slice(0,6).map(linha).join('')}${ord.length>6?`<details class="ivh-mais"><summary>Ver a lista toda (${ord.length})</summary>${ord.slice(6).map(linha).join('')}</details>`:''}</div>
+        <p class="ivh-s ivh-corte">Conte o que está no lugar agora. O painel desconta sozinho o que sair ou entrar depois da última foto do saldo do Focco.</p>
+        <div class="ivh-l">${grupos(ord).map((g,k)=>`<details class="ivh-gr"${k===0?' open':''}><summary><b>${esc(g.n)}</b><span>${g.f.length?g.f.length+' para contar':'✓ tudo contado'}${g.ok?' · '+g.ok+' já contados':''}</span>${g.f.length?`<button class="ivh-gb" data-a="grupo" data-g="${k}">Contar estes (${g.f.length})</button>`:''}</summary>${g.xs.map(linha).join('')}</details>`).join('')}</div>
         ${falta.length?`<button class="ivh-go" data-a="dia">Começar a contagem do dia (${falta.length})  ›</button>`:`<div class="ivh-fim">✓ Tudo da lista de hoje que você pode contar já foi contado.</div>`}`;
     el.innerHTML=`<div class="ivh-oi"><h1>${oi}${pri?', '+esc(pri):''}</h1><span>${esc(dsem)}, ${dt}${locais()?' · '+esc(locais()):''}</span></div>
       <div class="ivh-g"><section class="ivh-c ivh-dia">${cartao}</section>
@@ -69,6 +73,8 @@
         <section class="ivh-c ivh-meus"><div class="ivh-k">Minhas contagens de hoje</div>${D&&D.meus?`<div class="ivh-mn"><b>${D.meus}</b> ${D.meus===1?'item contado':'itens contados'}${D.meusUlt?' · última às '+esc(D.meusUlt):''}</div><div class="ivh-mc">${(D.meusItens||[]).slice(0,8).map(c=>`<span>${esc(c)}</span>`).join('')}${(D.meusItens||[]).length>8?`<span>+${D.meusItens.length-8}</span>`:''}</div>`:'<div class="ivh-mn v">Você ainda não contou nada hoje.</div>'}</section></div></div>
       <div class="ivh-rod">${esp?'':`<button data-a="lista">${ICO.lista}Escolher itens na lista</button>`}<button data-a="hist">${ICO.hist}${hist()?'Esconder contagens anteriores':'Ver contagens anteriores'}</button><button data-a="pdf">${ICO.imp}Imprimir lista de contagem</button>${podeAud()?`<button data-a="aud">${ICO.aud}Auditoria</button>`:''}</div>`; }
   function clica(ev){ const b=ev.target.closest('[data-a]'); if(!b) return; const a=b.dataset.a;
+    if(a==='grupo'){ ev.preventDefault(); ev.stopPropagation(); const D=dados(); if(!D) return; const ord=D.xs.filter(i=>!i.meu).concat(D.xs.filter(i=>i.meu)); const g=grupos(ord)[+b.dataset.g]; if(!g||!g.f.length) return;
+      try{ CONF_ITENS_SEL.clear(); g.f.forEach(c=>CONF_ITENS_SEL.add(c)); try{ atualizarBadgeSelConf(); }catch(e){} confIniciarConferencia(); }catch(e){ console.warn('[dia]',e); toast('Não consegui abrir a contagem.'); } return; }
     if(a==='dia'){ const D=dados(); if(!D) return; const xs=D.xs.filter(i=>!i.feito&&!i.meu).map(i=>String(i.cod)); if(!xs.length) return;
       try{ CONF_ITENS_SEL.clear(); xs.forEach(c=>CONF_ITENS_SEL.add(c)); try{ atualizarBadgeSelConf(); }catch(e){} confIniciarConferencia(); }catch(e){ console.warn('[dia]',e); toast('Não consegui abrir a contagem do dia.'); } return; }
     if((a==='achar'||a==='lista'||a==='dia')&&espera(dados())){ toast('A contagem de hoje ainda não foi liberada pelo PCP.'); return; }
@@ -105,6 +111,7 @@
   .ivh-it em{margin-left:auto;flex:none;font-style:normal;font-size:12px;padding:3px 10px;border-radius:999px;background:var(--tt);color:var(--tl);display:inline-flex;align-items:center;gap:6px}
   .ivh-it em::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
   .ivh-it.rec{background:var(--crt)}.ivh-it.rec em{background:#fff;color:var(--cr)}.ivh-it.ok,.ivh-it.meu{opacity:.55}
+  .ivh-gr{border:1px solid var(--ln,#E1E6EB);border-radius:14px;padding:4px 10px 8px}.ivh-gr>summary{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;cursor:pointer;min-height:48px;list-style:none}.ivh-gr>summary::-webkit-details-marker{display:none}.ivh-gr>summary b{font-size:16px}.ivh-gr>summary span{color:var(--ts);font-size:14px;flex:1 1 auto}.ivh-gr .ivh-it{margin-top:6px}.ivh-gb{min-height:44px;padding:0 16px;border-radius:12px;border:0;background:#143F54;color:#fff;font:inherit;font-weight:600;cursor:pointer}.ivh-corte{margin:2px 2px 10px;font-size:14px}
   .ivh-mais summary{cursor:pointer;color:var(--ts);font-weight:500;padding:10px 2px;min-height:44px}.ivh-mais .ivh-it{margin-top:6px}
   .ivh-go{margin-top:auto;border:0;border-radius:12px;background:var(--ts);color:#fff;font:inherit;font-size:20px;font-weight:600;padding:18px;width:100%;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(16,32,40,.14)}
   .ivh-go:active{transform:translateY(1px)}
