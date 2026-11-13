@@ -122,6 +122,8 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   ok('Pedir outra: volta para fechado e guarda o motivo', S['rh/dados/pjpag/2026-10-2'].pes.f2.st==='fechado'&&/CNPJ errado/.test(JSON.stringify(S['rh/dados/pjpag/2026-10-2'].pes.f2.hist)));
   await p.click('[data-act="pjp-pdf"]'); await H.dorme(1500); const pdfN=await p.evaluate(()=>window.__rrUltimoPdf||'');
   ok('Baixar PDF', /Pagamento-PJ-2026-10-2\.pdf/.test(pdfN), pdfN);
+  { const ls=await p.evaluate(()=>{ try{ return window.RHPJPag._calc.linhasRel().map(o=>o.f._id).join(','); }catch(e){ return 'erro:'+e.message; } });
+    ok('Excel e PDF só com quem vai ser pago: o PJ já pago (f1) não entra, o outro (f2) entra', !/f1/.test(ls)&&/f2/.test(ls), ls); }
   /* leitores que contam (05/11): passagem no refeitório depois da saída não pode virar a saída */
   await p.evaluate(()=>{ const D=window.RHAlmoco._A.dados['2026-10'], x=D.dias['2026-10-22']['55566677788']; x.t.push('18:30:00 REFEITÓRIO'); x.ar={'08:03:00':'Produção','17:58:00':'Produção','18:30:00':'Refeitório'}; window.Painel.render(); });
   await p.click('[data-act="pjp-ab"][data-f="f2"]'); await H.dorme(600);

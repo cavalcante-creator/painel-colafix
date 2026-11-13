@@ -1394,7 +1394,10 @@
     return 'https://outlook.office.com/mail/deeplink/compose?'+q.join('&'); }
   /* ---------- relatórios ---------- */
   function linhasRel(c){ const pid=J.per, p=perDe(pid), D=docP(pid);
-    return pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,descMot:fe?(fe.descMot||x.descMot||''):r.descMot,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh,acr:fe?fe.acr||0:r.acr,acrMot:fe?(fe.acrMot||''):r.acrMot}; }); }
+    /* 13/11/2026 ("os pagos já podem sair do Excel e do PDF; os relatórios são só para quem vai ser pago") */
+    const L=pjs(c,p).filter(f=>!J.emp||String(f.empresa||'').toUpperCase()===J.emp).filter(f=>(((D.pes||{})[f._id]||{}).st)!=='pago');
+    if(!L.length){ const e=new Error(pjs(c,p).length?'Todos desta quinzena já estão pagos: o relatório é só de quem ainda vai ser pago.':'Nenhum PJ para baixar.'); e.aviso=true; throw e; }
+    return L.map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=calcPessoa(c,f,p,x); const fe=x.st&&x.fech; return {f,x,r,min:fe?fe.min:r.min,valor:fe?fe.valor:r.valor,desc:fe?fe.desc||0:r.desc,descMot:fe?(fe.descMot||x.descMot||''):r.descMot,bruto:fe?fe.bruto:r.bruto,vh:fe?fe.vh:r.vh,acr:fe?fe.acr||0:r.acr,acrMot:fe?(fe.acrMot||''):r.acrMot}; }); }
   /* ---------- Excel igual à planilha do RH (04/11) ----------
      Uma aba por empresa ("Horas Trabalhadas Zenith", "NEXUS"…), um bloco por pessoa como na planilha original:
      NOME | SETOR | Horário…, depois Dia · Entrada · Saída · Entrada Tolerância Ajustada · Saída Tolerância Ajustada ·
@@ -1716,5 +1719,5 @@
     }catch(e){ if(e&&e.aviso) P.toast(e.message); else P.erro(e); } });
   document.addEventListener('keydown',ev=>{ if(ev.key!=='Escape'||!C) return; if(J.mod){ J.mod=null; C.P.render(); } else if(J.edDia){ J.edDia=null; C.P.render(); } else if(J.ab){ J.ab=''; C.P.render(); } });
   document.addEventListener('keydown',ev=>{ if(ev.key==='Enter'&&C&&J.edDia&&ev.target&&['pjp-ce','pjp-cs','pjp-cm'].includes(ev.target.id)){ ev.preventDefault(); const b=document.querySelector('[data-act="pjp-dsalva"]'); if(b) b.click(); } });
-  window.RHPJPag={_fin:{finAbrir,finHtml,finTexto,finAssunto},render,avisos,_J:J,_calc:{contaDia,perDe,perMove,lerXml,qsDe,ptoImporta:(f)=>ptoImporta(C,f),diaPas:(f,d)=>diaPas(C,f,d,leitDe(C,f).l)}};
+  window.RHPJPag={_fin:{finAbrir,finHtml,finTexto,finAssunto},render,avisos,_J:J,_calc:{linhasRel:()=>linhasRel(C),contaDia,perDe,perMove,lerXml,qsDe,ptoImporta:(f)=>ptoImporta(C,f),diaPas:(f,d)=>diaPas(C,f,d,leitDe(C,f).l)}};
 })();
