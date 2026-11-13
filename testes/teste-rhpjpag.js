@@ -123,7 +123,7 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.evaluate(()=>{ const D=window.RHAlmoco._A.dados['2026-10'], x=D.dias['2026-10-22']['55566677788']; x.t.push('18:30:00 REFEITÓRIO'); x.ar={'08:03:00':'Produção','17:58:00':'Produção','18:30:00':'Refeitório'}; window.Painel.render(); });
   await p.click('[data-act="pjp-ab"][data-f="f2"]'); await H.dorme(600);
   const c0=await p.evaluate(()=>[...document.querySelectorAll('.pjp-chips span')].filter(x=>/^18:30/.test(x.textContent)).map(x=>x.className+'|'+x.textContent).join(','));
-  ok('Sem escolher leitores: todas as passagens contam (18:30 do refeitório vira a saída) e cada uma mostra o leitor', /^pe\|18:30Refeit/i.test(c0), c0);
+  ok('Sem escolher leitores: o refeitório não vira a saída (só portaria/entrada/saída/estacionamento contam, 13/11) e cada passagem mostra o leitor', /^fo\|18:30Refeit/i.test(c0), c0);
   await p.keyboard.press('Escape'); await H.dorme(400); await p.click('[data-act="pjp-cfg"]'); await H.dorme(500);
   const cx=await p.evaluate(()=>[...document.querySelectorAll('[data-pjp-clt]')].map(i=>i.dataset.pjpClt).join(','));
   ok('Configurar mostra os leitores do mês (áreas e dispositivos)', /PRODUCAO/.test(cx)&&/REFEITORIO/.test(cx)&&/PORTARIA/.test(cx), cx);

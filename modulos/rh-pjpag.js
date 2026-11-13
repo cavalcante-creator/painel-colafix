@@ -168,8 +168,8 @@
     /* 13/11/2026 ("o da produção é o oficial; o do estacionamento é só uma garantia; se não bateu ali, conferir nos de saída"):
        2+ na produção = só a produção · 1 = a da produção + estacionamento/saída · nenhuma = estacionamento/saída;
        sem nada disso, o Face ID de sempre (leitores que contam). */
-    /* a regra da garantia só vale nos meses em que o Face ID da produção já existe (antes, como sempre) e respeita os leitores escolhidos */
-    const gq=q=>!!dP&&q.ok&&gar(q), gF=pF.filter(gq); let ps, src;
+    /* a regra da garantia vale também nos meses antes do Face ID da produção (13/11, "pode considerar os anteriores") e respeita os leitores escolhidos */
+    const gq=q=>q.ok&&gar(q), gF=pF.filter(gq); let ps, src;
     if(pP.length>=2){ src='pto'; ps=pP.concat(pF.map(q=>Object.assign(q,{ok:false,sec:true}))); }
     else if(pP.length===1){ src=gF.length?'mix':'pto1'; ps=pP.concat(pF.map(q=>gq(q)?q:Object.assign(q,{ok:false,sec:true}))); }
     else if(gF.length){ src='gar'; ps=pF.map(q=>gq(q)?q:Object.assign(q,{ok:false,sec:true})); }
@@ -519,7 +519,7 @@
       const lin=r.dias.map(d=>{ const dd=`<div class="pg-dd">${DNL[d.dw]} ${brc(d.d)}</div>`;
         if(!d.hs.length&&!(d.ps&&d.ps.length)&&!d.aj&&!d.esc&&!(d.fer&&(d.fer.rh||d.fer.pago))&&J.edDia!==d.d) return `<div class="pjp-d pg-fds" ${at(d)}>${dd}<div>${d.dw===0||d.dw===6?'fim de semana':'fora da escala'}${ed?` · <button class="lnk" data-act="pjp-dcor" data-d="${d.d}" ${fa}>trabalhou? lançar</button>`:''}</div></div>`;
         const ch=d.aj?`<div class="pjp-chips">${d.zero?'<span>não trabalhou</span>':`<span>${esc(d.e||'—')}</span><span>${esc(d.s||'—')}</span>`}</div><span class="pg-tag pg-t">corrigido · ${esc(d.mot||'à mão')}</span>${d.hs.length?`<small class="ps" style="display:block;font-size:11.5px;color:var(--muted)">${d.src==='pto'||d.src==='mix'?'Entrada da fábrica':'Face ID'}: ${esc(d.hs.join(' · '))}</small>`:''}`
-          :d.ps&&d.ps.length?`${diaVis(d,h,esc)}${d.src&&ptoMes(d.d.slice(0,7))?`<span class="pg-tag pg-src pg-${d.src}" title="${SRC_D[d.src]||''}">${SRC_T[d.src]}</span>`:''}${d.sp&&!d.sp.soAlm?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
+          :d.ps&&d.ps.length?`${diaVis(d,h,esc)}${d.src&&(ptoMes(d.d.slice(0,7))||d.src==='gar')?`<span class="pg-tag pg-src pg-${d.src}" title="${SRC_D[d.src]||''}">${SRC_T[d.src]}</span>`:''}${d.sp&&!d.sp.soAlm?spHtml(d,ed,fa,esc):''}${d.fl?`<span class="pg-tag pg-w">Só uma passagem · falta a saída</span>`:d.info?`<span class="pg-tag ${d.fer?'pg-f':'pg-m'}">${esc(d.info)}</span>`:''}`
           :d.fil?`<div class="pjp-chips"><span>dia cheio</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fech?`<div class="pjp-chips"><span>dia do fechamento</span></div><span class="pg-tag pg-m">${esc(d.info)}</span>`
           :d.fer?`<div class="pjp-chips"><span>não trabalhou</span></div><span class="pg-tag pg-f">Feriado · ${esc(d.fer.nome)}</span>`
