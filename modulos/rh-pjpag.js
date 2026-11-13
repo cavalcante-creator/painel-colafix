@@ -50,9 +50,22 @@
   const fimMes=(y,m)=>new Date(y,m,0).getDate();
   /* dia que divide a quinzena (Parâmetros, 11/11): 1ª = 1 até o corte, 2ª = corte+1 até o fim do mês; padrão 15 */
   const corteQ=()=>{ const v=+((((C&&C.R&&C.R.cfg)||{}).pjPag)||{}).corte; return v>=10&&v<=20?v:15; };
-  function perDe(pid){ const m=String(pid||'').match(/^(\d{4})-(\d{2})(?:-([12]))?$/); if(!m) return null; const y=+m[1], mo=+m[2], q=m[3], f=fimMes(y,mo), b=m[1]+'-'+m[2]+'-', k=corteQ();
+  /* 13/11/2026 ("quero pegar o dia 31/10 também"): dias do período ajustados à mão em rh/config.pjPag.perAj {pid:{de,ate}}.
+     O período vizinho se acerta sozinho (começa no dia seguinte / termina no dia anterior). Até 10 dias para cada lado. */
+  const perAjs=()=>((((C&&C.R&&C.R.cfg)||{}).pjPag)||{}).perAj||{};
+  function perBase(pid){ const m=String(pid||'').match(/^(\d{4})-(\d{2})(?:-([12]))?$/); if(!m) return null; const y=+m[1], mo=+m[2], q=m[3], f=fimMes(y,mo), b=m[1]+'-'+m[2]+'-', k=corteQ();
     const de=q==='2'?b+pad2(k+1):b+'01', ate=q==='1'?b+pad2(k):b+pad2(f);
     return {pid,de,ate,mes:m[1]+'-'+m[2],txt:(q?(q==='1'?'1 a '+k:(k+1)+' a '+f)+'/'+m[2]+'/'+m[1]:'mês '+m[2]+'/'+m[1])+'',curto:(q?brc(de)+' a '+brc(ate):m[2]+'/'+m[1])}; }
+  const diaMais=(iso,n)=>{ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return isoD(d); };
+  function perDe(pid){ const p=perBase(pid); if(!p) return null; const A=perAjs(), o=A[pid], ok=x=>x&&/^\d{4}-\d{2}-\d{2}$/.test(x);
+    let de=p.de, ate=p.ate, aj=false;
+    if(o&&ok(o.de)) { de=o.de; aj=true; } if(o&&ok(o.ate)) { ate=o.ate; aj=true; }
+    try{ const pa=A[perMove(pid,-1)]; if(!(o&&ok(o.de))&&pa&&ok(pa.ate)&&pa.ate>=de){ de=diaMais(pa.ate,1); aj=true; }
+      const pn=A[perMove(pid,1)]; if(!(o&&ok(o.ate))&&pn&&ok(pn.de)&&pn.de<=ate){ ate=diaMais(pn.de,-1); aj=true; } }catch(e){}
+    if(!aj||de>ate) return p;
+    return Object.assign(p,{de,ate,aj:true,base:{de:p.de,ate:p.ate},txt:brc(de)+' a '+brc(ate)+'/'+ate.slice(0,4),curto:brc(de)+' a '+brc(ate)}); }
+  /* meses que o período toca (31/10 numa quinzena de novembro) */
+  const mesesDe=p=>[...new Set([p.de.slice(0,7),p.mes,p.ate.slice(0,7)])];
   /* dia do pagamento sugerido = fim do período + N dias (Parâmetros), nunca antes de hoje */
   function pagSug(c,p){ const n=Math.max(0,parseInt(cfg(c).pagDias,10)||0), d=new Date(p.ate+'T12:00:00'); d.setDate(d.getDate()+n); const k=isoD(d), h=hojeS(); return k<h?h:k; }
   function perAtual(c){ const h=new Date(), y=h.getFullYear(), mo=h.getMonth()+1, d=h.getDate(), modo=cfg(c).modo;
@@ -261,8 +274,8 @@
       P.inscrever('pjp-'+pid,()=>P.db().collection(COL).where('pid','==',pid).limit(1),s=>{ const d=s.docs[0]; J.docs[pid]=d?d.data():{pid,pes:{}}; P.rerender(); }); }
     if(!J.envSub){ J.envSub=true;
       P.inscrever('pjp-env',()=>P.db().collection(ENV).orderBy('em','desc').limit(80),s=>{ s.docs.forEach(d=>{ J.env[d.id]=Object.assign({_id:d.id},d.data()); }); processa(c); P.rerender(); }); }
-    const p0=perDe(pid); if(p0&&!J.ptoSub[p0.mes]){ const m=p0.mes; J.ptoSub[m]=true; P.inscrever('pjp-pto-'+m,()=>P.db().collection(PTO).where('mes','==',m).limit(1),s=>{ const d=s.docs[0]; J.pto[m]=d?d.data():null; P.rerender(); }); }
-    const p=perDe(pid); if(p&&!J.carr[p.mes]&&window.RHAlmoco){ J.carr[p.mes]=true; window.RHAlmoco.carregar(c.alm(),p.mes).then(()=>P.rerender()); } }
+    const p0=perDe(pid); if(p0) mesesDe(p0).forEach(m=>{ if(J.ptoSub[m]) return; J.ptoSub[m]=true; P.inscrever('pjp-pto-'+m,()=>P.db().collection(PTO).where('mes','==',m).limit(1),s=>{ const d=s.docs[0]; J.pto[m]=d?d.data():null; P.rerender(); }); });
+    const p=perDe(pid); if(p&&window.RHAlmoco) mesesDe(p).forEach(m=>{ if(J.carr[m]) return; J.carr[m]=true; window.RHAlmoco.carregar(c.alm(),m).then(()=>P.rerender()); }); }
   const docP=pid=>J.docs[pid]||{pid,pes:{}};
   const pesDe=(pid,fid)=>(docP(pid).pes||{})[fid]||{};
   async function grava(c,pid,fid,obj,hist){ const p=perDe(pid), D=docP(pid); D.pes=D.pes||{}; const cur=D.pes[fid]||{};
@@ -599,6 +612,15 @@
         <div class="pg-big"><span>Total a pagar</span><b>${R$(r.valor)}</b>${antTxt(r)}</div><div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;align-items:center">${acoes(c,pid,f,x,r).replace(/<br>/g,' ')}</div></div>`:''}
     </aside></div>`; }
   function modal(c){ const M=J.mod, esc=c.esc; if(!M) return ''; if(M.k==='fin') return finModal(c); if(M.k==='cw') return cwModal(c); if(M.k==='cwconv') return cwConvModal(c); 
+    if(M.k==='perdias'){ const p=perDe(J.per), b=perBase(J.per), o=perAjs()[J.per]||null, mn=diaMais(b.de,-10), mx=diaMais(b.ate,10);
+      const pa=perBase(perMove(J.per,-1)), pn=perBase(perMove(J.per,1)), Da=J.docs[pa.pid], fa=Da&&Da.pes?Object.values(Da.pes).filter(x=>x&&x.st).length:0;
+      return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod" role="dialog" aria-label="Dias deste período"><h3>Dias deste período</h3>
+        <p class="sub">O normal é ${esc(brc(b.de))} a ${esc(brc(b.ate))}. Escolha outro primeiro ou último dia (até 10 dias para cada lado). Só vale para este período.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:10px 0"><label class="f" style="flex:1;min-width:150px"><span>Primeiro dia</span><input type="date" id="pjp-pde" value="${esc(p.de)}" min="${mn}" max="${mx}"></label>
+        <label class="f" style="flex:1;min-width:150px"><span>Último dia</span><input type="date" id="pjp-pate" value="${esc(p.ate)}" min="${mn}" max="${mx}"></label></div>
+        <p class="ps" style="font-size:13px;margin:0 0 6px">Se este período começar antes de ${esc(brc(b.de))}, o anterior (${esc(pa.curto)}) passa a terminar no dia de antes. Se terminar depois de ${esc(brc(b.ate))}, o próximo (${esc(pn.curto)}) começa no dia seguinte. Assim nenhum dia é pago duas vezes.</p>
+        ${fa?`<div class="pjp-av pjp-avw">O período anterior (${esc(pa.curto)}) já tem ${fa} PJ com o valor fechado. Se o dia que vier para cá já entrou no valor fechado lá, ele seria pago duas vezes: confira ou reabra o valor lá antes.</div>`:''}
+        <div class="pjp-ac" style="margin-top:12px">${btn('pjp-modx','Cancelar')}${o?btn('pjp-perpad','Voltar ao normal'):''}${btn('pjp-perok','Salvar os dias','','')}</div></div></div>`; }
     if(M.k==='cfg'){ const g=cfg(c), k=corteQ(), emV=pjEmps(c), emT=[...new Set(['ZENITH','NEXUS','COLAFIX'].concat((c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.empresa).map(f=>String(f.empresa).toUpperCase())))];
       const nEmp=e=>(c.R.func||[]).filter(f=>f&&!f.removido&&f.tipo==='PJ'&&f.status!=='Desligado'&&String(f.empresa||'').toUpperCase()===e).length;
       return `<div class="pjp-fundo" data-pjp-fundo><div class="pjp-mod pjp-par" role="dialog" aria-label="Parâmetros do pagamento dos PJ"><h3>Parâmetros do pagamento</h3><p class="sub">Valem para todos os PJ. O horário e o valor da hora de cada pessoa ficam no detalhe dela (toque no nome › Regras).</p>
@@ -956,7 +978,7 @@
     const pvH=pv.length?PVG.map(([k,t,sub])=>{ const ys=pv.filter(x=>(x.tom||'info')===k); return ys.length?`<div class="pjp-pvg ${k}"><div class="pjp-pvgh"><i></i><b>${t}</b><span>${ys.length}</span><small>${sub}</small></div>${ys.map(pvLin).join('')}</div>`:''; }).join('')
       :`<div class="pjp-pvok">${U?U.ic('ok',18):''} Nada esperando por você agora.</div>`;
     const dadosOk=!!(window.RHAlmoco&&window.RHAlmoco._A&&window.RHAlmoco._A.dados[p.mes]);
-    const dias=dadosOk?Object.keys(window.RHAlmoco._A.dados[p.mes].dias||{}).filter(d=>d>=p.de&&d<=p.ate).sort():[];
+    const dias=dadosOk?[].concat(...mesesDe(p).map(m=>Object.keys(((window.RHAlmoco._A.dados[m]||{}).dias)||{}))).filter(d=>d>=p.de&&d<=p.ate).sort():[];
     const av=(t,tom)=>U?U.aviso({tom:tom||'warn',txt:t}):`<div class="pjp-av">${esc(t)}</div>`;
     const avFid=!dadosOk?av('Carregando o Face ID do mês…','info'):!dias.length?av('Ainda não tem Face ID importado de '+p.curto+'. Importe o CSV em Almoço/café (ou espere o robô do Face ID).')
       :dias[dias.length-1]<p.ate&&p.ate<c.P.hojeStr()&&diasDe(p).some(d=>d>dias[dias.length-1]&&![0,6].includes(new Date(d+'T12:00:00').getDay()))?av('O Face ID importado vai até '+brc(dias[dias.length-1])+'; a quinzena vai até '+brc(p.ate)+'. Importe o resto antes de fechar.'):'';
@@ -978,9 +1000,9 @@
     const MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
     const pD=+p.de.slice(8,10), pA=+p.ate.slice(8,10), pM=MES[+p.mes.slice(5,7)-1], pY=p.mes.slice(0,4), ehMes=cfg(c).modo==='mes', q2=/-2$/.test(pid);
     const perOps=(()=>{ let k=perAtual(c); for(let n=0;n<2;n++) k=perMove(k,1); const out=[]; for(let n=0;n<26;n++){ out.push(k); k=perMove(k,-1); } if(!out.includes(pid)) out.push(pid); return out; })();
-    const perNome=k=>{ const q=perDe(k), mm=MES[+q.mes.slice(5,7)-1], dd=+q.de.slice(8,10), aa=+q.ate.slice(8,10); return ehMes?mm+' de '+q.mes.slice(0,4):dd+' a '+aa+' de '+mm+' de '+q.mes.slice(0,4); };
+    const perNome=k=>{ const q=perDe(k), mm=MES[+q.mes.slice(5,7)-1], dd=+q.de.slice(8,10), aa=+q.ate.slice(8,10); if(q.aj) return brc(q.de)+' a '+brc(q.ate)+' de '+q.mes.slice(0,4)+' (dias ajustados)'; return ehMes?mm+' de '+q.mes.slice(0,4):dd+' a '+aa+' de '+mm+' de '+q.mes.slice(0,4); };
     const quin=`<div class="pjp-q" aria-label="Período ${esc(p.txt)}"><button class="pjp-qb" data-act="pjp-per" data-v="-1" aria-label="${ehMes?'Mês':'Quinzena'} anterior">‹</button>
-          <div class="pjp-qm"><select class="pjp-qsel" data-pjp-qsel aria-label="Escolher o período">${perOps.map(k=>`<option value="${k}" ${k===pid?'selected':''}>${esc(perNome(k))}${k===perAtual(c)?' · atual':''}</option>`).join('')}</select><span class="pjp-qi" aria-hidden="true">${U?U.ic('calendario',16):''}</span><div><small>${ehMes?'Mês':(q2?'2ª quinzena':'1ª quinzena')}${ehAt?' · atual':''}</small><b>${ehMes?esc(pM)+' de '+pY:pD+' a '+pA+' de '+esc(pM)}</b>${ehAt?'':`<button class="pjp-qv" data-act="pjp-per" data-v="0" type="button">voltar para a atual</button>`}</div></div>
+          <div class="pjp-qm"><select class="pjp-qsel" data-pjp-qsel aria-label="Escolher o período">${perOps.map(k=>`<option value="${k}" ${k===pid?'selected':''}>${esc(perNome(k))}${k===perAtual(c)?' · atual':''}</option>`).join('')}</select><span class="pjp-qi" aria-hidden="true">${U?U.ic('calendario',16):''}</span><div><small>${ehMes?'Mês':(q2?'2ª quinzena':'1ª quinzena')}${ehAt?' · atual':''}</small><b>${p.aj?esc(brc(p.de))+' a '+esc(brc(p.ate)):ehMes?esc(pM)+' de '+pY:pD+' a '+pA+' de '+esc(pM)}</b><span class="pjp-qls"><button class="pjp-qv" data-act="pjp-perdias" type="button" title="Escolher o primeiro e o último dia deste período">${p.aj?'dias ajustados · mudar':'mudar os dias'}</button>${ehAt?'':`<button class="pjp-qv" data-act="pjp-per" data-v="0" type="button">voltar para a atual</button>`}</span></div></div>
           <button class="pjp-qb" data-act="pjp-per" data-v="1" aria-label="${ehMes?'Próximo mês':'Próxima quinzena'}">›</button></div>`;
     const barra=`<div class="pjp-bar">
         ${FI?`<div class="pjp-fid ${FI.tom}" role="status" title="${esc(fidT)}"><span class="pjp-fdot" aria-hidden="true"></span><b>${esc(FI.tit)}</b>${FI.curto?`<small>${esc(FI.curto)}</small>`:''}<button class="lnk" data-act="pjp-fidir" type="button">ver</button></div>`:''}
@@ -1255,7 +1277,7 @@
   .pjp-d details.pg-ps .pjp-chips{margin-top:6px}.pjp-d .pg-c2{margin-top:4px}
   .pjp-d .pg-tag.pg-sp2{display:block;width:fit-content;max-width:100%;background:none;padding:0;font-weight:600}
   .pjp-g .pjp-av.pjp-avw{background:none;border:1px solid var(--line,#E1E7EB);border-left:3px solid var(--warn,#C28A1E);padding:8px 12px;font-size:13px}
-  .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}
+  .pjp-qsel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}.pjp-qv{position:relative;z-index:1}.pjp-qls{display:flex;gap:10px;flex-wrap:wrap}
   .pjp-qm b::after{content:'▾';font-size:11px;color:var(--muted);margin-left:6px}
   .head .rh-acoes{align-self:flex-end}.head .rh-acoes .pjp-tbt{display:flex;gap:8px}
   .pjp-tbt .btn svg{vertical-align:-2px;margin-right:2px}
@@ -1563,6 +1585,15 @@
         await grava(c,J.per,f._id,{aj},'Corrigiu '+brc(d)+(a==='pjp-dzero'?': não trabalhou':': '+(aj[d].e||'')+' às '+(aj[d].s||''))+(mot?' ('+mot+')':'')); J.edDia=null; P.render(); return; }
       if(a==='pjp-ppad'){ const f=fDe(b.dataset.f); if(!confirm('Voltar o horário e o valor de '+c.titulo(f.nome)+' para o padrão?')) return; f.pjPag={}; await P.db().doc('rh/dados/funcionarios/'+f._id).update({pjPag:{}}); P.toast('Regras de '+c.titulo(f.nome)+' voltaram ao padrão.'); P.render(); return; }
       if(a==='pjp-modx'){ J.mod=null; P.render(); return; }
+      if(a==='pjp-perdias'){ ev.preventDefault&&ev.preventDefault(); J.mod={k:'perdias'}; P.render(); return; }
+      if(a==='pjp-perok'||a==='pjp-perpad'){ const b0=perBase(J.per), mn=diaMais(b0.de,-10), mx=diaMais(b0.ate,10); let v=null;
+        if(a==='pjp-perok'){ const de=(document.getElementById('pjp-pde')||{}).value||'', ate=(document.getElementById('pjp-pate')||{}).value||'';
+          if(!de||!ate) return P.toast('Escolha o primeiro e o último dia.'); if(de>ate) return P.toast('O primeiro dia tem que ser antes do último.');
+          if(de<mn||ate>mx) return P.toast('Dá para mudar até 10 dias para cada lado ('+brc(mn)+' a '+brc(mx)+').');
+          v=de===b0.de&&ate===b0.ate?null:{de,ate,por:c.eu(),em:agora()}; }
+        const A=Object.assign({},perAjs()); if(v) A[J.per]=v; else delete A[J.per]; c.R.cfg.pjPag=Object.assign({},(c.R.cfg||{}).pjPag||{},{perAj:A});
+        try{ await P.db().doc('rh/config').set({pjPag:{perAj:{[J.per]:v}}},{merge:true}); }catch(e){ return P.erro(e); }
+        const p1=perDe(J.per); J.mod=null; P.toast(v?'Pronto: o período agora é '+p1.curto+'.':'O período voltou ao normal ('+p1.curto+').'); P.render(); return; }
       if(a==='pjp-cfg'){ ev.preventDefault&&ev.preventDefault(); if(b.dataset.fecha){ J.ab=''; J.edDia=null; } J.mod={k:'cfg'}; P.render(); return; }
       if(a==='pjp-cfgok'){ const g=id=>document.getElementById(id), o={modo:g('pjp-cmodo').value,ini:g('pjp-cini').value||PAD.ini,fim:g('pjp-cfim').value||PAD.fim,intv:Math.max(0,parseInt(g('pjp-cintv').value,10)||0),tol:Math.max(0,parseInt(g('pjp-ctol').value,10)||0),
           horasMes:Math.max(1,parseInt(g('pjp-chm').value,10)||220),dias:Math.max(2,Math.min(90,parseInt(g('pjp-cdias').value,10)||30)),

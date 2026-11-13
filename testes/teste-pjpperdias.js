@@ -1,0 +1,35 @@
+/* Pagamento dos PJ (13/11): mudar os dias do período (1ª quinzena de novembro começando em 31/10). Nome inventado. */
+const H=require('./harness'); const {seedManut}=require('./manut-seed');
+const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHOU ')+n+(d?' — '+String(d).slice(0,300):'')); };
+(async()=>{ const {d}=seedManut(); const D=d.docs;
+  d.users['rh@painel-colafix.app']={uid:'uRH',pass:'rh1234',nome:'Stefani RH'}; D['perfis/uRH']={nome:'Stefani RH',usuario:'rh'}; D['acessos/uRH']={perfil:'rh',mods:['rh'],locais:[],ativo:true};
+  D['rh/config']={setores:['Manutenção'],pjPag:{ini:'08:00',fim:'18:00',intv:72,tol:5,fds:1}};
+  D['rh/dados/funcionarios/f1']={nome:'MARCOS TESTE DA SILVA',tipo:'PJ',empresa:'NEXUS',cpf:'11122233344',cnpj:'12345678000190',setor:'Manutenção',funcao:'Mecânico',status:'Ativo',admissao:'2025-01-10',pjPag:{vh:30}};
+  const pas=(e,s)=>({'11122233344':{p:1,t:[e+' PORTARIA',s+' PORTARIA']}});
+  D['rh/dados/almoco/2026-10']={mes:'2026-10',dias:{'2026-10-30':pas('08:00:00','18:00:00'),'2026-10-31':pas('08:00:00','12:00:00')},pessoas:{'11122233344':{n:'MARCOS TESTE DA SILVA',e:'NEXUS'}},imp:[]};
+  D['rh/dados/almoco/2026-11']={mes:'2026-11',dias:{'2026-11-03':pas('08:00:00','18:00:00')},pessoas:{'11122233344':{n:'MARCOS TESTE DA SILVA',e:'NEXUS'}},imp:[]};
+  const B=await H.abrir({viewport:{width:1440,height:950}}); const p=B.page; const er=[]; p.on('pageerror',e=>er.push(e.message));
+  await H.preparar(p,d); await p.goto(H.BASE); await H.entrar(p,'rh','rh1234'); await H.dorme(3000);
+  await p.evaluate(()=>{ const J=window.RHPJPag._J; J.per='2026-11-1'; J.aba='lista'; __T.go('rhpjpag'); window.Painel.render(); }); await H.dorme(2500);
+  const gav=async()=>{ await p.evaluate(()=>{ const J=window.RHPJPag._J; J.ab='f1'; J.tab='horas'; J.dk=''; J.dsel=''; window.Painel.render(); }); await H.dorme(1200); return p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||''); };
+  let g=await gav(); ok('Normal: 1ª quinzena de novembro não tem o 31/10', !/31\/10/.test(g), '');
+  await p.evaluate(()=>{ window.RHPJPag._J.ab=''; window.Painel.render(); }); await H.dorme(500);
+  if(process.env.SHOT){ await (await p.$('.pjp-q')).screenshot({path:'/tmp/claude-0/-home-user/f86fe028-9476-55f9-b3f1-86b5f102c0b3/scratchpad/q1.png'}); }
+  const bt=await p.$('[data-act=pjp-perdias]'); ok('Cartão da quinzena tem "mudar os dias"', !!bt);
+  await bt.click(); await H.dorme(600);
+  await p.fill('#pjp-pde','2026-10-31'); await p.click('[data-act=pjp-perok]'); await H.dorme(2500);
+  const S=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs, aj=(((S['rh/config']||{}).pjPag||{}).perAj||{})['2026-11-1']||{};
+  ok('Grava perAj com o primeiro dia 31/10', aj.de==='2026-10-31'&&aj.ate==='2026-11-15', JSON.stringify(aj));
+  const q=await p.evaluate(()=>(document.querySelector('.pjp-q')||{}).innerText||''); ok('Cartão mostra 31/10 a 15/11 e "dias ajustados"', /31\/10 a 15\/11/.test(q)&&/dias ajustados/.test(q), q.replace(/\n/g,' | '));
+  g=await gav(); const sab=(g.match(/Sáb 31\/10[\s\S]{0,160}/)||[''])[0];
+  ok('O 31/10 entra na quinzena com as horas do Face ID de outubro (2h48)', /2h48/.test(sab), sab.replace(/\n/g,' | '));
+  const ant=await p.evaluate(()=>{ const c=window.RHPJPag._calc; return c.perDe('2026-10-2').curto; }); ok('A 2ª quinzena de outubro passa a terminar em 30/10', /16\/10 a 30\/10/.test(ant), ant);
+  await p.evaluate(()=>{ window.RHPJPag._J.ab=''; window.Painel.render(); }); await H.dorme(400);
+  await p.click('[data-act=pjp-perdias]'); await H.dorme(500); await p.click('[data-act=pjp-perpad]'); await H.dorme(1500);
+  const n=await p.evaluate(()=>window.RHPJPag._calc.perDe('2026-11-1').curto); ok('"Voltar ao normal" volta para 01/11 a 15/11', /01\/11 a 15\/11/.test(n), n);
+  await p.evaluate(()=>{ window.RHPJPag._J.ab=''; window.Painel.render(); }); await H.dorme(400);
+  await p.click('[data-act=pjp-perdias]'); await H.dorme(500); await p.fill('#pjp-pde','2026-10-10'); await p.click('[data-act=pjp-perok]'); await H.dorme(800);
+  const S2=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs, aj2=(((S2['rh/config']||{}).pjPag||{}).perAj||{})['2026-11-1'];
+  ok('Mais de 10 dias para trás não grava', !aj2||!aj2.de, JSON.stringify(aj2));
+  const e2=er.concat(B.erros||[]).filter(x=>!/404|cdnjs|ERR_NAME/.test(x)); ok('Nenhum erro de JavaScript', !e2.length, e2.join(' | '));
+  console.log(res.every(Boolean)?'PASSOU tudo ('+res.length+')':'FALHOU ('+res.filter(x=>!x).length+')'); await B.browser.close(); })().catch(e=>{ console.error(e); process.exit(1); });
