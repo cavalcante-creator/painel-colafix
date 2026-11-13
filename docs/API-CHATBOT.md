@@ -128,3 +128,7 @@ resumo().then(r => console.log(JSON.stringify(r, null, 2)));
 3. **Liberar a leitura do resumo para ele:** em Firestore › Dados, crie a coleção `apibots` com um documento cujo **ID é o UID copiado**, com um campo `nome` = `Chatbot do gestor`.
 4. **Passar ao gestor:** o e-mail e a senha do chatbot, por um canal seguro (pessoalmente ou num gerenciador de senhas, não por WhatsApp), e a `apiKey` do projeto novo, que está no `config.js`.
 5. **Para cortar o acesso:** apagar o documento em `apibots` ou desativar o usuário em Authentication.
+
+## Testar o login do chatbot
+
+`docs/testar-chatbot.py` (Python 3, nada para instalar): `python testar-chatbot.py`. Ele pergunta o e-mail e a senha (a senha não aparece), entra, lê o resumo e diz o que falta: login errado, UID que não está em `apibots`, regras não publicadas ou resumo ainda não gravado. No fim confere que o login não lê o resto do banco.
