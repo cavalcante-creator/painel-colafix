@@ -17,6 +17,14 @@ const res=[]; const ok=(n,c,d)=>{ res.push(!!c); console.log((c?'PASSOU ':'FALHO
   let g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
   const sab=(g.match(/Sáb 24\/10[\s\S]{0,200}/)||[''])[0];
   ok('Sábado 24/10 (08:09 às 17:41, intervalo 1h12): 8h20 × 1,5 = 12h30', /12h30/.test(sab)&&/8h20 × 1,5/.test(sab), sab.replace(/\n/g,' | '));
+  await p.click('.pjp-g [data-act=pjp-dshe][data-d="2026-10-24"]'); await H.dorme(1200);
+  let sh=await p.evaluate(()=>{ const t=(document.querySelector('.pjp-g')||{}).innerText||''; return (t.match(/Sáb 24\/10[\s\S]{0,200}/)||[''])[0]; });
+  const Sh=JSON.parse(await p.evaluate(()=>localStorage.getItem('__srv'))).docs, ah=(((Sh['rh/dados/pjpag/2026-10-2']||{}).pes||{}).f1||{}).aj||{};
+  ok('"Não considerar hora extra" no sábado: conta 8h20 (hora normal) e grava aj.semHe', /8h20/.test(sh)&&!/12h30/.test(sh)&&/sem hora extra/.test(sh)&&ah['2026-10-24']&&ah['2026-10-24'].semHe===true, sh.replace(/\n/g,' | '));
+  await p.click('.pjp-g [data-act=pjp-dshex][data-d="2026-10-24"]'); await H.dorme(1200);
+  sh=await p.evaluate(()=>{ const t=(document.querySelector('.pjp-g')||{}).innerText||''; return (t.match(/Sáb 24\/10[\s\S]{0,200}/)||[''])[0]; });
+  ok('"considerar hora extra" volta o × 1,5 (12h30)', /12h30/.test(sh)&&/8h20 × 1,5/.test(sh), sh.replace(/\n/g,' | '));
+  g=await p.evaluate(()=>(document.querySelector('.pjp-g')||{}).innerText||'');
   const tot=(g.match(/Total a pagar\s*R\$\s*([\d.,]+)/)||[])[1]||''; const v=+tot.replace(/\./g,'').replace(',','.');
   ok('Total igual à planilha (R$ 2.284,60; diferença só dos segundos)', Math.abs(v-2284.60)<1, tot);
   await p.evaluate(()=>{ window.RHPJPag._J.tab='desc'; window.Painel.render(); }); await H.dorme(800);
