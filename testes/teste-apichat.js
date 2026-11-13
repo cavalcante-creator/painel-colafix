@@ -4,7 +4,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
 (async()=>{ const {d}=seedManut(); const D=d.docs;
  const AGORA=new Date(); AGORA.setHours(15,0,0,0); const hs=AGORA.getFullYear()+'-'+String(AGORA.getMonth()+1).padStart(2,'0')+'-'+String(AGORA.getDate()).padStart(2,'0'), cp=hs.slice(0,7); const ago=m=>new Date(AGORA.getTime()-m*60000).toISOString();
  d.users['marcelo@painel-colafix.app']={uid:'uMAR',pass:'mar123',nome:'Gestor Teste'}; D['perfis/uMAR']={nome:'Gestor Teste',usuario:'marcelo'}; D['acessos/uMAR']={perfil:'gestor',mods:['gestor','producao','silos','manut','telas','analise'],ativo:true};
- D['ordens/5001'].data=hs; D['ordens/5001'].produto='IT100 - ARGAMASSA AC1 20KG'; D['ordens/5001'].total=1000; D['ordens/5002'].data=hs; D['ordens/5002'].produto='IT200 - ARGAMASSA AC2 25KG';
+ D['ordens/5001'].data=hs; D['ordens/5001'].produto='IT100 - ARGAMASSA AC1 20KG'; D['ordens/5001'].total=1000; D['ordens/5001'].rancho='777'; D['ordens/5001'].rdb={sep:{em:ago(120),nome:'Separador X',conferido:true}}; D['ordens/5002'].data=hs; D['ordens/5002'].produto='IT200 - ARGAMASSA AC2 25KG';
  D['pcpbase/prev']={mes:{[cp]:{IT100:21000,IT200:10500}}}; D['pcpbase/itens']={l:{IT100:{d:'ARGAMASSA AC1 20KG',ln:['Linha 1']},IT200:{d:'ARGAMASSA AC2 25KG',ln:['Linha 2']}}};
  D['entregas/e1']={ordem:'5001',num:'5001',linha:'Linha 1',qtd:300,em:ago(90),por:'x'}; D['entregas/e2']={ordem:'5001',num:'5001',linha:'Linha 1',qtd:200,em:ago(30),por:'x'};
  D['entregas/e3']={ordem:'5002',num:'5002',linha:'Linha 2',qtd:400,em:ago(200),por:'x'};
@@ -28,12 +28,17 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  ok('Silos: toneladas, capacidade e ocupação de cada silo', SI.length===2&&SI[0].silo==='Silo 1'&&SI[0].toneladas===30&&SI[0].ocupacao===50&&SI[1].material==='Areia', JSON.stringify(SI));
  ok('Estoque: item zerado com venda aparece em "agir hoje"', (ES.agirHoje||[]).some(x=>x.codigo==='AC0002'), JSON.stringify(ES).slice(0,300));
  ok('Pessoas: números (vieram 2, chegou depois 1, férias 1)', PE.vieram===2&&PE.chegaramDepoisDoHorario===1&&PE.ferias===1, JSON.stringify(PE));
- ok('Pessoas: nomes só de quem faltou (C sem registro, D férias), sem quem veio', JSON.stringify((PE.faltaram||[]).map(x=>x.nome+':'+x.motivo))==='["Pessoa C:Sem registro no Face ID","Pessoa D:Férias"]'&&!/Pessoa A|Pessoa B/.test(JSON.stringify(PE)), JSON.stringify(PE.faltaram));
+ ok('Pessoas: nomes de quem faltou (C sem registro, D férias)', JSON.stringify((PE.faltaram||[]).map(x=>x.nome+':'+x.motivo))==='["Pessoa C:Sem registro no Face ID","Pessoa D:Férias"]', JSON.stringify(PE.faltaram));
+ const VL=PE.vieramLista||[]; ok('Pessoas: nomes de quem veio, com chegada, almoço e se ainda está', VL.length===2&&VL[0].nome==='Pessoa A'&&VL[0].chegada==='07:50'&&VL[0].almoco==='sim'&&VL[0].naEmpresaAgora===true&&VL[1].nome==='Pessoa B'&&VL[1].naEmpresaAgora===false&&VL[1].chegouDepoisDoHorario===true, JSON.stringify(VL));
+ const O1=(L1.ordensDoDia||[]).find(o=>o.ordem==='5001')||{};
+ ok('Produção: ordem do dia com programado, feito hoje e o que falta', O1.programado===1000&&O1.feitoHoje===500&&O1.falta===500, JSON.stringify(O1).slice(0,400));
+ ok('Rancho: a ordem 5001 mostra o rancho separado (quem e quando), ainda não entregue', O1.rancho&&O1.rancho.numero==='777'&&O1.rancho.separado===true&&O1.rancho.separadoPor==='Separador X'&&O1.rancho.entregueNaLinha===false&&/Aguardando entrega|Linha esperando/.test(O1.rancho.situacao)&&P.ranchosHoje&&P.ranchosHoje.separadosACaminho>=1, JSON.stringify(O1.rancho)+' '+JSON.stringify(P.ranchosHoje));
+ ok('Produção: produzido hoje por produto', (P.produzidoHojePorProduto||[]).some(x=>/AC1/.test(x.produto)&&x.sacos===500), JSON.stringify(P.produzidoHojePorProduto));
  const txt=JSON.stringify(R); console.log('outros:', JSON.stringify({s:R.silos,e:R.estoque,pe:R.pessoas}).slice(0,600));
  ok('Nada de CPF nem dado pessoal do RH no resumo', !/"cpf"|\d{3}\.\d{3}\.\d{3}-\d{2}/i.test(txt));
  await p.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(1200);
  const doc=await p.evaluate(()=>JSON.parse(localStorage.getItem('__srv')).docs['api/resumo']);
- ok('Publica em api/resumo: um campo JSON por assunto, com a hora', doc&&typeof doc.producao==='string'&&JSON.parse(doc.producao).totalHoje.sacos===900&&/^\d{4}-\d{2}-\d{2}T/.test(doc.em_producao||'')&&doc.versao===2&&typeof doc.manutencao==='string', JSON.stringify(doc||{}).slice(0,200));
+ ok('Publica em api/resumo: um campo JSON por assunto, com a hora', doc&&typeof doc.producao==='string'&&JSON.parse(doc.producao).totalHoje.sacos===900&&/^\d{4}-\d{2}-\d{2}T/.test(doc.em_producao||'')&&doc.versao===3&&typeof doc.manutencao==='string', JSON.stringify(doc||{}).slice(0,200));
  ok('Só grava campos permitidos pelas regras', doc&&Object.keys(doc).every(k=>/^(versao|producao|manutencao|silos|estoque|pessoas|em_(producao|manutencao|silos|estoque|pessoas))$/.test(k)), Object.keys(doc||{}).join(','));
  const em1=doc.em_producao; await p.evaluate(()=>Painel.apiResumo.publicar()); await H.dorme(600); await p.evaluate(()=>window.__api_pub=1);
  await B.browser.close();
