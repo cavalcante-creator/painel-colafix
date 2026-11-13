@@ -79,6 +79,9 @@ const xml=(o)=>`<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sp
   await p.screenshot({path:(process.env.SHOTS||'/tmp')+'/rhpjpag.png',fullPage:true});
   await p.click('[data-act="pjp-fech"][data-f="f1"]'); await H.dorme(900); S=await srv(); doc=S['rh/dados/pjpag/2026-10-2'];
   ok('Fechar valor guarda o valor e os dias', doc.pes.f1.st==='fechado'&&doc.pes.f1.fech.valor===2150&&doc.pes.f1.fech.min===5808&&doc.pes.f1.fech.dias.length===16, JSON.stringify(doc.pes.f1.fech).slice(0,200));
+  { const nomes=()=>p.evaluate(()=>[...document.querySelectorAll('.pjp-t tbody tr')].map(t=>t.innerText.split('\n')[0]).join('|'));
+    await p.selectOption('#pjp-fe','fe'); await H.dorme(600); const fe=await nomes(); await p.selectOption('#pjp-fe','ab'); await H.dorme(600); const ab=await nomes(); await p.selectOption('#pjp-fe',''); await H.dorme(600);
+    ok('Filtro Fechados/Abertos (13/11): Fechados mostra só o f1 (valor fechado) e Abertos não mostra ele', fe.split('|').length===1&&!ab.includes(fe), fe+' || '+ab); }
   await p.click('[data-act="pjp-ped"][data-f="f1"]'); await H.dorme(1200); S=await srv();
   const pk=Object.keys(S).find(k=>k.startsWith('rh/dados/pjnotaped/')), ped=S[pk], tok=pk.split('/').pop();
   const wa=await p.$eval('[data-act="pjp-wa"]',a=>a.href).catch(()=>''), lk=await p.evaluate(()=>(document.querySelector('.pjp-mod .lk')||{}).textContent||'');

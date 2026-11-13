@@ -884,7 +884,7 @@
     const rsT=xs.map(f=>{ const x=(D.pes||{})[f._id]||{}; const r=x.st&&x.fech?Object.assign(calcPessoa(c,f,p,x),{min:x.fech.min,valor:x.fech.valor,bruto:x.fech.bruto,desc:x.fech.desc||0}):calcPessoa(c,f,p,x); r.ant=antDe(c,f,pAnt,DA,dadosA); return {f,x,r}; });
     const sets=[...new Set(rsT.map(({f})=>f.setor).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const nConf=rsT.filter(({x,r})=>!x.st&&r.alerta).length;
-    const rsF=rsT.filter(({f,x,r})=>(!J.emp||String(f.empresa||'').toUpperCase()===J.emp)&&(!J.set||(f.setor||'')===J.set)&&(!J.conf||(!x.st&&r.alerta))&&(!q||norm(f.nome+' '+(f.setor||'')+' '+(f.empresa||'')).includes(q)))
+    const rsF=rsT.filter(({f,x,r})=>(!J.emp||String(f.empresa||'').toUpperCase()===J.emp)&&(!J.set||(f.setor||'')===J.set)&&(!J.conf||(!x.st&&r.alerta))&&(!J.fe||(J.fe==='fe'?!!x.st:!x.st))&&(!q||norm(f.nome+' '+(f.setor||'')+' '+(f.empresa||'')).includes(q)))
       .sort((A,B)=>etIdx(A.x.st)-etIdx(B.x.st)||String(A.f.nome).localeCompare(String(B.f.nome),'pt-BR'));
     const rs=rsF.filter(({x})=>col<0||COLS[col].st.includes(x.st||''));
     const okFech=o=>!o.x.st&&(o.r.fixo||(o.r.vh&&o.r.min))&&!o.r.uPend;
@@ -969,7 +969,8 @@
         <td class="pjp-st" data-r="Situação">${situ(c,x,r,f)}</td>
         <td class="n pjp-tt" data-r="Total a pagar"><b>${R$(r.valor)}</b><small>${r.fixo?'valor fixo':n2(hDec(r.min))+' h · '+hTxt(r.min)}${r.desc?' · desconto '+R$(r.desc):''}</small>${antTxt(r)}</td>
         <td class="pjp-qa">${acoes(c,pid,f,x,r)}</td></tr>`; }).join('');
-    const filtros=J.emp||J.set||J.conf||J.q||col>=0;
+    const filtros=J.emp||J.set||J.conf||J.fe||J.q||col>=0;
+    const nAb=rsT.filter(o=>!o.x.st).length, nFe=rsT.length-nAb; /* 13/11: filtro Abertos (valor ainda não fechado) · Fechados (valor fechado, inclusive pedido, nota e pago) */
     const vazio=!xs.length?['Nenhum PJ ativo','Cadastre em Funcionários as pessoas com vínculo PJ.']:col>=0&&rsF.length?['Ninguém nesta etapa','Toque em "ver todos" para a lista inteira.']:['Nenhum PJ com esse filtro','Mude a busca ou toque em "Limpar filtros".'];
     const FI=fidInfo(c,p), icn=(n,t)=>U?U.ic(n,t||18):'', aba=J.aba||'pv';
     const fidT=FI?[FI.sub,FI.ultTxt+(FI.imp&&FI.robo?' · último CSV '+hm(FI.imp.em):'')].join(' · '):'';
@@ -1015,6 +1016,7 @@
         <div class="pjp-lt2"><label class="pjp-busca"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pjp-q" type="search" placeholder="Buscar PJ, setor ou empresa" aria-label="Buscar PJ" value="${esc(J.q)}"></label>
           <select id="pjp-emp" aria-label="Empresa"><option value="">Todas as empresas</option>${emps.map(e=>`<option value="${esc(e)}" ${J.emp===e?'selected':''}>${esc(e)}</option>`).join('')}</select>
           ${sets.length?`<select id="pjp-set" aria-label="Setor"><option value="">Todos os setores</option>${sets.map(e=>`<option ${J.set===e?'selected':''}>${esc(e)}</option>`).join('')}</select>`:''}
+          <select id="pjp-fe" aria-label="Valor fechado ou aberto"><option value="">Abertos e fechados</option><option value="ab" ${J.fe==='ab'?'selected':''}>Abertos (${nAb})</option><option value="fe" ${J.fe==='fe'?'selected':''}>Fechados (${nFe})</option></select>
           ${nConf?`<button class="pjp-chip" data-act="pjp-confx" aria-pressed="${!!J.conf}">Só com dia para conferir<b>${nConf}</b></button>`:''}
           ${filtros?`<button class="lnk" data-act="pjp-flimpa">Limpar filtros</button>`:''}</div>
         ${rs.length?`<div class="pjp-tw"><table class="pjp-t"><thead><tr><th>PJ <small>· toque no nome para ver os dias</small></th><th>Situação</th><th class="n">Total a pagar</th><th class="pjp-qa"><span class="pjp-sr">Ações</span></th></tr></thead><tbody>${linhas}</tbody>
@@ -1480,6 +1482,7 @@
         if(t.dataset.pjpFsel) M.sel[t.dataset.pjpFsel]=t.checked; else if(t.id==='pjp-fmot') M.mot=t.value; else if(t.id==='pjp-fdata') M.data=t.value||M.data; else if(t.id==='pjp-fpara'){ M.para=t.value; return; } else { M.cc=t.value; return; }
         P.render(); return; }
       if(t.id==='pjp-set'){ J.set=t.value; P.render(); return; }
+      if(t.id==='pjp-fe'){ J.fe=t.value; P.render(); return; }
       if(t.id==='pjp-sit'){ J.sit=t.value; P.render(); return; }
       if(t.dataset.pjpDia){ const f=fDe(t.dataset.f), d=t.dataset.d, x=pesDe(J.per,f._id); if(x.st) return; const aj=Object.assign({},x.aj||{}), cur=Object.assign({},aj[d]||{});
         cur[t.dataset.pjpDia]=t.value||''; if(!cur.e&&!cur.s){ aj[d]=null; } else { cur.por=C.eu(); cur.em=agora(); cur.mot=cur.mot||'corrigido à mão'; aj[d]=cur; }
@@ -1548,7 +1551,7 @@
       if(a==='pjp-dcal'){ if(b.disabled) return; const v=b.dataset.v||''; J.dsel=v; J.calAb=false; if(v) J.dk='*'; P.render(); setTimeout(()=>{ const el=v&&document.querySelector('.pjp-dl [data-pjpd="'+v+'"]'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); },60); return; }
       if(a==='pjp-dk'){ if(J.dsel||J.calAb){ J.dsel=''; J.calAb=false; J.dk=b.dataset.v; P.render(); return; } J.dk=(J.dk||'*')===b.dataset.v&&b.dataset.v!=='*'?'*':b.dataset.v; document.querySelectorAll('[data-act=pjp-dk]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===J.dk))); dFiltra(); return; }
       if(a==='pjp-confx'){ J.conf=!J.conf; P.render(); return; }
-      if(a==='pjp-flimpa'){ J.emp=''; J.set=''; J.sit='*'; J.col=-1; J.conf=false; J.q=''; P.render(); return; }
+      if(a==='pjp-flimpa'){ J.emp=''; J.set=''; J.sit='*'; J.col=-1; J.conf=false; J.fe=''; J.q=''; P.render(); return; }
       if(a==='pjp-dcor'){ J.edDia=b.dataset.d; P.render(); setTimeout(()=>{ const i=document.getElementById(document.getElementById('pjp-ce')&&!document.getElementById('pjp-ce').value?'pjp-ce':'pjp-cs'); if(i) i.focus(); },30); return; }
       if(a==='pjp-dcanc'){ J.edDia=null; P.render(); return; }
       if(a==='pjp-dsalva'||a==='pjp-dzero'){ const f=fDe(b.dataset.f), d=b.dataset.d, x=pesDe(J.per,f._id); if(x.st) return; const aj=Object.assign({},x.aj||{}), g=id=>(document.getElementById(id)||{}).value||'';
