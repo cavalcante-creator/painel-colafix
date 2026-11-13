@@ -100,8 +100,19 @@ function apiEstoque() {
   if (!rows.length) return null;
   const it = r => ({ codigo: r.c, produto: r.d || '', estoque: Math.round(r.tot || 0), ruptura: r.rup == null ? null : apiR(r.rup), pedidosEmCarteira: Math.round(r.dc || 0), linha: r.lin0 || '' });
   const g = k => rows.filter(r => typeof eswGrupo === 'function' ? eswGrupo(r) === k : false);
+  /* 13/11: previsão do mês item a item (a mesma conta de "O que precisa produzir") */
+  let prev = [], W = null; try { W = eswSemanas(); } catch (e) {}
+  const PR = {}; try { anlPrevRows(anlDados()).forEach(y => { if (W && y.cp === W.cp) PR[y.c] = y; }); } catch (e) {}
+  try { prev = rows.filter(r => !r.int && r.pvm > 0).map(r => { const o = W && typeof eswCalc === 'function' ? eswCalc(r, W) : {}; const sf = PR[r.c] ? PR[r.c].sf : null;
+    return { codigo: r.c, produto: r.d || '', linha: (r.lp || []).join(', ') || r.lin0 || '', previsaoMes: Math.round(r.pvm), estoqueNoInicioDoMes: r.pvT == null ? null : Math.round(r.pvT), produzidoNoMes: Math.round(r.pvF || 0),
+      faltaProduzir: Math.max(0, Math.round(r.pvm - (r.pvT || 0) - (r.pvF || 0))), faltaFaturar: sf == null ? null : Math.round(sf), estoqueHoje: Math.round(r.tot || 0), pedidosEmCarteira: Math.round(r.dc || 0),
+      deveriaTerAteHoje: o.dev == null ? null : Math.round(o.dev), temAteHoje: o.tem == null ? null : Math.round(o.tem), semanasAdiantadoOuAtrasado: o.pos == null ? null : apiR(o.pos) }; })
+    .sort((a, b) => (a.semanasAdiantadoOuAtrasado == null ? 99 : a.semanasAdiantadoOuAtrasado) - (b.semanasAdiantadoOuAtrasado == null ? 99 : b.semanasAdiantadoOuAtrasado)); } catch (e) { console.warn('[api] previsão', e); }
+  const soma = k => prev.reduce((a, x) => a + (+x[k] || 0), 0);
   return { agirHoje: g('hoje').slice(0, 30).map(it), estaSemana: g('semana').slice(0, 30).map(it), itens: rows.filter(r => !r.int).length,
-    explicacao: 'ruptura = dias até acabar o estoque pela venda; agirHoje = zerado com demanda ou acaba em até 1 dia; estaSemana = acaba em até 7 dias' };
+    previsaoDoMes: { mes: W ? W.cp : '', semanasJaPassadas: W ? apiR(W.s) : null, totalPrevisto: soma('previsaoMes'), totalProduzido: soma('produzidoNoMes'), totalFaltaProduzir: soma('faltaProduzir'),
+      atrasados: prev.filter(x => x.semanasAdiantadoOuAtrasado != null && x.semanasAdiantadoOuAtrasado < 0).length, itens: prev.slice(0, 250) },
+    explicacao: 'ruptura = dias até acabar o estoque pela venda; agirHoje = zerado com demanda ou acaba em até 1 dia; estaSemana = acaba em até 7 dias; previsaoDoMes = previsão do comercial do mês por item (sacos): previsto, estoque no começo do mês, produzido no mês, falta produzir (previsão − estoque do começo − produzido), deveria ter até hoje × tem até hoje, semanasAdiantadoOuAtrasado (negativo = atrasado), em ordem do mais atrasado' };
 }
 
 function apiPessoas() {

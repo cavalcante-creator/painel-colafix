@@ -27,6 +27,8 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
  const SI=(R.silos||{}).silos||[], ES=R.estoque||{}, PE=R.pessoas||{};
  ok('Silos: toneladas, capacidade e ocupação de cada silo', SI.length===2&&SI[0].silo==='Silo 1'&&SI[0].toneladas===30&&SI[0].ocupacao===50&&SI[1].material==='Areia', JSON.stringify(SI));
  ok('Estoque: item zerado com venda aparece em "agir hoje"', (ES.agirHoje||[]).some(x=>x.codigo==='AC0002'), JSON.stringify(ES).slice(0,300));
+ const PV=(ES.previsaoDoMes||{}); const PI=(PV.itens||[]).find(x=>x.codigo==='AC0002')||{};
+ ok('Estoque: previsão do mês item a item (previsto, falta produzir, deveria ter × tem)', PV.totalPrevisto>=16000&&PI.previsaoMes===16000&&PI.faltaProduzir>0&&PI.deveriaTerAteHoje!=null, JSON.stringify(PI)+' '+JSON.stringify({t:PV.totalPrevisto,f:PV.totalFaltaProduzir}));
  ok('Pessoas: números (vieram 2, chegou depois 1, férias 1)', PE.vieram===2&&PE.chegaramDepoisDoHorario===1&&PE.ferias===1, JSON.stringify(PE));
  ok('Pessoas: nomes de quem faltou (C sem registro, D férias)', JSON.stringify((PE.faltaram||[]).map(x=>x.nome+':'+x.motivo))==='["Pessoa C:Sem registro no Face ID","Pessoa D:Férias"]', JSON.stringify(PE.faltaram));
  const VL=PE.vieramLista||[]; ok('Pessoas: nomes de quem veio, com chegada, almoço e se ainda está', VL.length===2&&VL[0].nome==='Pessoa A'&&VL[0].chegada==='07:50'&&VL[0].almoco==='sim'&&VL[0].naEmpresaAgora===true&&VL[1].nome==='Pessoa B'&&VL[1].naEmpresaAgora===false&&VL[1].chegouDepoisDoHorario===true, JSON.stringify(VL));
