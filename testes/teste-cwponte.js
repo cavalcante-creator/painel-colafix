@@ -14,7 +14,7 @@ const H=require('./harness'); const {seedManut}=require('./manut-seed'); const r
   await p.evaluate(()=>{ window.open=(u)=>{ window.__abriu=(window.__abriu||[]).concat([u]); return {}; }; window.RHPJPag._J.per='2026-10-2'; window.RHPJPag._J.aba='lista'; __T.go('rhpjpag'); }); await H.dorme(2500);
   const env=await p.evaluate(()=>window.__ptEnv);
   const it=(env[0]||[]);
-  ok('Com a ponte ligada, os PJ da Zenith com CNPJ vão sozinhos para a fila (sem CPF; o sem CNPJ fica de fora)', it.length===3&&it.some(x=>x.cnpjNum==='32345678000190'&&x.email==='rui@teste.com'&&x.prestadora==='Zenith')&&!JSON.stringify(env).includes('11122233'), JSON.stringify(env).slice(0,400));
+  ok('Com a ponte ligada, os PJ da Zenith com CNPJ vão sozinhos para a fila (sem CPF; o sem CNPJ fica de fora)', it.length===3&&it.some(x=>x.cnpjNum==='32345678000190'&&x.email==='rui@teste.com'&&x.prestadora==='Zenith'&&x.funcao==='Operador'&&x.desde==='2025-01-10')&&!JSON.stringify(env).includes('11122233'), JSON.stringify(env).slice(0,400));
   await p.click('[data-act="pjp-cwabre"]'); await H.dorme(500); await p.click('[data-act="pjp-cwconv"]'); await H.dorme(600);
   const t=await p.evaluate(()=>document.querySelector('.pjp-cwm').innerText);
   ok('"Convidar os PJ" mostra "Painel ligado ao Conectwork" e a situação de cada um (pronto · na fila)', /Painel ligado ao Conectwork/.test(t)&&/pronto no Conectwork · mande o convite/.test(t)&&/na fila/.test(t), t.slice(0,700));

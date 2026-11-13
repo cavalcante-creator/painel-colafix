@@ -42,13 +42,13 @@
     async sair() { try { localStorage.removeItem(LIG); } catch (e) { /* */ } if (app) await app.auth().signOut(); },
     resultados: () => E.res,
     ouvir(fn) { fns.add(fn); return () => fns.delete(fn); },
-    /* itens: [{cnpjNum, cnpj, nome, email, tel, prestadora, prestCnpj}]; só grava o que é novo ou mudou */
+    /* itens: [{cnpjNum, cnpj, nome, email, tel, prestadora, prestCnpj, funcao, desde}]; só grava o que é novo ou mudou */
     async sincronizar(itens, quem) {
       if (!E.on || !E.resOk) return { novos: 0, mudados: 0 };
       const db = app.firestore(), ts = firebase.firestore.FieldValue.serverTimestamp(), u = app.auth().currentUser; let novos = 0, mudados = 0;
       for (const x of itens) {
-        const r = E.res[x.cnpjNum], base = { nome: x.nome, email: x.email, tel: x.tel, prestadora: x.prestadora, prestCnpj: x.prestCnpj || '' };
-        if (r && ['nome', 'email', 'tel', 'prestadora'].every(k => String(r[k] || '') === String(base[k] || ''))) continue;
+        const r = E.res[x.cnpjNum], base = { nome: x.nome, email: x.email, tel: x.tel, prestadora: x.prestadora, prestCnpj: x.prestCnpj || '', funcao: x.funcao || '', desde: x.desde || '' };
+        if (r && ['nome', 'email', 'tel', 'prestadora', 'funcao', 'desde'].every(k => String(r[k] || '') === String(base[k] || ''))) continue;
         const up = Object.assign({}, base, { enviadoPor: u.uid, enviadoPorNome: String(quem || u.email || '').slice(0, 80), em: ts, st: 'pendente' });
         if (r) { await db.doc('filamei/' + x.cnpjNum).update(up); mudados++; }
         else { await db.doc('filamei/' + x.cnpjNum).set(Object.assign({ cnpj: x.cnpj, cnpjNum: x.cnpjNum, empresaId: E.empresaId }, up)); novos++; }
