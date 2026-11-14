@@ -753,6 +753,28 @@
   function cwAuto(c){ const T=PT(); if(!T) return; if(!J.ptLig){ J.ptLig=true; try{ T.ligar(dig(((c.EMP_DOC||{}).COLAFIX||{}).cnpj)); T.ouvir(()=>{ if(J.mod&&J.mod.k==='cwconv'&&C) C.P.rerender(); if(C) cwAuto(C); }); }catch(e){} }
     const E=T.estado(); if(!E.on||!E.resOk||J.ptSinc) return; const its=cwItens(c), h=JSON.stringify(its); if(h===J.ptHash) return;
     J.ptSinc=true; T.sincronizar(its,c.eu()).then(r=>{ J.ptHash=h; if(r.novos||r.mudados) c.P.toast((r.novos?r.novos+' PJ foram':'')+(r.novos&&r.mudados?' e ':'')+(r.mudados?r.mudados+' atualizados':'')+' para a fila do Conectwork.'); }).catch(e=>{ J.ptErro=e.message||String(e); }).finally(()=>{ J.ptSinc=false; }); }
+  /* 14/11/2026 ("o painel saber o que aconteceu no Conectwork"): com o painel ligado ao Conectwork (CwPonte), lê a situação das
+     medições, das notas e dos pagamentos da quinzena e marca sozinho os passos: medição chegou (conf), nota da empresa conferida
+     (nota) e Colafix pagou a empresa (pago). Grava com por 'Conectwork (automático)' e via 'conectwork-auto'. */
+  const CW_MED={enviada:'esperando a prestadora conferir',divergencia:'com divergência',confirmada_prestadora:'conferida pela prestadora',aprovada:'aprovada',cancelada:'cancelada'};
+  const CW_ESP={aguardando_nota:'esperando a nota',nota_enviada:'a nota chegou, falta conferir',nota_ok:'nota conferida',nota_contestada:'nota contestada'};
+  const CW_TIT={aprovado:'esperando liberar',liberado:'liberado para pagar',agendado:'agendado (ainda não pago)',liquidado:'pago',baixado:'pago'};
+  const cwSitEmp=(pid,k)=>((J.cwSit||{})[pid]||{})[pid+':'+k]||null;
+  function cwSitTxt(s){ if(!s) return ''; return 'No Conectwork agora: medição '+(CW_MED[s.med.status]||s.med.status)+(s.esp?' · '+(CW_ESP[s.esp.status]||s.esp.status):'')+(s.tit?' · pagamento '+(CW_TIT[s.tit.status]||s.tit.status):''); }
+  async function cwSitAuto(c){ const T=PT(), E=T&&T.estado(); if(!E||!E.on||!T.situacao||J.cwSitBusy) return; const pid=J.per; if(!pid) return;
+    J.cwSitBusy=true;
+    try{ const r=await T.situacao([pid]); J.cwSit=Object.assign({},J.cwSit,{[pid]:r}); if(J.per!==pid) return;
+      const D=docP(pid), quem='Conectwork (automático)'; let mudou=false;
+      for(const k of Object.keys(D.cw||{})){ const s=cwSitEmp(pid,k), ja=(D.cw||{})[k]||{}; if(!s||s.med.status==='cancelada') continue;
+        if(!ja.conf){ const p=perDe(pid), v={em:agora(),por:quem,via:'conectwork-auto'}; D.cw=Object.assign({},D.cw,{[k]:Object.assign({},ja,{conf:v})}); J.docs[pid]=D;
+          await c.P.db().doc(COL+'/'+pid).set({pid,de:p.de,ate:p.ate,em:agora(),cw:{[k]:{conf:v}}},{merge:true}); mudou=true; }
+        const notaOk=(s.esp&&s.esp.status==='nota_ok')||!!s.tit;
+        if(notaOk&&!((D.cw||{})[k]||{}).nota){ await cwEmpMarca(c,k,'nota',{em:agora(),por:quem,via:'conectwork-auto'},x=>['pedido','chegou'].includes(x.st)?{st:'conferida',conf:{em:agora(),por:quem,via:'conectwork-empresa'}}:null,'Nota da '+c.titulo(k)+' para a Colafix conferida no Conectwork'); mudou=true; }
+        if(s.tit&&s.tit.liquidado&&!((docP(pid).cw||{})[k]||{}).pago){ await cwEmpMarca(c,k,'pago',{em:agora(),por:quem,data:c.P.hojeStr(),via:'conectwork-auto'},x=>x.st&&x.st!=='pago'?{st:'pago',pago:{em:agora(),por:quem,data:c.P.hojeStr(),de:x.st,via:'empresa'}}:null,'Pagamento à '+c.titulo(k)+' confirmado no Conectwork'); mudou=true; }
+      }
+      if(mudou) c.P.toast('Pagamento dos PJ atualizado com o que aconteceu no Conectwork.');
+      if(mudou||!J.cwSitVisto){ J.cwSitVisto=true; c.P.render(); }
+    }catch(e){ J.cwSitErro=e.message||String(e); } finally{ J.cwSitBusy=false; } }
   const cwSit=(c,f)=>{ const T=PT(), E=T&&T.estado(); if(!E||!E.on) return null; const r=(E.res||{})[dig(f.cnpj)]; if(!r) return {t:'vai para a fila do Conectwork',k:''};
     if(r.st==='pendente') return {t:'na fila: o Conectwork pré-cadastra quando a equipe abrir o app',k:''};
     if(r.st==='ja') return {t:'já tinha cadastro no Conectwork: ele entra com o login dele',k:'ok'};
@@ -823,11 +845,11 @@
     const pas=(ok,t,s,acao)=>`<li class="${ok?'ok':''}"><i>${ok?'✓':''}</i><div><b>${t}</b>${s?`<small>${s}</small>`:''}</div>${acao||''}</li>`;
     /* 12/11 ("aparece medição enviada mas não funcionou"): o painel não lê o Conectwork; abrir o link não é enviar. O passo 1 só fica
        feito quando a pessoa confirma "Enviei no Conectwork" (cw.<EMP>.conf); até lá, explica o que fazer e deixa abrir de novo. */
-    const cf=ja.conf;
-    if(!cf) return `<ol class="pjp-cwp"><li class="pend"><i></i><div><b>Falta enviar no Conectwork</b><small>Aberta ${esc(quando(ja.em))}${ja.por?' · '+esc(ja.por):''}, mas ainda não confirmada. No Conectwork, confira e toque em <b>Enviar</b>. Se lá aparecer "Falta registrar o contrato", toque em <b>Registrar o contrato que já existe</b> (só uma vez por empresa).</small></div>
+    const cf=ja.conf, sitL=cwSitTxt(cwSitEmp(J.per,k)), sitH=sitL?`<p class="pjp-cwsit" data-cwsit="${esc(k)}">${esc(sitL)}</p>`:'';
+    if(!cf) return sitH+`<ol class="pjp-cwp"><li class="pend"><i></i><div><b>Falta enviar no Conectwork</b><small>Aberta ${esc(quando(ja.em))}${ja.por?' · '+esc(ja.por):''}, mas ainda não confirmada. No Conectwork, confira e toque em <b>Enviar</b>. Se lá aparecer "Falta registrar o contrato", toque em <b>Registrar o contrato que já existe</b> (só uma vez por empresa).</small></div>
         <span class="pjp-ac">${btn('pjp-cwped','Abrir de novo no Conectwork',e+' data-so="f"','sec')}${btn('pjp-cwconf','Enviei no Conectwork',e,'')}</span></li>
       ${pas(false,'Nota da '+nm+' para a Colafix','depois de enviar a medição','')}${pas(false,'Colafix pagou a '+nm,'','')}</ol>`;
-    return `<ol class="pjp-cwp">${pas(true,'Medição enviada no Conectwork','confirmada '+esc(quando(cf.em))+(cf.por?' · '+esc(cf.por):''),lnk('pjp-cwconfx','não chegou? desfazer',e)+' '+lnk('pjp-cwab','ver no Conectwork',''))}
+    return sitH+`<ol class="pjp-cwp">${pas(true,'Medição enviada no Conectwork','confirmada '+esc(quando(cf.em))+(cf.por?' · '+esc(cf.por):''),lnk('pjp-cwconfx','não chegou? desfazer',e)+' '+lnk('pjp-cwab','ver no Conectwork',''))}
       ${pas(!!n,'Nota da '+nm+' para a Colafix',n?'conferida no Conectwork · '+esc(quando(n.em))+(n.por?' · '+esc(n.por):''):'a '+nm+' emite uma nota só, do valor total ('+R$(ja.total/100)+')',n?lnk('pjp-cwnotax','desfazer',e):btn('pjp-cwnota','Nota conferida',e,'sec'))}
       ${pas(!!pg,'Colafix pagou a '+nm,pg?esc(quando(pg.em))+(pg.por?' · '+esc(pg.por):''):'depois do pagamento, a '+nm+' paga cada MEI pelo Conectwork',pg?lnk('pjp-cwpagox','desfazer',e):n?btn('pjp-cwpago','Marcar pago',e,''):'')}
       ${pas(false,'Notas dos MEIs para a '+nm,'cada MEI recebe a demanda no Conectwork dele; a '+nm+' confere e paga lá','')}</ol>`; }
@@ -899,7 +921,7 @@
     if(v==null||!(v>0)) return null; return {v,de,txt:pA.txt}; }
   const difAnt=r=>{ if(!r.ant||!(r.valor>0)) return null; if(r.fd&&hojeS()<r.fd) return null; const dv=Math.round((r.valor-r.ant.v)*100)/100, pc=dv/r.ant.v; return {dv,pc,muda:Math.abs(pc)>=0.2&&Math.abs(dv)>=100}; };
   const antTxt=r=>{ const z=difAnt(r); if(!z) return ''; return `<small class="pjp-ant ${z.muda?(z.dv>0?'up':'dn'):''}" title="Quinzena passada (${r.ant.txt}): ${R$(r.ant.v)}${r.ant.de==='conta'?' · ainda não fechada, pela conta do Face ID':''}">${Math.abs(z.dv)<0.01?'igual à passada':(z.dv>0?'+ ':'− ')+R$(Math.abs(z.dv))+' vs passada'+(z.muda?' ('+(z.dv>0?'+':'−')+Math.round(Math.abs(z.pc)*100)+'%)':'')}</small>`; };
-  function render(c){ C=c; try{ cwAuto(c); }catch(e){} const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
+  function render(c){ C=c; try{ cwAuto(c); }catch(e){} try{ cwSitAuto(c); }catch(e){} const esc=c.esc, U=window.Painel&&window.Painel.ui; if(!J.per) J.per=perAtual(c); const pid=J.per, p=perDe(pid); assina(c,pid); try{ assina(c,perMove(pid,-1)); }catch(e){}
     const D=docP(pid), xs=pjs(c,p);
     const emps=[...new Set(xs.map(f=>String(f.empresa||'').toUpperCase()).filter(Boolean))].sort();
     const q=norm(J.q), ehAt=pid===perAtual(c), col=J.col==null?-1:J.col;
@@ -1114,6 +1136,7 @@
   .pjp-lc .pc-vazio{margin:8px 18px 22px}
   /* cara de app (10/11): barra com a quinzena e o Face ID, cores por etapa, quadros de número */
   .pjp-ppl{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.pjp-ppl small{color:var(--muted);font-size:12.5px}
+  .pjp-cwsit{margin:4px 0 0;font-size:12.5px;color:var(--teal-strong);font-weight:500}
   .pjp-cwp{list-style:none;margin:6px 0 12px;padding:0 0 0 4px;display:flex;flex-direction:column;gap:2px}.pjp-cwp li{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13.5px}
   .pjp-cwp li>i{width:22px;height:22px;border-radius:50%;border:2px solid var(--line,#D5DCE1);display:grid;place-items:center;font-style:normal;font-size:12px;flex:none}
   .pjp-cwp li.ok>i{background:var(--k3);border-color:var(--k3);color:#fff}.pjp-cwp li>div{flex:1;min-width:0}.pjp-cwp li small{display:block;color:var(--muted);font-size:12px}

@@ -11,7 +11,7 @@
   const LIG = 'colafix.cwPonte';
   const dig = v => String(v == null ? '' : v).replace(/\D/g, '');
   const E = { on: false, email: '', empresaId: '', empresaNome: '', erro: '', carregando: false, res: {}, resOk: false };
-  let app = null, cnpjTomador = '', unsub = null; const fns = new Set();
+  let app = null, cnpjTomador = '', unsub = null; const fns = new Set(), SIT = {};
   const avisa = () => fns.forEach(f => { try { f(E); } catch (e) { /* tela */ } });
   const apl = () => { if (app) return app; if (!window.firebase) throw new Error('Firebase não carregou.');
     app = (firebase.apps || []).find(a => a.name === 'conectwork') || firebase.initializeApp(CFG, 'conectwork');
@@ -41,6 +41,29 @@
     async google(cnpj) { cnpjTomador = dig(cnpj) || cnpjTomador; E.erro = ''; try { await apl().auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()); } catch (err) { E.erro = msgErro(err); avisa(); throw new Error(E.erro); } },
     async sair() { try { localStorage.removeItem(LIG); } catch (e) { /* */ } if (app) await app.auth().signOut(); },
     resultados: () => E.res,
+    /* 14/11/2026 ("o painel saber o que aconteceu no Conectwork"): lê as medições, os espelhos e os títulos da Colafix (quem
+       contrata) nos períodos pedidos e devolve por empresa, pela ref 'painel-rh:<período>:<EMPRESA>[:<parte>]' que o painel
+       manda. Leitura sob demanda (no máximo a cada 2 min por grupo de períodos), sem escuta ao vivo. */
+    async situacao(pids, forcar) {
+      if (!E.on || !E.empresaId || !pids || !pids.length) return {};
+      const k = pids.slice().sort().join(','), agora = Date.now();
+      if (!forcar && SIT[k] && agora - SIT[k].em < 120000) return SIT[k].r;
+      if (SIT[k] && SIT[k].p) return SIT[k].p;
+      const db = app.firestore(), q = col => db.collection(col).where('tomadorId', '==', E.empresaId).where('periodo', 'in', pids.slice(0, 10)).get();
+      const p = (async () => {
+        const [m, e, t] = await Promise.all([q('medicoes'), q('espelhos').catch(() => null), q('titulos').catch(() => null)]);
+        const esp = {}, tit = {}; if (e) e.forEach(d => { esp[d.id] = d.data(); }); if (t) t.forEach(d => { tit[d.id] = d.data(); });
+        const r = {};
+        m.forEach(d => { const x = d.data(), ref = String(x.ref || ''); if (!/^painel-rh:/.test(ref)) return;
+          const [, per, emp, parte] = ref.split(':'), chave = per + ':' + emp + (parte ? ':' + parte : '');
+          const es = esp[d.id] || null, ti = tit[d.id] || null;
+          r[chave] = { id: d.id, periodo: per, emp, parte: parte || '', med: { status: x.status, valor: x.valorCentavos || 0 },
+            esp: es ? { status: es.status, valor: es.valorCentavos || 0 } : null, tit: ti ? { status: ti.status, liquidado: ti.status === 'liquidado' || ti.status === 'baixado' } : null }; });
+        SIT[k] = { em: Date.now(), r }; return r;
+      })();
+      SIT[k] = Object.assign({}, SIT[k] || {}, { p });
+      try { return await p; } catch (err) { delete SIT[k]; throw err; }
+    },
     ouvir(fn) { fns.add(fn); return () => fns.delete(fn); },
     /* itens: [{cnpjNum, cnpj, nome, email, tel, prestadora, prestCnpj, funcao, desde}]; só grava o que é novo ou mudou */
     async sincronizar(itens, quem) {
